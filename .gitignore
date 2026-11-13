@@ -1,0 +1,8 @@
+pipeline.json
+AUDIT.md
+.pipeline/
+.work/
+.wt/
+.audits/
+.code-index/
+.notes/
