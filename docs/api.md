@@ -1,0 +1,103 @@
+# API, provisioning and enrolment guide
+
+This guide covers the core HTTP API, the skill list file format, the database and admin CLIs, and how to run the tests.
+
+## Conventions
+
+- Base address: the core listens on `core.host` and `core.port` (defaults `127.0.0.1` and `8080`).
+- Bodies are JSON unless noted. Responses are JSON unless the status is 204 (no body).
+- Every route except `POST /auth/enrol` needs `Authorization: Bearer <token>`. A missing or malformed header returns 401 `missing bearer token`. An unknown or revoked token returns 401 `invalid or revoked token`.
+- The user id always comes from the token, never from the body or the path.
+
+## Routes
+
+| Method | Path | Auth | Body | Success | Errors |
+|---|---|---|---|---|---|
+| POST | `/auth/enrol` | none | `{"code": str, "label": str}` | 200 `{"token": str, "expires_in": int}` | 401 invalid or used enrolment code |
+| GET | `/auth/me` | bearer | none | 200 `{"user_id": int, "name": str}` | 401 user no longer exists |
+| DELETE | `/auth/devices/{device_id}` | bearer | none | 204 | 404 device not found |
+| GET | `/topics` | bearer | none | 200 list of `{"id", "category", "label", "private"}` | |
+| POST | `/topics` | bearer | `{"category": str, "label": str, "private": bool = false}` | 200 `{"id", "category", "label", "private"}` | 422 on empty fields |
+| POST | `/topics/{topic_id}/aliases` | bearer | `{"alias": str}` | 200 `{"id", "topic_id", "alias", "private": true}` | 404 topic not found |
+| POST | `/import` | bearer | raw UTF-8 text, skill list format (see below) | 200 `{"created_topics": int, "marked": int}` | 422 bad line or body not UTF-8; nothing changes |
+| POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | |
+| GET | `/jobs/next` | bearer | none | 200 `{"id": int, "payload": str}` | 204 nothing queued |
+| POST | `/jobs/{job_id}/result` | bearer | `{"category": str, "topic": str}` | 204 | 404 job not found or not leased by the caller |
+| POST | `/jobs/{job_id}/fail` | bearer | none | 204 | 404 job not found or not leased by the caller |
+| GET | `/jobs/{job_id}` | bearer | none | 200 `{"status": str, "topic": {"id", "category", "label"} or null, "known": bool or null}` | 404 job not found |
+| GET | `/marks` | bearer | none | 200 list of `{"topic_id", "category", "topic", "status"}` | |
+| PUT | `/marks/{topic_id}` | bearer | `{"status": "known"}` | 200 `{"topic_id", "category", "topic", "status"}` | 404 topic not found |
+| DELETE | `/marks/{topic_id}` | bearer | none | 204 | 404 mark not found |
+
+Notes:
+
+- `GET /jobs/next` answers 204 when nothing is queued. The worker polls it; there is no push channel.
+- `known` in `GET /jobs/{job_id}` is computed from the caller's marks. The model only picks the topic.
+- A topic created with `private: false` (the default) is shared. A private topic and a private alias belong to the caller.
+
+## Skill list file format
+
+The file is UTF-8 text, one skill per line:
+
+```
+Category / Topic
+Category / Topic = Alias
+# a comment line
+```
+
+- Blank lines and lines starting with `#` are ignored.
+- Whitespace around names is trimmed.
+- An optional `= Alias` suffix after the topic adds an alias.
+- A malformed line returns 422 with the 1-based line number. An import with a malformed line changes nothing.
+
+## Provisioning
+
+### Configuration
+
+The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` environment variable, or from `--config` where the CLI accepts it. Each key can be overridden by an environment variable named in the README. The example file is `config/kata.example.toml`.
+
+The database password is not in the file. The file names an environment variable in `[database] password_env`; set that variable to the password.
+
+### Database CLI
+
+Run from the repository root with the core package on the path:
+
+```
+PYTHONPATH=core python3 scripts/db/kata_db.py create NAME
+PYTHONPATH=core python3 scripts/db/kata_db.py migrate [--name NAME]
+PYTHONPATH=core python3 scripts/db/kata_db.py drop NAME
+```
+
+- `create NAME` creates a database.
+- `migrate` applies pending migrations to the configured database, or to `--name`.
+- `drop NAME` drops a database if it exists.
+
+### Admin CLI
+
+Users exist only because an admin created them. There is no self sign-up.
+
+```
+PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME
+PYTHONPATH=core python3 -m kata_core.auth.admin enrol USER_NAME
+PYTHONPATH=core python3 -m kata_core.auth.admin revoke DEVICE_ID
+```
+
+- `create-user NAME` creates a user and prints its id.
+- `enrol USER_NAME` prints an enrolment code once. The code is not stored. The user redeems it with `POST /auth/enrol`.
+- `revoke DEVICE_ID` revokes an active device, so its token stops working.
+
+## Enrolment flow
+
+1. An admin runs `create-user` once for the person.
+2. The admin runs `enrol` for that user and passes the printed code to the person.
+3. The person's client calls `POST /auth/enrol` with the code and a device label. The code works once.
+4. The response carries the raw token once. The client stores it and sends it as `Authorization: Bearer <token>`.
+5. `DELETE /auth/devices/{device_id}` or `revoke` ends a device's access.
+
+## Tests
+
+The tests need a reachable Postgres server. The database user named in the configuration must have the `CREATEDB` privilege, because the tests create and drop their own databases. Point the tests at the server with a config file set in `KATA_CONFIG`, and set the password environment variable it names. The tests fail, and do not skip, when Postgres is unreachable.
+
+```
+KATA_CONFIG=path/to/kata.toml python3 -m pytest tests
+```

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "kata",
+  "version": "0.0.0",
+  "permissions": ["storage", "sidePanel", "activeTab"],
+  "host_permissions": ["http://127.0.0.1:8080/*"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"]
+    }
+  ],
+  "action": {},
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

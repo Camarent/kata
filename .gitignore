@@ -6,3 +6,7 @@ AUDIT.md
 .audits/
 .code-index/
 .notes/
+node_modules/
+dist/
+.vite/
+__pycache__/

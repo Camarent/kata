@@ -1,0 +1,9 @@
+{
+  "gates": [
+    {"name": "ruff", "cmd": "cs-qrun -- ruff check ."},
+    {"name": "mypy", "cmd": "cs-qrun -- mypy core"},
+    {"name": "pytest", "cmd": "cs-qrun -- python3 -m pytest tests"},
+    {"name": "extension-build", "cmd": "cs-qrun -- npm --prefix extension run build"},
+    {"name": "extension-test", "cmd": "cs-qrun -- npm --prefix extension test"}
+  ]
+}

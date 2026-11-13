@@ -1,0 +1,34 @@
+# Example kata configuration. Every key here is required in a real config file.
+# Values are synthetic placeholders. Override any key with KATA_<SECTION>_<KEY>.
+
+[core]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+host = "127.0.0.1"
+port = 5432
+name = "kata_dev"
+user = "kata_dev"
+password_env = "KATA_DATABASE_PASSWORD"
+
+[auth]
+token_ttl_seconds = 3600
+enrolment_ttl_seconds = 86400
+
+[worker]
+poll_interval_seconds = 5
+request_timeout_seconds = 30
+core_url = "http://127.0.0.1:8080"
+token_env = "KATA_WORKER_TOKEN"
+
+[jobs]
+lease_seconds = 300
+
+[model]
+base_url = "http://127.0.0.1:11434/v1"
+model_name = "local-model"
+timeout_seconds = 60
+
+[client]
+request_timeout_seconds = 30

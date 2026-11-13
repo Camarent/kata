@@ -1,0 +1,18 @@
+{
+  "name": "kata-extension",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc && npm run build:content && npm run build:sidepanel",
+    "build:content": "esbuild src/content.ts --bundle --format=iife --platform=browser --target=es2022 --outfile=dist/content.js",
+    "build:sidepanel": "esbuild src/sidepanelBoot.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/sidepanelBoot.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "esbuild": "^0.21.5",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
