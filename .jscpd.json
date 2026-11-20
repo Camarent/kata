@@ -1,0 +1,11 @@
+{
+  "path": ["core", "worker", "extension/src"],
+  "ignore": [
+    "**/tests/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "reporters": ["console", "json"],
+  "output": "reports/jscpd"
+}

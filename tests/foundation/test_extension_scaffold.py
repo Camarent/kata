@@ -32,6 +32,15 @@ def test_package_json_scripts_and_dev_dependencies():
     assert "vitest" in package["devDependencies"]
 
 
+def test_coverage_and_jscpd_are_exact_pinned_and_test_cov_exists():
+    package = _load("package.json")
+    dev = package["devDependencies"]
+    for name in ("@vitest/coverage-v8", "jscpd"):
+        assert name in dev
+        assert dev[name][0].isdigit(), f"{name} must be exact-pinned, got {dev[name]}"
+    assert package["scripts"]["test:cov"] == "vitest run --coverage"
+
+
 def test_tsconfig_is_strict_with_dist_output():
     tsconfig = _load("tsconfig.json")
     assert tsconfig["compilerOptions"]["strict"] is True

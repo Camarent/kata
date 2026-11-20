@@ -9,6 +9,8 @@ AUDIT.md
 node_modules/
 dist/
 .vite/
+extension/coverage/
+reports/jscpd/
 __pycache__/
 .venv/
 .mypy_cache/
