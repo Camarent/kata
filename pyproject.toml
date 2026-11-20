@@ -18,3 +18,7 @@ files = ["core"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["core"]
+
+[tool.vulture]
+# FastAPI calls route handlers by decorator, so nothing in code calls them.
+ignore_decorators = ["@router.*"]
