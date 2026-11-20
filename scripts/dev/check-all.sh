@@ -5,6 +5,8 @@
 #   scripts/dev/check-all.sh          full chain: ruff, mypy, pytest, extension build, extension test
 #   scripts/dev/check-all.sh --py     ruff, mypy, pytest only
 #   scripts/dev/check-all.sh --ext    extension build and test only
+#   scripts/dev/check-all.sh --setup  create .venv and extension/node_modules when missing, run nothing
+#                                     (the pipeline's worktree_setup uses it, so a new worktree starts ready)
 #   Mode flags exclude each other: a combination exits 2.
 #
 # Isolation between concurrent runs:
@@ -29,7 +31,7 @@ QRUN="${KATA_QRUN:-}"
 MODE_FLAG=""
 for arg in "$@"; do
   case "$arg" in
-    --py|--ext)
+    --py|--ext|--setup)
       if [ -n "$MODE_FLAG" ]; then
         echo "check-all: mode flags cannot be combined: $MODE_FLAG $arg" >&2
         exit 2
@@ -109,6 +111,7 @@ run_extension() {
 setup_python
 setup_extension
 case "$MODE" in
+  setup) ;;
   py)   start_postgres; run_python ;;
   ext)  run_extension ;;
   full) start_postgres; run_python; run_extension ;;
