@@ -53,7 +53,7 @@ class TopicRef(BaseModel):
 class JobStatusResponse(BaseModel):
     status: str
     topic: TopicRef | None
-    known: bool | None
+    known: bool | None  # noqa: V107 - serialised to JSON by FastAPI, no code reads it
 
 
 def _topic_ref(conn: psycopg.Connection[Any], topic_id: int) -> TopicRef:

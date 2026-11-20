@@ -27,7 +27,7 @@ class EnrolRequest(BaseModel):
 
 class EnrolResponse(BaseModel):
     token: str
-    expires_in: int
+    expires_in: int  # noqa: V107 - serialised to JSON by FastAPI, no code reads it
 
 
 class MeResponse(BaseModel):

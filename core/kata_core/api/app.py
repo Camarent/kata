@@ -8,7 +8,7 @@ from kata_core.api.routes import include_routers
 from kata_core.config import Config
 
 
-def create_app(cfg: Config) -> FastAPI:
+def create_app(cfg: Config) -> FastAPI:  # noqa: V103 - app factory, called by tests and uvicorn
     app = FastAPI()
     app.state.cfg = cfg
     include_routers(app)
