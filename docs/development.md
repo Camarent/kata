@@ -19,7 +19,9 @@ It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pi
 extension build and tests. It is safe to run in several worktrees at once: they share one
 Postgres (started under a lock, never stopped by the script; stop it with
 `scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. Flags:
-`--py` runs ruff, mypy and pytest only, `--ext` runs the extension build and tests only.
+`--py` runs ruff, mypy and pytest only, `--ext` runs the extension build and tests only, `--setup`
+only creates `.venv` and `extension/node_modules` when they are missing (no tests, no Postgres), so a
+fresh git worktree can be made ready in a couple of seconds.
 
 ## Postgres for tests
 
