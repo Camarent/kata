@@ -84,6 +84,19 @@ def test_find_topic_category_filter(conn: psycopg.Connection[Any]) -> None:
     assert find_topic(conn, user, "pasta", category="missing") is None
 
 
+def test_find_topic_alias_category_filter(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "dave")
+    lang = ensure_category(conn, "lang")
+    food = ensure_category(conn, "food")
+    lang_topic = ensure_topic(conn, lang, "noodles")
+    food_topic = ensure_topic(conn, food, "ramen")
+    add_alias(conn, lang_topic, "noodle-alias")
+    add_alias(conn, food_topic, "noodle-alias")
+    assert find_topic(conn, user, "noodle-alias", category="food") == food_topic
+    assert find_topic(conn, user, "noodle-alias", category="lang") == lang_topic
+    assert find_topic(conn, user, "noodle-alias", category="missing") is None
+
+
 def test_set_mark_on_visible_topic_and_read_back(conn: psycopg.Connection[Any]) -> None:
     alice = _user(conn, "alice")
     category = ensure_category(conn, "misc")

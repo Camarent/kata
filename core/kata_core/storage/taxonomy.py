@@ -82,28 +82,48 @@ def find_topic(
     When both a private and a shared topic match, the user's own topic wins.
     Returns None when nothing visible matches.
     """
-    category_filter = "" if category is None else "AND c.name = %s"
-    category_args: tuple[str, ...] = () if category is None else (category,)
-
-    row = conn.execute(
-        "SELECT t.id FROM topics t JOIN categories c ON c.id = t.category_id "  # nosec B608 - category_filter is a fixed clause chosen above, values go through %s
-        "WHERE lower(t.label) = lower(%s) "
-        "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) " + category_filter + " "
-        "ORDER BY (t.owner_user_id IS NULL), t.id LIMIT 1",
-        (label, user_id, *category_args),
-    ).fetchone()
+    # Each branch is a complete literal statement; no SQL is built by concatenation.
+    if category is None:
+        row = conn.execute(
+            "SELECT t.id FROM topics t JOIN categories c ON c.id = t.category_id "
+            "WHERE lower(t.label) = lower(%s) "
+            "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
+            "ORDER BY (t.owner_user_id IS NULL), t.id LIMIT 1",
+            (label, user_id),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT t.id FROM topics t JOIN categories c ON c.id = t.category_id "
+            "WHERE lower(t.label) = lower(%s) "
+            "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
+            "AND c.name = %s "
+            "ORDER BY (t.owner_user_id IS NULL), t.id LIMIT 1",
+            (label, user_id, category),
+        ).fetchone()
     if row is not None:
         return int(row[0])
 
-    row = conn.execute(
-        "SELECT t.id FROM topic_aliases a "
-        "JOIN topics t ON t.id = a.topic_id JOIN categories c ON c.id = t.category_id "
-        "WHERE lower(a.alias) = lower(%s) "
-        "AND (a.owner_user_id IS NULL OR a.owner_user_id = %s) "
-        "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) " + category_filter + " "
-        "ORDER BY (a.owner_user_id IS NULL), (t.owner_user_id IS NULL), a.id LIMIT 1",
-        (label, user_id, user_id, *category_args),
-    ).fetchone()
+    if category is None:
+        row = conn.execute(
+            "SELECT t.id FROM topic_aliases a "
+            "JOIN topics t ON t.id = a.topic_id JOIN categories c ON c.id = t.category_id "
+            "WHERE lower(a.alias) = lower(%s) "
+            "AND (a.owner_user_id IS NULL OR a.owner_user_id = %s) "
+            "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
+            "ORDER BY (a.owner_user_id IS NULL), (t.owner_user_id IS NULL), a.id LIMIT 1",
+            (label, user_id, user_id),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT t.id FROM topic_aliases a "
+            "JOIN topics t ON t.id = a.topic_id JOIN categories c ON c.id = t.category_id "
+            "WHERE lower(a.alias) = lower(%s) "
+            "AND (a.owner_user_id IS NULL OR a.owner_user_id = %s) "
+            "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
+            "AND c.name = %s "
+            "ORDER BY (a.owner_user_id IS NULL), (t.owner_user_id IS NULL), a.id LIMIT 1",
+            (label, user_id, user_id, category),
+        ).fetchone()
     return None if row is None else int(row[0])
 
 
