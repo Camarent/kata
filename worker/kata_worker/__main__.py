@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 def _stop_on_signal(stop_event: threading.Event) -> None:
-    def handler(signum: int, frame: FrameType | None) -> None:
+    def handler(_signum: int, _frame: FrameType | None) -> None:
         stop_event.set()
 
     signal.signal(signal.SIGINT, handler)
