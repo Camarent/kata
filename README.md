@@ -42,7 +42,7 @@ cannot enforce branch protection on private repositories, so the flow is by habi
 Set up a machine and run the same checks locally with [`docs/development.md`](docs/development.md):
 
 ```
-scripts/dev/check.sh              # all gates against a throwaway Postgres
+scripts/dev/check-all.sh              # all gates against a throwaway Postgres
 scripts/dev/install-hooks.sh      # privacy hooks (pre-commit, commit-msg)
 ```
 
