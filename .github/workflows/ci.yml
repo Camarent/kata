@@ -1,0 +1,93 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: kata_dev
+          POSTGRES_DB: kata_dev
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U kata_dev -d kata_dev"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      KATA_CONFIG: config/kata.example.toml
+      KATA_DATABASE_PORT: "54329"
+      KATA_DATABASE_USER: kata_dev
+      KATA_DATABASE_NAME: kata_dev
+      KATA_DATABASE_PASSWORD: unused-with-trust-auth
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: Python environment
+        run: |
+          uv venv .venv
+          python3 - > requirements-ci.txt <<'PY'
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              d = tomllib.load(f)
+          print("\n".join(d["project"]["dependencies"] + d["dependency-groups"]["dev"]))
+          PY
+          uv pip install --python .venv/bin/python -r requirements-ci.txt
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/mypy core
+      - run: npm --prefix extension ci
+      - run: .venv/bin/python -m pytest tests
+      - run: npm --prefix extension run build
+      - run: npm --prefix extension test
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks over the full history
+        env:
+          GITLEAKS_VERSION: 8.21.2
+        run: |
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --source . --no-banner --redact
+
+  privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: personal-address blocklist
+        env:
+          PRIVACY_BLOCKLIST: ${{ secrets.PRIVACY_BLOCKLIST }}
+        run: |
+          if [ -z "$PRIVACY_BLOCKLIST" ]; then
+            echo "::notice::PRIVACY_BLOCKLIST secret not set, check skipped"
+            exit 0
+          fi
+          rc=0
+          if git grep -lIiE "$PRIVACY_BLOCKLIST"; then
+            echo "::error::blocklisted pattern found in the files listed above"
+            rc=1
+          fi
+          if git log --all --format='%an %ae %cn %ce%n%B' | grep -qiE "$PRIVACY_BLOCKLIST"; then
+            echo "::error::blocklisted pattern found in git history (authors or messages)"
+            rc=1
+          fi
+          exit $rc
