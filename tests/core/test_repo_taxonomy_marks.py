@@ -7,7 +7,6 @@ from typing import Any
 
 import psycopg
 import pytest
-from conftest import ScratchDatabase
 from kata_core.storage.marks import clear_mark, get_marks, is_known, set_mark
 from kata_core.storage.taxonomy import (
     add_alias,
@@ -16,6 +15,7 @@ from kata_core.storage.taxonomy import (
     find_topic,
     list_topics,
 )
+from support.scratch_db import ScratchDatabase
 
 
 @pytest.fixture

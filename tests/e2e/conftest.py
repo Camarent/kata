@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -173,6 +174,8 @@ def running_worker(
 @pytest.fixture
 def driver_js(tmp_path: Path) -> Path:
     """Bundle driver.ts with esbuild; jsdom stays inside the bundle."""
+    if shutil.which("node") is None or not ESBUILD.exists():
+        pytest.fail("e2e tests need node on PATH and `npm ci` run in extension/ (see docs/development.md)")
     out = tmp_path / "driver.mjs"
     # jsdom cannot be bundled as ESM, so it stays external; node resolves it from
     # tmp_path/node_modules, a symlink to the extension's installed modules.

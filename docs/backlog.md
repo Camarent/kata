@@ -17,12 +17,16 @@ Project items after Milestone 0.
       `uv lock` and pinned versions.
 - [ ] Style nits: three `nosec` lines longer than 100 columns; `MarkSink` vs
       `Pick<CoreClient>`.
-- [ ] A combined `pytest tests/core tests/worker` run once gave 11 collection errors (each
-      directory passes alone). Check that `pytest tests` collects cleanly.
+- [x] Combined pytest run collected badly: three `conftest.py` files shadowed each other
+      (`from conftest import ...`). Fixed by moving the shared helper to `tests/support`.
 - [ ] Decide whether to track a copy of the project instructions file and the audit tool list,
       which are currently excluded from git.
 - [ ] Embeddings, cloud model path, concept-level marks and the guided screen are out of scope
       until later milestones (see [`roadmap.md`](roadmap.md)).
-- [ ] Reproducible Postgres test setup (roles, port, config generated from
-      `config/kata.example.toml`) as a script or documented commands.
-- [ ] Remove hard-coded paths and ports (extension default base URL and host permission).
+- [x] Reproducible Postgres test setup: `scripts/dev/pg.sh`, see [`development.md`](development.md).
+- [ ] The extension manifest allows only `http://127.0.0.1:8080/*`, so a core reached over a VPN
+      or another port needs a manifest change (request the host permission at sign-in).
+- [ ] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have;
+      `scripts/dev/check.sh` runs the same gates with plain commands.
+- [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
+      token lifetime; fixed, but check new tests for fixed dates.

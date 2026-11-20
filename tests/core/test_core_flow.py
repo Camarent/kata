@@ -5,13 +5,13 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from conftest import ScratchDatabase
 from fastapi.testclient import TestClient
 from kata_core.api.app import create_app
 from kata_core.auth.admin import run
 from kata_core.config import Config
+from support.scratch_db import ScratchDatabase
 
-NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
+NOW = datetime.now(UTC)  # the API checks tokens against the real clock
 PATH_PARAM = re.compile(r"\{[^}]+\}")
 
 

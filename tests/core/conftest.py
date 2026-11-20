@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -14,27 +16,11 @@ from kata_core.api.deps import get_conn
 from kata_core.config import Config, load_config
 from kata_core.storage.provision import connect, create_database, drop_database, migrate
 
-# Names of every test database created in this run, for leak checks in test modules.
-CREATED_DB_NAMES: list[str] = []
+TESTS_DIR = Path(__file__).resolve().parents[1]
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
-
-class ScratchDatabase:
-    """A migrated database that tests connect to; closed and dropped at teardown."""
-
-    def __init__(self, cfg: Config, name: str) -> None:
-        self.cfg = cfg
-        self.name = name
-        self._conns: list[psycopg.Connection[Any]] = []
-
-    def connect(self) -> psycopg.Connection[Any]:
-        conn = connect(self.cfg, self.name)
-        self._conns.append(conn)
-        return conn
-
-    def close(self) -> None:
-        for conn in self._conns:
-            conn.close()
-        self._conns.clear()
+from support.scratch_db import CREATED_DB_NAMES, ScratchDatabase
 
 
 @pytest.fixture(scope="session")

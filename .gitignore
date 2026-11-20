@@ -10,3 +10,8 @@ node_modules/
 dist/
 .vite/
 __pycache__/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.pyc

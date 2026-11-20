@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import psycopg
-from conftest import ScratchDatabase
 from kata_core.jobs.queue import claim_next, complete, enqueue, fail, get_job
+from support.scratch_db import ScratchDatabase
 
 T0 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
 LEASE_SECONDS = 60
