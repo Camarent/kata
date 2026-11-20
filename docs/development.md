@@ -11,12 +11,15 @@ Everything below works from a clean clone. Nothing depends on files from another
 ## One command
 
 ```
-scripts/dev/check.sh
+scripts/dev/check-all.sh
 ```
 
 It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), runs
 `npm ci` in `extension/`, starts a throwaway Postgres, runs ruff, mypy, pytest and the
-extension build and tests, and stops Postgres again. Set `KATA_KEEP_PG=1` to leave it running.
+extension build and tests. It is safe to run in several worktrees at once: they share one
+Postgres (started under a lock, never stopped by the script; stop it with
+`scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. Flags:
+`--py` runs ruff, mypy and pytest only, `--ext` runs the extension build and tests only.
 
 ## Postgres for tests
 
