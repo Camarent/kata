@@ -12,4 +12,4 @@
 | End-to-end tests | [`e2e.md`](e2e.md) |
 | Code map (generated) | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`INDEX.md`](INDEX.md), [`modules/`](modules/) |
 
-Research and benchmarks follow in a later change under `research/`.
+Research: [`research/`](research/).

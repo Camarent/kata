@@ -36,7 +36,7 @@ test the foundation, so it waits for a later milestone.
 - Chat subscriptions and APIs are billed separately; subscription tokens must not be used in
   application code. The application uses API keys through its adapters.
 - The cloud provider is chosen with tests on the real tasks and the provider research
-  (to follow under `research/`); the adapters keep this a
+  ([`research/benchmarks`](research/benchmarks)); the adapters keep this a
   configuration change.
 
 ## Secret scanner
@@ -60,7 +60,7 @@ Choose models per task, not globally:
   parallel slots.
 - Retrieval for lesson checks passes the top entries, not the whole base.
 
-Benchmarks and method will be added under `research/`.
+Benchmarks and method: [`research/benchmarks`](research/benchmarks).
 
 ## Resolved design decisions
 

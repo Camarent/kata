@@ -33,7 +33,7 @@ embeddings with hybrid retrieval over the learner's knowledge base, retrieval-ba
 check, a guided initial review screen.
 
 **Success criteria.** Three-state lookup accuracy and abstain behaviour measured on the
-benchmark suite (to follow under `research/`); whole-lesson scan card within
+benchmark suite ([`research/benchmarks`](research/benchmarks)); whole-lesson scan card within
 30 seconds.
 
 ## Milestone 3: cloud path and cost control
