@@ -1,0 +1,12 @@
+#!/bin/sh
+# Patterns come from `git config privacy.blocklist` (extended regex, case-insensitive).
+PATTERNS=$(git config --get-all privacy.blocklist)
+if [ -z "$PATTERNS" ]; then
+  echo "privacy hook: no privacy.blocklist configured, check skipped" >&2; exit 0
+fi
+if printf '%s %s' "$(git var GIT_AUTHOR_IDENT)" "$(git var GIT_COMMITTER_IDENT)" | grep -qiE "$PATTERNS"; then
+  echo "pre-commit: personal email in author/committer identity; use the noreply address" >&2; exit 1
+fi
+if git diff --cached -U0 | grep '^+' | grep -v '^+++' | grep -qiE "$PATTERNS"; then
+  echo "pre-commit: staged content contains the personal address" >&2; exit 1
+fi

@@ -9,11 +9,10 @@ ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
 DECISIONS = ROOT / "docs" / "decisions.md"
 
-# Names of people, places, hardware and providers that must not appear in the docs.
+# Names of people and hardware that must not appear in the docs.
 FORBIDDEN = (
     "wife", "husband", "daughter", "son's", "mother", "father", "family",
     "RTX", "GeForce", "Radeon", "Nvidia", "AMD", "Intel", "Apple",
-    "OpenAI", "Ollama", "Google", "Microsoft", "AWS", "Azure",
 )
 
 

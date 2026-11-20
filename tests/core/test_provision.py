@@ -11,7 +11,6 @@ from typing import Any
 
 import psycopg
 import pytest
-from conftest import CREATED_DB_NAMES, ScratchDatabase
 from kata_core.config import Config, ConfigError
 from kata_core.storage.provision import (
     MIGRATION_GLOB,
@@ -23,6 +22,7 @@ from kata_core.storage.provision import (
     migrate,
 )
 from psycopg import sql
+from support.scratch_db import CREATED_DB_NAMES, ScratchDatabase
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_TABLES = {

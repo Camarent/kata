@@ -30,3 +30,23 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
+
+## Development workflow
+
+`master` is the only long-lived branch. Work happens on a short-lived branch, goes through a
+pull request, and is squash-merged once the GitHub `ci` workflow is green: `checks` (ruff,
+mypy, pytest against a Postgres service, extension build and tests), `secrets` (gitleaks over
+the full history) and `privacy` (a blocklist check of files and history). GitHub's free plan
+cannot enforce branch protection on private repositories, so the flow is by habit.
+
+Set up a machine and run the same checks locally with [`docs/development.md`](docs/development.md):
+
+```
+scripts/dev/check.sh              # all gates against a throwaway Postgres
+scripts/dev/install-hooks.sh      # privacy hooks (pre-commit, commit-msg)
+```
+
+The privacy hooks and the CI `privacy` job read a regex of personal strings. Keep it out of
+the repository: `git config --global --add privacy.blocklist '<regex>'` locally, and the same
+regex as the repository secret `PRIVACY_BLOCKLIST` for CI. Use the GitHub noreply address as
+your git identity. Documentation lives in [`docs/`](docs/README.md).

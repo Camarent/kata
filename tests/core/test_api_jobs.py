@@ -7,15 +7,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psycopg
-from conftest import ScratchDatabase
 from fastapi.testclient import TestClient
 from kata_core.api.deps import get_conn
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
 from kata_core.storage.marks import set_mark
 from kata_core.storage.users import create_user
+from support.scratch_db import ScratchDatabase
 
-NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
+NOW = datetime.now(UTC)  # the API checks tokens against the real clock
 
 
 def _user_token(client: TestClient, db: ScratchDatabase, cfg: Config, name: str) -> dict[str, str]:

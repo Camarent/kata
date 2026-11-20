@@ -7,11 +7,11 @@ from typing import Any
 
 import psycopg
 import pytest
-from conftest import ScratchDatabase
 from kata_core.importer import skill_list
 from kata_core.importer.skill_list import ParseError, import_list, parse
 from kata_core.storage.marks import get_marks, set_mark
 from kata_core.storage.taxonomy import ensure_category, ensure_topic
+from support.scratch_db import ScratchDatabase
 
 # Synthetic list: no real course names.
 GOOD_LIST = """\

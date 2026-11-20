@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import ScratchDatabase
 from kata_core.auth.admin import AdminError, run
 from kata_core.auth.service import (
     AuthContext,
@@ -18,6 +17,7 @@ from kata_core.auth.service import (
 )
 from kata_core.config import Config
 from kata_core.storage.users import create_user
+from support.scratch_db import ScratchDatabase
 
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 

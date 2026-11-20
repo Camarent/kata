@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from conftest import ScratchDatabase
 from kata_core.storage.devices import add_device, find_by_token_hash, list_devices, revoke_device
 from kata_core.storage.users import (
     consume_enrolment,
@@ -14,6 +13,7 @@ from kata_core.storage.users import (
     get_user,
     list_users,
 )
+from support.scratch_db import ScratchDatabase
 
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 
