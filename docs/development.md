@@ -23,6 +23,31 @@ Postgres (started under a lock, never stopped by the script; stop it with
 only creates `.venv` and `extension/node_modules` when they are missing (no tests, no Postgres), so a
 fresh git worktree can be made ready in a couple of seconds.
 
+### Output of the full run
+
+- pytest runs with coverage (`--cov=core --cov=worker`): a term table per package is printed into
+  the log, with a `TOTAL` line at the end.
+- The extension tests run as `npm run test:cov` (vitest with coverage): a table per file, with the
+  totals for statements, branches, functions and lines at the end.
+- After the extension tests, the jscpd duplication report prints a clone summary per format
+  (python, sql, typescript) and a `Total` row with the duplicated-line percentage. It is report
+  only: it has no threshold, and its exit code is ignored, so a finding never turns the gate red.
+- The gate stops at the first red step; a failing pytest run means the extension steps and the
+  jscpd report do not run.
+
+## Coverage baseline
+
+Recorded 2026-11-20 at git commit `b0ae863`, from the output of the run above.
+
+| Measure | Total |
+|---|---|
+| Python (`core` and `worker`, pytest-cov, `TOTAL` line) | 90% (867 statements, 84 missed) |
+| Extension (vitest coverage, lines) | 93.87% (322 of 343) |
+| Extension (vitest coverage, statements) | 90% (351 of 390) |
+| Duplicate code (jscpd, all formats, duplicated lines) | 0.41% (11 of 2715 lines) |
+
+No coverage floor is enforced yet: the numbers above are a record, not a threshold.
+
 ## Postgres for tests
 
 ```

@@ -6,11 +6,14 @@
     "build": "tsc && npm run build:content && npm run build:sidepanel",
     "build:content": "esbuild src/content.ts --bundle --format=iife --platform=browser --target=es2022 --outfile=dist/content.js",
     "build:sidepanel": "esbuild src/sidepanelBoot.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/sidepanelBoot.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",
+    "@vitest/coverage-v8": "5.1.0",
     "esbuild": "^0.21.5",
+    "jscpd": "5.4.3",
     "jsdom": "^31.0.1",
     "typescript": "^5.0.0",
     "vitest": "^5.1.0"

@@ -8,9 +8,10 @@ Project items after Milestone 0.
       real sign-in and "I know this" against a running core). Milestone 0 only checked the
       panel with stubs.
 - [ ] Side panel: check dark-theme contrast and keyboard focus and tab order.
-- [ ] Coverage: add vitest coverage for the extension and pytest-cov for core and worker,
-      record a baseline, add a duplicate-code check. The extension needs a coverage
-      dependency vetted first.
+- [x] Coverage: vitest coverage for the extension, pytest-cov for core and worker, a
+      recorded baseline and a jscpd duplicate-code report (report only, see
+      [`development.md`](development.md)). Still open: a coverage floor (a minimum percentage
+      that fails the gate), not yet decided.
 - [ ] Narrow the `<all_urls>` content-script permission in `extension/manifest.json` before
       any publish.
 - [ ] Python dependencies are pinned with `==` and there is no lock file; decide between
