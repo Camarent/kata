@@ -6,7 +6,7 @@ summary: Tagging worker (Python) - pulls queued blocks from the core, asks a loc
 
 ## Purpose
 Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends its text to an OpenAI-style chat model, and posts `result` or `fail` back to the core. The worker never decides known/new; the core does.
-`worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, a cloud policy (`Policy`) and a secret guard (`guarded`) that scans cloud text. The loop still tags through `ModelAdapter`; nothing routes through `Policy` or `guarded` yet.
+`worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, a cloud policy (`Policy`) and a secret guard (`guarded`) that scans cloud text. `providers/cost.py` adds a daily cost cap (`capped`) for cloud calls, with spend kept on the core. The loop still tags through `ModelAdapter`; nothing routes through `Policy`, `guarded` or `capped` yet.
 
 ## Public surface
 - `worker/kata_worker/__main__.py:28` `main` - entry for `python -m kata_worker`; runs until SIGINT or SIGTERM (`:20` `_stop_on_signal`).
@@ -23,6 +23,10 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `worker/kata_worker/providers/policy.py:43` `Policy` - `from_config(config)` (`:50`), `allows(provider, task_class) -> bool` (`:61`); `PolicyError` at `:19`; `PROVIDER_NAMES` at `:16`.
 - `worker/kata_worker/providers/scanner.py:45` `scan(text) -> list[Finding]` - secret findings ordered by offset; `Finding(kind, offset)` at `:15`; fixed `RULES` at `:29`.
 - `worker/kata_worker/providers/guard.py:56` `guarded(inner, audit) -> GuardedProvider` - the only way to build a guarded provider; `GuardedProvider` at `:37` (`complete` at `:46`); `SecretBlocked(ProviderError)` at `:29`; `AuditEvent(kind, offset)` at `:19`; `AuditSink` at `:26`.
+- `worker/kata_worker/providers/cost.py:68` `CappedProvider(inner, ledger, model, cap, warn, log)` - `complete` at `:89`; built by `capped` (`:105`) from `[cost]`.
+- `worker/kata_worker/providers/cost.py:43` `Ledger` (Protocol) - `record_usage(micro_usd)` (`:46`), `usage_today() -> int` (`:48`); `CoreClient` implements it (`worker/kata_worker/core_client.py:110`, `:116`).
+- `worker/kata_worker/providers/cost.py:54` `estimate_tokens(text) -> int`; `:59` `cost_micro_usd(model, in_text, out_text) -> int` (integer micro-USD, rounded up).
+- `worker/kata_worker/providers/cost.py:20` `PRICES` - pinned `(input, output)` micro-USD per 1M tokens, keyed by model name; `:29` `PricingError(ProviderError)`; `:33` `CapReached(ProviderError)` with `spent` and `cap`.
 - `worker/kata_worker/providers/__init__.py:7` `__all__` - re-exports `TASK_CLASSES`, `GuardedProvider`, `LocalProvider`, `Provider`, `ProviderError`, `SecretBlocked`, `guarded` only (`AnthropicProvider`, `Policy` and `scan` are imported from their modules).
 
 ## Key files
@@ -35,6 +39,7 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `worker/kata_worker/providers/policy.py` - which provider may run which task class.
 - `worker/kata_worker/providers/scanner.py` - secret rules and `scan`; returns kind and offset only.
 - `worker/kata_worker/providers/guard.py` - `GuardedProvider`: scans system and user text of cloud calls before the inner provider runs.
+- `worker/kata_worker/providers/cost.py` - `CappedProvider`: daily cap check before a cloud call, spend recorded after it.
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
@@ -50,10 +55,17 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - Guard: a cloud provider's call is scanned; any finding means the inner provider is not called, one `AuditEvent` per finding, then `SecretBlocked` (`worker/kata_worker/providers/guard.py:46-53`). Local providers pass unscanned. No flag or config skips the scan.
 - Findings and errors hold rule kind and offset only, never the matched text (`worker/kata_worker/providers/scanner.py:3`, `worker/kata_worker/providers/guard.py:20`).
 - Scanner rules: `high_entropy` needs a token of 20 or more `[A-Za-z0-9+/_=-]` characters with entropy of at least 4.0 bits (`worker/kata_worker/providers/scanner.py:27`, `:34`, `:58`); a match overlapping an earlier rule's match is dropped (`:56`), so rule order in `RULES` matters.
+- Cost cap applies only to cloud providers; a local provider passes through with no ledger access (`worker/kata_worker/providers/cost.py:90-91`).
+- An unpriced model raises `PricingError` before any cloud call (`worker/kata_worker/providers/cost.py:93`); prices live in `PRICES` (`:20`), not in config.
+- The cap is checked before the call: `CapReached` when today's spend is at or over `cap_micro_usd` (`worker/kata_worker/providers/cost.py:95-96`). Spend is recorded after the call, so one call may overshoot the cap by its own cost (`:98`).
+- Cost is estimated from text: ceil(chars / 4) tokens per side, priced in integer micro-USD, rounded up (`worker/kata_worker/providers/cost.py:54-65`). The input side is `system + user`, the output side is the reply.
+- The warn level writes one log line and does not block calls (`worker/kata_worker/providers/cost.py:100-101`).
+- Cost errors name amounts or the model only, never prompt or reply text (`worker/kata_worker/providers/cost.py:34-37`).
 
 ## Depends on / used by
 - Depends on: `core/` (`kata_core.config.Config`) for settings; the core HTTP API (`/jobs/next`, `/jobs/{id}/result`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
 - Providers: `kata_worker.model` (`CHAT_PATH`, `ModelError`, `reply_content`) used by `providers/local.py`; Anthropic Messages API at `[provider_anthropic] base_url` (`/v1/messages`).
-- Provider config: `[providers]` `cloud_enabled` (`config/kata.example.toml:49`); `[provider_local]` `task_classes` (`:52`); `[provider_anthropic]` `allow_cloud` (`:55`), `task_classes` (`:56`), `api_key_env` (`:59`).
+- Provider config: `[providers]` `cloud_enabled` (`config/kata.example.toml:53`); `[provider_local]` `task_classes` (`:56`); `[provider_anthropic]` `allow_cloud` (`:59`), `task_classes` (`:60`), `api_key_env` (`:63`).
+- Cost config: `[cost]` `cap_micro_usd` and `warn_micro_usd` (`config/kata.example.toml:49-50`); spend goes to the core `POST /usage` and is read from `GET /usage` (`docs/api.md`).
 - Config keys: `[worker]` `poll_interval_seconds`, `request_timeout_seconds`, `core_url`, `token_env`; `[model]` `base_url`, `model_name`, `timeout_seconds` (`config/kata.example.toml:19`, `:28`). Env overrides follow the config module (`KATA_*`).
 - Used by: `tests/worker/`, and `tests/e2e/conftest.py:143` `running_worker` (`kata_worker.loop.run_forever` in a thread).

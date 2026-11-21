@@ -33,6 +33,8 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | PUT | `/concepts/{concept_id}/mark` | bearer | `{"state": "known" \| "learning" \| "new", "evidence": str = ""}` | 200 `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | 404 concept not found; 422 unknown state |
 | DELETE | `/concepts/{concept_id}/mark` | bearer | none | 204 | 404 mark not found |
 | POST | `/lesson-check` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"results": [{"concept_id", "label", "state", "source", "evidence"}]}`, in input order | 404 a concept is not visible to the caller (nothing partial); 422 empty or non-integer list |
+| POST | `/usage` | bearer | `{"micro_usd": int}` (>= 0) | 204 | 422 negative or non-integer `micro_usd` |
+| GET | `/usage` | bearer | none | 200 `{"day": "YYYY-MM-DD", "micro_usd": int, "calls": int}` (UTC day) | zeros when nothing recorded |
 
 Notes:
 
