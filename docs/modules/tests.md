@@ -31,6 +31,10 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_a11y.py:22` `test_signin_tab_order_and_focus_indicator` - keyboard tab order and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py:90` `test_panel_signin_dark_theme_contrast` - dark-theme contrast; `:72` `contrast_ratio`.
 - `tests/browser/panel_page.py:25` `panel_url`, `:31` `open_panel`, `:39` `force_dark_scheme` - shared panel helpers.
+- `tests/core/test_policy_engine.py` - policy engine: nudge and stop thresholds (`:44`, `:56`), stop-then-nudge (`:67`), quiet mark (`:115`), rate limit (`:144`, `:155`), late events (`:171`, `:183`), user isolation (`:200`).
+- `tests/core/test_journal_store.py` - journal write, paging with no overlap or gap (`:47`), newest first (`:65`), user isolation (`:72`), limit clamp (`:86`), cascade on user delete (`:93`).
+- `tests/core/test_api_journal.py` - `GET /v1/journal` over HTTP: 401 without token (`:36`), three pages (`:47`), item shape (`:72`), two-token isolation (`:82`), limit 422 (`:90`).
+- `tests/foundation/test_core_config_keys.py:48`, `:54`, `:61` - `[policy]` example keys: bool and positive int, missing key raises `ConfigError`.
 - `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
 - `tests/worker/test_cost.py` - cost estimate in integer micro-USD from pinned prices.
 - `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.

@@ -42,6 +42,12 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/retrieval/retriever.py:22` `Hit`, `:29` `Retriever`, `:43` `from_config(conn, cfg)` (reads `[retrieval] rrf_k` `:47` and `candidate_limit` `:48`), `:51` `search(user_id, query, limit)`, `:72` `_vector_ranking` (cosine in Python over visible entries of the same `embedder.name`).
 
 - `core/kata_core/egress/scanner.py:45` `scan(text) -> list[Finding]` - secret rules; findings hold rule kind and offset only; `Finding` at `:15`, `RULES` at `:29`. Used by the worker guard.
+- `core/kata_core/api/routes/journal.py:34` `GET /v1/journal` (`list_journal`, `:35`; `limit` default 50, `before_id`); response `JournalPageOut` `:29`, items `JournalItemOut` `:22`.
+- `core/kata_core/journal/store.py:28` `write_entry(conn, user_id, kind, detail, at) -> id`; `:45` `read_page(conn, user_id, limit, before_id)`; `:21` `JournalEntry`; `:16-17` `MIN_PAGE_LIMIT` 1, `MAX_PAGE_LIMIT` 200.
+- `core/migrations/0005_journal.sql` table `journal_entry` `:4` (`id` bigserial, `user_id` cascade, `kind`, `detail` jsonb, `created_at`); index `:12` on `(user_id, id DESC)`.
+- `core/kata_core/policy/engine.py:60` `Policy` - in-memory per-user decisions; `:61` `__init__(config, clock)`, `:69` `from_config(cfg, clock)`, `:72` `observe(user_id, event_kind, at) -> list[Decision]`. Event kinds `EventKind` `:21` (`error`, `ok`, `idle`); decision kinds `DecisionKind` `:22` (`quiet_mark`, `nudge`, `stop`).
+- `core/kata_core/policy/engine.py:26` `PolicyConfig` (frozen; fields from `[policy]`), `:38` `from_config`; `:53` `Decision` (`kind`, `user_id`, `at`, `detail`).
+- No non-test caller of `kata_core.policy` or `write_entry` exists yet: no route or worker feeds events into `Policy` (grep, this run).
 
 ## Key files
 - `core/kata_core/egress/scanner.py` - secret scanner rules (shared by worker guard).
@@ -53,6 +59,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/storage/provision.py` - create/drop DB, apply migrations.
 - `core/kata_core/api/routes/usage.py` and `core/kata_core/storage/usage.py` - per-user daily spend (micro-USD) and call count.
 - `core/migrations/0004_usage.sql` - `usage_daily`.
+- `core/migrations/0005_journal.sql` - `journal_entry`.
+- `core/kata_core/journal/store.py` and `api/routes/journal.py` - per-user journal, paged newest first.
+- `core/kata_core/policy/engine.py` - pure policy decisions (nudge, stop, quiet mark) from error and idle events; config `[policy]`.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
@@ -79,6 +88,14 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Lesson check reads `[lesson_check]` (`min_score`, `known_hits`, `search_limit`) and `[retrieval]` (through `Retriever.from_config`); every query filters by `user_id`.
 - Usage is per user per day in UTC: `usage_daily` is keyed by `(user_id, day)` and money is integer micro-USD; the route takes the day from the server clock (`core/kata_core/api/routes/usage.py:36`, `:43`), never from the client.
 - `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`).
+- Journal reads page by id: `before_id` is the id of the last item of the previous page; pages never overlap or skip (`core/kata_core/journal/store.py:45`). `limit` is validated 1..200 by the route (422) and clamped again in the store.
+- Journal `user_id` comes from the token (`core/kata_core/api/routes/journal.py:42`); rows cascade on user delete (`core/migrations/0005_journal.sql:6`).
+- `write_entry` takes `at` from the caller; the store does not set `created_at` (`core/kata_core/journal/store.py:33`).
+- `Policy` state lives in process memory only: restart forgets error windows, last-seen times and rate limits (`core/kata_core/policy/engine.py:61-66`).
+- Policy order: stop is checked first and, when it fires, only the stop is returned; a rate-limited stop has not fired, so the nudge may still fire (`core/kata_core/policy/engine.py:95-101`).
+- Policy events older than `late_event_seconds` before the clock are dropped with no state change (`core/kata_core/policy/engine.py:73-75`).
+- Policy rate limit is per user and per decision kind (`core/kata_core/policy/engine.py:116-119`). A quiet mark needs prior activity; idle with no earlier `ok`/`error` gives nothing (`core/kata_core/policy/engine.py:106-107`).
+- Unknown event kind raises `ValueError` (`core/kata_core/policy/engine.py:83`).
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.

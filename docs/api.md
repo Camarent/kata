@@ -35,6 +35,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/lesson-check` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"results": [{"concept_id", "label", "state", "source", "evidence"}]}`, in input order | 404 a concept is not visible to the caller (nothing partial); 422 empty or non-integer list |
 | POST | `/usage` | bearer | `{"micro_usd": int}` (>= 0) | 204 | 422 negative or non-integer `micro_usd` |
 | GET | `/usage` | bearer | none | 200 `{"day": "YYYY-MM-DD", "micro_usd": int, "calls": int}` (UTC day) | zeros when nothing recorded |
+| GET | `/v1/journal?limit=50&before_id=N` | bearer | query: `limit` 1..200 (default 50), `before_id` optional | 200 `{"items": [{"id", "kind", "detail", "created_at"}], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..200; `next_before_id` is null unless the page is full |
 
 Notes:
 
