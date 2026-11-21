@@ -1,0 +1,29 @@
+{
+  "entries": [
+    {"source_ref": "note:1", "body": "Photosynthesis converts light energy into chemical energy in chloroplasts. The Calvin cycle fixes carbon dioxide."},
+    {"source_ref": "note:2", "body": "Mitochondria produce ATP through cellular respiration. Glycolysis happens in the cytoplasm."},
+    {"source_ref": "note:3", "body": "Enzymes lower activation energy. The substrate binds to the active site of the enzyme."},
+    {"source_ref": "note:4", "body": "Osmosis moves water across a semipermeable membrane toward higher solute concentration."},
+    {"source_ref": "note:5", "body": "Plate tectonics explains earthquakes and volcanic arcs at plate boundaries."},
+    {"source_ref": "note:6", "body": "Mendel's pea experiments established dominant allele and recessive allele patterns."}
+  ],
+  "concepts": [
+    {"label": "Photosynthesis", "expected": "known", "mark": null},
+    {"label": "Calvin cycle", "expected": "learning", "mark": null},
+    {"label": "Mitochondria", "expected": "known", "mark": null},
+    {"label": "Glycolysis", "expected": "learning", "mark": null},
+    {"label": "Enzymes", "expected": "known", "mark": null},
+    {"label": "Active site", "expected": "learning", "mark": null},
+    {"label": "Osmosis", "expected": "known", "mark": null},
+    {"label": "Semipermeable membrane", "expected": "learning", "mark": null},
+    {"label": "Plate tectonics", "expected": "known", "mark": null},
+    {"label": "Dominant allele", "expected": "learning", "mark": null},
+    {"label": "Recessive allele", "expected": "known", "mark": "known"},
+    {"label": "Covalent bond", "expected": "learning", "mark": "learning"},
+    {"label": "Gradient descent", "expected": "new", "mark": "new"},
+    {"label": "Cellular respiration", "expected": "new", "mark": "new"},
+    {"label": "Quantum tunneling", "expected": "abstain", "mark": null},
+    {"label": "Mitosis", "expected": "abstain", "mark": null},
+    {"label": "Neural networks", "expected": "abstain", "mark": null}
+  ]
+}
