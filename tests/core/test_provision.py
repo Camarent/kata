@@ -41,6 +41,10 @@ SCHEMA_TABLES = {
     "journal_entry",
     "event",
     "message",
+    "course",
+    "course_file",
+    "course_artifact",
+    "course_item_map",
 }
 
 
