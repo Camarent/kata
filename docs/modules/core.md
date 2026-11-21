@@ -40,6 +40,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/retrieval/fusion.py:6` `rrf(rankings, k)` - reciprocal rank fusion, an item at rank r scores `1 / (k + r)`.
 - `core/kata_core/retrieval/store.py:16` `add_entry(...)` (stores body, embedding and `embedder.name`), `:35` `keyword_search(conn, user_id, query, limit)` (`websearch_to_tsquery('simple', ...)`, `:44-46`).
 - `core/kata_core/retrieval/retriever.py:22` `Hit`, `:29` `Retriever`, `:43` `from_config(conn, cfg)` (reads `[retrieval] rrf_k` `:47` and `candidate_limit` `:48`), `:51` `search(user_id, query, limit)`, `:72` `_vector_ranking` (cosine in Python over visible entries of the same `embedder.name`).
+- `core/kata_core/api/routes/mcp.py:26` `POST /mcp` (`mcp_post`; scope check via `MCP_SCOPE` `:22`; 204 for a notification); `authenticate` at `:35`.
+- `core/kata_core/mcp/rpc.py:58` `handle(conn, cfg, user_id, message, at)` - answers one decoded message, None for a notification; `:88` `handle_text`; `:29` `TOOLS` (`tools/list` payload); `:19` `PROTOCOL_VERSION`; error codes `:24-27`.
+- `core/kata_core/mcp/tools.py:38` `kata_search(conn, cfg, user_id, query, limit, at)` (limit clamped 1..10, `:22-23`); `:53` `kata_concept_state(conn, user_id, concept, at)`; `:70` `_finish` (gate, then journal).
+- `core/kata_core/mcp/gate.py:45` `gate(text) -> GateResult(allowed, text, reason)`; `:40` `safe_concept_name`; `:22` `MAX_RESULT_BYTES` 4096.
 
 - `core/kata_core/egress/scanner.py:45` `scan(text) -> list[Finding]` - secret rules; findings hold rule kind and offset only; `Finding` at `:15`, `RULES` at `:29`. Used by the worker guard.
 - `core/kata_core/api/routes/journal.py:34` `GET /v1/journal` (`list_journal`, `:35`; `limit` default 50, `before_id`); response `JournalPageOut` `:29`, items `JournalItemOut` `:22`.
@@ -76,6 +80,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
 - `core/kata_core/lesson_check/checker.py` - per-concept known/learning/abstain rule (`check_lesson`); route in `api/routes/lesson_check.py`.
+- `core/kata_core/mcp/` and `core/kata_core/api/routes/mcp.py` - MCP server: raw JSON-RPC 2.0 (`rpc.py`), two read tools (`tools.py`), egress gate on every tool result (`gate.py`). Contract in `docs/api.md` (MCP).
 - `core/kata_core/retrieval/` - hybrid retrieval: `embedder.py` (embedder interface, fake and model embedders), `fusion.py` (RRF), `store.py` (entry writes and keyword search), `retriever.py` (keyword plus vector ranks fused).
 
 ## Invariants and gotchas
@@ -110,8 +115,13 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Event `user_id` and `device_id` come from the token (`core/kata_core/api/routes/events.py:118`); `event_id` is unique per user, not globally (`core/migrations/0006_events.sql:14`).
 - Messages are delivered once: `deliver_pending` sets `delivered_at`; rows locked by a concurrent delivery are skipped (`core/kata_core/delivery/messages.py:48`).
 - `POST /v1/events` returns the caller's pending messages in its response (piggyback); `GET /v1/messages` returns and marks them the same way (`core/kata_core/api/routes/events.py:100`, `:130`).
+- MCP gate order is fixed: size first (UTF-8 bytes, `surrogatepass`, `core/kata_core/mcp/gate.py:48`), then secret scan (`:50`); no flag skips it (`core/kata_core/mcp/gate.py:7-9`, critique F33).
+- A blocked MCP result has empty text and a reason naming the rule only (`size` or `secret:<kind>`), never the matched text (`core/kata_core/mcp/gate.py:49`, `:52`); it writes one `egress_block` journal entry (`core/kata_core/mcp/tools.py:81`) and the tool result is `isError: true`.
+- Bad tool arguments raise `InvalidParams` -> `-32602` (`core/kata_core/mcp/rpc.py:83-84`); unknown methods `-32601` (`:82`); batches and malformed messages `-32600` (`:69`, `:74`). Tool errors from the gate are normal results, not JSON-RPC errors.
+- MCP tools write the journal, so the caller commits the connection (`core/kata_core/mcp/tools.py:5`).
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.
 - Events: `events/` and `delivery/` use `policy` (`Policy.observe`) and `journal/store.py` (`write_entry`); `api/routes/events.py` wires them.
+- MCP depends on: `egress/scanner.py` (`scan`), `journal/store.py` (`write_entry`), `retrieval/retriever.py` (`Retriever`), `storage/concepts.py` (`list_concept_marks_detail`), `auth/service.py` (`authenticate`, scope `mcp`).
 - Used by: `tests/core/` (API and repository tests), `scripts/db/kata_db.py` (provisioning). Model worker client: TODO(verify), not found in repo.
