@@ -36,6 +36,8 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/usage` | bearer | `{"micro_usd": int}` (>= 0) | 204 | 422 negative or non-integer `micro_usd` |
 | GET | `/usage` | bearer | none | 200 `{"day": "YYYY-MM-DD", "micro_usd": int, "calls": int}` (UTC day) | zeros when nothing recorded |
 | GET | `/v1/journal?limit=50&before_id=N` | bearer | query: `limit` 1..200 (default 50), `before_id` optional | 200 `{"items": [{"id", "kind", "detail", "created_at"}], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..200; `next_before_id` is null unless the page is full |
+| POST | `/v1/events` | bearer | `{"events": [raw event, ...]}` (at most 100, see Events) | 200 `{"results": [{"event_id", "status", "reason"}], "messages": [message, ...]}`, results in input order | 422 more than 100 events or body not in that shape; a bad event is reported in `results` and never fails the batch |
+| GET | `/v1/messages` | bearer | none | 200 `{"messages": [message, ...]}`, oldest first, at most 50 | |
 
 Notes:
 
@@ -45,6 +47,32 @@ Notes:
 - Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.
 - A concept made through `POST /concepts` belongs to its creator. A repeated label under the same topic and owner hits the unique index; the route does not map that error to a 4xx yet.
 - `POST /lesson-check` gives the state of each concept for the caller. `state` is `known`, `learning` or `abstain` from retrieval; a caller's mark gives its own state, which may be `new`. Retrieval never gives `new`: it cannot prove absence. `source` is `mark` when the caller's concept mark decides; then `evidence` is the mark's text. Otherwise `source` is `retrieval` and `evidence` is a list of `{"source_ref", "score"}` hits. An abstain has `source` `none` and `evidence` `[]`. The user id comes from the token, never from the body.
+
+## Events and messages
+
+`POST /v1/events` ingests a batch of device events. `GET /v1/messages` returns the caller's pending messages on their own. The user and device ids come from the token, never from the body.
+
+Batch: `events` is a list of at most 100 raw events. A longer list returns 422. Each raw event is an object with these fields:
+
+- `event_id`: string, 1 to 64 characters. The pair (user, `event_id`) is unique.
+- `type`: string. Known types are `terminal.command`, `terminal.error` and `editor.<name>` (a non-empty name after `editor.`).
+- `occurred_at`: ISO 8601 string with a time zone offset.
+- `payload`: JSON object.
+
+Each event gets one result, in input order: `{"event_id", "status", "reason"}`. `event_id` is null when the raw event has no string `event_id`. `reason` appears only for `rejected`.
+
+- `accepted`: the event is stored and goes to the policy.
+- `duplicate`: the (user, `event_id`) pair is already stored. The payload is ignored; nothing is inserted.
+- `rejected`: the event is refused. The checks run in this order, and the first failure is the reason:
+  - `bad_envelope`: the raw event is not an object, a field is missing or has the wrong type, `event_id` length is outside 1..64, or `occurred_at` is not ISO 8601 with an offset.
+  - `unknown_type`: `type` is not a known type.
+  - `clock_skew`: `occurred_at` is more than `MAX_FUTURE_SKEW_SECONDS` 300 seconds after the server time. An event older than the server time is accepted here; the policy decides whether late events count.
+
+Only accepted events reach the policy. Its decisions are queued as messages for the caller. A message has this shape: `{"id": int, "kind", "body": {"at": ISO 8601, "detail": object}, "created_at": ISO 8601}`. Decision kinds are `quiet_mark`, `nudge` and `stop`.
+
+Piggyback: the `messages` in the `POST /v1/events` response are the caller's pending messages, delivered in that same response after the batch is ingested.
+
+Delivery is at-most-once. Each message is returned once: when it is returned, its `delivered_at` is set, and it is never sent again. `GET /v1/messages` and the piggyback both take up to 50 pending messages, oldest first. For each delivered message the server writes one journal entry of kind `message_delivered` with detail `{"message_id", "kind"}`; `GET /v1/journal` shows these entries.
 
 ## Skill list file format
 
