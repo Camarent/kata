@@ -160,3 +160,31 @@ Runs on the owner's machine inside a git checkout. The device package `kata_devi
 - Depends on `kata_core.egress.scanner` (`core/kata_core/egress/scanner.py:45` `scan`; the one rule set, shared with the worker and the MCP gate). Stdlib otherwise.
 - Used by git (the hooks) and, once built, by the `kata` entry point. No caller in `worker/` or `core/kata_core/`.
 - Tests: `tests/device/` (one file per command module; gitutil and marker are covered through the hook tests).
+
+## Terminal tool (`core/kata_term/`)
+
+### Purpose
+`kata term` runs the owner's shell inside a PTY, records each typed command line (masked) and the error kinds seen in the output, and sends them as `terminal.command` and `terminal.error` events to `POST /v1/events`. It runs only when the owner starts it. SSH capture is not proven (`docs/decisions.md`, `docs/open-questions.md`).
+
+### Public surface
+Env names: `KATA_URL` (core base URL), `KATA_TOKEN` (device token), `KATA_TERM_MASKS` (path of the private mask list; default `~/.config/kata/term-masks`). Also read: `KATA_TERM_ACTIVE` (set in the child shell), `SHELL`, `XDG_STATE_HOME`.
+- `core/kata_term/cli.py` `main` - entry point; `default_spool_path` gives `<state>/kata/term-spool.jsonl`.
+- `core/kata_term/session.py` `run_session` - PTY relay; line buffer feeds `on_command`, an output scan feeds `on_error` with a kind.
+- `core/kata_term/mask.py` `load_masks`, `mask_command`, `default_mask_path`, `BUILTIN_PATTERNS`, `MASK_TOKEN`.
+- `core/kata_term/spool.py` `append`, `read_all`, `rewrite_without` - JSONL spool.
+- `core/kata_term/client.py` `build_event`, `post_batch`, `ClientError` - stdlib `urllib` batch post.
+
+### Key files
+- `core/kata_term/cli.py` - wiring: mask, spool, flush after each command and at exit, print `nudge` and `stop` messages.
+- `core/kata_term/session.py` - PTY child and line capture.
+- `core/kata_term/mask.py`, `spool.py`, `client.py` - one concern each.
+
+### Invariants and gotchas
+- The error signal is a kind only; no output text is stored or sent.
+- Masking runs before the spool write. The mask list and load errors are never logged or printed.
+- The spool is flushed at least once per event; the server dedupes by `event_id`, so a retry is safe.
+- A failed post keeps events spooled; the session continues silently.
+
+### Depends on / used by
+- Stdlib only (no `kata_core` import). Talks to `POST /v1/events`.
+- Tests: `tests/term/`.

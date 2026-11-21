@@ -284,3 +284,31 @@ Decided 2026-11-21. A passing pre-commit writes the staged tree hash to `<git_di
 ## Installer never overwrites a hook or core.hooksPath
 
 Decided 2026-11-21. `python -m kata_device hooks install` (`core/kata_device/hooks.py`; the `kata` entry point is not built yet) writes `pre-commit` and `post-commit` only when neither file exists or the existing file carries its own marker line, and `core.hooksPath` is unset. Otherwise it prints the two command lines for the owner to add by hand and writes nothing. Reason: a hook the owner wrote, or a shared `core.hooksPath`, must not be replaced silently.
+
+## kata term is opt-in and explicit
+
+Decided 2026-11-21. Capture happens only while the owner runs `kata term`. There is no shell hook, no auto-start and no change to the shell rc files. Reason: the owner must know when typing is recorded, and leaving the session ends capture.
+
+## kata term uses a PTY and captures lines, not a shell hook
+
+Decided 2026-11-21. `core/kata_term/session.py` runs the shell in a PTY and reads the typed line buffer and the output stream. Reason: it works with any shell and needs no install into the user's shell config.
+
+## kata term error signal is a kind only
+
+Decided 2026-11-21. Output is scanned for known error patterns and only a kind is emitted (`terminal.error`). Output text is never stored or sent. Reason: output can hold secrets and code.
+
+## kata term mask list is private and never logged
+
+Decided 2026-11-21. Command text is masked before the spool write with built-in patterns plus a private list outside the repo (`KATA_TERM_MASKS`, default `~/.config/kata/term-masks`). Nothing logs the text, the patterns or a load error; a bad list is skipped. Reason: the list itself can reveal secrets, and the repo holds no personal data.
+
+## kata term spool is JSONL with at-least-once flush
+
+Decided 2026-11-21. Events go to a JSONL spool first and are flushed in batches after each command and at exit; sent ids are removed only after the server settles them. The server dedupes by `event_id`. Reason: the tool works offline, and a retry after a crash or failed post never double counts.
+
+## kata term client uses stdlib urllib
+
+Decided 2026-11-21. `core/kata_term/client.py` posts with `urllib`. Reason: the tool must run with no installed dependency.
+
+## kata term SSH capture is not proven
+
+Decided 2026-11-21. This phase does not prove capture over SSH. `docs/open-questions.md` item 7 stays open. Reason: no SSH test exists; claiming it would be unverified.
