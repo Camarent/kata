@@ -31,9 +31,9 @@ def test_package_json_scripts_and_dev_dependencies():
     package = _load("package.json")
     assert package["private"] is True
     assert package["version"] == "0.0.0"
-    assert package["scripts"]["build"] == "tsc && npm run build:content && npm run build:sidepanel"
-    assert package["scripts"]["build:sidepanel"].startswith("esbuild src/sidepanelBoot.ts --bundle --format=esm")
-    assert package["scripts"]["build:content"].startswith("esbuild src/content.ts --bundle --format=iife")
+    assert package["scripts"]["build"] == "tsc --noEmit && node build/build.mjs"
+    assert "build:content" not in package["scripts"]
+    assert "build:sidepanel" not in package["scripts"]
     assert package["scripts"]["test"] == "vitest run"
     assert "typescript" in package["devDependencies"]
     assert "esbuild" in package["devDependencies"]
