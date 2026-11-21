@@ -66,6 +66,14 @@ The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` en
 
 The database password is not in the file. The file names an environment variable in `[database] password_env`; set that variable to the password.
 
+### Core server
+
+Run from the repository root with the core package on the path. The server listens on the `[core]` `host` and `port`:
+
+```
+PYTHONPATH=core python3 -m kata_core
+```
+
 ### Database CLI
 
 Run from the repository root with the core package on the path:

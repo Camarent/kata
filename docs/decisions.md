@@ -148,3 +148,11 @@ A retrieval hit counts as evidence only when its fused RRF score is at least `[l
 ## Lesson check: worker job not wired into loop.py yet
 
 The worker has a `lesson_check` job (`worker/kata_worker/lesson_check.py`) and `CoreClient.lesson_check`, but `worker/kata_worker/loop.py` does not dispatch it yet. Until it does, only the `POST /lesson-check` route runs lesson checks.
+
+## Model config key is `model_name`
+
+The `[model]` section names its model with `model_name` (`config/kata.example.toml:30`). That is the canonical key: the example config, the config tests (`tests/foundation/test_config.py:61`, `:65`, `:86`) and the worker model code all use it. A second spelling would be read by nothing, so config keys must use `model_name` only. `[retrieval]` also has a `model_name` key for the embedder (`config/kata.example.toml:38`); it is a separate section and the same name.
+
+## Core entrypoint runs uvicorn on `[core]` host and port
+
+`python -m kata_core` (`core/kata_core/__main__.py:19-31`) loads the config from `KATA_CONFIG` and calls `uvicorn.run` with `[core] host` and `[core] port`. Signal handling (SIGINT, SIGTERM) is left to uvicorn, so the entrypoint adds no signal code of its own. Run the core with `python -m kata_core`, not with a bare uvicorn command, so the host and port come from config.
