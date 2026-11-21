@@ -9,7 +9,8 @@
 #   scripts/dev/check-all.sh --py     ruff, mypy, pytest (with coverage) only: the Python part of the
 #                                     full run, without the -m filter
 #   scripts/dev/check-all.sh --merge  pytest -m 'not e2e' (with coverage), extension build and test
-#   scripts/dev/check-all.sh --ext    extension build and test (with coverage) only
+#   scripts/dev/check-all.sh --ext    extension build and test (with coverage) only; also the editor
+#   scripts/dev/check-all.sh --editor editor build and test (with coverage) only
 #   scripts/dev/check-all.sh --browser  browser tests (tests/browser, -m browser) through selenium.
 #                                     Needs scripts/dev/install-browsers.sh; without it the step
 #                                     prints a skip line and exits 0. No Postgres.
@@ -43,7 +44,7 @@ QRUN="${KATA_QRUN:-}"
 MODE_FLAG=""
 for arg in "$@"; do
   case "$arg" in
-    --unit|--py|--merge|--ext|--setup|--browser)
+    --unit|--py|--merge|--ext|--editor|--setup|--browser)
       if [ -n "$MODE_FLAG" ]; then
         echo "check-all: mode flags cannot be combined: $MODE_FLAG $arg" >&2
         exit 2
@@ -102,6 +103,10 @@ setup_extension() {
   [ -d extension/node_modules ] || npm --prefix extension ci --no-audit --no-fund
 }
 
+setup_editor() {
+  [ -d editor/node_modules ] || npm --prefix editor ci --no-audit --no-fund
+}
+
 # One shared server for every worktree. The lock stops two runs from running initdb together.
 start_postgres() {
   local state="${XDG_STATE_HOME:-$HOME/.local/state}/kata"
@@ -138,6 +143,11 @@ run_extension() {
   step extension-test npm --prefix extension run test:cov
 }
 
+run_editor() {
+  step editor-build npm --prefix editor run build
+  step editor-test npm --prefix editor run test:cov
+}
+
 # Browser tests need Firefox and geckodriver from install-browsers.sh. Without them: skip, exit 0.
 run_browser() {
   local dir
@@ -158,13 +168,15 @@ run_reports() {
 
 setup_python
 setup_extension
+setup_editor
 case "$MODE" in
   setup) ;;
   unit)  run_lint; run_tests -m 'not integration and not e2e and not smoke and not browser' ;;
   py)    start_postgres; run_python ;;
-  merge) start_postgres; run_tests -m 'not e2e and not browser'; run_extension ;;
-  ext)   run_extension ;;
+  merge) start_postgres; run_tests -m 'not e2e and not browser'; run_extension; run_editor ;;
+  ext)   run_extension; run_editor ;;
+  editor) run_editor ;;
   browser) run_browser ;;
-  full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky and not browser'; run_extension; run_reports ;;
+  full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky and not browser'; run_extension; run_editor; run_reports ;;
 esac
 echo "CHECK-ALL OK ($MODE)"
