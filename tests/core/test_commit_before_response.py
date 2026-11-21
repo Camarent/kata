@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psycopg
-import pytest
 from fastapi.testclient import TestClient
 from kata_core.api.app import create_app
 from kata_core.api.deps import get_conn
@@ -55,7 +54,6 @@ def _recording_conn(
     return _conn
 
 
-@pytest.mark.xfail(strict=True, reason="API commit runs after the response has started")
 def test_commit_lands_before_response_starts(db: ScratchDatabase, cfg: Config) -> None:
     events: list[str] = []
     app = create_app(cfg)

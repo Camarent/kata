@@ -35,7 +35,7 @@ def get_authenticator() -> Authenticator:
 
 
 def current_user(
-    conn: Annotated[psycopg.Connection[Any], Depends(get_conn)],
+    conn: Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")],
     authenticator: Annotated[Authenticator, Depends(get_authenticator)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthContext:

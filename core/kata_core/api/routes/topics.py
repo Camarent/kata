@@ -23,7 +23,7 @@ from kata_core.storage.taxonomy import (
 
 router = APIRouter(prefix="/topics")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn)]
+Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 Caller = Annotated[AuthContext, Depends(current_user)]
 
 

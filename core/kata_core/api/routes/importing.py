@@ -14,7 +14,7 @@ from kata_core.importer.skill_list import ParseError, import_list
 
 router = APIRouter(prefix="/import")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn)]
+Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 
 
 class ImportResponse(BaseModel):

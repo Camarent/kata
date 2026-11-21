@@ -17,7 +17,7 @@ from kata_core.storage.marks import clear_mark, list_marks_detail, set_mark
 
 router = APIRouter(prefix="/marks")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn)]
+Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 Caller = Annotated[AuthContext, Depends(current_user)]
 
 

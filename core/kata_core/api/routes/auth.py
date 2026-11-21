@@ -17,7 +17,7 @@ from kata_core.storage.users import get_user
 
 router = APIRouter(prefix="/auth")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn)]
+Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 
 
 class EnrolRequest(BaseModel):
