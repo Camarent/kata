@@ -46,6 +46,7 @@ SCHEMA_TABLES = {
     "course_artifact",
     "course_item_map",
     "trainer_progress",
+    "trainer_progress_doc",
     "trainer_evidence",
     "concept_mastery",
 }
