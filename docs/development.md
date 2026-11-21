@@ -68,9 +68,9 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
 - `--merge`: pytest `-m 'not e2e'` with coverage, then the extension build and tests.
 - `--ext`: extension build and tests only.
 
-`tools/gates.json` lists the same gates as the full chain (ruff, mypy, pytest, extension build,
-extension test), each as a command wrapped in `cs-qrun`. Its pytest step has no `-m 'not flaky'`
-filter. It is the pipeline's gate list; on a clean clone, run `check-all.sh`.
+`tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
+`-m 'not flaky'`, extension build, extension test), each as a plain command with no `cs-qrun`
+wrapper. The pipeline runs `check-all` through `cs-qrun`; on a clean clone, run `check-all.sh`.
 
 ## Coverage baseline
 

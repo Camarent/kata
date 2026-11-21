@@ -27,10 +27,8 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 - Extension: `extension/manifest.json` loads `dist/background.js` (service worker), `dist/content.js` and `sidepanel.html`; built by `npm run build` in `extension/`.
 
 ## Build and test commands
-From `tools/gates.json` (also `pipeline.json`):
-- `cs-qrun -- ruff check .`
-- `cs-qrun -- mypy core`
-- `cs-qrun -- python3 -m pytest tests`
+From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
+`pipeline.json` runs `cs-qrun -- scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (tsc, then two esbuild bundles), `npm test` (vitest run). Node install: TODO(verify).

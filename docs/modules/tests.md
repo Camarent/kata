@@ -14,7 +14,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/conftest.py:73` `db` fixture, `:91` `client` fixture (FastAPI TestClient).
 - `tests/e2e/conftest.py:65` `live_core` (core on uvicorn, 127.0.0.1, scratch DB), `:92` `enrolled`, `:118` `issue_code`, `:131` `fake_model`, `:142` `running_worker`, `:174` `driver_js` (esbuild bundle of `tests/e2e/driver.ts`), `:200` `run_driver`.
 - `tests/e2e/test_lesson_round_trip.py:34` `test_lesson_round_trip` - scan, tag, "I know this", read back on a second device.
-- `tests/foundation/test_gates.py` `load_gates` - reads `tools/gates.json`; asserts every `cmd` runs through `cs-qrun`.
+- `tests/foundation/test_gates.py:18` `load_gates` - reads `tools/gates.json`; `test_no_cmd_runs_through_qrun` (`:45`) asserts no `cmd` runs through `cs-qrun`.
 - `tests/foundation/test_docs.py` - README config table covers every example key; decisions text; no personal or provider names in docs.
 
 ## Key files
@@ -33,7 +33,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - The DB user needs `CREATEDB`; tests create and drop their own databases.
 - Every test cleans up its databases; `no_leaked_test_databases` (`tests/core/conftest.py:61`) checks for leftovers.
 - E2e tests need Node and `npm install` in `extension/` (esbuild, jsdom); they fail, not skip, when a prerequisite is missing (`docs/e2e.md`).
-- Run: `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests` (`docs/api.md`); gate form `cs-qrun -- python3 -m pytest tests` (`tools/gates.json`).
+- Run: `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests` (`docs/api.md`); gate cmd `.venv/bin/python -m pytest tests ...` with coverage and `-m 'not flaky'` (`tools/gates.json:6`).
 
 ## Depends on / used by
 - Depends on: `core/` (`kata_core`), `worker/` (`kata_worker`), `config/kata.example.toml`, `tools/gates.json`, `docs/`, `extension/`.

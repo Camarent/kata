@@ -1,26 +1,29 @@
 ---
 paths: [tools/]
-summary: Quality gate definitions (ruff, mypy, pytest) run through cs-qrun
+summary: Quality gate definitions (ruff, mypy, smoke, pytest, extension build and test) as plain commands
 ---
 # tools
 
 ## Purpose
-Declares the repo's quality gates. Each gate runs a command through `cs-qrun`. `pipeline.json` lists the same gates.
+Declares the repo's quality gates. Each gate is a plain command with no `cs-qrun` wrapper and mirrors the full `scripts/dev/check-all.sh` chain. `pipeline.json` does not read this file; it runs one gate, `check-all`, through `cs-qrun`.
 
 ## Public surface
-- `tools/gates.json` - top-level key `gates`; list of `{name, cmd}`:
-  - `ruff` - `cs-qrun -- ruff check .`
-  - `mypy` - `cs-qrun -- mypy core`
-  - `pytest` - `cs-qrun -- python3 -m pytest tests`
+- `tools/gates.json` - top-level key `gates` (`tools/gates.json:2`); list of `{name, cmd}`:
+  - `ruff` - `.venv/bin/ruff check .` (`tools/gates.json:3`)
+  - `mypy` - `.venv/bin/mypy core` (`tools/gates.json:4`)
+  - `smoke` - `.venv/bin/python -m pytest tests -m smoke` (`tools/gates.json:5`)
+  - `pytest` - `.venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term -m 'not flaky'` (`tools/gates.json:6`)
+  - `extension-build` - `npm --prefix extension run build` (`tools/gates.json:7`)
+  - `extension-test` - `npm --prefix extension run test:cov` (`tools/gates.json:8`)
 
 ## Key files
 - `tools/gates.json` - the only file. Gate names are checked exactly by `tests/foundation/test_gates.py`.
 
 ## Invariants and gotchas
 - Gate names are exact (`test_entry_names_are_exact`); renaming breaks the test.
-- Every `cmd` must start with `cs-qrun --` (`test_every_cmd_runs_through_qrun`).
+- No `cmd` may contain `cs-qrun` (`test_no_cmd_runs_through_qrun`, `tests/foundation/test_gates.py:45`); the expected list lives in `EXPECTED_GATES` (`tests/foundation/test_gates.py:7`), so change both together.
 - Lint and type config live in `pyproject.toml` (`[tool.ruff]` line length 100; `[tool.mypy]` strict on `core`).
 
 ## Depends on / used by
-- Depends on: `cs-qrun`, ruff, mypy, pytest (installed tools; versions TODO(verify)).
-- Used by: `tests/foundation/test_gates.py`; the pipeline gate runner.
+- Depends on: `.venv` tools (ruff, mypy, pytest), npm in `extension/` (versions TODO(verify)).
+- Used by: `tests/foundation/test_gates.py`. Not read by `pipeline.json`.

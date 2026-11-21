@@ -29,7 +29,7 @@ Project items after Milestone 0.
       or another port needs a manifest change (request the host permission at sign-in).
 - [x] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have.
       Closed: `scripts/dev/check-all.sh` is the clean-clone gate with plain commands;
-      `gates.json` keeps the wrapper for the pipeline runner (see
+      `gates.json` now has plain commands too; `pipeline.json` runs `check-all` through `cs-qrun` (see
       [`development.md`](development.md)).
 - [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
       token lifetime; fixed, but check new tests for fixed dates.
