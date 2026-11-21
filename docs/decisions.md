@@ -217,3 +217,20 @@ Decided 2026-11-21. Spend is kept in table `usage_daily`, keyed by (user_id, day
 ## Routing uses one provider chain per task class, with no implicit local fallback
 
 Decided 2026-11-21. `[routing]` in `config/kata.example.toml` lists one comma-ordered chain per task class; `worker/kata_worker/providers/router.py` `Router.route` tries them in order and the first reply wins. A provider the chain does not list is never called, so local is a fallback only when the chain names it (`tests/worker/test_router.py:152`). Each cloud provider is wrapped as `guarded(capped(inner))`: the secret guard runs before the cost cap, so a blocked text never reads the ledger or reaches the API. Task classes stay `tag`, `explain`, `summary` and `batch`. `lesson_check` is not a task class: it is a synchronous core call since phase 01, and no worker job runs it. Reason: the chain makes the order of providers visible in config, and the wrap order keeps secret text out of the spend path. Limit: a chain of only cloud providers fails the job when the cap or the guard refuses, with no local answer.
+
+## Secret scanner has no bypass
+
+Decided 2026-11-21. `worker/kata_worker/providers/guard.py` wraps every cloud provider as `GuardedProvider`. It scans the system and the user text of each cloud completion, and a finding blocks the call before the inner provider runs. No flag, config key or env var skips the scan; `tests/worker/test_scanner_guard.py` checks that `guarded` has no skip parameter (`test_guarded_has_no_skip_parameter`) and walks every provider module with `pkgutil.walk_packages` (`test_cloud_provider_classes_are_not_exposed_outside_guard`), so a cloud class reachable outside the guard fails the test. Local providers pass through unscanned by design. Reason: a bypass switch would let secret text leave the machine with no audit event. Limit: the walk covers modules under `worker/kata_worker/providers`; a cloud client built in another package is not seen by that test.
+
+## Secret scanner lives in core egress
+
+Decided 2026-11-21. The scanner rule set moves to `core/kata_core/egress/scanner.py`, so the worker, the later MCP server and the pre-commit check share one rule set instead of copies. Reason: one place to fix a pattern, and one test suite for it. Limit: the move is a code change tracked in task-1 of this stage; until it lands, the scanner is still in `worker/kata_worker/providers/scanner.py`.
+
+## M3 leftovers for M4
+
+Checked 2026-11-21 against `docs/backlog.md` open items. Items that block M4:
+
+- Anthropic wire format is untested live: `tests/worker/test_providers.py` uses an httpx mock transport only. M4 needs an opt-in live check before relying on the format.
+- Config keys: `[cost]` `cap_micro_usd` and `warn_micro_usd` in `config/kata.example.toml` are example values, and the price table is unverified. Set real values before M4 uses the cap.
+
+Items that do not block M4 and stay in the backlog: the real-provider run on a PC, the non-atomic cost check-then-record, and `POST /usage` trusting client-reported `micro_usd`. Note: the last two are cost-path risks, so review them before any multi-user use.

@@ -43,3 +43,12 @@ Project items after Milestone 0.
       [`development.md`](development.md)).
 - [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
       token lifetime; fixed, but check new tests for fixed dates.
+- [ ] Cost cap check-then-record is not atomic: `CappedProvider.complete` in
+      `worker/kata_worker/providers/cost.py` reads `usage_today()`, calls the provider, then
+      records. Two concurrent calls can both pass the check before either records, so the
+      cap can overshoot by more than one call. The store write itself (`add_usage` in
+      `core/kata_core/storage/usage.py`) is an upsert.
+- [ ] `POST /usage` trusts client-reported `micro_usd`: `core/kata_core/api/routes/usage.py`
+      adds the value with no server-side price check, so a client can under-report spend.
+      Decide whether the server prices the call or the cap stays advisory (see
+      [`decisions.md`](decisions.md)).
