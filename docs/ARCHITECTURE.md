@@ -27,7 +27,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
 - Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:65` `main`), run with `PYTHONPATH=core`.
 - DB CLI: `python3 scripts/db/kata_db.py` (`scripts/db/kata_db.py:35` `main`), run with `PYTHONPATH=core`.
-- Extension: `extension/manifest.json` loads `dist/background.js` (service worker), `dist/content.js` and `sidepanel.html`; built by `npm run build` in `extension/`.
+- Extension: `extension/manifest.base.json` plus `extension/build/manifest.mjs` compose `dist/<browser>/manifest.json` for `chrome` and `firefox`; each `dist/<browser>/` loads `background.js`, `content.js`, `sidepanelBoot.js` and `sidepanel.html`. Built by `npm run build` in `extension/`.
 
 ## Build and test commands
 From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.

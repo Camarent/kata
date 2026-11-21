@@ -96,6 +96,21 @@ PYTHONPATH=core python3 -m kata_core
 It serves the API with uvicorn on the `[core]` `host` and `port`. A config error prints
 `config: ...` to the log and exits with status 1.
 
+## Building and loading the extension
+
+From `extension/`, `npm run build` type-checks the sources and then writes one folder per browser:
+
+- `extension/dist/firefox/` - `manifest.json`, `background.js`, `content.js`, `sidepanelBoot.js`, `sidepanel.html`.
+- `extension/dist/chrome/` - the same files, with the Chrome manifest.
+
+`node build/build.mjs firefox` (or `chrome`) builds one browser. Each build removes its folder first.
+
+To load Firefox: open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on", and pick `extension/dist/firefox/manifest.json`. Click the extension's toolbar button to open the panel.
+
+To load Chrome: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick `extension/dist/chrome/`.
+
+Firefox loads the add-on under the id `kata@kata.local` and needs version 128.0 or later (see `docs/decisions.md`). The core must be running on `http://127.0.0.1:8080` for the panel to show marks.
+
 ## Postgres for tests
 
 ```

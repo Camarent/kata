@@ -12,8 +12,9 @@ Project items after Milestone 0.
       recorded baseline and a jscpd duplicate-code report (report only, see
       [`development.md`](development.md)). Still open: a coverage floor (a minimum percentage
       that fails the gate), not yet decided.
-- [ ] Narrow the `<all_urls>` content-script permission in `extension/manifest.json` before
-      any publish.
+- [ ] Narrow the `<all_urls>` content-script permission in `extension/manifest.base.json` before
+      any publish. Note: the match is now `http://*/*` and `https://*/*` in
+      `extension/manifest.base.json` (see [`decisions.md`](decisions.md)); still host-wide.
 - [x] Python dependencies are pinned with `==` and there is no lock file. Decided: keep the
       `==` pins, no `uv lock` (see [`decisions.md`](decisions.md)).
 - [ ] Style nits: three `nosec` lines longer than 100 columns; `MarkSink` vs

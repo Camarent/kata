@@ -4,7 +4,7 @@
  * Pure function: no file system access. The caller reads the base file and writes the result.
  *
  * Firefox: `browser_specific_settings.gecko.id` is `kata@kata.local`; `strict_min_version`
- * is `128.0` (first release with the `sidebar_action` panel used here). Change both only
+ * is `128.0` (the chosen minimum, see docs/decisions.md). Change both only
  * together with the Firefox add-on listing.
  */
 
