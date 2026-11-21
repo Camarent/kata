@@ -6,6 +6,7 @@ is visible to that user too. Every query filters by user_id.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -66,15 +67,37 @@ def set_concept_mark(
     )
 
 
-def list_concept_marks(conn: psycopg.Connection[Any], user_id: int) -> list[tuple[int, str, str, str]]:
-    """Return (concept_id, label, state, evidence) for every concept mark of `user_id`, ordered by concept id."""
+def list_concept_marks_detail(
+    conn: psycopg.Connection[Any], user_id: int
+) -> list[tuple[int, str, str, str, datetime, datetime]]:
+    """Return (concept_id, label, state, evidence, created_at, updated_at) for every concept mark of `user_id`,
+    ordered by concept id."""
     rows = conn.execute(
-        "SELECT m.concept_id, c.label, m.state, m.evidence FROM concept_marks m "
+        "SELECT m.concept_id, c.label, m.state, m.evidence, m.created_at, m.updated_at FROM concept_marks m "
         "JOIN concepts c ON c.id = m.concept_id "
         "WHERE m.user_id = %s ORDER BY m.concept_id",
         (user_id,),
     ).fetchall()
-    return [(int(cid), str(label), str(state), str(evidence)) for cid, label, state, evidence in rows]
+    return [
+        (int(cid), str(label), str(state), str(evidence), created, updated)
+        for cid, label, state, evidence, created, updated in rows
+    ]
+
+
+def get_concept_mark_detail(
+    conn: psycopg.Connection[Any], user_id: int, concept_id: int
+) -> tuple[int, str, str, str, datetime, datetime] | None:
+    """Return (concept_id, label, state, evidence, created_at, updated_at) of one mark of `user_id`, or None."""
+    row = conn.execute(
+        "SELECT m.concept_id, c.label, m.state, m.evidence, m.created_at, m.updated_at FROM concept_marks m "
+        "JOIN concepts c ON c.id = m.concept_id "
+        "WHERE m.user_id = %s AND m.concept_id = %s",
+        (user_id, concept_id),
+    ).fetchone()
+    if row is None:
+        return None
+    cid, label, state, evidence, created, updated = row
+    return int(cid), str(label), str(state), str(evidence), created, updated
 
 
 def clear_concept_mark(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> bool:

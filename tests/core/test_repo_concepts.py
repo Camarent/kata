@@ -10,7 +10,7 @@ import pytest
 from kata_core.storage.concepts import (
     clear_concept_mark,
     create_concept,
-    list_concept_marks,
+    list_concept_marks_detail,
     set_concept_mark,
 )
 from kata_core.storage.taxonomy import ensure_category, ensure_topic
@@ -57,7 +57,9 @@ def test_upsert_keeps_created_at_and_bumps_updated_at(conn: psycopg.Connection[A
     created, updated = _marks_times(conn, alice, concept)
     assert created.year == 2000
     assert updated.year > 2000
-    assert list_concept_marks(conn, alice) == [(concept, "free variables", "known", "explained it")]
+    assert [row[:4] for row in list_concept_marks_detail(conn, alice)] == [
+        (concept, "free variables", "known", "explained it")
+    ]
 
 
 def test_invisible_concept_raises(conn: psycopg.Connection[Any]) -> None:
@@ -80,11 +82,11 @@ def test_marks_are_per_user(conn: psycopg.Connection[Any]) -> None:
     bob = _user(conn, "bob")
     concept = create_concept(conn, _topic(conn, "generators"), "yield")
     set_concept_mark(conn, alice, concept, "known")
-    assert list_concept_marks(conn, bob) == []
+    assert list_concept_marks_detail(conn,bob) == []
     assert clear_concept_mark(conn, bob, concept) is False
-    assert [row[0] for row in list_concept_marks(conn, alice)] == [concept]
+    assert [row[0] for row in list_concept_marks_detail(conn,alice)] == [concept]
     assert clear_concept_mark(conn, alice, concept) is True
-    assert list_concept_marks(conn, alice) == []
+    assert list_concept_marks_detail(conn,alice) == []
 
 
 def test_bad_state_rejected(conn: psycopg.Connection[Any]) -> None:
@@ -92,4 +94,4 @@ def test_bad_state_rejected(conn: psycopg.Connection[Any]) -> None:
     concept = create_concept(conn, _topic(conn, "decorators"), "wrapping")
     with pytest.raises(ValueError):
         set_concept_mark(conn, alice, concept, "mastered")
-    assert list_concept_marks(conn, alice) == []
+    assert list_concept_marks_detail(conn,alice) == []
