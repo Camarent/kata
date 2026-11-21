@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import socket
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import httpx
 import pytest
@@ -14,9 +15,13 @@ from kata_core.config import EXAMPLE_PATH, load_config
 from kata_worker.model import ModelError
 from kata_worker.providers import TASK_CLASSES, LocalProvider, Provider, ProviderError
 from kata_worker.providers import local as local_module
+from kata_worker.providers.anthropic import AnthropicProvider
 
 SYSTEM = "You are a tutor."
 USER = "Explain TCP in one line."
+ANTHROPIC_KEY = "sk-test-secret-key"
+ANTHROPIC_BASE = "https://api.test"
+ANTHROPIC_KEY_ENV = "KATA_ANTHROPIC_API_KEY"
 
 
 @pytest.fixture
@@ -145,3 +150,109 @@ def test_fake_provider_exhausted_raises() -> None:
 
 def test_fake_provider_satisfies_protocol() -> None:
     assert isinstance(FakeProvider(name="fake", is_cloud=True), Provider)
+
+
+def _anthropic(
+    handler: Callable[[httpx.Request], httpx.Response],
+    key: str | None = ANTHROPIC_KEY,
+) -> AnthropicProvider:
+    """Anthropic provider on an in-process MockTransport: no socket, no network."""
+    env = {"KATA_PROVIDER_ANTHROPIC_BASE_URL": ANTHROPIC_BASE}
+    if key is not None:
+        env[ANTHROPIC_KEY_ENV] = key
+    config = load_config(EXAMPLE_PATH, env=env)
+    return AnthropicProvider(config, env=env, transport=httpx.MockTransport(handler))
+
+
+def _reply(content: list[dict[str, str]]) -> Callable[[httpx.Request], httpx.Response]:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"id": "msg_1", "content": content})
+
+    return handler
+
+
+def test_anthropic_identity_and_protocol() -> None:
+    provider = _anthropic(_reply([{"type": "text", "text": "x"}]))
+
+    assert provider.name == "anthropic"
+    assert provider.is_cloud is True
+    assert isinstance(provider, Provider)
+
+
+def test_anthropic_request_shape_carries_key_and_version() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+    _anthropic(handler).complete(SYSTEM, USER)
+
+    request = seen[0]
+    assert request.method == "POST"
+    assert str(request.url) == f"{ANTHROPIC_BASE}/v1/messages"
+    assert request.headers["x-api-key"] == ANTHROPIC_KEY
+    assert request.headers["anthropic-version"] == "2023-06-01"
+    body = json.loads(request.content)
+    assert body["model"] == "claude-model"
+    assert body["max_tokens"] > 0
+    assert body["system"] == SYSTEM
+    assert body["messages"] == [{"role": "user", "content": USER}]
+
+
+def test_anthropic_reply_joins_text_blocks_and_skips_other_blocks() -> None:
+    content = [
+        {"type": "text", "text": "TCP is "},
+        {"type": "tool_use", "text": "ignored"},
+        {"type": "text", "text": "a reliable byte stream."},
+    ]
+
+    reply = _anthropic(_reply(content)).complete(SYSTEM, USER)
+
+    assert reply == "TCP is a reliable byte stream."
+
+
+def test_anthropic_401_raises_provider_error_without_key() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": {"message": "invalid x-api-key"}})
+
+    with pytest.raises(ProviderError, match="status 401") as info:
+        _anthropic(handler).complete(SYSTEM, USER)
+    assert ANTHROPIC_KEY not in str(info.value)
+
+
+def test_anthropic_timeout_raises_provider_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("read timed out", request=request)
+
+    with pytest.raises(ProviderError, match="timed out"):
+        _anthropic(handler).complete(SYSTEM, USER)
+
+
+def test_anthropic_unreadable_body_raises_provider_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>not json</html>")
+
+    with pytest.raises(ProviderError, match="no content blocks"):
+        _anthropic(handler).complete(SYSTEM, USER)
+
+
+def test_anthropic_reply_without_text_block_raises_provider_error() -> None:
+    with pytest.raises(ProviderError, match="no text block"):
+        _anthropic(_reply([{"type": "tool_use", "text": "x"}])).complete(SYSTEM, USER)
+
+
+def test_anthropic_missing_key_raises_at_construction() -> None:
+    with pytest.raises(ProviderError, match="API key missing") as info:
+        _anthropic(_reply([]), key=None)
+    assert ANTHROPIC_KEY_ENV in str(info.value)
+
+
+def test_anthropic_key_absent_from_error_text() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(f"refused for {ANTHROPIC_BASE}")
+
+    with pytest.raises(ProviderError) as info:
+        _anthropic(handler).complete(SYSTEM, USER)
+    assert ANTHROPIC_KEY not in str(info.value)
+    assert ANTHROPIC_KEY not in repr(info.value)
