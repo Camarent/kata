@@ -12,7 +12,9 @@ from collections.abc import Mapping
 import httpx
 from kata_core.config import Config
 
-from kata_worker.providers.base import ProviderError
+from kata_worker.providers.base import Provider, ProviderError
+from kata_worker.providers.cost import Ledger, LogSink, capped
+from kata_worker.providers.guard import AuditSink, guarded
 
 SECTION = "provider_anthropic"
 MESSAGES_PATH = "/v1/messages"
@@ -82,3 +84,23 @@ class AnthropicProvider:
         if response.status_code != httpx.codes.OK:
             raise ProviderError(f"anthropic returned status {response.status_code}")
         return _reply_text(response)
+
+
+def build_cloud(
+    config: Config,
+    ledger: Ledger,
+    env: Mapping[str, str],
+    audit: AuditSink,
+    log: LogSink,
+) -> Provider | None:
+    """The Anthropic provider as the router uses it: guarded(capped(inner)). None when no key is set.
+
+    The guard runs before the cap, so a blocked text never reads the ledger or reaches the API.
+    Lives here because only this module and guard.py may name the cloud class.
+    """
+    try:
+        inner = AnthropicProvider(config, env)
+    except ProviderError:
+        return None
+    model = str(config.get(SECTION, "model_name"))
+    return guarded(capped(inner, ledger, model, config, log), audit)
