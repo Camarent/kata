@@ -26,6 +26,10 @@ class FakeCore:
     token: str
     queue: list[dict[str, Any]] = field(default_factory=list)
     requests: list[RecordedRequest] = field(default_factory=list)
+    # Results POST /lesson-check answers with; None means abstain for every requested id.
+    lesson_results: list[dict[str, Any]] | None = None
+    # Status POST /lesson-check answers with; anything but 200 is sent as an error.
+    lesson_status: int = 200
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _server: HTTPServer | None = None
     _thread: threading.Thread | None = None
@@ -72,6 +76,24 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
         def _authorized(self) -> bool:
             return self.headers.get("Authorization") == BEARER_PREFIX + core.token
 
+        def _lesson_check(self, body: bytes) -> None:
+            try:
+                ids = json.loads(body)["concept_ids"]
+            except (ValueError, KeyError, TypeError):
+                self._send(400, {"error": "bad lesson-check body"})
+                return
+            if core.lesson_status != 200:
+                self._send(core.lesson_status, {"error": "lesson-check failed"})
+                return
+            if core.lesson_results is not None:
+                results = core.lesson_results
+            else:
+                results = [
+                    {"concept_id": cid, "label": "", "state": "abstain", "source": "none", "evidence": []}
+                    for cid in ids
+                ]
+            self._send(200, {"results": results})
+
         def _handle(self, method: str) -> None:
             body = self._body()
             auth = self.headers.get("Authorization")
@@ -90,6 +112,9 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
             is_outcome = len(parts) == 3 and parts[0] == "jobs" and parts[2] in ("result", "fail")
             if method == "POST" and is_outcome:
                 self._send(204)
+                return
+            if method == "POST" and self.path == "/lesson-check":
+                self._lesson_check(body)
                 return
             self._send(404, {"error": "not found"})
 
