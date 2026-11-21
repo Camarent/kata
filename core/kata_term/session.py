@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import select
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 POLL_SECONDS = 0.1  # bounded select timeout: the loop re-checks the child at this rate
 READ_SIZE = 4096
@@ -36,8 +36,12 @@ def run_session(
     on_error: Callable[[str], None],
     stdin_fd: int,
     stdout_fd: int,
+    env: Mapping[str, str] | None = None,
 ) -> int:
-    """Run `argv` on a pty until the child exits; return its exit code."""
+    """Run `argv` on a pty until the child exits; return its exit code.
+
+    `env` is the child's environment; None inherits this process's environment.
+    """
     master, slave = os.openpty()
     try:
         proc = subprocess.Popen(
@@ -47,6 +51,7 @@ def run_session(
             stderr=slave,
             start_new_session=True,
             close_fds=True,
+            env=env,
         )
     except BaseException:
         os.close(master)
