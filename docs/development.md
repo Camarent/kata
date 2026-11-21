@@ -85,6 +85,17 @@ Recorded 2026-11-20 at git commit `b0ae863`, from the output of the run above.
 
 No coverage floor is enforced yet: the numbers above are a record, not a threshold.
 
+## Running the core
+
+From the repository root, with the config file named by `KATA_CONFIG`:
+
+```
+PYTHONPATH=core python3 -m kata_core
+```
+
+It serves the API with uvicorn on the `[core]` `host` and `port`. A config error prints
+`config: ...` to the log and exits with status 1.
+
 ## Postgres for tests
 
 ```
