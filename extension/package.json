@@ -10,9 +10,9 @@
     "test:cov": "vitest run --coverage"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.270",
+    "@types/chrome": "^0.3.7",
     "@vitest/coverage-v8": "5.1.0",
-    "esbuild": "^0.21.5",
+    "esbuild": "^0.28.2",
     "jscpd": "5.4.3",
     "jsdom": "^31.0.1",
     "typescript": "^5.0.0",
