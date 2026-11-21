@@ -6,7 +6,6 @@ supported. The caller's user_id comes from the authenticated token, never from t
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -83,22 +82,6 @@ def handle(
     except InvalidParams as exc:
         return _error(request_id, INVALID_PARAMS, str(exc))
     return {"jsonrpc": JSONRPC_VERSION, "id": request_id, "result": result}
-
-
-def handle_text(
-    conn: psycopg.Connection[Any],
-    cfg: Config,
-    user_id: int,
-    text: str,
-    at: datetime | None = None,
-) -> str | None:
-    """Decode one JSON text, answer it, and encode the reply. None when no reply is due."""
-    try:
-        message = json.loads(text)
-    except json.JSONDecodeError:
-        return json.dumps(_error(None, PARSE_ERROR, "parse error"))
-    reply = handle(conn, cfg, user_id, message, at)
-    return None if reply is None else json.dumps(reply)
 
 
 def _dispatch(

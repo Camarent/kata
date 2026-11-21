@@ -14,7 +14,7 @@ import pytest
 from kata_core.config import Config
 from kata_core.journal.store import read_page
 from kata_core.mcp.gate import DATA_PREFIX
-from kata_core.mcp.rpc import handle, handle_text
+from kata_core.mcp.rpc import handle
 from kata_core.retrieval.embedder import FakeEmbedder
 from kata_core.retrieval.store import add_entry
 from kata_core.storage.concepts import create_concept, set_concept_mark
@@ -180,13 +180,6 @@ def test_malformed_requests(conn: psycopg.Connection[Any], cfg: Config) -> None:
     assert _error_code(conn, cfg, ana, {"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": [1]}) == -32600
     assert _error_code(conn, cfg, ana, [{"jsonrpc": "2.0", "id": 6, "method": "tools/list"}]) == -32600
     assert _error_code(conn, cfg, ana, "tools/list") == -32600
-
-
-def test_text_that_is_not_json_is_parse_error(conn: psycopg.Connection[Any], cfg: Config) -> None:
-    ana = _user(conn, "ana")
-    reply = handle_text(conn, cfg, ana, "{not json", at=NOW)
-    assert reply is not None
-    assert '"code": -32700' in reply
 
 
 def _call_msg(name: str, args: dict[str, Any]) -> dict[str, Any]:
