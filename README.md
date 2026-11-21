@@ -52,6 +52,15 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
 | `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
 | `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
+| `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
+| `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
+| `policy.nudge_enabled` | true | `KATA_POLICY_NUDGE_ENABLED` |
+| `policy.nudge_error_threshold` | 3 | `KATA_POLICY_NUDGE_ERROR_THRESHOLD` |
+| `policy.nudge_window_seconds` | 900 | `KATA_POLICY_NUDGE_WINDOW_SECONDS` |
+| `policy.stop_enabled` | true | `KATA_POLICY_STOP_ENABLED` |
+| `policy.stop_error_threshold` | 8 | `KATA_POLICY_STOP_ERROR_THRESHOLD` |
+| `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
+| `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 

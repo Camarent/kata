@@ -11,8 +11,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from kata_core.egress.scanner import scan
+
 from kata_worker.providers.base import Provider, ProviderError
-from kata_worker.providers.scanner import scan
 
 
 @dataclass(frozen=True)

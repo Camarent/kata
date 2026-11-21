@@ -51,6 +51,9 @@ jobs:
       - run: .venv/bin/python -m pytest tests -m 'not flaky and not browser'
       - run: npm --prefix extension run build
       - run: npm --prefix extension test
+      - run: npm --prefix editor ci
+      - run: npm --prefix editor run build
+      - run: npm --prefix editor test
 
   secrets:
     runs-on: ubuntu-latest

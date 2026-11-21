@@ -2,6 +2,7 @@
 
     python -m kata_core.auth.admin create-user NAME
     python -m kata_core.auth.admin enrol USER_NAME
+    python -m kata_core.auth.admin mint-mcp-token USER_NAME LABEL
     python -m kata_core.auth.admin revoke DEVICE_ID
 
 Config comes from KATA_CONFIG. `enrol` prints the raw code once; it is not stored.
@@ -18,7 +19,7 @@ from typing import Any
 
 import psycopg
 
-from kata_core.auth.service import new_enrolment, revoke
+from kata_core.auth.service import issue_scoped_token, new_enrolment, revoke
 from kata_core.config import Config, ConfigError, load_config
 from kata_core.storage.provision import connect
 from kata_core.storage.users import create_user, list_users
@@ -35,9 +36,20 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("name")
     enrol = commands.add_parser("enrol", help="issue an enrolment code for USER_NAME")
     enrol.add_argument("user_name")
+    mint = commands.add_parser("mint-mcp-token", help="issue an MCP token for USER_NAME")
+    mint.add_argument("user_name")
+    mint.add_argument("label")
     revoke_cmd = commands.add_parser("revoke", help="revoke device DEVICE_ID")
     revoke_cmd.add_argument("device_id", type=int)
     return parser
+
+
+def _user_id_named(conn: psycopg.Connection[Any], name: str) -> int:
+    """Return the id of user `name`. Raises AdminError if no such user."""
+    matches = [uid for uid, user in list_users(conn) if user == name]
+    if not matches:
+        raise AdminError(f"no user named {name}")
+    return matches[0]
 
 
 def run(
@@ -52,11 +64,11 @@ def run(
         user_id = create_user(conn, args.name)
         return f"created user {user_id} {args.name}"
     if args.command == "enrol":
-        matches = [uid for uid, name in list_users(conn) if name == args.user_name]
-        if not matches:
-            raise AdminError(f"no user named {args.user_name}")
-        code = new_enrolment(conn, matches[0], cfg, now)
+        code = new_enrolment(conn, _user_id_named(conn, args.user_name), cfg, now)
         return f"enrolment code for {args.user_name} (shown once): {code}"
+    if args.command == "mint-mcp-token":
+        token = issue_scoped_token(conn, _user_id_named(conn, args.user_name), args.label, "mcp")
+        return f"mcp token for {args.user_name}, label {args.label} (shown once): {token}"
     if not revoke(conn, args.device_id):
         raise AdminError(f"no active device {args.device_id}")
     return f"revoked device {args.device_id}"

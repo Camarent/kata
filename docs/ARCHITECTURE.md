@@ -4,7 +4,8 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 
 ## Modules
 - [config](modules/config.md) - TOML loader and env overrides; source of all settings.
-- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, daily usage, Postgres storage.
+- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, daily usage, per-user journal, device event ingest and message queue, policy engine, MCP server (`POST /mcp`, two read tools, egress gate), device tool in `core/kata_device/` (git pre-commit and post-commit hooks, local queue and tree-hash marker; `python -m kata_device hooks install` never overwrites a foreign hook; the `kata` entry point is not built yet), terminal tool in `core/kata_term/` (`kata term`: PTY capture of masked command lines and error kinds, JSONL spool, stdlib client; env `KATA_URL`, `KATA_TOKEN`, `KATA_TERM_MASKS`), Postgres storage.
+- [editor](modules/editor.md) - VS Code extension in `editor/`: posts one `editor.save` event per save (no document text), shows the server quiet mark as a diagnostic, runs the device hook installer on command.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
 - [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate); `scripts/dev/` gate runner `check-all.sh` and pinned browser installer `install-browsers.sh`.
 - [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/browser` (real Firefox and Chrome through selenium; only `check-all.sh --browser`), `tests/scripts` (bench, install-browsers, check-all browser mode).
@@ -15,24 +16,27 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 
 ## Data and control flow
 1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:69`).
-2. Provisioning: `scripts/db/kata_db.py` calls `storage/provision.py` to create databases and apply `core/migrations/*.sql`.
-3. Auth: admin creates a user and an enrolment code (`auth/admin.py`). Client redeems the code at `POST /auth/enrol`; the core stores only sha256 digests and returns the raw token once. Every other route takes `Authorization: Bearer`, resolved by `current_user` (`core/kata_core/api/deps.py:37`).
+2. Provisioning: `scripts/db/kata_db.py` calls `core/kata_core/storage/provision.py` to create databases and apply `core/migrations/*.sql`.
+3. Auth: admin creates a user and an enrolment code (`core/kata_core/auth/admin.py`). Client redeems the code at `POST /auth/enrol`; the core stores only sha256 digests and returns the raw token once. Every other route takes `Authorization: Bearer`, resolved by `current_user` (`core/kata_core/api/deps.py:40`).
 4. Request: route module in `core/kata_core/api/routes/` -> repository in `core/kata_core/storage/` -> Postgres. `user_id` always comes from the token.
-5. Import: `POST /import` parses the skill-list text (`importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
-6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next` (204 when empty), leases a job for `lease_seconds`, and posts `result` or `fail`. Expired leases are reclaimed (`jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
+5. Import: `POST /import` parses the skill-list text (`core/kata_core/importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
+6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next` (204 when empty), leases a job for `lease_seconds`, and posts `result` or `fail`. Expired leases are reclaimed (`core/kata_core/jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
 7. Concept marks: concepts sit under a topic (`/concepts`, `core/kata_core/api/routes/concepts.py`). Each user marks a concept `known`, `learning` or `new` with optional evidence; these marks live in `concept_marks` next to the topic-level `marks` table, which is unchanged. Concept marks are private to their user.
 8. Retrieval (library, no HTTP route yet): `core/kata_core/retrieval/` stores text entries (`store.py`, shared when `owner_user_id` is NULL), ranks by full-text and by cosine over embeddings, and fuses the two lists with RRF (`retriever.py`, `fusion.py`). Config `[retrieval]`; tests use the fake embedder only.
 9. Lesson check: `POST /lesson-check` (`core/kata_core/api/routes/lesson_check.py:54`) returns each concept's state for the caller. A concept mark wins; otherwise the concept label is searched in retrieval and the hits decide `known`, `learning` or `abstain` (`core/kata_core/lesson_check/checker.py:40`). Thresholds in `[lesson_check]`. The check runs synchronously in the core; no worker job calls it.
-10. Cost cap (worker side): `providers/cost.py` `capped` wraps the cloud provider in the router; it checks today's spend (`GET /usage`) before each cloud call, refuses at `cap_micro_usd`, and records the estimated cost (`POST /usage`) after it. Local calls are not capped.
+10. Cost cap (worker side): `worker/kata_worker/providers/cost.py` `capped` wraps the cloud provider in the router; it checks today's spend (`GET /usage`) before each cloud call, refuses at `cap_micro_usd`, and records the estimated cost (`POST /usage`) after it. Local calls are not capped.
+11. Journal and policy (library plus read route): `core/kata_core/journal/store.py` appends and pages per-user entries (`GET /v1/journal`, `core/kata_core/api/routes/journal.py:34`). `core/kata_core/policy/engine.py` turns `error`, `ok` and `idle` events into `nudge`, `stop` and `quiet_mark` decisions in memory, from `[policy]`. Device events enter at `POST /v1/events` (`core/kata_core/api/routes/events.py:99`): each event is validated (`core/kata_core/events/envelope.py`), stored once per `event_id` (`core/kata_core/events/store.py`), and only accepted ones reach the engine. Decisions become `message` rows, delivered in that response or on `GET /v1/messages` (`core/kata_core/delivery/messages.py`).
+12. MCP: `POST /mcp` (`core/kata_core/api/routes/mcp.py:26`) takes one JSON-RPC message from an `mcp`-scoped token, dispatches it in `core/kata_core/mcp/rpc.py`, and runs each tool result through `core/kata_core/mcp/gate.py` (size, secret scan, quoting) before it is returned. Details: `docs/modules/core.md` (MCP entries).
 
 ## Entry points
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
-- Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:65` `main`), run with `PYTHONPATH=core`.
+- Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:77` `main`), run with `PYTHONPATH=core`.
 - DB CLI: `python3 scripts/db/kata_db.py` (`scripts/db/kata_db.py:35` `main`), run with `PYTHONPATH=core`.
 - Extension: `extension/manifest.base.json` plus `extension/build/manifest.mjs` compose `dist/<browser>/manifest.json` for `chrome` and `firefox`; each `dist/<browser>/` loads `background.js`, `content.js`, `sidepanelBoot.js` and `sidepanel.html`. Built by `npm run build` in `extension/`.
 
 ## Build and test commands
 From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
+Editor (from `editor/package.json`): `npm --prefix editor run build` (`tsc --noEmit`), `npm --prefix editor run test:cov` (vitest with coverage); CI runs build and `npm --prefix editor test` (`.github/workflows/ci.yml:54-56`).
 `pipeline.json` runs `cs-qrun -- scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
 
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:27`). It refuses any embedder but `fake`.

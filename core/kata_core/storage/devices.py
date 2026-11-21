@@ -10,22 +10,35 @@ from typing import Any
 import psycopg
 
 
-def add_device(conn: psycopg.Connection[Any], user_id: int, label: str, token_hash: str) -> int:
-    """Register a device for `user_id` under `token_hash`. Return its id."""
+def add_device(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    label: str,
+    token_hash: str,
+    scope: str = "api",
+) -> int:
+    """Register a device for `user_id` under `token_hash` with token `scope`. Return its id."""
     row = conn.execute(
-        "INSERT INTO devices (user_id, label, token_hash) VALUES (%s, %s, %s) RETURNING id",
-        (user_id, label, token_hash),
+        "INSERT INTO devices (user_id, label, token_hash, scope) VALUES (%s, %s, %s, %s) RETURNING id",
+        (user_id, label, token_hash, scope),
     ).fetchone()
     if row is None:
         raise RuntimeError("add_device: INSERT ... RETURNING id returned no row")
     return int(row[0])
 
 
-def find_by_token_hash(conn: psycopg.Connection[Any], token_hash: str) -> tuple[int, int] | None:
-    """Return (user_id, device_id) for an active device with `token_hash`; revoked devices are ignored."""
+def find_by_token_hash(
+    conn: psycopg.Connection[Any],
+    token_hash: str,
+    scope: str = "api",
+) -> tuple[int, int] | None:
+    """Return (user_id, device_id) for an active device with `token_hash` and `scope`.
+
+    Revoked devices are ignored. A token of another scope does not match.
+    """
     row = conn.execute(
-        "SELECT user_id, id FROM devices WHERE token_hash = %s AND revoked_at IS NULL",
-        (token_hash,),
+        "SELECT user_id, id FROM devices WHERE token_hash = %s AND scope = %s AND revoked_at IS NULL",
+        (token_hash, scope),
     ).fetchone()
     return None if row is None else (int(row[0]), int(row[1]))
 

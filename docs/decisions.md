@@ -45,8 +45,8 @@ test the foundation, so it waits for a later milestone.
 ## Secret scanner
 
 Two layers behind a scanner interface. Client masking in the terminal session tool uses a
-small dependency-free pattern list. The core runs gitleaks in stdin mode as a subprocess on
-every outgoing text before any cloud call. TruffleHog is rejected (AGPL licence does not fit
+small dependency-free pattern list. The core scans
+every outgoing text before any cloud call with `core/kata_core/egress/scanner.py`, no subprocess (for the hook, superseded by the section at line 270). TruffleHog is rejected (AGPL licence does not fit
 an MIT repository).
 
 ## Local model selection
@@ -74,7 +74,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   rename migrates users' states. Each user's private overlay never changes the shared tree.
 - **Thresholds.** Intervention thresholds are tuned per user from that user's own journal.
   Global defaults change only by the administrator, from content-free counts.
-- **Pre-commit secret check.** Runs gitleaks locally, so it does not depend on the core.
+- **Pre-commit secret check.** Runs the core scanner locally, so it does not depend on the core (superseded for the hook by the section at line 270: the scanner is `core/kata_core/egress/scanner.py`, no subprocess).
 - **Automatic scan on page open.** Only on sites the user added, each a URL mask (a pattern
   with wildcards, so one entry can cover a whole platform); elsewhere a scan starts on a
   click. Background prefetch for a user without a worker is a setting, off by default.
@@ -217,3 +217,114 @@ Decided 2026-11-21. Spend is kept in table `usage_daily`, keyed by (user_id, day
 ## Routing uses one provider chain per task class, with no implicit local fallback
 
 Decided 2026-11-21. `[routing]` in `config/kata.example.toml` lists one comma-ordered chain per task class; `worker/kata_worker/providers/router.py` `Router.route` tries them in order and the first reply wins. A provider the chain does not list is never called, so local is a fallback only when the chain names it (`tests/worker/test_router.py:152`). Each cloud provider is wrapped as `guarded(capped(inner))`: the secret guard runs before the cost cap, so a blocked text never reads the ledger or reaches the API. Task classes stay `tag`, `explain`, `summary` and `batch`. `lesson_check` is not a task class: it is a synchronous core call since phase 01, and no worker job runs it. Reason: the chain makes the order of providers visible in config, and the wrap order keeps secret text out of the spend path. Limit: a chain of only cloud providers fails the job when the cap or the guard refuses, with no local answer.
+
+## Secret scanner has no bypass
+
+Decided 2026-11-21. `worker/kata_worker/providers/guard.py` wraps every cloud provider as `GuardedProvider`. It scans the system and the user text of each cloud completion, and a finding blocks the call before the inner provider runs. No flag, config key or env var skips the scan; `tests/worker/test_scanner_guard.py` checks that `guarded` has no skip parameter (`test_guarded_has_no_skip_parameter`) and walks every provider module with `pkgutil.walk_packages` (`test_cloud_provider_classes_are_not_exposed_outside_guard`), so a cloud class reachable outside the guard fails the test. Local providers pass through unscanned by design. Reason: a bypass switch would let secret text leave the machine with no audit event. Limit: the walk covers modules under `worker/kata_worker/providers`; a cloud client built in another package is not seen by that test.
+
+## Secret scanner lives in core egress
+
+Decided 2026-11-21. The scanner rule set moves to `core/kata_core/egress/scanner.py`, so the worker, the later MCP server and the pre-commit check share one rule set instead of copies. Reason: one place to fix a pattern, and one test suite for it. Landed in task-1 of this stage: no copy remains under `worker/`, and `worker/kata_worker/providers/guard.py` imports `scan` from core.
+
+## M3 leftovers for M4
+
+Checked 2026-11-21 against `docs/backlog.md` open items. Items that block M4:
+
+- Anthropic wire format is untested live: `tests/worker/test_providers.py` uses an httpx mock transport only. M4 needs an opt-in live check before relying on the format.
+- Config keys: `[cost]` `cap_micro_usd` and `warn_micro_usd` in `config/kata.example.toml` are example values, and the price table is unverified. Set real values before M4 uses the cap.
+
+Items that do not block M4 and stay in the backlog: the real-provider run on a PC, the non-atomic cost check-then-record, and `POST /usage` trusting client-reported `micro_usd`. Note: the last two are cost-path risks, so review them before any multi-user use.
+
+## MCP server speaks raw JSON-RPC, no SDK
+
+Decided 2026-11-21. `core/kata_core/mcp/rpc.py` implements the JSON-RPC 2.0 methods the kata tools need (`initialize`, `tools/list`, `tools/call`) by hand, with the standard library `json`. No MCP SDK is a dependency. Reason: the surface is two tools and three methods, so the SDK would add a pinned package and its licence for little gain. Limit: a new MCP method or protocol revision means changing `rpc.py` by hand, and batches are refused.
+
+## Devices have a token scope: api or mcp
+
+Decided 2026-11-21. `devices.scope` is `api` or `mcp`, default `api`. An `mcp` token passes only `POST /mcp` (`core/kata_core/api/routes/mcp.py`), and an `api` token gets 401 there. An `mcp` token gets 401 on every `api` route, because `api.deps.current_user` checks scope `api`. Reason: an assistant token that reaches the MCP surface must not also reach the write routes, and the reverse. `mint-mcp-token` (see `docs/api.md`) issues the `mcp` scope.
+
+## MCP gate: quoted data, size limit, secret scan, one rule set
+
+Decided 2026-11-21. `core/kata_core/mcp/gate.py` checks every tool result before it leaves the core, in this order:
+
+1. Size: more than `MAX_RESULT_BYTES` (4096) UTF-8 bytes is blocked with reason `size`.
+2. Secret scan: the single scanner in `core/kata_core/egress/scanner.py` runs; a finding blocks with reason `secret:<kind>`.
+3. Quoting: an allowed result becomes `DATA_PREFIX` (a fixed sentence that says the block is data, not instructions), then every line prefixed with `> `, so injected text cannot start a new instruction line.
+
+Concept names passed to `kata_concept_state` must match `[\w .\-]{1,80}` (`safe_concept_name`). A blocked result returns empty text and a reason that names the rule only, never the matched text.
+
+Unknown provider: the core does not know which assistant reads a result. The gate therefore applies one fixed rule set to every result. It has no provider or content-class input, so no flag can skip the scan. Reason: critique F33, see `docs/design/critique.md`.
+
+Journal: a blocked result writes one `egress_block` entry with `{"tool", "reason"}` (`core/kata_core/mcp/tools.py:81`). The entry never holds the blocked text.
+
+## Device package lives in core/kata_device
+
+Decided 2026-11-21. The device-side code (`python -m kata_device`, git hooks, local queue, marker; the `kata` entry point is not built yet) is the package `core/kata_device/`, next to `kata_core` and imported with `core` on `PYTHONPATH`. Reason: the hooks and the core share the one secret scanner (`kata_core.egress.scanner`), so one tree and one test run cover both. The package imports `kata_core` only for the scanner; the queue and marker modules import nothing from core.
+
+## Device subcommands load through a lazy registry
+
+Decided 2026-11-21. `core/kata_device/cli.py` maps each command name to a `"module:function"` string in `REGISTRY`. A command module is imported only when its command runs, so a missing module fails that one command with a message. The entry `term` maps to `kata_term.cli:main`; phase 6 adds that package and no change to the dispatcher is needed for it. Reason: the pre-commit hook runs on every commit and must not import the terminal code, and a broken optional command must not break the hook.
+
+## Pre-commit scans staged lines in process with the one scanner
+
+Decided 2026-11-21. `core/kata_device/precommit.py` reads the staged added lines (`gitutil.staged_added_lines`) and scans each with `kata_core.egress.scanner.scan`, in the hook process. It has no time limit. This replaces the gitleaks binary from the earlier design (`docs/design/detailed-architecture.md:668`, "gitleaks locally with a 5 s limit"): the pre-commit hook does not use gitleaks (CI still runs gitleaks in the secrets job), and no external binary is needed. Reason: one rule set for the hook, the worker and the core, so a pattern fixed once is fixed everywhere, and no install step beyond Python. The 5 s limit is dropped because the scan is local and bounded by the staged diff size.
+
+## Block message names the kind and location only
+
+Decided 2026-11-21. A blocked commit prints one line per finding: `kata: blocked: <kind> at <file>:<line>`. The message never prints the matched text or the line. Reason: the terminal and the CI log must not copy the secret the hook found.
+
+## Pre-commit results are queued locally, not uploaded
+
+Decided 2026-11-21. Each pre-commit block and each post-commit bypass appends one JSON record to `<git_dir>/kata/queue.jsonl` (`core/kata_device/queue.py`, `enqueue`). The record holds the result and rule kinds with counts only, never paths or code. The upload is not built (the events API, `POST /v1/events`, has no `precommit` event type, so the queue has no sink yet); the finish phase lists it in `docs/backlog.md`. Reason: the hook must work offline and must not block a commit on the network.
+
+## Marker holds the staged tree hash and is cleared after every commit
+
+Decided 2026-11-21. A passing pre-commit writes the staged tree hash to `<git_dir>/kata/marker` (`core/kata_device/marker.py`). The post-commit hook compares that hash with the committed tree: a different hash, or no marker, queues a `bypassed` record. The marker is cleared after every post-commit, except a post-commit run while a rebase, merge, revert or cherry-pick is in progress (marker kept) or after an unexpected error before the clear (marker kept), so a stale marker never outlives a normal commit. Reason: a tree hash detects a skipped check (for example `--no-verify`) without storing any file content.
+
+## Installer never overwrites a hook or core.hooksPath
+
+Decided 2026-11-21. `python -m kata_device hooks install` (`core/kata_device/hooks.py`; the `kata` entry point is not built yet) writes `pre-commit` and `post-commit` only when neither file exists or the existing file carries its own marker line, and `core.hooksPath` is unset. Otherwise it prints the two command lines for the owner to add by hand and writes nothing. Reason: a hook the owner wrote, or a shared `core.hooksPath`, must not be replaced silently.
+
+## kata term is opt-in and explicit
+
+Decided 2026-11-21. Capture happens only while the owner runs `kata term`. There is no shell hook, no auto-start and no change to the shell rc files. Reason: the owner must know when typing is recorded, and leaving the session ends capture.
+
+## kata term uses a PTY and captures lines, not a shell hook
+
+Decided 2026-11-21. `core/kata_term/session.py` runs the shell in a PTY and reads the typed line buffer and the output stream. Reason: it works with any shell and needs no install into the user's shell config.
+
+## kata term error signal is a kind only
+
+Decided 2026-11-21. Output is scanned for known error patterns and only a kind is emitted (`terminal.error`). Output text is never stored or sent. Reason: output can hold secrets and code.
+
+## kata term mask list is private and never logged
+
+Decided 2026-11-21. Command text is masked before the spool write with built-in patterns plus a private list outside the repo (`KATA_TERM_MASKS`, default `~/.config/kata/term-masks`). Nothing logs the text, the patterns or a load error; a bad list is skipped. Reason: the list itself can reveal secrets, and the repo holds no personal data.
+
+## kata term spool is JSONL with at-least-once flush
+
+Decided 2026-11-21. Events go to a JSONL spool first and are flushed in batches after each command and at exit; sent ids are removed only after the server settles them. The server dedupes by `event_id`. Reason: the tool works offline, and a retry after a crash or failed post never double counts.
+
+## kata term client uses stdlib urllib
+
+Decided 2026-11-21. `core/kata_term/client.py` posts with `urllib`. Reason: the tool must run with no installed dependency.
+
+## kata term SSH capture is not proven
+
+Decided 2026-11-21. This phase does not prove capture over SSH. `docs/open-questions.md` item 7 stays open. Reason: no SSH test exists; claiming it would be unverified.
+
+## Editor stop patterns suppress posting
+
+Decided 2026-11-21. A document whose text matches a `kata.stopPatterns` entry posts nothing (`editor/src/poster.ts:31`). The match runs locally, before any network call; an invalid pattern is skipped (`editor/src/stopPatterns.ts:8-9`). Reason: the owner can keep a file out of the signal without the server ever seeing it.
+
+## Editor payload carries language only
+
+Decided 2026-11-21. The `editor.save` event carries `payload: { language }` (`editor/src/poster.ts:38`). Document text is read only for the stop check and is never sent. Reason: code can hold secrets and personal data, and the core needs only the signal.
+
+## Editor dev dependencies are pinned
+
+Decided 2026-11-21. `editor/package.json` pins `@types/node`, `@vitest/coverage-v8`, `typescript` and `vitest` to exact versions, and `editor/package-lock.json` is committed. Reason: a moving toolchain would change the build and tests without a code change.
+
+## Editor build and test run in check-all --editor
+
+Decided 2026-11-21. `scripts/dev/check-all.sh --editor` runs the editor build and `test:cov` only (`scripts/dev/check-all.sh:146-148`), and the full and merge modes also run it. Reason: the editor needs no Postgres or browser, so the owner can check it alone; CI runs the same steps (`.github/workflows/ci.yml:54-56`).

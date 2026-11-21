@@ -38,6 +38,9 @@ SCHEMA_TABLES = {
     "concept_marks",
     "retrieval_entries",
     "usage_daily",
+    "journal_entry",
+    "event",
+    "message",
 }
 
 

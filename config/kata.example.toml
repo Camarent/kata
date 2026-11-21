@@ -71,3 +71,15 @@ api_key_env = "KATA_ANTHROPIC_API_KEY"
 timeout_seconds = 60
 max_tokens = 1024
 api_version = "2023-06-01"
+
+[policy]
+quiet_mark_enabled = true
+quiet_mark_idle_seconds = 600
+nudge_enabled = true
+nudge_error_threshold = 3
+nudge_window_seconds = 900
+stop_enabled = true
+stop_error_threshold = 8
+# Same limit for each type; state is kept per type.
+rate_limit_seconds = 300
+late_event_seconds = 120
