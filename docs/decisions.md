@@ -96,3 +96,39 @@ Runtime and dev dependencies are pinned with `==` in `pyproject.toml`. `scripts/
 and `.github/workflows/ci.yml` both install from that file, so the pins are the one source. No
 `uv lock` file and no new tool are added: a lock file would be a second list to keep in step
 with the pins. Revisit only if a transitive dependency must be pinned for reproducible installs.
+
+## Embeddings are real[] with cosine in Python, no pgvector yet
+
+Embeddings are stored in a plain `real[]` column (`core/migrations/0003_retrieval.sql:10`).
+The vector side loads the candidate rows and ranks them by cosine in Python
+(`core/kata_core/retrieval/retriever.py:72`). pgvector is not added yet: a few entries scan
+fast enough. Revisit when an entry count makes the scan slow, and then move the ranking into
+Postgres behind the repository interface.
+
+## Full-text search uses the simple FTS configuration
+
+Keyword search uses the `simple` text search configuration, both in the stored `tsv` column
+(`core/migrations/0003_retrieval.sql:9`) and in queries (`core/kata_core/retrieval/store.py:44`).
+`simple` does no stemming and no stop-word removal, so it does not depend on one language.
+
+## Rank fusion is reciprocal rank fusion with k = 60
+
+Keyword and vector rankings are merged with reciprocal rank fusion: an item at rank r scores
+1 / (k + r) in each list (`core/kata_core/retrieval/fusion.py:6`). The shipped `[retrieval] rrf_k`
+value is 60 (`config/kata.example.toml:39`). RRF needs no score scale matching between the
+keyword and the cosine side, so the two rankings combine without tuning.
+
+## Tests use FakeEmbedder only; the CPU model is never run in CI
+
+`[retrieval] embedder = "fake"` is the shipped default (`config/kata.example.toml:37`). The
+tests use `FakeEmbedder`, a deterministic hashing embedder with no model download. The real
+model is `embedder = "model"`, a small CPU model loaded through sentence_transformers
+(`core/kata_core/retrieval/embedder.py:79`). It is set by configuration only and is never run
+in CI, so CI stays fast and needs no model weights.
+
+## Retrieval entries are private per owner or shared
+
+A `retrieval_entries` row with `owner_user_id` set is private to that user. A row with
+`owner_user_id` NULL is shared and visible to every user (`core/migrations/0003_retrieval.sql:6`,
+`core/kata_core/retrieval/store.py:45`). Both the keyword and the vector side filter on the
+caller's id, so a private entry never reaches another user.
