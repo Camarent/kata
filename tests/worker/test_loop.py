@@ -16,7 +16,10 @@ from fakes.fake_model import FakeModel
 from fakes.fake_provider import FakeProvider
 from kata_core.config import Config, load_config
 from kata_worker.core_client import CoreClient
-from kata_worker.loop import TAG_CLASS, run_forever, run_once
+from kata_worker.handlers import load_handlers
+from kata_worker.handlers import tag as tag_handler
+from kata_worker.handlers.tag import TAG_CLASS
+from kata_worker.loop import run_forever, run_once
 from kata_worker.model import SYSTEM_PROMPT
 from kata_worker.providers.base import ProviderError
 from kata_worker.providers.local import LocalProvider
@@ -163,6 +166,43 @@ def test_route_exhausted_fails_job(fake_core: FakeCore, token_env: str) -> None:
 
     posts = [(r.path, r.body) for r in fake_core.requests if r.method == "POST"]
     assert posts == [("/jobs/4/fail", b"")]
+
+
+def test_run_once_claims_only_handled_kinds_and_leaves_other_jobs_queued(
+    fake_core: FakeCore, fake_model: FakeModel, token_env: str
+) -> None:
+    cfg = _config(fake_core.url, fake_model.url)
+    fake_core.enqueue({"id": 5, "kind": "course.build", "payload": "not ours"})
+    fake_core.enqueue({"id": 6, "payload": "pasta recipe text"})
+    fake_model.add_reply(_tag_reply("food", "pasta"))
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, _local_router(cfg)) is True
+
+    gets = [r.path for r in fake_core.requests if r.method == "GET"]
+    assert gets == ["/jobs/next?kind=tag"]
+    assert [job["id"] for job in fake_core.queue] == [5]
+    posts = [(r.path, json.loads(r.body)) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/6/result", {"category": "food", "topic": "pasta"})]
+
+
+def test_job_of_kind_without_handler_is_failed_not_run(
+    fake_core: FakeCore, fake_model: FakeModel, token_env: str
+) -> None:
+    cfg = _config(fake_core.url, fake_model.url)
+    fake_core.enqueue({"id": 8, "payload": "text"})
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, _local_router(cfg), handlers={}) is True
+
+    posts = [(r.path, r.body) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/8/fail", b"")]
+    assert fake_model.requests == []
+
+
+def test_handler_registry_discovers_tag_handler() -> None:
+    assert load_handlers() == {tag_handler.KIND: tag_handler.handle}
+    assert tag_handler.KIND == "tag"
 
 
 @pytest.mark.usefixtures("token_env")

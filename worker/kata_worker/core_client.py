@@ -9,10 +9,10 @@ from __future__ import annotations
 import http.client
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-from urllib.parse import SplitResult, urlsplit
+from urllib.parse import SplitResult, urlencode, urlsplit
 
 if TYPE_CHECKING:
     from kata_core.config import Config
@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 ALLOWED_SCHEMES = frozenset({"http", "https"})
 NO_CONTENT = 204
+# The kind the core claims when a pull names no kind (D2): old workers keep getting `tag` jobs.
+DEFAULT_KIND = "tag"
 
 
 class CoreError(Exception):
@@ -30,6 +32,7 @@ class CoreError(Exception):
 class Job:
     id: int
     payload: str
+    kind: str = DEFAULT_KIND
 
 
 def _loopback_base(core_url: str) -> SplitResult:
@@ -80,18 +83,27 @@ class CoreClient:
         finally:
             conn.close()
 
-    def next_job(self) -> Job | None:
-        """Lease the oldest queued job; None when the core answers 204."""
-        status, raw = self._call("GET", "/jobs/next")
+    def next_job(self, kinds: Sequence[str] = ()) -> Job | None:
+        """Lease the oldest queued job of the named kinds; None when the core answers 204.
+
+        With no kinds named, the core claims `tag` jobs only.
+        """
+        query = urlencode([("kind", kind) for kind in kinds])
+        path = f"/jobs/next?{query}" if query else "/jobs/next"
+        status, raw = self._call("GET", path)
         if status == NO_CONTENT:
             return None
         if status != 200:
-            raise CoreError(f"GET /jobs/next -> {status}")
+            raise CoreError(f"GET {path} -> {status}")
         try:
             data = json.loads(raw)
-            return Job(id=int(data["id"]), payload=str(data["payload"]))
-        except (ValueError, KeyError, TypeError) as exc:
-            raise CoreError("GET /jobs/next: unreadable job body") from exc
+            return Job(
+                id=int(data["id"]),
+                payload=str(data["payload"]),
+                kind=str(data.get("kind", DEFAULT_KIND)),
+            )
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise CoreError(f"GET {path}: unreadable job body") from exc
 
     def report(self, job_id: int, category: str, topic: str) -> None:
         """Complete a leased job with the topic it resolved to."""
@@ -100,6 +112,12 @@ class CoreClient:
         )
         if status != NO_CONTENT:
             raise CoreError(f"POST /jobs/{job_id}/result -> {status}")
+
+    def output(self, job_id: int, obj: Mapping[str, Any]) -> None:
+        """Post a kind's output object for a leased job; the core runs the kind's output hook."""
+        status, _ = self._call("POST", f"/jobs/{job_id}/output", {"output": dict(obj)})
+        if status != NO_CONTENT:
+            raise CoreError(f"POST /jobs/{job_id}/output -> {status}")
 
     def fail(self, job_id: int) -> None:
         """Mark a leased job as failed."""
