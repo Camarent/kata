@@ -38,6 +38,10 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
 | `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
 | `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
+| `routing.tag` | "local" | `KATA_ROUTING_TAG` |
+| `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
+| `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |
+| `routing.batch` | "anthropic" | `KATA_ROUTING_BATCH` |
 | `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
 | `provider_local.task_classes` | "tag,explain" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
 | `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |

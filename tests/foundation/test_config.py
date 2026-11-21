@@ -48,11 +48,13 @@ def test_example_has_required_sections() -> None:
         "retrieval",
         "lesson_check",
         "cost",
+        "routing",
         "providers",
         "provider_local",
         "provider_anthropic",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
+    assert set(data["routing"]) == {"tag", "explain", "summary", "batch"}
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
@@ -124,6 +126,13 @@ def test_env_overrides_each_key_with_cast(tmp_path: Path) -> None:
     assert cfg.get("database", "host") == "127.0.0.2"
     assert cfg.get("worker", "poll_interval_seconds") == 7
     assert cfg.get("model", "timeout_seconds") == 90
+
+
+def test_env_overrides_routing_chain(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    assert load_config(path, env={}).get("routing", "explain") == "anthropic,local"
+    cfg = load_config(path, env={"KATA_ROUTING_EXPLAIN": "local"})
+    assert cfg.get("routing", "explain") == "local"
 
 
 def test_env_overrides_bool_cloud_switch(tmp_path: Path) -> None:

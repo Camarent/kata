@@ -49,6 +49,13 @@ search_limit = 5
 cap_micro_usd = 2000000
 warn_micro_usd = 1500000
 
+[routing]
+# Per task class: comma list of provider names, tried in order.
+tag = "local"
+explain = "anthropic,local"
+summary = "anthropic"
+batch = "anthropic"
+
 [providers]
 cloud_enabled = false
 
