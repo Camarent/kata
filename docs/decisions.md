@@ -234,3 +234,25 @@ Checked 2026-11-21 against `docs/backlog.md` open items. Items that block M4:
 - Config keys: `[cost]` `cap_micro_usd` and `warn_micro_usd` in `config/kata.example.toml` are example values, and the price table is unverified. Set real values before M4 uses the cap.
 
 Items that do not block M4 and stay in the backlog: the real-provider run on a PC, the non-atomic cost check-then-record, and `POST /usage` trusting client-reported `micro_usd`. Note: the last two are cost-path risks, so review them before any multi-user use.
+
+## MCP server speaks raw JSON-RPC, no SDK
+
+Decided 2026-11-21. `core/kata_core/mcp/rpc.py` implements the JSON-RPC 2.0 methods the kata tools need (`initialize`, `tools/list`, `tools/call`) by hand, with the standard library `json`. No MCP SDK is a dependency. Reason: the surface is two tools and three methods, so the SDK would add a pinned package and its licence for little gain. Limit: a new MCP method or protocol revision means changing `rpc.py` by hand, and batches are refused.
+
+## Devices have a token scope: api or mcp
+
+Decided 2026-11-21. `devices.scope` is `api` or `mcp`, default `api`. An `mcp` token passes only `POST /mcp` (`core/kata_core/api/routes/mcp.py`), and an `api` token gets 401 there. An `mcp` token gets 401 on every `api` route, because `api.deps.current_user` checks scope `api`. Reason: an assistant token that reaches the MCP surface must not also reach the write routes, and the reverse. `mint-mcp-token` (see `docs/api.md`) issues the `mcp` scope.
+
+## MCP gate: quoted data, size limit, secret scan, one rule set
+
+Decided 2026-11-21. `core/kata_core/mcp/gate.py` checks every tool result before it leaves the core, in this order:
+
+1. Size: more than `MAX_RESULT_BYTES` (4096) UTF-8 bytes is blocked with reason `size`.
+2. Secret scan: the single scanner in `core/kata_core/egress/scanner.py` runs; a finding blocks with reason `secret:<kind>`.
+3. Quoting: an allowed result becomes `DATA_PREFIX` (a fixed sentence that says the block is data, not instructions), then every line prefixed with `> `, so injected text cannot start a new instruction line.
+
+Concept names passed to `kata_concept_state` must match `[\w .\-]{1,80}` (`safe_concept_name`). A blocked result returns empty text and a reason that names the rule only, never the matched text.
+
+Unknown provider: the core does not know which assistant reads a result. The gate therefore applies one fixed rule set to every result. It has no provider or content-class input, so no flag can skip the scan. Reason: critique F33, see `docs/design/critique.md`.
+
+Journal: a blocked result writes one `egress_block` entry with `{"tool", "reason"}` (`core/kata_core/mcp/tools.py:81`). The entry never holds the blocked text.

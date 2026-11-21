@@ -38,6 +38,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/v1/journal?limit=50&before_id=N` | bearer | query: `limit` 1..200 (default 50), `before_id` optional | 200 `{"items": [{"id", "kind", "detail", "created_at"}], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..200; `next_before_id` is null unless the page is full |
 | POST | `/v1/events` | bearer | `{"events": [raw event, ...]}` (at most 100, see Events) | 200 `{"results": [{"event_id", "status", "reason"}], "messages": [message, ...]}`, results in input order | 422 more than 100 events or body not in that shape; a bad event is reported in `results` and never fails the batch |
 | GET | `/v1/messages` | bearer | none | 200 `{"messages": [message, ...]}`, oldest first, at most 50 | |
+| POST | `/mcp` | bearer, `mcp` scope | one JSON-RPC 2.0 message (see MCP below) | 200 JSON-RPC reply; 204 for a valid notification (no `id`) | 401 missing, invalid or revoked token, or an `api` token; 200 with JSON-RPC error `-32700` for bad JSON |
 
 Notes:
 
@@ -73,6 +74,35 @@ Only accepted events reach the policy. Its decisions are queued as messages for 
 Piggyback: the `messages` in the `POST /v1/events` response are the caller's pending messages, delivered in that same response after the batch is ingested.
 
 Delivery is at-most-once. Each message is returned once: when it is returned, its `delivered_at` is set, and it is never sent again. `GET /v1/messages` and the piggyback both take up to 50 pending messages, oldest first. For each delivered message the server writes one journal entry of kind `message_delivered` with detail `{"message_id", "kind"}`; `GET /v1/journal` shows these entries.
+
+## MCP
+
+`POST /mcp` answers one JSON-RPC 2.0 message per request body. It takes only tokens of scope `mcp` (issued by `mint-mcp-token`). The user id comes from the token, never from the message. Batches are not supported: a JSON array gets `-32600`.
+
+Methods:
+
+- `initialize`: returns protocol version `2025-06-18`, capability `tools`, and server info `kata`.
+- `notifications/initialized` and any valid notification (`jsonrpc: "2.0"`, string `method`, no `id`): no reply, HTTP 204. A malformed message without `id` still gets a `-32600` error reply (HTTP 200).
+- `tools/list`: returns the two tools below with their input schemas.
+- `tools/call`: runs one tool by `name` with `arguments`.
+
+Tools:
+
+- `kata_search` (`query` string, `limit` integer): visible entries for the query, one `[source_ref] body` line each, best first. `limit` is clamped to 1..10; default 5.
+- `kata_concept_state` (`concept` string, 1 to 80 letters, digits, spaces, hyphens, underscores or dots): state and evidence of the caller's mark on that concept, or `no mark`.
+
+Every tool result passes the MCP gate before it is returned (`core/kata_core/mcp/gate.py`). An allowed result is quoted: a fixed data sentence, then each line prefixed `> `. A result over 4096 UTF-8 bytes, or with a secret finding, is blocked: the tool returns `isError: true` with no data, and the core writes one `egress_block` journal entry naming the tool and the rule.
+
+Error codes (JSON-RPC `error.code`):
+
+| Code | Meaning |
+|---|---|
+| -32700 | parse error: body is not valid JSON or UTF-8 |
+| -32600 | invalid request: batch, non-object message, missing `jsonrpc: "2.0"` or string `method`, non-object `params` |
+| -32601 | method not found |
+| -32602 | invalid params: bad tool name, missing or wrongly typed argument, bad concept name |
+
+Tool errors from the gate are not JSON-RPC errors: they come back as a normal result with `isError: true`.
 
 ## Skill list file format
 
@@ -127,11 +157,13 @@ Users exist only because an admin created them. There is no self sign-up.
 PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME
 PYTHONPATH=core python3 -m kata_core.auth.admin enrol USER_NAME
 PYTHONPATH=core python3 -m kata_core.auth.admin revoke DEVICE_ID
+PYTHONPATH=core python3 -m kata_core.auth.admin mint-mcp-token USER_NAME LABEL
 ```
 
 - `create-user NAME` creates a user and prints its id.
 - `enrol USER_NAME` prints an enrolment code once. The code is not stored. The user redeems it with `POST /auth/enrol`.
 - `revoke DEVICE_ID` revokes an active device, so its token stops working.
+- `mint-mcp-token USER_NAME LABEL` issues a device token of scope `mcp` and prints it once (`core/kata_core/auth/admin.py:39`). Use it for an assistant that calls `POST /mcp`; the token does not work on the `api` routes.
 
 ## Enrolment flow
 
