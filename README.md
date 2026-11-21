@@ -33,6 +33,9 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `retrieval.rrf_k` | 60 | `KATA_RETRIEVAL_RRF_K` |
 | `retrieval.candidate_limit` | 50 | `KATA_RETRIEVAL_CANDIDATE_LIMIT` |
 | `retrieval.dimensions` | 64 | `KATA_RETRIEVAL_DIMENSIONS` |
+| `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
+| `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
+| `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 
