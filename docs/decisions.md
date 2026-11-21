@@ -45,8 +45,8 @@ test the foundation, so it waits for a later milestone.
 ## Secret scanner
 
 Two layers behind a scanner interface. Client masking in the terminal session tool uses a
-small dependency-free pattern list. The core runs gitleaks in stdin mode as a subprocess on
-every outgoing text before any cloud call. TruffleHog is rejected (AGPL licence does not fit
+small dependency-free pattern list. The core scans
+every outgoing text before any cloud call with `core/kata_core/egress/scanner.py`, no subprocess (for the hook, superseded by the section at line 270). TruffleHog is rejected (AGPL licence does not fit
 an MIT repository).
 
 ## Local model selection
@@ -74,7 +74,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   rename migrates users' states. Each user's private overlay never changes the shared tree.
 - **Thresholds.** Intervention thresholds are tuned per user from that user's own journal.
   Global defaults change only by the administrator, from content-free counts.
-- **Pre-commit secret check.** Runs gitleaks locally, so it does not depend on the core.
+- **Pre-commit secret check.** Runs the core scanner locally, so it does not depend on the core (superseded for the hook by the section at line 270: the scanner is `core/kata_core/egress/scanner.py`, no subprocess).
 - **Automatic scan on page open.** Only on sites the user added, each a URL mask (a pattern
   with wildcards, so one entry can cover a whole platform); elsewhere a scan starts on a
   click. Background prefetch for a user without a worker is a setting, off by default.
@@ -256,3 +256,31 @@ Concept names passed to `kata_concept_state` must match `[\w .\-]{1,80}` (`safe_
 Unknown provider: the core does not know which assistant reads a result. The gate therefore applies one fixed rule set to every result. It has no provider or content-class input, so no flag can skip the scan. Reason: critique F33, see `docs/design/critique.md`.
 
 Journal: a blocked result writes one `egress_block` entry with `{"tool", "reason"}` (`core/kata_core/mcp/tools.py:81`). The entry never holds the blocked text.
+
+## Device package lives in core/kata_device
+
+Decided 2026-11-21. The device-side code (`python -m kata_device`, git hooks, local queue, marker; the `kata` entry point is not built yet) is the package `core/kata_device/`, next to `kata_core` and imported with `core` on `PYTHONPATH`. Reason: the hooks and the core share the one secret scanner (`kata_core.egress.scanner`), so one tree and one test run cover both. The package imports `kata_core` only for the scanner; the queue and marker modules import nothing from core.
+
+## Device subcommands load through a lazy registry
+
+Decided 2026-11-21. `core/kata_device/cli.py` maps each command name to a `"module:function"` string in `REGISTRY`. A command module is imported only when its command runs, so a missing module fails that one command with a message. The entry `term` maps to `kata_term.cli:main`; phase 6 adds that package and no change to the dispatcher is needed for it. Reason: the pre-commit hook runs on every commit and must not import the terminal code, and a broken optional command must not break the hook.
+
+## Pre-commit scans staged lines in process with the one scanner
+
+Decided 2026-11-21. `core/kata_device/precommit.py` reads the staged added lines (`gitutil.staged_added_lines`) and scans each with `kata_core.egress.scanner.scan`, in the hook process. It has no time limit. This replaces the gitleaks binary from the earlier design (`docs/design/detailed-architecture.md:668`, "gitleaks locally with a 5 s limit"): the pre-commit hook does not use gitleaks (CI still runs gitleaks in the secrets job), and no external binary is needed. Reason: one rule set for the hook, the worker and the core, so a pattern fixed once is fixed everywhere, and no install step beyond Python. The 5 s limit is dropped because the scan is local and bounded by the staged diff size.
+
+## Block message names the kind and location only
+
+Decided 2026-11-21. A blocked commit prints one line per finding: `kata: blocked: <kind> at <file>:<line>`. The message never prints the matched text or the line. Reason: the terminal and the CI log must not copy the secret the hook found.
+
+## Pre-commit results are queued locally, not uploaded
+
+Decided 2026-11-21. Each pre-commit block and each post-commit bypass appends one JSON record to `<git_dir>/kata/queue.jsonl` (`core/kata_device/queue.py`, `enqueue`). The record holds the result and rule kinds with counts only, never paths or code. The upload is not built (the events API, `POST /v1/events`, has no `precommit` event type, so the queue has no sink yet); the finish phase lists it in `docs/backlog.md`. Reason: the hook must work offline and must not block a commit on the network.
+
+## Marker holds the staged tree hash and is cleared after every commit
+
+Decided 2026-11-21. A passing pre-commit writes the staged tree hash to `<git_dir>/kata/marker` (`core/kata_device/marker.py`). The post-commit hook compares that hash with the committed tree: a different hash, or no marker, queues a `bypassed` record. The marker is cleared after every post-commit, except a post-commit run while a rebase, merge, revert or cherry-pick is in progress (marker kept), so a stale marker never outlives a normal commit. Reason: a tree hash detects a skipped check (for example `--no-verify`) without storing any file content.
+
+## Installer never overwrites a hook or core.hooksPath
+
+Decided 2026-11-21. `python -m kata_device hooks install` (`core/kata_device/hooks.py`; the `kata` entry point is not built yet) writes `pre-commit` and `post-commit` only when neither file exists or the existing file carries its own marker line, and `core.hooksPath` is unset. Otherwise it prints the two command lines for the owner to add by hand and writes nothing. Reason: a hook the owner wrote, or a shared `core.hooksPath`, must not be replaced silently.
