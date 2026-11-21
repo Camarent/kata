@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 
 import httpx
+import pytest
 from fakes.fake_model import FakeModel
 
 JOB_DEADLINE_SECONDS = 20.0
@@ -15,6 +16,7 @@ POLL_STEP_SECONDS = 0.05
 HTTP_TIMEOUT_SECONDS = 10.0
 
 
+@pytest.mark.smoke
 def test_live_core_answers_over_http_and_requires_a_token(live_core: str) -> None:
     resp = httpx.get(f"{live_core}/auth/me", timeout=HTTP_TIMEOUT_SECONDS)
     assert resp.status_code == 401
@@ -35,6 +37,7 @@ def test_enrolled_devices_of_one_user_get_distinct_tokens(
         assert resp.status_code == 200
 
 
+@pytest.mark.smoke
 def test_running_worker_tags_a_queued_job(
     live_core: str,
     enrolled: Callable[[str, str], str],
