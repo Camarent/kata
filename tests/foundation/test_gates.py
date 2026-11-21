@@ -4,8 +4,15 @@ import json
 from pathlib import Path
 
 GATES_FILE = Path(__file__).resolve().parents[2] / "tools" / "gates.json"
-EXPECTED_NAMES = ["ruff", "mypy", "pytest", "extension-build", "extension-test"]
-CMD_PREFIX = "cs-qrun -- "
+EXPECTED_GATES = [
+    ("ruff", ".venv/bin/ruff check ."),
+    ("mypy", ".venv/bin/mypy core"),
+    ("smoke", ".venv/bin/python -m pytest tests -m smoke"),
+    ("pytest", ".venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term -m 'not flaky'"),
+    ("extension-build", "npm --prefix extension run build"),
+    ("extension-test", "npm --prefix extension run test:cov"),
+]
+EXPECTED_NAMES = [name for name, _ in EXPECTED_GATES]
 
 
 def load_gates() -> dict:
@@ -30,6 +37,11 @@ def test_entry_names_are_exact():
     assert names == EXPECTED_NAMES
 
 
-def test_every_cmd_runs_through_qrun():
+def test_entry_names_and_cmds_are_exact():
+    pairs = [(entry["name"], entry["cmd"]) for entry in load_gates()["gates"]]
+    assert pairs == EXPECTED_GATES
+
+
+def test_no_cmd_runs_through_qrun():
     for entry in load_gates()["gates"]:
-        assert entry["cmd"].startswith(CMD_PREFIX), entry["name"]
+        assert "cs-qrun" not in entry["cmd"], entry["name"]
