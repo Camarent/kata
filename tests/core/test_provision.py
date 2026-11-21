@@ -37,6 +37,7 @@ SCHEMA_TABLES = {
     "concepts",
     "concept_marks",
     "retrieval_entries",
+    "usage_daily",
 }
 
 
