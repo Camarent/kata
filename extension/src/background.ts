@@ -1,6 +1,6 @@
 import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
 import { DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
-import { CoreAuthError, CoreClient } from "./coreClient";
+import { CoreAuthError, CoreClient, type ConceptMark } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { runScan, type ScanResult } from "./scanSession";
 import type { SignInInput } from "./sidepanel";
@@ -24,10 +24,20 @@ export interface ChromeLike {
 export type PanelMessage =
   | { type: "panel:signIn"; input: SignInInput }
   | { type: "panel:scan" }
-  | { type: "panel:known"; topicId: number };
+  | { type: "panel:known"; topicId: number }
+  | { type: "panel:review" }
+  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] };
 
 /** Reply to a panel message: the result, or the error text. */
 export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string };
+
+/** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
+export interface ReviewRow {
+  conceptId: number;
+  label: string;
+  state: ConceptMark["state"] | null;
+  evidence: string;
+}
 
 /** Business logic behind the side panel; each call talks to the core. */
 export interface Backend {
@@ -35,6 +45,8 @@ export interface Backend {
   scan(): Promise<ScanResult[]>;
   markKnown(topicId: number): Promise<MarkOutcome>;
   flush(): Promise<FlushResult | null>;
+  review(): Promise<ReviewRow[]>;
+  setConcept(conceptId: number, state: ConceptMark["state"]): Promise<void>;
 }
 
 /** Builds the backend over the chrome tabs API and the extension storage area. */
@@ -79,6 +91,33 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       if (!session) return null;
       return new OfflineQueue(area, clientFor(session)).flush();
     },
+
+    async review() {
+      const session = await requireSession();
+      const client = clientFor(session);
+      const marks = await client.listConceptMarks();
+      if (marks.length === 0) return [];
+      const checks = await client.lessonCheck(marks.map((mark) => mark.concept_id));
+      const markById = new Map(marks.map((mark) => [mark.concept_id, mark]));
+      return checks.map((check): ReviewRow => {
+        const mark = markById.get(check.concept_id);
+        // A stored mark wins; with no mark, an abstaining check leaves the state null.
+        let state: ReviewRow["state"] = null;
+        if (mark) state = mark.state;
+        else if (check.state !== "abstain") state = check.state;
+        return {
+          conceptId: check.concept_id,
+          label: mark?.label ?? check.label,
+          state,
+          evidence: mark?.evidence ?? check.evidence,
+        };
+      });
+    },
+
+    async setConcept(conceptId, state) {
+      const session = await requireSession();
+      await clientFor(session).setConceptMark(conceptId, state);
+    },
   };
 }
 
@@ -92,6 +131,11 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
       return { ok: true, data: await backend.scan() };
     case "panel:known":
       return { ok: true, data: await backend.markKnown(message.topicId) };
+    case "panel:review":
+      return { ok: true, data: await backend.review() };
+    case "panel:setConcept":
+      await backend.setConcept(message.conceptId, message.state);
+      return { ok: true };
   }
 }
 
@@ -99,7 +143,13 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
 function isPanelMessage(message: unknown): message is PanelMessage {
   if (typeof message !== "object" || message === null) return false;
   const type = (message as { type?: unknown }).type;
-  return type === "panel:signIn" || type === "panel:scan" || type === "panel:known";
+  return (
+    type === "panel:signIn" ||
+    type === "panel:scan" ||
+    type === "panel:known" ||
+    type === "panel:review" ||
+    type === "panel:setConcept"
+  );
 }
 
 /**

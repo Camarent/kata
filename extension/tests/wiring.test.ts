@@ -166,4 +166,75 @@ describe("background wiring", () => {
     const reply = (await chrome.send({ type: "panel:scan" })) as PanelReply;
     expect(reply).toEqual({ ok: false, error: "page gave no blocks" });
   });
+
+  it("review merges each concept mark with its lesson check, mark state wins", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST" && url.endsWith("/lesson-check")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              { concept_id: 1, label: "A", state: "abstain", source: "", evidence: "" },
+              { concept_id: 2, label: "B", state: "learning", source: "", evidence: "from check" },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify([
+          { concept_id: 1, label: "A", state: "known", evidence: "marked", created_at: "", updated_at: "" },
+          { concept_id: 2, label: "B", state: "new", evidence: "", created_at: "", updated_at: "" },
+        ]),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = (await chrome.send({ type: "panel:review" })) as PanelReply;
+    expect(reply).toEqual({
+      ok: true,
+      data: [
+        { conceptId: 1, label: "A", state: "known", evidence: "marked" },
+        { conceptId: 2, label: "B", state: "new", evidence: "" },
+      ],
+    });
+    const checkCall = vi.mocked(fetchImpl).mock.calls.find(([input]) => String(input).endsWith("/lesson-check"));
+    expect(JSON.parse(String(checkCall?.[1]?.body))).toEqual({ concept_ids: [1, 2] });
+  });
+
+  it("review with no concept marks returns no rows and makes no lesson-check call", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = (await chrome.send({ type: "panel:review" })) as PanelReply;
+    expect(reply).toEqual({ ok: true, data: [] });
+    const urls = vi.mocked(fetchImpl).mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.endsWith("/lesson-check"))).toBe(false);
+  });
+
+  it("setConcept PUTs the new state of one concept mark", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = (await chrome.send({ type: "panel:setConcept", conceptId: 3, state: "known" })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    const [input, init] = vi.mocked(fetchImpl).mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(input).endsWith("/concepts/3/mark")).toBe(true);
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(String(init.body))).toEqual({ state: "known", evidence: "" });
+  });
+
+  it("review and setConcept without a session reply with the auth error", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
+    expect(await chrome.send({ type: "panel:review" })).toEqual({ ok: false, error: "not signed in" });
+    expect(await chrome.send({ type: "panel:setConcept", conceptId: 3, state: "known" })).toEqual({
+      ok: false,
+      error: "not signed in",
+    });
+  });
 });
