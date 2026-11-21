@@ -13,7 +13,10 @@ from typing import Any
 
 import psycopg
 
-JOB_COLUMNS = "id, user_id, payload, status, lease_expires_at, attempts, result_topic_id"
+JOB_COLUMNS = (
+    "id, user_id, payload, status, lease_expires_at, attempts, result_topic_id, kind, output"
+)
+DEFAULT_KIND = "tag"
 
 
 @dataclass(frozen=True)
@@ -25,17 +28,25 @@ class Job:
     lease_expires_at: datetime | None
     attempts: int
     result_topic_id: int | None
+    kind: str
+    output: dict[str, Any] | None
 
 
 def _job(row: tuple[Any, ...]) -> Job:
     return Job(*row)
 
 
-def enqueue(conn: psycopg.Connection[Any], user_id: int, payload: str) -> int:
-    """Queue a job for `user_id`. Returns the new job id."""
+def enqueue(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    payload: str,
+    kind: str = DEFAULT_KIND,
+) -> int:
+    """Queue a job of `kind` for `user_id`. Returns the new job id."""
     row = conn.execute(
-        "INSERT INTO jobs (user_id, payload, status) VALUES (%s, %s, 'queued') RETURNING id",
-        (user_id, payload),
+        "INSERT INTO jobs (user_id, payload, status, kind) "
+        "VALUES (%s, %s, 'queued', %s) RETURNING id",
+        (user_id, payload, kind),
     ).fetchone()
     if row is None:
         raise RuntimeError("enqueue: INSERT ... RETURNING id returned no row")
@@ -48,18 +59,19 @@ def claim_next(
     user_id: int,
     now: datetime,
     lease_seconds: int,
+    kinds: tuple[str, ...] = (DEFAULT_KIND,),
 ) -> Job | None:
-    """Lease the oldest queued job of `user_id`, or one whose lease has expired.
+    """Lease the oldest job of `user_id` with a kind in `kinds`: queued, or lease expired.
 
     The claimed job is set to leased with lease_expires_at = now + lease_seconds and
     attempts + 1. Returns None when no job is claimable.
     """
     picked = conn.execute(
         "SELECT id FROM jobs "
-        "WHERE user_id = %s AND (status = 'queued' "
+        "WHERE user_id = %s AND kind = ANY(%s) AND (status = 'queued' "
         "OR (status = 'leased' AND lease_expires_at <= %s)) "
         "ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED",
-        (user_id, now),
+        (user_id, list(kinds), now),
     ).fetchone()
     if picked is None:
         return None

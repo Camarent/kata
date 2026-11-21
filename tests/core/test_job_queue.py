@@ -92,3 +92,54 @@ def test_empty_queue_claims_none(db: ScratchDatabase) -> None:
     with db.connect() as conn:
         user = _user(conn, "alice")
         assert claim_next(conn, user, T0, LEASE_SECONDS) is None
+
+
+def test_enqueue_defaults_to_tag_kind(db: ScratchDatabase) -> None:
+    with db.connect() as conn:
+        user = _user(conn, "alice")
+        job_id = enqueue(conn, user, "tag this")
+
+        job = get_job(conn, job_id, user)
+        assert job is not None
+        assert job.kind == "tag"
+        assert job.output is None
+
+
+def test_row_inserted_without_kind_reads_as_tag(db: ScratchDatabase) -> None:
+    with db.connect() as conn:
+        user = _user(conn, "alice")
+        row = conn.execute(
+            "INSERT INTO jobs (user_id, payload, status) VALUES (%s, 'p', 'queued') RETURNING id",
+            (user,),
+        ).fetchone()
+        assert row is not None
+        job = get_job(conn, row[0], user)
+        assert job is not None
+        assert job.kind == "tag"
+
+
+def test_kind_filter_skips_other_kinds(db: ScratchDatabase) -> None:
+    with db.connect() as conn:
+        user = _user(conn, "alice")
+        embed_id = enqueue(conn, user, "embed this", kind="embed")
+        tag_id = enqueue(conn, user, "tag this")
+
+        # Default claim takes the tag job even though the embed job is older.
+        tag = claim_next(conn, user, T0, LEASE_SECONDS)
+        assert tag is not None
+        assert tag.id == tag_id
+        assert tag.kind == "tag"
+
+        embed = claim_next(conn, user, T0, LEASE_SECONDS, kinds=("embed",))
+        assert embed is not None
+        assert embed.id == embed_id
+        assert embed.kind == "embed"
+
+
+def test_default_claims_tag_only(db: ScratchDatabase) -> None:
+    with db.connect() as conn:
+        user = _user(conn, "alice")
+        enqueue(conn, user, "embed this", kind="embed")
+
+        assert claim_next(conn, user, T0, LEASE_SECONDS) is None
+        assert claim_next(conn, user, T0, LEASE_SECONDS, kinds=("embed",)) is not None
