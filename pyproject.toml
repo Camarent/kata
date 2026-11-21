@@ -25,6 +25,7 @@ markers = [
     "e2e: runs a live core, worker and fake model (tests/e2e), set by tests/conftest.py",
     "smoke: quick end-to-end sanity check, selected by hand",
     "flaky: known intermittent test, kept out of the gate until fixed",
+    "browser: real Firefox/Chrome through selenium (tests/browser), needs scripts/dev/install-browsers.sh",
 ]
 
 [tool.vulture]
