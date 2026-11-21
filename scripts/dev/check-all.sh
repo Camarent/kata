@@ -10,6 +10,10 @@
 #                                     full run, without the -m filter
 #   scripts/dev/check-all.sh --merge  pytest -m 'not e2e' (with coverage), extension build and test
 #   scripts/dev/check-all.sh --ext    extension build and test (with coverage) only
+#   scripts/dev/check-all.sh --browser  browser tests (tests/browser, -m browser) through selenium.
+#                                     Needs scripts/dev/install-browsers.sh; without it the step
+#                                     prints a skip line and exits 0. No Postgres.
+#   Every other mode excludes the browser marker (-m 'not browser'): CI and the gate have no browser.
 #   Coverage prints term tables into the log. The jscpd report prints a duplicate summary and
 #   never fails the gate: it has no threshold and its exit code is ignored.
 #   scripts/dev/check-all.sh --setup  create .venv and extension/node_modules when missing, run nothing
@@ -39,7 +43,7 @@ QRUN="${KATA_QRUN:-}"
 MODE_FLAG=""
 for arg in "$@"; do
   case "$arg" in
-    --unit|--py|--merge|--ext|--setup)
+    --unit|--py|--merge|--ext|--setup|--browser)
       if [ -n "$MODE_FLAG" ]; then
         echo "check-all: mode flags cannot be combined: $MODE_FLAG $arg" >&2
         exit 2
@@ -122,16 +126,28 @@ run_tests() {
 
 run_python() {
   run_lint
-  run_tests
+  run_tests -m 'not browser'
 }
 
 run_smoke() {
-  step smoke .venv/bin/python -m pytest tests -m smoke
+  step smoke .venv/bin/python -m pytest tests -m 'smoke and not browser'
 }
 
 run_extension() {
   step extension-build npm --prefix extension run build
   step extension-test npm --prefix extension run test:cov
+}
+
+# Browser tests need Firefox and geckodriver from install-browsers.sh. Without them: skip, exit 0.
+run_browser() {
+  local dir
+  dir="$(scripts/dev/install-browsers.sh --print-dir)"
+  if ! scripts/dev/install-browsers.sh --status; then
+    echo "check-all: browser tests skipped: firefox or geckodriver missing from $dir; run scripts/dev/install-browsers.sh"
+    exit 0
+  fi
+  step browser-deps uv pip install -q --python .venv/bin/python -r requirements-browser.txt
+  step browser .venv/bin/python -m pytest tests/browser -m browser
 }
 
 # Report only: jscpd has no threshold here, and a finding must not turn the gate red.
@@ -144,10 +160,11 @@ setup_python
 setup_extension
 case "$MODE" in
   setup) ;;
-  unit)  run_lint; run_tests -m 'not integration and not e2e and not smoke' ;;
+  unit)  run_lint; run_tests -m 'not integration and not e2e and not smoke and not browser' ;;
   py)    start_postgres; run_python ;;
-  merge) start_postgres; run_tests -m 'not e2e'; run_extension ;;
+  merge) start_postgres; run_tests -m 'not e2e and not browser'; run_extension ;;
   ext)   run_extension ;;
-  full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky'; run_extension; run_reports ;;
+  browser) run_browser ;;
+  full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky and not browser'; run_extension; run_reports ;;
 esac
 echo "CHECK-ALL OK ($MODE)"
