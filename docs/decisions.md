@@ -32,6 +32,9 @@ test the foundation, so it waits for a later milestone.
 - Adapters: (a) any OpenAI-compatible endpoint (local runtimes and hosted providers that offer
   that API); (b) a first-party API key; (c) optionally a vendor CLI as a subprocess, only for
   the large task class because start-up takes seconds.
+- Cloud is off by default. A cloud call needs both the provider's `allow_cloud` and the global
+  `[providers] cloud_enabled` set to true. Task classes are tag, explain, summary and batch.
+  The API key is read from the env var named by `api_key_env`, never from the config file.
 - A cost cap is built into the core and spend is tracked per call, per user.
 - Chat subscriptions and APIs are billed separately; subscription tokens must not be used in
   application code. The application uses API keys through its adapters.
@@ -145,9 +148,9 @@ A retrieval hit counts as evidence only when its fused RRF score is at least `[l
 
 `min_score` 0.02, `known_hits` 3 and `search_limit` 5 in `config/kata.example.toml:43-46` are starting values, not measured ones. They are set for the benchmark phase to check on labelled data; change them in config, not in code.
 
-## Lesson check: worker job not wired into loop.py yet
+## Lesson check stays synchronous in the core
 
-The worker has a `lesson_check` job (`worker/kata_worker/lesson_check.py`) and `CoreClient.lesson_check`, but `worker/kata_worker/loop.py` does not dispatch it yet. Until it does, only the `POST /lesson-check` route runs lesson checks.
+Lesson check runs synchronously in the core via `POST /lesson-check`. No worker job runs it. Reason: there is no consumer and no result channel (`POST /jobs/{id}/result` takes only category and topic and creates a shared topic), so a job could not return a check result. Revisit when embedding gets heavy.
 
 ## Model config key is `model_name`
 
@@ -206,3 +209,11 @@ Decided 2026-11-21. `tests/browser/test_panel_a11y.py` opens the side panel sign
 ## Dark-theme contrast of the sign-in view is at least 4.5 to 1 in Firefox and Chrome
 
 Decided 2026-11-21. `tests/browser/test_panel_contrast.py` opens the sign-in view with dark mode forced. For each text element (labels, input text, button text, error text) it takes the first non-transparent background up the ancestor chain, or the canvas colour, and computes the WCAG 2.x contrast ratio. It asserts every ratio is at least 4.5 (`MIN_RATIO`). How dark is forced: Firefox sets `layout.css.prefers-color-scheme.content-override` to 0 at launch (`tests/browser/conftest.py`); Chrome uses CDP `Emulation.setEmulatedMedia` from `force_dark_scheme` (`tests/browser/panel_page.py`). The case skips with a reason when `matchMedia('(prefers-color-scheme: dark)')` is false, so a browser that ignores the override does not pass silently. Outcome: Firefox and Chrome both passed on 2026-11-21, not skipped. Limit: the sign-in view only; the review screen and light theme are not covered. Reason: WCAG AA is the bar the backlog names; the threshold is a fixed constant, not tuned to the result.
+
+## Cost cap is per user per day in integer micro-USD
+
+Decided 2026-11-21. Spend is kept in table `usage_daily`, keyed by (user_id, day in UTC). The cap is per user per day. Money is stored as integer micro-USD, so no float rounding enters the sum. The price table is pinned in `worker/kata_worker/providers/cost.py`, not in config, so no config edit can understate a price. An unknown model price fails closed: the call is refused. Token counts are estimated as ceil(chars / 4) because `Provider.complete` returns only a str. The cap is checked before the call and the spend is recorded after it, so one call may overshoot the cap by its own cost. The warn threshold is a log line only. Local providers are free and are not checked against the cap. Reason: a config value cannot understate a price, and the cap stays simple to audit. Limit: the estimate is rough, and the overshoot is bounded by one call.
+
+## Routing uses one provider chain per task class, with no implicit local fallback
+
+Decided 2026-11-21. `[routing]` in `config/kata.example.toml` lists one comma-ordered chain per task class; `worker/kata_worker/providers/router.py` `Router.route` tries them in order and the first reply wins. A provider the chain does not list is never called, so local is a fallback only when the chain names it (`tests/worker/test_router.py:152`). Each cloud provider is wrapped as `guarded(capped(inner))`: the secret guard runs before the cost cap, so a blocked text never reads the ledger or reaches the API. Task classes stay `tag`, `explain`, `summary` and `batch`. `lesson_check` is not a task class: it is a synchronous core call since phase 01, and no worker job runs it. Reason: the chain makes the order of providers visible in config, and the wrap order keeps secret text out of the spend path. Limit: a chain of only cloud providers fails the job when the cap or the guard refuses, with no local answer.

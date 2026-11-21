@@ -1,4 +1,4 @@
-"""Worker core client against the fake core: claim, none, report, fail, loopback-only URLs, token."""
+"""Worker core client against the fake core: claim, none, report, fail, usage, loopback-only URLs, token."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import pytest
 from fakes.fake_core import FakeCore
 from kata_core.config import Config
 from kata_worker.core_client import CoreClient, CoreError, Job, resolve_token
+from kata_worker.providers.cost import Ledger
 
 TOKEN_ENV = "KATA_WORKER_TOKEN"
 
@@ -102,3 +103,59 @@ def test_missing_token_env_is_a_clear_error(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(ValueError, match=TOKEN_ENV):
         CoreClient(_cfg("http://127.0.0.1:8080"))
+
+
+def test_record_then_read_usage_today(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    client.record_usage(1_500)
+    client.record_usage(250)
+
+    assert client.usage_today() == 1_750
+    assert [(r.method, r.path) for r in fake_core.requests] == [
+        ("POST", "/usage"),
+        ("POST", "/usage"),
+        ("GET", "/usage"),
+    ]
+    assert json.loads(fake_core.requests[0].body) == {"micro_usd": 1_500}
+
+
+def test_record_usage_bad_status_raises(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token="not-the-token")
+
+    with pytest.raises(CoreError, match="401"):
+        client.record_usage(1)
+    assert fake_core.usage_totals() == (0, 0)
+
+
+def test_record_usage_accepts_only_204(fake_core: FakeCore) -> None:
+    fake_core.usage_post_status = 200
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    with pytest.raises(CoreError, match="200"):
+        client.record_usage(1)
+
+
+def test_usage_today_bad_status_raises(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token="not-the-token")
+
+    with pytest.raises(CoreError, match="401"):
+        client.usage_today()
+
+
+@pytest.mark.parametrize(
+    "raw", [b"not json", b'{"calls": 1}', b'{"micro_usd": null}', b'{"micro_usd": "x"}']
+)
+def test_usage_today_unreadable_body_raises(fake_core: FakeCore, raw: bytes) -> None:
+    fake_core.usage_body = raw
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    with pytest.raises(CoreError, match="unreadable usage body"):
+        client.usage_today()
+
+
+def test_core_client_satisfies_ledger_protocol(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    ledger: Ledger = client  # mypy checks the structural match with the Protocol
+    assert isinstance(ledger, Ledger)

@@ -13,10 +13,15 @@ import pytest
 from fakes import fake_model as fake_model_module
 from fakes.fake_core import FakeCore
 from fakes.fake_model import FakeModel
+from fakes.fake_provider import FakeProvider
 from kata_core.config import Config, load_config
 from kata_worker.core_client import CoreClient
-from kata_worker.loop import run_forever, run_once
-from kata_worker.model import ModelAdapter
+from kata_worker.loop import TAG_CLASS, run_forever, run_once
+from kata_worker.model import SYSTEM_PROMPT
+from kata_worker.providers.base import ProviderError
+from kata_worker.providers.local import LocalProvider
+from kata_worker.providers.policy import Policy
+from kata_worker.providers.router import Router
 
 TOKEN_ENV = "KATA_WORKER_TOKEN"
 EXAMPLE_CONFIG = Path(__file__).resolve().parents[2] / "config" / "kata.example.toml"
@@ -54,6 +59,25 @@ def _tag_reply(category: str, topic: str) -> str:
     return json.dumps({"category": category, "topic": topic})
 
 
+def _local_router(cfg: Config) -> Router:
+    """A router whose only provider is the local one, which calls the fake model over HTTP."""
+    return Router(
+        {TAG_CLASS: ("local",)}, {"local": LocalProvider(cfg)}, Policy.from_config(cfg), [].append
+    )
+
+
+def _cloud_tag_policy(cfg: Config) -> Policy:
+    """Policy with the cloud switch on and the anthropic provider allowed to run tag."""
+    sections = dict(cfg.sections)
+    sections["providers"] = {"cloud_enabled": True}
+    sections["provider_anthropic"] = {
+        **cfg.sections["provider_anthropic"],
+        "allow_cloud": True,
+        "task_classes": TAG_CLASS,
+    }
+    return Policy.from_config(Config(sections=sections))
+
+
 def test_run_once_tags_job_and_reports_scripted_topic(
     fake_core: FakeCore, fake_model: FakeModel, token_env: str
 ) -> None:
@@ -61,9 +85,9 @@ def test_run_once_tags_job_and_reports_scripted_topic(
     fake_core.enqueue({"id": 7, "payload": "pasta recipe text"})
     fake_model.add_reply(_tag_reply("food", "pasta"))
     client = CoreClient(cfg, token=token_env)
-    adapter = ModelAdapter(cfg)
+    router = _local_router(cfg)
 
-    assert run_once(client, adapter) is True
+    assert run_once(client, router) is True
 
     assert fake_model.requests[0].body["messages"][1]["content"] == "pasta recipe text"
     report = [r for r in fake_core.requests if r.method == "POST"]
@@ -81,10 +105,10 @@ def test_model_error_fails_job_and_loop_continues(
     fake_model.add_reply(500)
     fake_model.add_reply(_tag_reply("news", "election"))
     client = CoreClient(cfg, token=token_env)
-    adapter = ModelAdapter(cfg)
+    router = _local_router(cfg)
 
-    assert run_once(client, adapter) is True
-    assert run_once(client, adapter) is True
+    assert run_once(client, router) is True
+    assert run_once(client, router) is True
 
     posts = [(r.path, r.body) for r in fake_core.requests if r.method == "POST"]
     assert posts == [
@@ -98,12 +122,47 @@ def test_run_once_returns_false_when_idle_and_does_not_report(
 ) -> None:
     cfg = _config(fake_core.url, fake_model.url)
     client = CoreClient(cfg, token=token_env)
-    adapter = ModelAdapter(cfg)
+    router = _local_router(cfg)
 
-    assert run_once(client, adapter) is False
+    assert run_once(client, router) is False
 
     assert [r.method for r in fake_core.requests] == ["GET"]
     assert fake_model.requests == []
+
+
+def test_failing_first_provider_falls_to_second_and_reports_its_tag(
+    fake_core: FakeCore, token_env: str
+) -> None:
+    cfg = _config(fake_core.url, "http://127.0.0.1:9")  # unused: both providers are in-process fakes
+    cloud = FakeProvider(name="anthropic", is_cloud=True, script=[ProviderError("cloud down")])
+    local = FakeProvider(name="local", script=[_tag_reply("food", "pasta")])
+    router = Router(
+        {TAG_CLASS: ("anthropic", "local")},
+        {"anthropic": cloud, "local": local},
+        _cloud_tag_policy(cfg),
+        [].append,
+    )
+    fake_core.enqueue({"id": 3, "payload": "pasta recipe text"})
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, router) is True
+
+    assert local.calls == [(SYSTEM_PROMPT, "pasta recipe text")]
+    posts = [(r.path, json.loads(r.body)) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/3/result", {"category": "food", "topic": "pasta"})]
+
+
+def test_route_exhausted_fails_job(fake_core: FakeCore, token_env: str) -> None:
+    cfg = _config(fake_core.url, "http://127.0.0.1:9")  # unused: the only provider is a fake
+    local = FakeProvider(name="local", script=[ProviderError("local down")])
+    router = Router({TAG_CLASS: ("local",)}, {"local": local}, Policy.from_config(cfg), [].append)
+    fake_core.enqueue({"id": 4, "payload": "text"})
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, router) is True
+
+    posts = [(r.path, r.body) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/4/fail", b"")]
 
 
 @pytest.mark.usefixtures("token_env")

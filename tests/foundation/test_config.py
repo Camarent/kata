@@ -47,7 +47,14 @@ def test_example_has_required_sections() -> None:
         "client",
         "retrieval",
         "lesson_check",
+        "cost",
+        "routing",
+        "providers",
+        "provider_local",
+        "provider_anthropic",
     }
+    assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
+    assert set(data["routing"]) == {"tag", "explain", "summary", "batch"}
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
@@ -68,6 +75,20 @@ def test_example_has_required_sections() -> None:
         "dimensions",
     }
     assert set(data["lesson_check"]) == {"min_score", "known_hits", "search_limit"}
+    assert set(data["providers"]) == {"cloud_enabled"}
+    assert set(data["provider_local"]) == {"task_classes"}
+    assert set(data["provider_anthropic"]) == {
+        "allow_cloud",
+        "task_classes",
+        "base_url",
+        "model_name",
+        "api_key_env",
+        "timeout_seconds",
+        "max_tokens",
+        "api_version",
+    }
+    assert data["providers"]["cloud_enabled"] is False
+    assert data["provider_anthropic"]["allow_cloud"] is False
     assert data["core"]["host"] == "127.0.0.1"
     assert data["database"]["host"] == "127.0.0.1"
 
@@ -105,6 +126,20 @@ def test_env_overrides_each_key_with_cast(tmp_path: Path) -> None:
     assert cfg.get("database", "host") == "127.0.0.2"
     assert cfg.get("worker", "poll_interval_seconds") == 7
     assert cfg.get("model", "timeout_seconds") == 90
+
+
+def test_env_overrides_routing_chain(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    assert load_config(path, env={}).get("routing", "explain") == "anthropic,local"
+    cfg = load_config(path, env={"KATA_ROUTING_EXPLAIN": "local"})
+    assert cfg.get("routing", "explain") == "local"
+
+
+def test_env_overrides_bool_cloud_switch(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    assert load_config(path, env={}).get("providers", "cloud_enabled") is False
+    cfg = load_config(path, env={"KATA_PROVIDERS_CLOUD_ENABLED": "true"})
+    assert cfg.get("providers", "cloud_enabled") is True
 
 
 def test_env_override_bad_cast_raises(tmp_path: Path) -> None:

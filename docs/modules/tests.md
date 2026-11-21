@@ -1,6 +1,6 @@
 ---
 paths: [tests/]
-summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client), e2e (one full lesson round trip)
+summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client, providers, scanner and guard, cost, router), e2e (one full lesson round trip)
 ---
 # tests
 
@@ -22,7 +22,6 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/test_api_*.py` - HTTP routes end to end.
 - `tests/core/test_repo_*.py`, `test_job_queue.py`, `test_importer.py`, `test_provision.py` - storage and queue units.
 - `tests/core/test_lesson_check.py`, `tests/core/test_api_lesson_check.py` - lesson-check rule order (checker) and `POST /lesson-check` over HTTP.
-- `tests/worker/test_worker_lesson_check.py` - lesson-check payload and `CoreClient.lesson_check` against `tests/fakes/fake_core.py`.
 - `tests/foundation/` - config, docs, gates, extension, package metadata.
 - `tests/scripts/test_bench_lesson_check.py` - lesson-check bench runner on a scratch DB (fake embedder only); `test_bench_scoring.py` - pure three-state scoring; `test_bench_results_note.py` - the block in `docs/research/benchmarks/RESULTS.md` equals the bench output (paste the printed block when stale).
 - `tests/scripts/test_install_browsers.py` - `scripts/dev/install-browsers.sh`: install dir, `--status` exit codes, sha256 check; no network.
@@ -32,6 +31,14 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_a11y.py:22` `test_signin_tab_order_and_focus_indicator` - keyboard tab order and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py:90` `test_panel_signin_dark_theme_contrast` - dark-theme contrast; `:72` `contrast_ratio`.
 - `tests/browser/panel_page.py:25` `panel_url`, `:31` `open_panel`, `:39` `force_dark_scheme` - shared panel helpers.
+- `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
+- `tests/worker/test_cost.py` - cost estimate in integer micro-USD from pinned prices.
+- `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
+- `tests/worker/test_router.py` - router: first success wins and later providers are not called (`:74`); policy-denied cloud skipped without call (`:81`); over-cap and failing providers fall to the next (`:92`, `:101`); secret block falls to local (`:116`); exhausted names skipped and failed only (`:130`); no implicit local fallback (`:152`); `build_router` config errors (`:174`-`:195`); guard runs before cap (`:203`).
+- `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:182`); missing key raises at construction (`:245`).
+- `tests/worker/test_scanner.py` - secret scanner: expected kinds (`:33`), rule table coverage (`:37`), offset (`:42`), findings hold no text (`:48`), frozen (`:54`), low-entropy token not flagged (`:60`).
+- `tests/worker/test_scanner_guard.py` - guard: clean text reaches inner provider (`:36`), a secret blocks the call with one event per finding (`:45`, `:65`), no secret text in errors or events (`:75`), local passes unscanned (`:92`), no skip parameter (`:116`), cloud classes not named outside guard (`:138`, `:174`).
+- `tests/fakes/fake_provider.py:13` `FakeProvider` - scripted provider for tests; records calls.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
 - `tests/e2e/test_driver.py` - driver alone against a fake core (scan, tag, mark; auth error exits 1).

@@ -22,6 +22,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/routes/topics.py:54` `GET /topics`, `:63` `POST /topics`, `:72` `POST /topics/{id}/aliases`.
 - `core/kata_core/auth/service.py:41` `hash_secret`, `:46` `new_enrolment`, `:59` `redeem`, `:77` `authenticate`, `:86` `revoke`, `:35` `Authenticator` (Protocol), `:91` `TokenAuthenticator`.
 - `core/kata_core/auth/admin.py:31` `build_parser`, `:43` `run`, `:65` `main`; CLI `python3 -m kata_core.auth.admin` (`:79`).
+- `core/kata_core/api/routes/usage.py:33` `POST /usage` (`record_usage`, 204), `:40` `GET /usage` (`read_usage`, returns `UsageOut` `:27`); request model `UsageIn` `:23`.
+- `core/kata_core/storage/usage.py:14` `add_usage(conn, user_id, day, micro_usd)` - one atomic upsert, raises `ValueError` (`:17`) when negative; `:26` `get_usage(conn, user_id, day) -> (micro_usd, calls)`.
+- `core/migrations/0004_usage.sql` table `usage_daily` `:4` (PK `user_id, day`; `micro_usd` bigint CHECK `>= 0`; `calls` integer).
 - `core/kata_core/importer/skill_list.py:45` `parse(text)`, `:73` `import_list(conn, user_id, text)`, `:23` `ParseError`.
 - `core/kata_core/jobs/queue.py:34` `enqueue`, `:45` `claim_next` (lease), `:74` `complete`, `:92` `fail`, `:102` `get_job`.
 - `core/kata_core/storage/provision.py:34` `connect`, `:52` `create_database`, `:58` `drop_database`, `:70` `migrate`.
@@ -45,6 +48,8 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/jobs/queue.py` - tagging queue with expiring leases.
 - `core/kata_core/importer/skill_list.py` - skill list parser and import.
 - `core/kata_core/storage/provision.py` - create/drop DB, apply migrations.
+- `core/kata_core/api/routes/usage.py` and `core/kata_core/storage/usage.py` - per-user daily spend (micro-USD) and call count.
+- `core/migrations/0004_usage.sql` - `usage_daily`.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
@@ -69,6 +74,8 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Lesson check rule order (`check_lesson`, `core/kata_core/lesson_check/checker.py:40`), per concept, in input order: (1) a concept not visible to the user raises `LookupError`, and the route answers 404 for the whole request; (2) a mark of the user wins and its state is taken as is (`source` `mark`); (3) otherwise the concept label is searched in the user's visible retrieval entries, and hits scoring at least `[lesson_check] min_score` are kept; (4) no kept hit gives `abstain`; (5) `known_hits` or more kept hits give `known`, fewer give `learning`. Retrieval never gives `new`.
 - Score scale: hits carry the fused RRF score (`1 / (rrf_k + rank)` summed over the keyword and vector lists). With the example `rrf_k` 60, one list gives at most 1/61, below the example `min_score` 0.02, so a hit passes only when both lists rank it.
 - Lesson check reads `[lesson_check]` (`min_score`, `known_hits`, `search_limit`) and `[retrieval]` (through `Retriever.from_config`); every query filters by `user_id`.
+- Usage is per user per day in UTC: `usage_daily` is keyed by `(user_id, day)` and money is integer micro-USD; the route takes the day from the server clock (`core/kata_core/api/routes/usage.py:36`, `:43`), never from the client.
+- `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`).
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.

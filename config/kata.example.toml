@@ -44,3 +44,30 @@ dimensions = 64
 min_score = 0.02
 known_hits = 3
 search_limit = 5
+
+[cost]
+cap_micro_usd = 2000000
+warn_micro_usd = 1500000
+
+[routing]
+# Per task class: comma list of provider names, tried in order.
+tag = "local"
+explain = "anthropic,local"
+summary = "anthropic"
+batch = "anthropic"
+
+[providers]
+cloud_enabled = false
+
+[provider_local]
+task_classes = "tag,explain"
+
+[provider_anthropic]
+allow_cloud = false
+task_classes = "explain,summary,batch"
+base_url = "https://api.anthropic.com"
+model_name = "claude-model"
+api_key_env = "KATA_ANTHROPIC_API_KEY"
+timeout_seconds = 60
+max_tokens = 1024
+api_version = "2023-06-01"

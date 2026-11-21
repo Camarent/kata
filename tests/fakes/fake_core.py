@@ -26,10 +26,12 @@ class FakeCore:
     token: str
     queue: list[dict[str, Any]] = field(default_factory=list)
     requests: list[RecordedRequest] = field(default_factory=list)
-    # Results POST /lesson-check answers with; None means abstain for every requested id.
-    lesson_results: list[dict[str, Any]] | None = None
-    # Status POST /lesson-check answers with; anything but 200 is sent as an error.
-    lesson_status: int = 200
+    usage_micro_usd: int = 0
+    usage_calls: int = 0
+    # Status answered to POST /usage when the usage body is valid (the core answers 204).
+    usage_post_status: int = 204
+    # When set, GET /usage answers 200 with these raw bytes instead of the total (broken-body tests).
+    usage_body: bytes | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _server: HTTPServer | None = None
     _thread: threading.Thread | None = None
@@ -45,6 +47,15 @@ class FakeCore:
     def pop_job(self) -> dict[str, Any] | None:
         with self._lock:
             return self.queue.pop(0) if self.queue else None
+
+    def add_usage(self, micro_usd: int) -> None:
+        with self._lock:
+            self.usage_micro_usd += micro_usd
+            self.usage_calls += 1
+
+    def usage_totals(self) -> tuple[int, int]:
+        with self._lock:
+            return self.usage_micro_usd, self.usage_calls
 
     @property
     def url(self) -> str:
@@ -76,23 +87,24 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
         def _authorized(self) -> bool:
             return self.headers.get("Authorization") == BEARER_PREFIX + core.token
 
-        def _lesson_check(self, body: bytes) -> None:
-            try:
-                ids = json.loads(body)["concept_ids"]
-            except (ValueError, KeyError, TypeError):
-                self._send(400, {"error": "bad lesson-check body"})
+        def _usage(self, method: str, body: bytes) -> None:
+            if method == "POST":
+                try:
+                    micro_usd = int(json.loads(body)["micro_usd"])
+                except (ValueError, KeyError, TypeError):
+                    self._send(400, {"error": "bad usage body"})
+                    return
+                core.add_usage(micro_usd)
+                self._send(core.usage_post_status)
                 return
-            if core.lesson_status != 200:
-                self._send(core.lesson_status, {"error": "lesson-check failed"})
+            if core.usage_body is not None:
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(core.usage_body)))
+                self.end_headers()
+                self.wfile.write(core.usage_body)
                 return
-            if core.lesson_results is not None:
-                results = core.lesson_results
-            else:
-                results = [
-                    {"concept_id": cid, "label": "", "state": "abstain", "source": "none", "evidence": []}
-                    for cid in ids
-                ]
-            self._send(200, {"results": results})
+            total, calls = core.usage_totals()
+            self._send(200, {"micro_usd": total, "calls": calls})
 
         def _handle(self, method: str) -> None:
             body = self._body()
@@ -109,12 +121,12 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
                 else:
                     self._send(200, job)
                 return
+            if self.path == "/usage" and method in ("GET", "POST"):
+                self._usage(method, body)
+                return
             is_outcome = len(parts) == 3 and parts[0] == "jobs" and parts[2] in ("result", "fail")
             if method == "POST" and is_outcome:
                 self._send(204)
-                return
-            if method == "POST" and self.path == "/lesson-check":
-                self._lesson_check(body)
                 return
             self._send(404, {"error": "not found"})
 

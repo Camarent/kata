@@ -33,7 +33,7 @@ def _strip_fence(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _reply_content(response: httpx.Response) -> str:
+def reply_content(response: httpx.Response) -> str:
     try:
         content = response.json()["choices"][0]["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError) as exc:
@@ -43,7 +43,8 @@ def _reply_content(response: httpx.Response) -> str:
     return content
 
 
-def _parse_tag(reply: str) -> tuple[str, str]:
+def parse_tag(reply: str) -> tuple[str, str]:
+    """Return (category, topic) from a JSON tag reply; raise ModelError when the reply is unusable."""
     try:
         fields = json.loads(_strip_fence(reply))
     except ValueError as exc:
@@ -86,4 +87,4 @@ class ModelAdapter:
             raise ModelError(f"model request failed: {exc}") from exc
         if response.status_code != httpx.codes.OK:
             raise ModelError(f"model returned status {response.status_code}")
-        return _parse_tag(_reply_content(response))
+        return parse_tag(reply_content(response))
