@@ -47,7 +47,14 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0005_journal.sql` table `journal_entry` `:4` (`id` bigserial, `user_id` cascade, `kind`, `detail` jsonb, `created_at`); index `:12` on `(user_id, id DESC)`.
 - `core/kata_core/policy/engine.py:60` `Policy` - in-memory per-user decisions; `:61` `__init__(config, clock)`, `:69` `from_config(cfg, clock)`, `:72` `observe(user_id, event_kind, at) -> list[Decision]`. Event kinds `EventKind` `:21` (`error`, `ok`, `idle`); decision kinds `DecisionKind` `:22` (`quiet_mark`, `nudge`, `stop`).
 - `core/kata_core/policy/engine.py:26` `PolicyConfig` (frozen; fields from `[policy]`), `:38` `from_config`; `:53` `Decision` (`kind`, `user_id`, `at`, `detail`).
-- No non-test caller of `kata_core.policy` or `write_entry` exists yet: no route or worker feeds events into `Policy` (grep, this run).
+- `core/kata_core/api/routes/events.py:100` `POST /v1/events` (`post_events`; body `EventsIn` `:33`, at most `MAX_EVENTS_PER_BATCH` 100 at `:29`; response `EventsOut` `:50`); accepted events go to `Policy.observe` and decisions to `enqueue_decisions`.
+- `core/kata_core/api/routes/events.py:130` `GET /v1/messages` (`get_messages`; response `MessagesOut` `:55`); each message is returned once.
+- `core/kata_core/api/routes/events.py:69` `_policy(request)` - one `Policy` per app, cached on `app.state.policy`.
+- `core/kata_core/events/envelope.py:58` `validate(raw, now) -> Envelope | Rejection`; `:28` `Envelope` (`event_id`, `type`, `occurred_at`, `payload`); `:36` `Rejection(reason)`; reasons `bad_envelope`, `unknown_type`, `clock_skew` (`:21-23`).
+- `core/kata_core/events/store.py:19` `ingest(conn, user_id, device_id, env, now)` - returns `accepted` or `duplicate`.
+- `core/kata_core/delivery/messages.py:31` `enqueue(conn, user_id, kind, body, now)`; `:48` `deliver_pending(conn, user_id, now, limit=50)`; `:89` `enqueue_decisions(conn, decisions, now)`; `:24` `Message`.
+- `core/kata_core/journal/store.py:28` `write_entry` is called by `core/kata_core/delivery/messages.py:79` (one `message_delivered` entry per delivered message).
+- `core/migrations/0006_events.sql` tables `event` `:5` (UNIQUE `user_id, event_id`) and `message` `:17` (`delivered_at` NULL = pending); pending index `:27`.
 
 ## Key files
 - `core/kata_core/egress/scanner.py` - secret scanner rules (shared by worker guard).
@@ -62,6 +69,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0005_journal.sql` - `journal_entry`.
 - `core/kata_core/journal/store.py` and `api/routes/journal.py` - per-user journal, paged newest first.
 - `core/kata_core/policy/engine.py` - pure policy decisions (nudge, stop, quiet mark) from error and idle events; config `[policy]`.
+- `core/kata_core/events/` - device event envelope validation (`envelope.py`) and idempotent storage (`store.py`).
+- `core/kata_core/delivery/messages.py` - message queue: enqueue, once-only delivery, policy decisions as messages.
+- `core/migrations/0006_events.sql` - `event` and `message` tables.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
@@ -96,7 +106,12 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Policy events older than `late_event_seconds` before the clock are dropped with no state change (`core/kata_core/policy/engine.py:73-75`).
 - Policy rate limit is per user and per decision kind (`core/kata_core/policy/engine.py:116-119`). A quiet mark needs prior activity; idle with no earlier `ok`/`error` gives nothing (`core/kata_core/policy/engine.py:106-107`).
 - Unknown event kind raises `ValueError` (`core/kata_core/policy/engine.py:83`).
+- Event ingest: a rejected event is never stored; a duplicate `event_id` (`ON CONFLICT DO NOTHING`, `core/kata_core/events/store.py:19`) is not observed again; only `accepted` events reach `Policy.observe` (`core/kata_core/api/routes/events.py:118-121`).
+- Event `user_id` and `device_id` come from the token (`core/kata_core/api/routes/events.py:118`); `event_id` is unique per user, not globally (`core/migrations/0006_events.sql:14`).
+- Messages are delivered once: `deliver_pending` sets `delivered_at`; rows locked by a concurrent delivery are skipped (`core/kata_core/delivery/messages.py:48`).
+- `POST /v1/events` returns the caller's pending messages in its response (piggyback); `GET /v1/messages` returns and marks them the same way (`core/kata_core/api/routes/events.py:100`, `:130`).
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.
+- Events: `events/` and `delivery/` use `policy` (`Policy.observe`) and `journal/store.py` (`write_entry`); `api/routes/events.py` wires them.
 - Used by: `tests/core/` (API and repository tests), `scripts/db/kata_db.py` (provisioning). Model worker client: TODO(verify), not found in repo.
