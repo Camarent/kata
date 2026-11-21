@@ -32,6 +32,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/concepts/marks` | bearer | none | 200 list of `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | |
 | PUT | `/concepts/{concept_id}/mark` | bearer | `{"state": "known" \| "learning" \| "new", "evidence": str = ""}` | 200 `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | 404 concept not found; 422 unknown state |
 | DELETE | `/concepts/{concept_id}/mark` | bearer | none | 204 | 404 mark not found |
+| POST | `/lesson-check` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"results": [{"concept_id", "label", "state", "source", "evidence"}]}`, in input order | 404 a concept is not visible to the caller (nothing partial); 422 empty or non-integer list |
 
 Notes:
 
@@ -40,6 +41,7 @@ Notes:
 - A topic created with `private: false` (the default) is shared. A private topic and a private alias belong to the caller.
 - Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.
 - A concept made through `POST /concepts` belongs to its creator. A repeated label under the same topic and owner hits the unique index; the route does not map that error to a 4xx yet.
+- `POST /lesson-check` gives the state of each concept for the caller. `state` is `known`, `learning` or `abstain` from retrieval; a caller's mark gives its own state, which may be `new`. Retrieval never gives `new`: it cannot prove absence. `source` is `mark` when the caller's concept mark decides; then `evidence` is the mark's text. Otherwise `source` is `retrieval` and `evidence` is a list of `{"source_ref", "score"}` hits. An abstain has `source` `none` and `evidence` `[]`. The user id comes from the token, never from the body.
 
 ## Skill list file format
 

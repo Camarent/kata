@@ -16,6 +16,8 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/routes/concepts.py:56` `POST /concepts`, `:65` `GET /concepts/marks`, `:83` `PUT /concepts/{id}/mark`, `:104` `DELETE /concepts/{id}/mark`; request models `ConceptIn` `:31`, `ConceptMarkIn` `:42`.
 - `core/kata_core/api/routes/importing.py:25` `POST /import`.
 - `core/kata_core/api/routes/jobs.py:69` `POST /jobs`, `:75` `GET /jobs/next`, `:89` `POST /jobs/{id}/result`, `:102` `POST /jobs/{id}/fail`, `:110` `GET /jobs/{id}`.
+- `core/kata_core/api/routes/lesson_check.py:54` `POST /lesson-check` (`lesson_check_route` `:55`); request `LessonCheckIn` `:26`, response `LessonCheckOut` `:44`.
+- `core/kata_core/lesson_check/checker.py:30` `ConceptCheck`, `:40` `check_lesson(conn, retriever, cfg, user_id, concept_ids)`, `:60` `_check_one` (the rule order below).
 - `core/kata_core/api/routes/marks.py:35` `GET /marks`, `:44` `PUT /marks/{topic_id}`, `:57` `DELETE /marks/{topic_id}`.
 - `core/kata_core/api/routes/topics.py:54` `GET /topics`, `:63` `POST /topics`, `:72` `POST /topics/{id}/aliases`.
 - `core/kata_core/auth/service.py:41` `hash_secret`, `:46` `new_enrolment`, `:59` `redeem`, `:77` `authenticate`, `:86` `revoke`, `:35` `Authenticator` (Protocol), `:91` `TokenAuthenticator`.
@@ -63,6 +65,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Vector ranking is cosine in Python over `real[]` embeddings, no pgvector yet; only entries whose `embedding_model` equals the active `embedder.name` are compared (`core/kata_core/retrieval/retriever.py:72-83`).
 - Retrieval config (`[retrieval]`, `config/kata.example.toml:36-41`): `embedder` = `"fake"` or `"model"` (any other value raises ValueError, `core/kata_core/retrieval/embedder.py:94`); `dimensions` (fake embedder size); `rrf_k` (RRF constant, example value 60); `candidate_limit` (max ids taken per side); `model` (sentence_transformers model id, read at `core/kata_core/retrieval/embedder.py:92`). Mismatch: the example file names this key `model_name` (`config/kata.example.toml:38`), so `model` is unset there: TODO(verify) which name is intended.
 - Tests use `FakeEmbedder` only. The `model` embedder is never run in CI.
+- Lesson check rule order (`check_lesson`, `core/kata_core/lesson_check/checker.py:40`), per concept, in input order: (1) a concept not visible to the user raises `LookupError`, and the route answers 404 for the whole request; (2) a mark of the user wins and its state is taken as is (`source` `mark`); (3) otherwise the concept label is searched in the user's visible retrieval entries, and hits scoring at least `[lesson_check] min_score` are kept; (4) no kept hit gives `abstain`; (5) `known_hits` or more kept hits give `known`, fewer give `learning`. Retrieval never gives `new`.
+- Score scale: hits carry the fused RRF score (`1 / (rrf_k + rank)` summed over the keyword and vector lists). With the example `rrf_k` 60, one list gives at most 1/61, below the example `min_score` 0.02, so a hit passes only when both lists rank it.
+- Lesson check reads `[lesson_check]` (`min_score`, `known_hits`, `search_limit`) and `[retrieval]` (through `Retriever.from_config`); every query filters by `user_id`.
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.

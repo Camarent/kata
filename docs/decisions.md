@@ -132,3 +132,19 @@ A `retrieval_entries` row with `owner_user_id` set is private to that user. A ro
 `owner_user_id` NULL is shared and visible to every user (`core/migrations/0003_retrieval.sql:6`,
 `core/kata_core/retrieval/store.py:45`). Both the keyword and the vector side filter on the
 caller's id, so a private entry never reaches another user.
+
+## Lesson check: retrieval never yields 'new'
+
+Only a mark can say a concept is `new`. Absence of retrieval entries is not proof that the user has not met the concept, so a concept with no kept evidence gets `abstain`, not `new` (`core/kata_core/lesson_check/checker.py:6`).
+
+## Lesson check: abstain below min_score on the RRF scale
+
+A retrieval hit counts as evidence only when its fused RRF score is at least `[lesson_check] min_score` (`checker.py:79`). The score is a sum of `1 / (rrf_k + rank)` over the keyword and vector lists. With `rrf_k` 60, one list gives at most 1/61 (about 0.0164), so the example `min_score` 0.02 passes a hit only when both lists rank it. Below the threshold the concept abstains.
+
+## Lesson check: thresholds are placeholders for the benchmark phase
+
+`min_score` 0.02, `known_hits` 3 and `search_limit` 5 in `config/kata.example.toml:43-46` are starting values, not measured ones. They are set for the benchmark phase to check on labelled data; change them in config, not in code.
+
+## Lesson check: worker job not wired into loop.py yet
+
+The worker has a `lesson_check` job (`worker/kata_worker/lesson_check.py`) and `CoreClient.lesson_check`, but `worker/kata_worker/loop.py` does not dispatch it yet. Until it does, only the `POST /lesson-check` route runs lesson checks.
