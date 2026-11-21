@@ -6,8 +6,8 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [config](modules/config.md) - TOML loader and env overrides; source of all settings.
 - [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, Postgres storage.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
-- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases.
-- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node).
+- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate).
+- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/scripts` (bench).
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
@@ -32,6 +32,8 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 ## Build and test commands
 From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
 `pipeline.json` runs `cs-qrun -- scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
+
+Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:27`). It refuses any embedder but `fake`.
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (tsc, then two esbuild bundles), `npm test` (vitest run). Node install: TODO(verify).
