@@ -36,6 +36,7 @@ SCHEMA_TABLES = {
     "jobs",
     "concepts",
     "concept_marks",
+    "retrieval_entries",
 }
 
 
@@ -100,8 +101,8 @@ def test_every_schema_table_exists(db: ScratchDatabase) -> None:
     with db.connect() as conn:
         rows = conn.execute(
             "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = ANY(%s)",
-            (sorted(SCHEMA_TABLES),),
+            "WHERE table_schema = 'public' AND table_name <> %s",
+            (MIGRATIONS_TABLE,),
         ).fetchall()
     assert {row[0] for row in rows} == SCHEMA_TABLES
 

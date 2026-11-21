@@ -32,3 +32,10 @@ timeout_seconds = 60
 
 [client]
 request_timeout_seconds = 30
+
+[retrieval]
+embedder = "fake"
+model_name = ""
+rrf_k = 60
+candidate_limit = 50
+dimensions = 64
