@@ -163,7 +163,7 @@ PYTHONPATH=core python3 -m kata_core.auth.admin mint-mcp-token USER_NAME LABEL
 - `create-user NAME` creates a user and prints its id.
 - `enrol USER_NAME` prints an enrolment code once. The code is not stored. The user redeems it with `POST /auth/enrol`.
 - `revoke DEVICE_ID` revokes an active device, so its token stops working.
-- `mint-mcp-token USER_NAME LABEL` issues a device token of scope `mcp` and prints it once (`core/kata_core/auth/admin.py:39`). Use it for an assistant that calls `POST /mcp`; the token does not work on the `api` routes.
+- `mint-mcp-token USER_NAME LABEL` issues a device token of scope `mcp` (stored in `devices.scope`) and prints it once (`core/kata_core/auth/admin.py:39`). Use it for an assistant that calls `POST /mcp`; the token does not work on the `api` routes.
 
 ## Enrolment flow
 

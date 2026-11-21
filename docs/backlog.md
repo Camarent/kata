@@ -52,3 +52,11 @@ Project items after Milestone 0.
       adds the value with no server-side price check, so a client can under-report spend.
       Decide whether the server prices the call or the cap stays advisory (see
       [`decisions.md`](decisions.md)).
+- [ ] Real editor test: run the VS Code extension in `editor/` against a running core on the
+      owner PC (save event, quiet-mark diagnostic, hook installer command). Mocks only so far.
+- [ ] Real MCP client test: connect an MCP client to `POST /mcp` with an `mcp`-scope token
+      on the owner PC (`initialize`, `tools/list`, `tools/call`). Only the wire tests exist.
+- [ ] Real terminal test: run `kata term` in a real terminal on the owner PC (PTY capture,
+      mask list, spool flush). Not proven in a live session, see [`decisions.md`](decisions.md).
+- [ ] Event retention and journal text: `design/architecture.md` promises 90-day removal of
+      stored terminal history; no runner deletes events yet, and the journal text does not say so.
