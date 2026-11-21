@@ -34,6 +34,8 @@ SCHEMA_TABLES = {
     "topic_aliases",
     "marks",
     "jobs",
+    "concepts",
+    "concept_marks",
 }
 
 
