@@ -36,13 +36,21 @@ check, a guided initial review screen.
 benchmark suite ([`research/benchmarks`](research/benchmarks)); whole-lesson scan card within
 30 seconds.
 
-## Milestone 3: cloud path and cost control
+## Milestone 3: cloud path and cost control (done)
 
 **Scope.** Cloud provider adapters, provider policy flags, a mandatory secret scanner before
 every cloud call, per-user cost cap with warning, routing chains per task class.
 
 **Success criteria.** No outgoing text that contains a detected secret reaches a cloud
 provider. Spend is tracked per call and capped per user.
+
+**Shipped.** Provider protocol with a local provider and an Anthropic adapter over httpx;
+cloud policy flags per provider and task class; a pinned-rule secret scanner wrapped in a
+guard that runs before every cloud call and before the cost cap; per-user daily spend in
+micro-USD (`usage_daily`, `POST`/`GET /usage`) with a cap and a warning; `[routing]` chains
+per task class tried in order. The Anthropic adapter is tested against a mock transport only.
+
+**Known gaps.** No real-provider run has been made yet. See [`backlog.md`](backlog.md).
 
 ## Milestone 4: advice in the editor and terminal
 

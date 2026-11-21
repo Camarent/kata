@@ -24,8 +24,16 @@ Project items after Milestone 0.
       (`from conftest import ...`). Fixed by moving the shared helper to `tests/support`.
 - [ ] Decide whether to track a copy of the project instructions file and the audit tool list,
       which are currently excluded from git.
-- [ ] Embeddings, cloud model path, concept-level marks and the guided screen are out of scope
-      until later milestones (see [`roadmap.md`](roadmap.md)).
+- [x] Embeddings and the cloud model path (Milestone 3 adapters, policy, scanner, cost cap,
+      routing chains). Still out of scope: concept-level marks and the guided screen (see
+      [`roadmap.md`](roadmap.md)).
+- [ ] Real-provider run on a PC: no live call to a cloud provider has been made; set up the
+      key and the `[provider_anthropic]` section on the PC and run one tagged lesson end to end.
+- [ ] Anthropic adapter is never called in tests: `tests/worker/test_providers.py` uses an httpx
+      mock transport only. Add an opt-in live check before relying on the wire format.
+- [ ] Cost cap and warn tuning: `[cost]` `cap_micro_usd` and `warn_micro_usd` are example
+      values (see `config/kata.example.toml`); the price table is pinned and unverified against
+      live billing.
 - [x] Reproducible Postgres test setup: `scripts/dev/pg.sh`, see [`development.md`](development.md).
 - [ ] The extension manifest allows only `http://127.0.0.1:8080/*`, so a core reached over a VPN
       or another port needs a manifest change (request the host permission at sign-in).

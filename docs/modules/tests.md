@@ -1,6 +1,6 @@
 ---
 paths: [tests/]
-summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client), e2e (one full lesson round trip)
+summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client, providers, scanner and guard, cost, router), e2e (one full lesson round trip)
 ---
 # tests
 
@@ -31,6 +31,8 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_a11y.py:22` `test_signin_tab_order_and_focus_indicator` - keyboard tab order and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py:90` `test_panel_signin_dark_theme_contrast` - dark-theme contrast; `:72` `contrast_ratio`.
 - `tests/browser/panel_page.py:25` `panel_url`, `:31` `open_panel`, `:39` `force_dark_scheme` - shared panel helpers.
+- `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
+- `tests/worker/test_cost.py` - cost estimate in integer micro-USD from pinned prices.
 - `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
 - `tests/worker/test_router.py` - router: first success wins and later providers are not called (`:74`); policy-denied cloud skipped without call (`:81`); over-cap and failing providers fall to the next (`:92`, `:101`); secret block falls to local (`:116`); exhausted names skipped and failed only (`:130`); no implicit local fallback (`:152`); `build_router` config errors (`:174`-`:195`); guard runs before cap (`:203`).
 - `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:182`); missing key raises at construction (`:245`).
