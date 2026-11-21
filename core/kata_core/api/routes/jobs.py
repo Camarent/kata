@@ -82,6 +82,9 @@ def next_job(
     """Lease the caller's oldest claimable job. 204 when there is none."""
     lease_seconds = int(cfg.get("jobs", "lease_seconds"))
     job = claim_next(conn, ctx.user_id, datetime.now(UTC), lease_seconds)
+    # Commit the lease before the response starts: the worker may call /result at once,
+    # and a commit that runs after the response can leave that call seeing no lease (404).
+    conn.commit()
     if job is None:
         return Response(status_code=204)
     return ClaimResponse(id=job.id, payload=job.payload)
