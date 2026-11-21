@@ -74,9 +74,21 @@ def redeem(
     return token
 
 
-def authenticate(conn: psycopg.Connection[Any], token: str) -> AuthContext | None:
-    """Return the user and device for an active device `token`, or None."""
-    found = find_by_token_hash(conn, hash_secret(token))
+def issue_scoped_token(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    label: str,
+    scope: str,
+) -> str:
+    """Register a device token of `scope` for `user_id`. Return the raw token; the caller shows it once."""
+    raw = secrets.token_urlsafe(SECRET_BYTES)
+    add_device(conn, user_id, label, hash_secret(raw), scope)
+    return raw
+
+
+def authenticate(conn: psycopg.Connection[Any], token: str, scope: str = "api") -> AuthContext | None:
+    """Return the user and device for an active device `token` of `scope`, or None."""
+    found = find_by_token_hash(conn, hash_secret(token), scope)
     if found is None:
         return None
     user_id, device_id = found
