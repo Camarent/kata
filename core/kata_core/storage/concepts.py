@@ -14,6 +14,7 @@ import psycopg
 from kata_core.storage.taxonomy import topic_visible
 
 CONCEPT_STATES = ("known", "learning", "new")
+MARK_SOURCES = ("user", "trainer")
 
 
 def create_concept(
@@ -52,19 +53,34 @@ def set_concept_mark(
     concept_id: int,
     state: str,
     evidence: str = "",
+    source: str = "user",
 ) -> None:
-    """Upsert the mark of `user_id` on `concept_id`. Raises LookupError when the concept is not visible
-    to the user, ValueError when `state` is not one of CONCEPT_STATES."""
+    """Upsert the mark of `user_id` on `concept_id`. `source` says who wrote it: "user" or "trainer".
+    Raises LookupError when the concept is not visible to the user, ValueError when `state` is not one
+    of CONCEPT_STATES or `source` is not one of MARK_SOURCES."""
     if state not in CONCEPT_STATES:
         raise ValueError(f"unknown concept state {state!r}")
+    if source not in MARK_SOURCES:
+        raise ValueError(f"unknown mark source {source!r}")
     if not concept_visible(conn, user_id, concept_id):
         raise LookupError(f"concept {concept_id} is not visible to user {user_id}")
     conn.execute(
-        "INSERT INTO concept_marks (user_id, concept_id, state, evidence) VALUES (%s, %s, %s, %s) "
+        "INSERT INTO concept_marks (user_id, concept_id, state, evidence, source) VALUES (%s, %s, %s, %s, %s) "
         "ON CONFLICT (user_id, concept_id) DO UPDATE SET "
-        "state = EXCLUDED.state, evidence = EXCLUDED.evidence, updated_at = now()",
-        (user_id, concept_id, state, evidence),
+        "state = EXCLUDED.state, evidence = EXCLUDED.evidence, source = EXCLUDED.source, updated_at = now()",
+        (user_id, concept_id, state, evidence, source),
     )
+
+
+def concept_mark_source(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> tuple[str, str] | None:
+    """Return (state, source) of the mark of `user_id` on `concept_id`, or None when there is no mark."""
+    row = conn.execute(
+        "SELECT state, source FROM concept_marks WHERE user_id = %s AND concept_id = %s",
+        (user_id, concept_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return str(row[0]), str(row[1])
 
 
 def list_concept_marks_detail(
