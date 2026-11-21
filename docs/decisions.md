@@ -312,3 +312,19 @@ Decided 2026-11-21. `core/kata_term/client.py` posts with `urllib`. Reason: the 
 ## kata term SSH capture is not proven
 
 Decided 2026-11-21. This phase does not prove capture over SSH. `docs/open-questions.md` item 7 stays open. Reason: no SSH test exists; claiming it would be unverified.
+
+## Editor stop patterns suppress posting
+
+Decided 2026-11-21. A document whose text matches a `kata.stopPatterns` entry posts nothing (`editor/src/poster.ts:31`). The match runs locally, before any network call; an invalid pattern is skipped (`editor/src/stopPatterns.ts:8-9`). Reason: the owner can keep a file out of the signal without the server ever seeing it.
+
+## Editor payload carries language only
+
+Decided 2026-11-21. The `editor.save` event carries `payload: { language }` (`editor/src/poster.ts:38`). Document text is read only for the stop check and is never sent. Reason: code can hold secrets and personal data, and the core needs only the signal.
+
+## Editor dev dependencies are pinned
+
+Decided 2026-11-21. `editor/package.json` pins `@types/node`, `@vitest/coverage-v8`, `typescript` and `vitest` to exact versions, and `editor/package-lock.json` is committed. Reason: a moving toolchain would change the build and tests without a code change.
+
+## Editor build and test run in check-all --editor
+
+Decided 2026-11-21. `scripts/dev/check-all.sh --editor` runs the editor build and `test:cov` only (`scripts/dev/check-all.sh:146-148`), and the full and merge modes also run it. Reason: the editor needs no Postgres or browser, so the owner can check it alone; CI runs the same steps (`.github/workflows/ci.yml:54-56`).
