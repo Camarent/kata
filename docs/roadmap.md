@@ -61,6 +61,18 @@ pre-commit secret check).
 **Success criteria.** Every intervention type has a switch and a threshold; every firing is
 journaled; a secret in a commit blocks the commit.
 
+**Shipped.** Per-user journal (`GET /v1/journal`); intervention policy engine (`error`, `ok`,
+`idle` events to `nudge`, `stop`, `quiet_mark`, from `[policy]`); device event ingest
+(`POST /v1/events`, stored once per `event_id`) with message delivery; MCP server
+(`POST /mcp`, two read tools, egress gate); git pre-commit and post-commit hooks in
+`core/kata_device/` (`python -m kata_device hooks install`); `kata term` terminal tool in
+`core/kata_term/`; editor extension in `editor/` (one `editor.save` event per save, quiet mark
+as a diagnostic, hook installer command).
+
+**Open.** A real editor run (the extension has only been checked with stubs and in tests); a
+real MCP client; a real terminal test on the owner's PC; event retention (no expiry of stored
+events yet).
+
 ## Milestone 5: practice courses and planning
 
 **Scope.** Gap to mini-course through the trainer tool with a two-way loop, triage of a

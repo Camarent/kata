@@ -15,15 +15,16 @@ scripts/dev/check-all.sh
 ```
 
 It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), runs
-`npm ci` in `extension/`, starts a throwaway Postgres, runs ruff, mypy, the smoke tests
+`npm ci` in `extension/` and `editor/`, starts a throwaway Postgres, runs ruff, mypy, the smoke tests
 (`-m smoke`, 2 today in `tests/e2e/test_fixtures.py`; an empty selection is red), pytest with `-m 'not flaky'`, and the
-extension build and tests. It is safe to run in several worktrees at once: they share one
+extension build and tests, then the editor build and tests (`editor/`). It is safe to run in several worktrees at once: they share one
 Postgres (started under a lock, never stopped by the script; stop it with
 `scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. Flags:
 `--unit` runs ruff, mypy and pytest with `-m 'not integration and not e2e and not smoke'`;
 `--py` runs ruff, mypy and pytest only (the Python part of the full run, no `-m` filter); `--merge`
-runs pytest with `-m 'not e2e'` plus the extension build and tests; `--ext` runs the extension build
-and tests only; `--setup` only creates `.venv` and `extension/node_modules` when they are missing
+runs pytest with `-m 'not e2e and not browser'` plus the extension and editor build and tests; `--ext`
+runs the extension build and tests, then the editor build and tests; `--editor` runs the editor build
+and tests only; `--setup` only creates `.venv`, `extension/node_modules` and `editor/node_modules` when they are missing
 (no tests, no Postgres), so a fresh git worktree can be made ready in a couple of seconds.
 
 ### Output of the full run
@@ -44,7 +45,8 @@ CI is `.github/workflows/ci.yml`. It has three jobs:
 
 - `checks`: installs `pyproject.toml` with uv, then runs ruff (`ruff check .`), mypy
   (`mypy core`), pytest (`pytest tests -m 'not flaky and not browser'`, no coverage), the extension build and
-  `npm test`. It has no separate smoke step; the smoke tests run inside the pytest step, which
+  `npm test`, then the editor steps (`npm --prefix editor ci`, `npm --prefix editor run build`,
+  `npm --prefix editor test`; `.github/workflows/ci.yml:54-56`, inside `checks`, not a separate job). It has no separate smoke step; the smoke tests run inside the pytest step, which
   does not deselect them.
 - `secrets`: gitleaks over the full history.
 - `privacy`: the personal-address blocklist check (skipped when the `PRIVACY_BLOCKLIST` secret
@@ -63,11 +65,12 @@ The test tiers are markers in `pyproject.toml`:
 Which `scripts/dev/check-all.sh` flag runs which tier:
 
 - no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky and not browser'` with coverage,
-  extension build and tests, then the jscpd report. The closest local run to CI, plus the extras.
+  extension build and tests, then editor build and tests, then the jscpd report. The closest local run to CI, plus the extras.
 - `--unit`: ruff, mypy, pytest without the `integration`, `e2e`, `smoke` and `browser` tiers.
 - `--py`: ruff, mypy, pytest with every test except `browser`, `flaky` included.
-- `--merge`: pytest `-m 'not e2e and not browser'` with coverage, then the extension build and tests.
-- `--ext`: extension build and tests only.
+- `--merge`: pytest `-m 'not e2e and not browser'` with coverage, then the extension and editor build and tests.
+- `--ext`: extension build and tests, then editor build and tests.
+- `--editor`: editor build and tests only.
 - `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
   without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md`.
 
