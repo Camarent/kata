@@ -4,7 +4,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 
 ## Modules
 - [config](modules/config.md) - TOML loader and env overrides; source of all settings.
-- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, Postgres storage.
+- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, Postgres storage.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
 - [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases.
 - [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node).
@@ -20,6 +20,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 5. Import: `POST /import` parses the skill-list text (`importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
 6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next` (204 when empty), leases a job for `lease_seconds`, and posts `result` or `fail`. Expired leases are reclaimed (`jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
 7. Concept marks: concepts sit under a topic (`/concepts`, `core/kata_core/api/routes/concepts.py`). Each user marks a concept `known`, `learning` or `new` with optional evidence; these marks live in `concept_marks` next to the topic-level `marks` table, which is unchanged. Concept marks are private to their user.
+8. Retrieval (library, no HTTP route yet): `core/kata_core/retrieval/` stores text entries (`store.py`, shared when `owner_user_id` is NULL), ranks by full-text and by cosine over embeddings, and fuses the two lists with RRF (`retriever.py`, `fusion.py`). Config `[retrieval]`; tests use the fake embedder only.
 
 ## Entry points
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
