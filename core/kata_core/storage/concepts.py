@@ -107,3 +107,11 @@ def clear_concept_mark(conn: psycopg.Connection[Any], user_id: int, concept_id: 
         (user_id, concept_id),
     )
     return cur.rowcount > 0
+
+
+def concept_label(conn: psycopg.Connection[Any], concept_id: int) -> str:
+    """Label of concept `concept_id`. Raises LookupError when the concept does not exist."""
+    row = conn.execute("SELECT label FROM concepts WHERE id = %s", (concept_id,)).fetchone()
+    if row is None:
+        raise LookupError(f"concept {concept_id} does not exist")
+    return str(row[0])
