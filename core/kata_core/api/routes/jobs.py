@@ -13,7 +13,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from kata_core.api.deps import current_user, get_cfg, get_conn
+from kata_core.api.deps import Conn, current_user, get_cfg
 from kata_core.auth.service import AuthContext
 from kata_core.config import Config
 from kata_core.jobs.queue import claim_next, complete, enqueue, fail, get_job
@@ -22,7 +22,6 @@ from kata_core.storage.taxonomy import ensure_category, ensure_topic
 
 router = APIRouter(prefix="/jobs")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn)]
 Caller = Annotated[AuthContext, Depends(current_user)]
 
 
@@ -82,6 +81,9 @@ def next_job(
     """Lease the caller's oldest claimable job. 204 when there is none."""
     lease_seconds = int(cfg.get("jobs", "lease_seconds"))
     job = claim_next(conn, ctx.user_id, datetime.now(UTC), lease_seconds)
+    # Commit the lease before the response starts: the worker may call /result at once,
+    # and a commit that runs after the response can leave that call seeing no lease (404).
+    conn.commit()
     if job is None:
         return Response(status_code=204)
     return ClaimResponse(id=job.id, payload=job.payload)
