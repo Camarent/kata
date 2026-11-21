@@ -22,6 +22,35 @@ convenience.
 | Lesson check against a knowledge base | Retrieve the top entries instead of passing the whole base: the small model needs about 50 entries; the larger model is flat from 10 to 25. |
 | Code and agent hints | Real-time hints in the terminal and editor use the small model: the Docker and C++ review tasks were saturated for every model, so speed decides (first token about 0.2 s). Architecture questions across many files score best on the larger model (1.00 against 0.77 to 0.87 for small models). |
 
+## Lesson check on the fake retrieval path (three states)
+
+Run by `scripts/bench/lesson_check_bench.py` with the fake embedder, the keyword retrieval path and the synthetic cases in `scripts/bench/cases.json`. No model loads, so the numbers test the rule order and the scoring, not model quality. Accuracy is the share of concepts whose known, learning or new state matches the expectation; abstain rate is the share the checker declined to label, and abstain precision is the share of those abstentions that were expected. The fake embedder is not model quality: retrieval on real notes (T7) and every real-model row stay open. Rerun with the project venv's python3: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown`, with `KATA_CONFIG` and the dev Postgres env (`scripts/dev/pg.sh env`) set.
+
+<!-- bench:lesson-check:begin -->
+# Lesson-check benchmark
+
+| metric | value |
+| --- | --- |
+| accuracy | 1.000 |
+| abstain_rate | 0.176 |
+| abstain_precision | 1.000 |
+| total | 17 |
+| embedder | fake:64 |
+
+| state | expected count |
+| --- | --- |
+| known | 1 |
+| learning | 11 |
+| new | 2 |
+| abstain | 3 |
+
+| threshold | value |
+| --- | --- |
+| min_score | 0.02 |
+| known_hits | 3 |
+| search_limit | 5 |
+<!-- bench:lesson-check:end -->
+
 ## Reliability notes
 
 - Automatic "invented command" flags were regex false positives; a manual read found no

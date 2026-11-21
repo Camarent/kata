@@ -5,7 +5,7 @@ summary: pytest suites - core (API, repositories, auth, queue, import; needs Pos
 # tests
 
 ## Purpose
-Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`.
+Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`, `tests/scripts/` (lesson-check bench in `scripts/bench/`).
 
 ## Public surface
 - `tests/core/conftest.py:21` `ScratchDatabase` - per-test database helper.
@@ -24,6 +24,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/test_lesson_check.py`, `tests/core/test_api_lesson_check.py` - lesson-check rule order (checker) and `POST /lesson-check` over HTTP.
 - `tests/worker/test_worker_lesson_check.py` - lesson-check payload and `CoreClient.lesson_check` against `tests/fakes/fake_core.py`.
 - `tests/foundation/` - config, docs, gates, extension, package metadata.
+- `tests/scripts/test_bench_lesson_check.py` - lesson-check bench runner on a scratch DB (fake embedder only); `test_bench_scoring.py` - pure three-state scoring; `test_bench_results_note.py` - the block in `docs/research/benchmarks/RESULTS.md` equals the bench output (paste the printed block when stale).
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
 - `tests/e2e/test_driver.py` - driver alone against a fake core (scan, tag, mark; auth error exits 1).

@@ -1,6 +1,6 @@
 # Model-selection benchmark suite
 
-Design of the suite that measures every candidate model on every task class and says which model should serve which role. Results are in [`RESULTS.md`](RESULTS.md). The measurement scripts are not part of the repository yet; they depend on one machine's paths and will be ported.
+Design of the suite that measures every candidate model on every task class and says which model should serve which role. Results are in [`RESULTS.md`](RESULTS.md). `scripts/bench/` holds the lesson-check harness (scenario 1 in section 7, on the fake embedder); the rest of the suite is not ported yet, because it depends on one machine's paths.
 
 Goal: after any engine or model update, one command re-measures every candidate on every task class and says which model should serve which role. The always-on server must keep working during the run.
 
