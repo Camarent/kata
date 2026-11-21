@@ -24,6 +24,10 @@ token_env = "KATA_WORKER_TOKEN"
 
 [jobs]
 lease_seconds = 300
+# Seconds between polls of the job runner (python -m kata_core.jobs).
+runner_poll_seconds = 5
+# Cap on the output a job may store, in bytes.
+max_output_bytes = 262144
 
 [model]
 base_url = "http://127.0.0.1:11434/v1"
@@ -55,16 +59,18 @@ tag = "local"
 explain = "anthropic,local"
 summary = "anthropic"
 batch = "anthropic"
+generate_course = "local,anthropic"
+extract_syllabus = "local,anthropic"
 
 [providers]
 cloud_enabled = false
 
 [provider_local]
-task_classes = "tag,explain"
+task_classes = "tag,explain,generate_course,extract_syllabus"
 
 [provider_anthropic]
 allow_cloud = false
-task_classes = "explain,summary,batch"
+task_classes = "explain,summary,batch,generate_course,extract_syllabus"
 base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"
@@ -83,3 +89,53 @@ stop_error_threshold = 8
 # Same limit for each type; state is kept per type.
 rate_limit_seconds = 300
 late_event_seconds = 120
+
+[trainer]
+# Trainer CLI run by the job runner. Config-supplied executable (TOML array); placeholder name.
+enabled = true
+command = ["kata-trainer"]
+# Seconds before a trainer run is killed.
+timeout_seconds = 120
+# Cap on concepts per generated course.
+max_concepts = 10
+# Items generated per concept.
+items_per_concept = 3
+# Minimum items a course must keep, else the job fails.
+min_items = 5
+# Cap on the trainer artifact size, in bytes.
+max_artifact_bytes = 1048576
+# Cap on a saved trainer progress document, in bytes (413 above it).
+max_progress_bytes = 262144
+
+[knowledge]
+# Score change per trainer evidence step, and the largest change per save.
+trainer_step = 0.1
+trainer_max_step = 0.3
+# Score at or above known_threshold is known; at or above learning_threshold is learning.
+known_threshold = 0.8
+learning_threshold = 0.4
+# Contrary trainer evidence rows needed before a user mark is overwritten.
+assertion_hold = 3
+# Base score for a concept with no evidence, by mark state.
+base_known = 0.9
+base_learning = 0.5
+base_new = 0.1
+
+[syllabus]
+enabled = true
+# Ask the model for help when no syllabus structure is found.
+model_extract = false
+# Cap on the syllabus input size, in bytes.
+max_bytes = 524288
+
+[planning]
+enabled = true
+# Known share of a partly known unit at or above which it is skimmed, not studied.
+skim_share = 0.5
+# Words per unit of reading effort (units = ceil(words / words_per_unit), at least 1).
+words_per_unit = 400
+# Minutes per unit for each action.
+minutes_skip = 1
+minutes_skim = 5
+minutes_practice = 15
+minutes_learn = 30

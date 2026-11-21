@@ -24,6 +24,8 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `worker.core_url` | "http://127.0.0.1:8080" | `KATA_WORKER_CORE_URL` |
 | `worker.token_env` | "KATA_WORKER_TOKEN" | `KATA_WORKER_TOKEN_ENV` |
 | `jobs.lease_seconds` | 300 | `KATA_JOBS_LEASE_SECONDS` |
+| `jobs.runner_poll_seconds` | 5 | `KATA_JOBS_RUNNER_POLL_SECONDS` |
+| `jobs.max_output_bytes` | 262144 | `KATA_JOBS_MAX_OUTPUT_BYTES` |
 | `model.base_url` | "http://127.0.0.1:11434/v1" | `KATA_MODEL_BASE_URL` |
 | `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
 | `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
@@ -42,10 +44,12 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
 | `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |
 | `routing.batch` | "anthropic" | `KATA_ROUTING_BATCH` |
+| `routing.generate_course` | "local,anthropic" | `KATA_ROUTING_GENERATE_COURSE` |
+| `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
 | `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
-| `provider_local.task_classes` | "tag,explain" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_local.task_classes` | "tag,explain,generate_course,extract_syllabus" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
 | `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |
-| `provider_anthropic.task_classes` | "explain,summary,batch" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
@@ -61,6 +65,32 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `policy.stop_error_threshold` | 8 | `KATA_POLICY_STOP_ERROR_THRESHOLD` |
 | `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
 | `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
+| `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
+| `trainer.command` | ["kata-trainer"] | `KATA_TRAINER_COMMAND` |
+| `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
+| `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
+| `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
+| `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
+| `trainer.max_artifact_bytes` | 1048576 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
+| `trainer.max_progress_bytes` | 262144 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
+| `knowledge.trainer_step` | 0.1 | `KATA_KNOWLEDGE_TRAINER_STEP` |
+| `knowledge.trainer_max_step` | 0.3 | `KATA_KNOWLEDGE_TRAINER_MAX_STEP` |
+| `knowledge.known_threshold` | 0.8 | `KATA_KNOWLEDGE_KNOWN_THRESHOLD` |
+| `knowledge.learning_threshold` | 0.4 | `KATA_KNOWLEDGE_LEARNING_THRESHOLD` |
+| `knowledge.assertion_hold` | 3 | `KATA_KNOWLEDGE_ASSERTION_HOLD` |
+| `knowledge.base_known` | 0.9 | `KATA_KNOWLEDGE_BASE_KNOWN` |
+| `knowledge.base_learning` | 0.5 | `KATA_KNOWLEDGE_BASE_LEARNING` |
+| `knowledge.base_new` | 0.1 | `KATA_KNOWLEDGE_BASE_NEW` |
+| `syllabus.enabled` | true | `KATA_SYLLABUS_ENABLED` |
+| `syllabus.model_extract` | false | `KATA_SYLLABUS_MODEL_EXTRACT` |
+| `syllabus.max_bytes` | 524288 | `KATA_SYLLABUS_MAX_BYTES` |
+| `planning.enabled` | true | `KATA_PLANNING_ENABLED` |
+| `planning.skim_share` | 0.5 | `KATA_PLANNING_SKIM_SHARE` |
+| `planning.words_per_unit` | 400 | `KATA_PLANNING_WORDS_PER_UNIT` |
+| `planning.minutes_skip` | 1 | `KATA_PLANNING_MINUTES_SKIP` |
+| `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
+| `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
+| `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 

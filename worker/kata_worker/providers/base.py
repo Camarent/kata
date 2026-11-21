@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-TASK_CLASSES = ("tag", "explain", "summary", "batch")
+TASK_CLASSES = ("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")
 
 
 class ProviderError(Exception):
