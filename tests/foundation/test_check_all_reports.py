@@ -34,7 +34,7 @@ def test_jscpd_report_runs_in_full_mode_and_never_fails_the_gate():
     # The jscpd command must not go through step(), which exits 1 on failure.
     assert "step " not in lines[0]
     assert "|| echo" in text
-    assert "full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky'; run_extension; run_reports ;;" in text
+    assert "full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky and not browser'; run_extension; run_reports ;;" in text
     py_arm = _lines_with(text, "  py)")
     assert len(py_arm) == 1
     assert "run_reports" not in py_arm[0]

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "kata",
+  "version": "0.0.0",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["http://127.0.0.1:8080/*"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {}
+}

@@ -156,3 +156,53 @@ The `[model]` section names its model with `model_name` (`config/kata.example.to
 ## Core entrypoint runs uvicorn on `[core]` host and port
 
 `python -m kata_core` (`core/kata_core/__main__.py:19-31`) loads the config from `KATA_CONFIG` and calls `uvicorn.run` with `[core] host` and `[core] port`. Signal handling (SIGINT, SIGTERM) is left to uvicorn, so the entrypoint adds no signal code of its own. Run the core with `python -m kata_core`, not with a bare uvicorn command, so the host and port come from config.
+
+## Extension has one manifest base and a per-browser composer
+
+Decided 2026-11-21. The MV3 manifest is `extension/manifest.base.json`: the fields both browsers share. `extension/build/manifest.mjs` (`composeManifest`) adds the browser-specific keys. Reason: two hand-kept manifests drift apart, so a permission or host change would have to be made twice. The composer is a pure function, so the difference between browsers is tested in one place (`extension/tests/manifest.test.ts`). There is no `extension/manifest.json` in the repo any more; the build writes one per browser.
+
+## Browser adapter picks sidePanel or sidebarAction
+
+Decided 2026-11-21. Chrome opens the panel with `chrome.sidePanel`; Firefox opens it with `sidebarAction`. `extension/src/browser.ts` (`openPanel`) hides the difference behind one call and throws when neither API exists. Reason: the background script stays one code path for both browsers, and Firefox first (see the `extension` module doc) needs no separate background file.
+
+## Content script matches http and https only
+
+Decided 2026-11-21. The content script used to match `<all_urls>`. It now matches `http://*/*` and `https://*/*`. Reason: the scanner only reads lesson pages, and `<all_urls>` also injects into `file:`, `ftp:` and other schemes the extension never needs. The narrowing does not finish the job: the script still runs on every http and https page, so the backlog item about the `<all_urls>` permission stays open.
+
+## Firefox gecko id is kata@kata.local, minimum version 128.0
+
+Decided 2026-11-21. `browser_specific_settings.gecko.id` is `kata@kata.local` and `strict_min_version` is `128.0`, both set in `extension/build/manifest.mjs`. The id is a fixed value chosen for this project; 128.0 is the chosen minimum, not a claim about when `sidebar_action` appeared. Change the id and the minimum only together with the Firefox add-on listing, because the id is what Firefox uses to tell installed versions apart.
+
+## Extension build writes each browser to dist/<browser>/
+
+Decided 2026-11-21. `npm run build` in `extension/` runs `build/build.mjs`, which writes `extension/dist/chrome/` and `extension/dist/firefox/`. Each folder holds its own `manifest.json`, the bundled scripts and a copy of `sidepanel.html`, so each folder loads on its own. Reason: one shared `dist/` cannot hold two manifests that differ. `node build/build.mjs firefox` builds one browser only.
+
+## Browser e2e drives the browsers through selenium and geckodriver
+
+Decided 2026-11-21. The real-browser tests in `tests/browser/` use selenium (`requirements-browser.txt`, pinned `selenium==4.53.0`) with a Firefox driver: geckodriver from `scripts/dev/install-browsers.sh`, and Chrome through chromedriver on `PATH`. Reason: the tests run the stock Firefox and geckodriver binaries that the install script pins with sha256, one install path for both the test driver and the browser. Playwright was not chosen: it brings its own browser downloads and a second install path next to the pinned one. The repo does not record a longer comparison; this entry is the decision, not a benchmark.
+
+## Browser tools install per user with pinned sha256
+
+Decided 2026-11-21. `scripts/dev/install-browsers.sh` downloads Firefox 140.0esr and geckodriver 0.36.0 (linux x86_64) into `$KATA_BROWSERS_DIR`, default `$HOME/.cache/kata-browsers`. It needs no sudo, changes nothing system-wide, and verifies each archive against a pinned sha256 before it unpacks. An empty pin refuses the install (fail closed). Reason: a user-level, pinned install is reproducible and leaves the system browser alone. Chromedriver is not pinned: Chrome is looked up on `PATH` instead. `install-browsers.sh --status` checks the install with no network; `--print-dir` prints the directory.
+
+## Browser marker is excluded from every gate except --browser
+
+Decided 2026-11-21. Tests marked `browser` (`pyproject.toml`, marker `browser`) run only through `scripts/dev/check-all.sh --browser`. Every other mode excludes them with `-m 'not browser'`: `--py`, `--unit`, `--merge`, the smoke step and the full run. Reason: CI and the pipeline gate have no browser and no Firefox, so a browser test there would fail or skip for a reason that is not a code fault. The marker keeps the browser tier out of the default gate without deleting its tests.
+
+## Browser tests skip with a message when a browser is missing
+
+Decided 2026-11-21. With no Firefox or geckodriver from the install, `check-all.sh --browser` prints `check-all: browser tests skipped: ...` and exits 0. Each browser case also skips with a reason from `tests/browser/conftest.py` (`pytest.skip`) when its binary is missing. A missing built extension is a failure, not a skip: the case says to run `npm run build`. Reason: a developer without browsers keeps a green run, and a broken build still shows red.
+
+## Chrome browser case is unverified
+
+Decided 2026-11-21. The Chrome param of `tests/browser/test_panel_flow.py` has never run against a real Chrome: the only run so far skipped, because no chromedriver was on `PATH`. The Chrome extension id is derived in the test from a sha256 of the dist path, which is unverified. Branded Chrome 137 and later may ignore `--load-extension`, so the Chrome flow may not load the extension at all. The Firefox case is the one the stage relies on. Reason for recording it here: a green Chrome skip must not be read as a passing Chrome flow.
+
+Update 2026-11-21: with `extension/dist/` built and `/usr/bin/google-chrome` and chromedriver on `PATH`, the Chrome cases of `test_panel_flow.py`, `test_panel_a11y.py` and `test_panel_contrast.py` ran and passed (7 passed, no skip, `pytest tests/browser -m browser`). The points above still hold for other Chrome builds and for a machine without chromedriver.
+
+## Keyboard focus order and focus indicator are checked on the sign-in view
+
+Decided 2026-11-21. `tests/browser/test_panel_a11y.py` opens the side panel sign-in view and presses Tab from the page start. It asserts the order `input[name=code]`, `input[name=deviceLabel]`, `button[type=submit]`, that each focused control sits inside `form.signin`, and that each focused control shows a focus indicator (a non-zero outline or a box-shadow). Outcome: Firefox and Chrome both passed on 2026-11-21. Limit: the sign-in view only. The review screen is not covered. Reason: these are the checks a real browser can prove; a stub cannot show the focus ring the browser draws.
+
+## Dark-theme contrast of the sign-in view is at least 4.5 to 1 in Firefox and Chrome
+
+Decided 2026-11-21. `tests/browser/test_panel_contrast.py` opens the sign-in view with dark mode forced. For each text element (labels, input text, button text, error text) it takes the first non-transparent background up the ancestor chain, or the canvas colour, and computes the WCAG 2.x contrast ratio. It asserts every ratio is at least 4.5 (`MIN_RATIO`). How dark is forced: Firefox sets `layout.css.prefers-color-scheme.content-override` to 0 at launch (`tests/browser/conftest.py`); Chrome uses CDP `Emulation.setEmulatedMedia` from `force_dark_scheme` (`tests/browser/panel_page.py`). The case skips with a reason when `matchMedia('(prefers-color-scheme: dark)')` is false, so a browser that ignores the override does not pass silently. Outcome: Firefox and Chrome both passed on 2026-11-21, not skipped. Limit: the sign-in view only; the review screen and light theme are not covered. Reason: WCAG AA is the bar the backlog names; the threshold is a fixed constant, not tuned to the result.

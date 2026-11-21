@@ -57,7 +57,7 @@ describe("sidepanel.html", () => {
   it("loads the boot script as an external module", () => {
     const script = parsedPage().querySelector("script[src]");
     expect(script?.getAttribute("type")).toBe("module");
-    expect(script?.getAttribute("src")).toBe("dist/sidepanelBoot.js");
+    expect(script?.getAttribute("src")).toBe("sidepanelBoot.js");
   });
 });
 
@@ -68,7 +68,9 @@ describe("built side panel boot script", () => {
 
   it("the file referenced by sidepanel.html exists after build", () => {
     const src = parsedPage().querySelector("script[src]")?.getAttribute("src") ?? "";
-    expect(existsSync(join(EXTENSION_DIR, src))).toBe(true);
+    for (const browser of ["firefox", "chrome"]) {
+      expect(existsSync(join(EXTENSION_DIR, "dist", browser, src))).toBe(true);
+    }
   });
 });
 

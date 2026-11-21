@@ -48,7 +48,7 @@ jobs:
       - run: .venv/bin/ruff check .
       - run: .venv/bin/mypy core
       - run: npm --prefix extension ci
-      - run: .venv/bin/python -m pytest tests -m 'not flaky'
+      - run: .venv/bin/python -m pytest tests -m 'not flaky and not browser'
       - run: npm --prefix extension run build
       - run: npm --prefix extension test
 

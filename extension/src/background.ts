@@ -1,4 +1,5 @@
 import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
+import { openPanel, type PanelOpenApi } from "./browser";
 import { DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
@@ -8,11 +9,10 @@ import { TokenStore, type StorageArea } from "./tokenStore";
 import type { Session } from "./types";
 
 /** The part of `chrome` the background script uses; tests pass a fake with these members. */
-export interface ChromeLike {
+export interface ChromeLike extends PanelOpenApi {
   action: {
     onClicked: { addListener(listener: (tab: { windowId?: number }) => void): void };
   };
-  sidePanel: { open(options: { windowId: number }): Promise<void> };
   tabs: {
     query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number }[]>;
     sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
@@ -159,7 +159,7 @@ function isPanelMessage(message: unknown): message is PanelMessage {
 export function wireBackground(api: ChromeLike, backend: Backend): void {
   api.action.onClicked.addListener((tab) => {
     if (tab.windowId === undefined) return;
-    api.sidePanel.open({ windowId: tab.windowId }).catch((err: unknown) => console.error(err));
+    openPanel(api, tab.windowId).catch((err: unknown) => console.error(err));
     // A failed flush stays queued; the next panel open retries it.
     backend.flush().catch(() => undefined);
   });

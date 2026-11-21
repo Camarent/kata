@@ -6,8 +6,8 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [config](modules/config.md) - TOML loader and env overrides; source of all settings.
 - [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, Postgres storage.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
-- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate).
-- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/scripts` (bench).
+- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate); `scripts/dev/` gate runner `check-all.sh` and pinned browser installer `install-browsers.sh`.
+- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/browser` (real Firefox and Chrome through selenium; only `check-all.sh --browser`), `tests/scripts` (bench, install-browsers, check-all browser mode).
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
@@ -27,7 +27,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
 - Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:65` `main`), run with `PYTHONPATH=core`.
 - DB CLI: `python3 scripts/db/kata_db.py` (`scripts/db/kata_db.py:35` `main`), run with `PYTHONPATH=core`.
-- Extension: `extension/manifest.json` loads `dist/background.js` (service worker), `dist/content.js` and `sidepanel.html`; built by `npm run build` in `extension/`.
+- Extension: `extension/manifest.base.json` plus `extension/build/manifest.mjs` compose `dist/<browser>/manifest.json` for `chrome` and `firefox`; each `dist/<browser>/` loads `background.js`, `content.js`, `sidepanelBoot.js` and `sidepanel.html`. Built by `npm run build` in `extension/`.
 
 ## Build and test commands
 From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
@@ -36,8 +36,8 @@ From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:27`). It refuses any embedder but `fake`.
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
-Extension (from `extension/package.json`): `npm run build` (tsc, then two esbuild bundles), `npm test` (vitest run). Node install: TODO(verify).
-E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`).
+Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
+E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests").
 
 ## Known gaps
 - `pyproject.toml:5` comment says "stdlib only" but dependencies (`pyproject.toml:6`) are fastapi, psycopg, httpx, uvicorn.
