@@ -9,6 +9,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate); `scripts/dev/` gate runner `check-all.sh` and pinned browser installer `install-browsers.sh`.
 - [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/browser` (real Firefox and Chrome through selenium; only `check-all.sh --browser`), `tests/scripts` (bench, install-browsers, check-all browser mode).
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
+- [worker](modules/worker.md) - Python pull loop: takes tagging jobs from the core, tags with a local model, reports result or fail; provider protocol (local, Anthropic) and cloud policy in `worker/kata_worker/providers/`, not yet wired into the loop.
 
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
 
@@ -41,4 +42,3 @@ E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser test
 
 ## Known gaps
 - `pyproject.toml:5` comment says "stdlib only" but dependencies (`pyproject.toml:6`) are fastapi, psycopg, httpx, uvicorn.
-- Worker code is in `worker/kata_worker/` (`loop.py`, `core_client.py`, `model.py`) but has no module doc yet: TODO(verify) add `docs/modules/worker.md`.

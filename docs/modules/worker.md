@@ -6,6 +6,7 @@ summary: Tagging worker (Python) - pulls queued blocks from the core, asks a loc
 
 ## Purpose
 Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends its text to an OpenAI-style chat model, and posts `result` or `fail` back to the core. The worker never decides known/new; the core does.
+`worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, and a cloud policy (`Policy`). The loop still tags through `ModelAdapter`; nothing routes through `Policy` yet.
 
 ## Public surface
 - `worker/kata_worker/__main__.py:28` `main` - entry for `python -m kata_worker`; runs until SIGINT or SIGTERM (`:20` `_stop_on_signal`).
@@ -14,22 +15,38 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `worker/kata_worker/core_client.py:54` `CoreClient` - `next_job`, `report`, `fail`; errors raise `CoreError` (`:25`).
 - `worker/kata_worker/core_client.py:45` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
 - `worker/kata_worker/model.py:62` `ModelAdapter(config)`; `:70` `tag(block_text) -> (category, topic)`.
-- `worker/kata_worker/model.py:21` `ModelError`.
+- `worker/kata_worker/model.py:21` `ModelError`; `:36` `reply_content(response)` - reads the chat reply text, shared with `LocalProvider`.
+- `worker/kata_worker/providers/base.py:11` `TASK_CLASSES` = `("tag", "explain", "summary", "batch")`.
+- `worker/kata_worker/providers/base.py:19` `Provider` protocol - `name`, `is_cloud`, `complete(system, user) -> str` (`:25`); `ProviderError` at `:14`.
+- `worker/kata_worker/providers/local.py:15` `LocalProvider(config)` - `name = "local"`, `is_cloud = False`; `complete` at `:26`.
+- `worker/kata_worker/providers/anthropic.py:44` `AnthropicProvider(config, env, transport)` - `name = "anthropic"`, `is_cloud = True`; `complete` at `:66`.
+- `worker/kata_worker/providers/policy.py:43` `Policy` - `from_config(config)` (`:50`), `allows(provider, task_class) -> bool` (`:61`); `PolicyError` at `:19`; `PROVIDER_NAMES` at `:16`.
+- `worker/kata_worker/providers/__init__.py:6` `__all__` - re-exports `TASK_CLASSES`, `LocalProvider`, `Provider`, `ProviderError` only (`AnthropicProvider` and `Policy` are imported from their modules).
 
 ## Key files
 - `worker/kata_worker/loop.py` - pull loop and per-job handling.
 - `worker/kata_worker/core_client.py` - HTTP client to the core, loopback-only.
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
+- `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
+- `worker/kata_worker/providers/local.py` - completion through the `[model]` OpenAI-compatible endpoint.
+- `worker/kata_worker/providers/anthropic.py` - completion through the Anthropic Messages API over httpx.
+- `worker/kata_worker/providers/policy.py` - which provider may run which task class.
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
-- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:35`).
+- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:38` and `:41`).
 - The token comes from an env var, never from the config file; a missing variable raises `ValueError` (`worker/kata_worker/core_client.py:50`).
 - A tagging exception fails only that job (`worker/kata_worker/loop.py:29` `client.fail`); the worker keeps running.
 - Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `_parse_tag`).
 - Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:43`).
+- A cloud call is allowed only when `[providers] cloud_enabled`, the provider's `allow_cloud` and the task class in its `task_classes` all agree (`worker/kata_worker/providers/policy.py:67-69`). Local needs only the task class (`:65-68`).
+- `Policy.allows` returns False for an unknown provider name and raises `PolicyError` for an unknown task class (`worker/kata_worker/providers/policy.py:63`); `from_config` raises it for a bad `task_classes` entry (`worker/kata_worker/providers/policy.py:27`).
+- Anthropic key is read once, at construction, from the env var named in `api_key_env`; missing raises `ProviderError` (`worker/kata_worker/providers/anthropic.py:60-62`). The key never appears in an error.
+- Providers raise only `ProviderError` (`worker/kata_worker/providers/anthropic.py:79-83`, `worker/kata_worker/providers/local.py:40-48`); callers catch that one type.
 
 ## Depends on / used by
 - Depends on: `core/` (`kata_core.config.Config`) for settings; the core HTTP API (`/jobs/next`, `/jobs/{id}/result`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
+- Providers: `kata_worker.model` (`CHAT_PATH`, `ModelError`, `reply_content`) used by `providers/local.py`; Anthropic Messages API at `[provider_anthropic] base_url` (`/v1/messages`).
+- Provider config: `[providers]` `cloud_enabled` (`config/kata.example.toml:49`); `[provider_local]` `task_classes` (`:52`); `[provider_anthropic]` `allow_cloud` (`:55`), `task_classes` (`:56`), `api_key_env` (`:59`).
 - Config keys: `[worker]` `poll_interval_seconds`, `request_timeout_seconds`, `core_url`, `token_env`; `[model]` `base_url`, `model_name`, `timeout_seconds` (`config/kata.example.toml:19`, `:28`). Env overrides follow the config module (`KATA_*`).
-- Used by: `tests/worker/`, and `tests/e2e/conftest.py:142` `running_worker` (`kata_worker.loop.run_forever` in a thread).
+- Used by: `tests/worker/`, and `tests/e2e/conftest.py:143` `running_worker` (`kata_worker.loop.run_forever` in a thread).

@@ -31,6 +31,9 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_a11y.py:22` `test_signin_tab_order_and_focus_indicator` - keyboard tab order and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py:90` `test_panel_signin_dark_theme_contrast` - dark-theme contrast; `:72` `contrast_ratio`.
 - `tests/browser/panel_page.py:25` `panel_url`, `:31` `open_panel`, `:39` `force_dark_scheme` - shared panel helpers.
+- `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
+- `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:182`); missing key raises at construction (`:245`).
+- `tests/fakes/fake_provider.py:13` `FakeProvider` - scripted provider for tests; records calls.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
 - `tests/e2e/test_driver.py` - driver alone against a fake core (scan, tag, mark; auth error exits 1).
