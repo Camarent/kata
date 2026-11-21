@@ -9,7 +9,7 @@ Three tools. `scripts/db/` provisions Postgres databases for kata: a thin wrappe
 
 ## Public surface
 - `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
-- `scripts/dev/check-all.sh:46` mode flags (`--py`, `--ext`, `--editor`, `--browser`, ...), `:152` `run_browser` (`--browser`: prints a skip line and exits 0 when the install status fails, else runs `tests/browser -m browser`); every other mode excludes `browser` (`:134`, `:138`, `:174-180`).
+- `scripts/dev/check-all.sh:47` mode flags (`--py`, `--ext`, `--editor`, `--browser`, ...), `:152` `run_browser` (`--browser`: prints a skip line and exits 0 when the install status fails, else runs `tests/browser -m browser`); every other mode excludes `browser` (`:134`, `:138`, `:174-180`).
 - `scripts/db/kata_db.py:35` `main(argv)` - subcommands `create NAME`, `migrate [--name NAME]`, `drop NAME`.
 - `scripts/db/kata_db.py:20` `_parser()` - argparse setup; `--config` at `:24`.
 - `scripts/db/kata_db.py:55` `if __name__ == "__main__"` - run as script.

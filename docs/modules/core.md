@@ -41,6 +41,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/retrieval/store.py:16` `add_entry(...)` (stores body, embedding and `embedder.name`), `:35` `keyword_search(conn, user_id, query, limit)` (`websearch_to_tsquery('simple', ...)`, `:44-46`).
 - `core/kata_core/retrieval/retriever.py:22` `Hit`, `:29` `Retriever`, `:43` `from_config(conn, cfg)` (reads `[retrieval] rrf_k` `:47` and `candidate_limit` `:48`), `:51` `search(user_id, query, limit)`, `:72` `_vector_ranking` (cosine in Python over visible entries of the same `embedder.name`).
 - `core/kata_core/api/routes/mcp.py:26` `POST /mcp` (`mcp_post`; scope check via `MCP_SCOPE` `:22`; 204 for a notification); `authenticate` at `:35`.
+- `core/kata_core/auth/service.py:77` `issue_scoped_token(conn, user_id, label, scope)`, `:89` `authenticate(conn, token, scope="api")`; `core/kata_core/storage/devices.py:30` `find_by_token_hash` matches only the given scope; `core/kata_core/auth/admin.py:70` issues `mcp` tokens.
 - `core/kata_core/mcp/rpc.py:58` `handle(conn, cfg, user_id, message, at)` - answers one decoded message, None for a notification; `:88` `handle_text`; `:29` `TOOLS` (`tools/list` payload); `:19` `PROTOCOL_VERSION`; error codes `:24-27`.
 - `core/kata_core/mcp/tools.py:38` `kata_search(conn, cfg, user_id, query, limit, at)` (limit clamped 1..10, `:22-23`); `:53` `kata_concept_state(conn, user_id, concept, at)`; `:70` `_finish` (gate, then journal).
 - `core/kata_core/mcp/gate.py:45` `gate(text) -> GateResult(allowed, text, reason)`; `:40` `safe_concept_name`; `:22` `MAX_RESULT_BYTES` 4096.
@@ -76,6 +77,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/events/` - device event envelope validation (`envelope.py`) and idempotent storage (`store.py`).
 - `core/kata_core/delivery/messages.py` - message queue: enqueue, once-only delivery, policy decisions as messages.
 - `core/migrations/0006_events.sql` - `event` and `message` tables.
+- `core/migrations/0007_token_scope.sql` - `devices.scope` (`api` default, or `mcp`); pre-existing tokens stay `api`.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
