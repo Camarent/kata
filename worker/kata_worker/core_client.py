@@ -106,16 +106,3 @@ class CoreClient:
         status, _ = self._call("POST", f"/jobs/{job_id}/fail")
         if status != NO_CONTENT:
             raise CoreError(f"POST /jobs/{job_id}/fail -> {status}")
-
-    def lesson_check(self, concept_ids: list[int]) -> list[dict[str, Any]]:
-        """Check the concepts against the user's marks and entries; returns the core's `results`."""
-        status, raw = self._call("POST", "/lesson-check", {"concept_ids": concept_ids})
-        if status != 200:
-            raise CoreError(f"POST /lesson-check -> {status}")
-        try:
-            results = json.loads(raw)["results"]
-        except (ValueError, KeyError, TypeError) as exc:
-            raise CoreError("POST /lesson-check: unreadable results body") from exc
-        if not isinstance(results, list) or not all(isinstance(r, dict) for r in results):
-            raise CoreError("POST /lesson-check: results is not a list of objects")
-        return results
