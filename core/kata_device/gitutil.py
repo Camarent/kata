@@ -51,6 +51,11 @@ def write_tree(repo: Path) -> str:
     return _git(repo, "write-tree").strip()
 
 
+def head_tree(repo: Path) -> str:
+    """Hash of the tree of the commit HEAD points to, from `git rev-parse HEAD^{tree}`."""
+    return _git(repo, "rev-parse", "HEAD^{tree}").strip()
+
+
 def staged_added_lines(repo: Path) -> list[tuple[str, int, str]]:
     """Added lines of the staged diff as (path, new line number, text), in diff order.
 
