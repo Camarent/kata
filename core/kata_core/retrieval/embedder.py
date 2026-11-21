@@ -18,8 +18,10 @@ _TOKEN = re.compile(r"\w+")
 
 
 class Embedder(Protocol):
-    """Maps each text to a vector of `dimensions` floats."""
+    """Maps each text to a vector of `dimensions` floats. `name` identifies the model: vectors
+    from embedders with different names are never compared."""
 
+    name: str
     dimensions: int
 
     def embed(self, texts: list[str]) -> list[list[float]]: ...
@@ -32,6 +34,7 @@ class FakeEmbedder:
         if dimensions < 1:
             raise ValueError(f"dimensions must be at least 1, got {dimensions}")
         self.dimensions = dimensions
+        self.name = f"fake:{dimensions}"
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         return [self._vector(text) for text in texts]
@@ -51,8 +54,9 @@ class FakeEmbedder:
 class _ModelEmbedder:
     """Wraps a sentence_transformers model; built only by load_embedder."""
 
-    def __init__(self, model: Any) -> None:
+    def __init__(self, model: Any, model_id: str) -> None:
         self._model = model
+        self.name = f"model:{model_id}"
         self.dimensions = int(model.get_sentence_embedding_dimension())
 
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -85,5 +89,6 @@ def load_embedder(cfg: Config) -> Embedder:
                 "retrieval.embedder = 'model' needs the sentence_transformers package, "
                 "which is not installed"
             ) from exc
-        return _ModelEmbedder(st.SentenceTransformer(cfg.get("retrieval", "model")))
+        model_id = str(cfg.get("retrieval", "model"))
+        return _ModelEmbedder(st.SentenceTransformer(model_id), model_id)
     raise ValueError(f"retrieval.embedder must be 'fake' or 'model', got {kind!r}")
