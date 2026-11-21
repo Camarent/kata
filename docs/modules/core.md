@@ -11,28 +11,28 @@ Single source of truth for the knowledge model, taxonomy and marks. Exposes the 
 HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. No server launcher found in the repo: TODO(verify) how uvicorn is started.
 - `core/kata_core/api/routes/__init__.py:14` `include_routers(app)` - includes every module that defines `router`.
-- `core/kata_core/api/deps.py:22` `get_cfg`, `:27` `get_conn`, `:33` `get_authenticator`, `:37` `current_user` - request dependencies.
-- `core/kata_core/api/routes/auth.py:38` `POST /enrol`, `:51` `GET /me`, `:59` `DELETE /devices/{device_id}`.
+- `core/kata_core/api/deps.py:22` `get_cfg`, `:27` `get_conn`, `:36` `get_authenticator`, `:40` `current_user` - request dependencies.
+- `core/kata_core/api/routes/auth.py:35` `POST /enrol`, `:48` `GET /me`, `:56` `DELETE /devices/{device_id}`.
 - `core/kata_core/api/routes/concepts.py:56` `POST /concepts`, `:65` `GET /concepts/marks`, `:83` `PUT /concepts/{id}/mark`, `:104` `DELETE /concepts/{id}/mark`; request models `ConceptIn` `:31`, `ConceptMarkIn` `:42`.
-- `core/kata_core/api/routes/importing.py:25` `POST /import`.
-- `core/kata_core/api/routes/jobs.py:69` `POST /jobs`, `:75` `GET /jobs/next`, `:89` `POST /jobs/{id}/result`, `:102` `POST /jobs/{id}/fail`, `:110` `GET /jobs/{id}`.
+- `core/kata_core/api/routes/importing.py:22` `POST /import`.
+- `core/kata_core/api/routes/jobs.py:69` `POST /jobs`, `:75` `GET /jobs/next`, `:92` `POST /jobs/{id}/result`, `:107` `POST /jobs/{id}/fail`, `:115` `GET /jobs/{id}`.
 - `core/kata_core/api/routes/lesson_check.py:54` `POST /lesson-check` (`lesson_check_route` `:55`); request `LessonCheckIn` `:26`, response `LessonCheckOut` `:44`.
 - `core/kata_core/lesson_check/checker.py:30` `ConceptCheck`, `:40` `check_lesson(conn, retriever, cfg, user_id, concept_ids)`, `:60` `_check_one` (the rule order below).
-- `core/kata_core/api/routes/marks.py:35` `GET /marks`, `:44` `PUT /marks/{topic_id}`, `:57` `DELETE /marks/{topic_id}`.
-- `core/kata_core/api/routes/topics.py:54` `GET /topics`, `:63` `POST /topics`, `:72` `POST /topics/{id}/aliases`.
-- `core/kata_core/auth/service.py:41` `hash_secret`, `:46` `new_enrolment`, `:59` `redeem`, `:77` `authenticate`, `:86` `revoke`, `:35` `Authenticator` (Protocol), `:91` `TokenAuthenticator`.
-- `core/kata_core/auth/admin.py:31` `build_parser`, `:43` `run`, `:65` `main`; CLI `python3 -m kata_core.auth.admin` (`:79`).
+- `core/kata_core/api/routes/marks.py:33` `GET /marks`, `:42` `PUT /marks/{topic_id}`, `:55` `DELETE /marks/{topic_id}`.
+- `core/kata_core/api/routes/topics.py:52` `GET /topics`, `:61` `POST /topics`, `:70` `POST /topics/{id}/aliases`.
+- `core/kata_core/auth/service.py:41` `hash_secret`, `:46` `new_enrolment`, `:59` `redeem`, `:89` `authenticate`, `:98` `revoke`, `:35` `Authenticator` (Protocol), `:103` `TokenAuthenticator`.
+- `core/kata_core/auth/admin.py:32` `build_parser`, `:55` `run`, `:77` `main`; CLI `python3 -m kata_core.auth.admin` (`:91`).
 - `core/kata_core/api/routes/usage.py:33` `POST /usage` (`record_usage`, 204), `:40` `GET /usage` (`read_usage`, returns `UsageOut` `:27`); request model `UsageIn` `:23`.
 - `core/kata_core/storage/usage.py:14` `add_usage(conn, user_id, day, micro_usd)` - one atomic upsert, raises `ValueError` (`:17`) when negative; `:26` `get_usage(conn, user_id, day) -> (micro_usd, calls)`.
 - `core/migrations/0004_usage.sql` table `usage_daily` `:4` (PK `user_id, day`; `micro_usd` bigint CHECK `>= 0`; `calls` integer).
 - `core/kata_core/importer/skill_list.py:45` `parse(text)`, `:73` `import_list(conn, user_id, text)`, `:23` `ParseError`.
-- `core/kata_core/jobs/queue.py:34` `enqueue`, `:45` `claim_next` (lease), `:74` `complete`, `:92` `fail`, `:102` `get_job`.
+- `core/kata_core/jobs/queue.py:34` `enqueue`, `:46` `claim_next` (lease), `:76` `complete`, `:94` `fail`, `:104` `get_job`.
 - `core/kata_core/storage/provision.py:34` `connect`, `:52` `create_database`, `:58` `drop_database`, `:70` `migrate`.
-- `core/kata_core/storage/devices.py:13` `add_device`, `:23` `find_by_token_hash`, `:32` `revoke_device`.
-- `core/kata_core/storage/users.py:15` `create_user`, `:40` `create_enrolment`, `:55` `consume_enrolment`.
+- `core/kata_core/storage/devices.py:13` `add_device`, `:30` `find_by_token_hash`, `:46` `revoke_device`.
+- `core/kata_core/storage/users.py:15` `create_user`, `:41` `create_enrolment`, `:57` `consume_enrolment`.
 - `core/kata_core/storage/marks.py:15` `set_mark`, `:46` `is_known`.
 - `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:19` `create_concept`, `:35` `concept_visible`, `:49` `set_concept_mark`, `:70` `list_concept_marks_detail`, `:87` `get_concept_mark_detail`, `:103` `clear_concept_mark`, `:112` `concept_label`.
-- `core/kata_core/storage/taxonomy.py:26` `ensure_topic`, `:46` `add_alias`, `:61` `topic_visible`, `:70` `find_topic`.
+- `core/kata_core/storage/taxonomy.py:27` `ensure_topic`, `:48` `add_alias`, `:64` `topic_visible`, `:73` `find_topic`.
 - `core/migrations/0001_init.sql` tables: `users` `:4`, `enrolment_codes` `:10`, `devices` `:18`, `categories` `:27`, `topics` `:32`, `topic_aliases` `:44`, `marks` `:51`, `jobs` `:59`.
 - `core/migrations/0002_concepts.sql` tables: `concepts` `:5` (unique label index per topic and owner at `:14`), `concept_marks` `:17` (PK `user_id, concept_id`; cascade on user delete).
 - `core/migrations/0003_retrieval.sql` table `retrieval_entries` `:4` (`owner_user_id` NULL = shared, `tsv` generated with `to_tsvector('simple', body)` `:9`, `embedding real[]` and `embedding_model` `:10-11`; GIN index `:14`, owner index `:15`).
@@ -169,9 +169,9 @@ Runs on the owner's machine inside a git checkout. The device package `kata_devi
 ### Public surface
 Env names: `KATA_URL` (core base URL), `KATA_TOKEN` (device token), `KATA_TERM_MASKS` (path of the private mask list; default `~/.config/kata/term-masks`). Also read: `KATA_TERM_ACTIVE` (set in the child shell), `SHELL`, `XDG_STATE_HOME`.
 - `core/kata_term/cli.py:86` `main` - entry point; `core/kata_term/cli.py:40` `default_spool_path` gives `<state>/kata/term-spool.jsonl`.
-- `core/kata_term/session.py:33` `run_session` - PTY relay; line buffer feeds `on_command`, an output scan feeds `on_error` with a kind.
+- `core/kata_term/session.py:34` `run_session` - PTY relay; line buffer feeds `on_command`, an output scan feeds `on_error` with a kind.
 - `core/kata_term/mask.py:34` `load_masks`, `core/kata_term/mask.py:61` `mask_command`, `core/kata_term/mask.py:69` `default_mask_path`, `core/kata_term/mask.py:20` `BUILTIN_PATTERNS`, `core/kata_term/mask.py:13` `MASK_TOKEN`.
-- `core/kata_term/spool.py:16` `append`, `core/kata_term/spool.py:24` `read_all`, `core/kata_term/spool.py:42` `rewrite_without` - JSONL spool.
+- `core/kata_term/spool.py:22` `append`, `core/kata_term/spool.py:50` `read_all`, `core/kata_term/spool.py:68` `rewrite_without` - JSONL spool.
 - `core/kata_term/client.py:28` `ClientError`, `core/kata_term/client.py:32` `build_event`, `core/kata_term/client.py:48` `post_batch` - stdlib `urllib` batch post.
 
 ### Key files
