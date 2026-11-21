@@ -2,9 +2,12 @@
 # Every gate for one checkout, safe to run in several worktrees at the same time.
 # Stops at the first red step.
 #
-#   scripts/dev/check-all.sh          full chain: ruff, mypy, pytest, extension build, extension test
-#   scripts/dev/check-all.sh --py     ruff, mypy, pytest only
-#   scripts/dev/check-all.sh --ext    extension build and test only
+#   scripts/dev/check-all.sh          full chain: ruff, mypy, pytest (with coverage), extension build,
+#                                     extension test (with coverage), then the jscpd duplication report
+#   scripts/dev/check-all.sh --py     ruff, mypy, pytest (with coverage) only
+#   scripts/dev/check-all.sh --ext    extension build and test (with coverage) only
+#   Coverage prints term tables into the log. The jscpd report prints a duplicate summary and
+#   never fails the gate: it has no threshold and its exit code is ignored.
 #   scripts/dev/check-all.sh --setup  create .venv and extension/node_modules when missing, run nothing
 #                                     (the pipeline's worktree_setup uses it, so a new worktree starts ready)
 #   Mode flags exclude each other: a combination exits 2.
@@ -100,12 +103,18 @@ start_postgres() {
 run_python() {
   step ruff .venv/bin/ruff check .
   step mypy .venv/bin/mypy core
-  step pytest .venv/bin/python -m pytest tests
+  step pytest .venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term
 }
 
 run_extension() {
   step extension-build npm --prefix extension run build
-  step extension-test npm --prefix extension test
+  step extension-test npm --prefix extension run test:cov
+}
+
+# Report only: jscpd has no threshold here, and a finding must not turn the gate red.
+run_reports() {
+  extension/node_modules/.bin/jscpd --reporters console core worker extension/src \
+    || echo "jscpd: report step could not run (non-blocking)"
 }
 
 setup_python
@@ -114,6 +123,6 @@ case "$MODE" in
   setup) ;;
   py)   start_postgres; run_python ;;
   ext)  run_extension ;;
-  full) start_postgres; run_python; run_extension ;;
+  full) start_postgres; run_python; run_extension; run_reports ;;
 esac
 echo "CHECK-ALL OK ($MODE)"
