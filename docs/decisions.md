@@ -89,3 +89,10 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   address.
 - **Terminal tracking.** Opt-in per session through an explicit command, not an always-on shell
   hook. A spike must confirm that capture inside an SSH session works.
+
+## Python dependencies stay pinned with ==, no lock file
+
+Runtime and dev dependencies are pinned with `==` in `pyproject.toml`. `scripts/dev/check-all.sh`
+and `.github/workflows/ci.yml` both install from that file, so the pins are the one source. No
+`uv lock` file and no new tool are added: a lock file would be a second list to keep in step
+with the pins. Revisit only if a transitive dependency must be pinned for reproducible installs.

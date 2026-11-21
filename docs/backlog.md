@@ -14,8 +14,8 @@ Project items after Milestone 0.
       that fails the gate), not yet decided.
 - [ ] Narrow the `<all_urls>` content-script permission in `extension/manifest.json` before
       any publish.
-- [ ] Python dependencies are pinned with `==` and there is no lock file; decide between
-      `uv lock` and pinned versions.
+- [x] Python dependencies are pinned with `==` and there is no lock file. Decided: keep the
+      `==` pins, no `uv lock` (see [`decisions.md`](decisions.md)).
 - [ ] Style nits: three `nosec` lines longer than 100 columns; `MarkSink` vs
       `Pick<CoreClient>`.
 - [x] Combined pytest run collected badly: three `conftest.py` files shadowed each other
@@ -27,7 +27,9 @@ Project items after Milestone 0.
 - [x] Reproducible Postgres test setup: `scripts/dev/pg.sh`, see [`development.md`](development.md).
 - [ ] The extension manifest allows only `http://127.0.0.1:8080/*`, so a core reached over a VPN
       or another port needs a manifest change (request the host permission at sign-in).
-- [ ] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have;
-      `scripts/dev/check-all.sh` runs the same gates with plain commands.
+- [x] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have.
+      Closed: `scripts/dev/check-all.sh` is the clean-clone gate with plain commands;
+      `gates.json` keeps the wrapper for the pipeline runner (see
+      [`development.md`](development.md)).
 - [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
       token lifetime; fixed, but check new tests for fixed dates.
