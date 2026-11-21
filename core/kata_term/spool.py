@@ -12,23 +12,39 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-# Most events the spool keeps. When an append goes over it, the oldest events are dropped.
+# Most events the spool keeps. When an append leaves more than this many lines, the spool is
+# trimmed to the newest `MAX_EVENTS - TRIM_SLACK` events (oldest dropped). The slack means the
+# next `TRIM_SLACK` appends need no rewrite; the one after does.
 MAX_EVENTS = 10000
+TRIM_SLACK = 1000
 
 
 def append(path: Path, event: dict[str, Any]) -> None:
     """Append one event as one JSON line, creating the parent directory when missing.
 
-    When the spool then holds more than `MAX_EVENTS` events, it is rewritten with only the
-    newest `MAX_EVENTS` (drop oldest).
+    The cap check only counts lines (no JSON parse). When the spool then holds more than
+    `MAX_EVENTS` lines, it is rewritten with only the newest `MAX_EVENTS - TRIM_SLACK`
+    events (drop oldest), so the next `TRIM_SLACK` appends need no rewrite.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(event, sort_keys=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(line + "\n")
-    events = read_all(path)
-    if len(events) > MAX_EVENTS:
-        _atomic_write(path, events[-MAX_EVENTS:])
+    if _count_lines(path) > MAX_EVENTS:
+        events = read_all(path)
+        keep = max(MAX_EVENTS - TRIM_SLACK, 0)
+        # Torn lines count as lines but not as events: len(events) can be below keep.
+        _atomic_write(path, events[max(len(events) - keep, 0) :])
+
+
+def _count_lines(path: Path) -> int:
+    """Count non-blank lines by streaming the file; a torn line counts as one line."""
+    count = 0
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            if line.strip():
+                count += 1
+    return count
 
 
 def read_all(path: Path) -> list[dict[str, Any]]:
