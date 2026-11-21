@@ -1,6 +1,7 @@
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
 import type { Session } from "./types";
+import { renderReview, type ReviewRow, type ReviewState } from "./reviewScreen";
 
 /** Group heading for rows whose block has no topic. */
 const UNTAGGED = "untagged";
@@ -20,11 +21,12 @@ type PanelStatus =
   | { kind: "partial"; done: number; total: number }
   | { kind: "error"; reason: "timeout" | "auth" | "failed" };
 
-/** Everything the panel draws. `session` null means signed out. */
+/** Everything the panel draws. `session` null means signed out. `review` non-null means the review screen. */
 export interface PanelState {
   session: Session | null;
   rows: PanelRow[];
   status: PanelStatus;
+  review?: ReviewRow[] | null;
 }
 
 /** Values typed into the sign-in form. */
@@ -37,6 +39,9 @@ export interface SignInInput {
 export interface PanelHandlers {
   onSignIn: (input: SignInInput) => void | Promise<void>;
   onKnown: (topicId: number) => Promise<MarkOutcome>;
+  onReview: () => Promise<void>;
+  onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
+  onCloseReview: () => void;
 }
 
 /** Creates an element with text content; never parses markup. */
@@ -157,6 +162,18 @@ function renderGroups(rows: PanelRow[], handlers: PanelHandlers): HTMLElement {
   return root;
 }
 
+/** Review screen: a Back button to the scan view, then one row per concept. */
+function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLElement {
+  const view = el("div", undefined, "review-view");
+  const back = el("button", "Back", "back");
+  back.type = "button";
+  back.addEventListener("click", () => handlers.onCloseReview());
+  const list = el("div");
+  renderReview(list, rows, { onSet: handlers.onSetConcept });
+  view.append(back, list);
+  return view;
+}
+
 /** Draws the panel into root: sign-in form when signed out, else status and grouped results. */
 export function renderPanel(root: HTMLElement, state: PanelState, handlers: PanelHandlers): void {
   root.replaceChildren();
@@ -165,6 +182,14 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
     if (state.status.kind === "error") root.append(el("p", statusText(state.status), "status"));
     return;
   }
+  if (state.review != null) {
+    root.append(renderReviewView(state.review, handlers));
+    return;
+  }
+  const review = el("button", "Review concepts", "review-open");
+  review.type = "button";
+  review.addEventListener("click", () => void handlers.onReview());
+  root.append(review);
   root.append(el("p", statusText(state.status), "status"));
   if (state.rows.length === 0 && state.status.kind === "idle") {
     root.append(el("p", "Nothing scanned yet", "empty"));

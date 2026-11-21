@@ -123,4 +123,50 @@ describe("bootPanel", () => {
     await vi.waitFor(() => expect(root.querySelector(".status")).not.toBeNull());
     expect(root.querySelector("form.signin")).not.toBeNull();
   });
+
+  const reviewRows = [{ conceptId: 5, label: "ser", state: null, evidence: "" }];
+  const signedIn = { baseUrl: "http://localhost:8000", token: "t" };
+
+  it("Review concepts sends panel:review and draws the returned rows", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: reviewRows }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.review-open")!.click();
+    await vi.waitFor(() => expect(root.querySelector("li.review-row")).not.toBeNull());
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:review" });
+    expect(root.querySelector("span.label")?.textContent).toBe("ser");
+    expect(root.querySelector("button.review-open")).toBeNull();
+  });
+
+  it("a refused review sets the error status and stays on the scan view", async () => {
+    const { api } = fakeChrome({ ok: false, error: "core down" }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.review-open")!.click();
+    await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("Something went wrong"));
+    expect(root.querySelector("li.review-row")).toBeNull();
+    expect(root.querySelector("button.review-open")).not.toBeNull();
+  });
+
+  it("a state button sends panel:setConcept with the concept id and state", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: reviewRows }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.review-open")!.click();
+    await vi.waitFor(() => expect(root.querySelector("li.review-row")).not.toBeNull());
+    const known = [...root.querySelectorAll<HTMLButtonElement>("button.state-button")].find(
+      (b) => b.textContent === "known",
+    )!;
+    known.click();
+    await vi.waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith({ type: "panel:setConcept", conceptId: 5, state: "known" }),
+    );
+  });
+
+  it("Back returns to the scan view", async () => {
+    const { api } = fakeChrome({ ok: true, data: reviewRows }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.review-open")!.click();
+    await vi.waitFor(() => expect(root.querySelector("button.back")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.back")!.click();
+    expect(root.querySelector("li.review-row")).toBeNull();
+    expect(root.querySelector("button.review-open")).not.toBeNull();
+  });
 });

@@ -2,6 +2,7 @@ import type { PanelMessage, PanelReply } from "./background";
 import { renderPanel, type PanelHandlers, type PanelState, type SignInInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import type { MarkOutcome } from "./offlineQueue";
+import type { ReviewRow, ReviewState } from "./reviewScreen";
 
 /** The part of `chrome` the side panel page uses; tests pass a fake with these members. */
 export interface PanelChromeLike {
@@ -15,7 +16,7 @@ export interface PanelChromeLike {
  */
 export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promise<void> {
   const tokens = new TokenStore(api.storage.local);
-  const state: PanelState = { session: await tokens.loadSession(), rows: [], status: { kind: "idle" } };
+  const state: PanelState = { session: await tokens.loadSession(), rows: [], status: { kind: "idle" }, review: null };
   const draw = (): void => renderPanel(root, state, handlers);
 
   const handlers: PanelHandlers = {
@@ -34,6 +35,26 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       const reply = await api.runtime.sendMessage({ type: "panel:known", topicId });
       if (!reply.ok) throw new Error(reply.error);
       return reply.data as MarkOutcome;
+    },
+
+    async onReview() {
+      const reply = await api.runtime.sendMessage({ type: "panel:review" });
+      if (reply.ok) {
+        state.review = reply.data as ReviewRow[];
+      } else {
+        state.status = { kind: "error", reason: "failed" };
+      }
+      draw();
+    },
+
+    async onSetConcept(conceptId: number, conceptState: ReviewState) {
+      const reply = await api.runtime.sendMessage({ type: "panel:setConcept", conceptId, state: conceptState });
+      if (!reply.ok) throw new Error(reply.error);
+    },
+
+    onCloseReview() {
+      state.review = null;
+      draw();
     },
   };
 

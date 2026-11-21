@@ -7,6 +7,9 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
   return {
     onSignIn: vi.fn(),
     onKnown: vi.fn(async () => "saved" as const),
+    onReview: vi.fn(async () => {}),
+    onSetConcept: vi.fn(async () => {}),
+    onCloseReview: vi.fn(),
     ...overrides,
   };
 }
@@ -161,5 +164,67 @@ describe("renderPanel", () => {
     const label = root.querySelector("span.label")!;
     expect(label.textContent).toBe(hostile);
     expect(root.querySelector("img")).toBeNull();
+  });
+
+  it("shows the Review concepts button only when signed in", () => {
+    renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, handlers());
+    expect(root.querySelector("button.review-open")).toBeNull();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, handlers());
+    const button = root.querySelector<HTMLButtonElement>("button.review-open");
+    expect(button?.textContent).toBe("Review concepts");
+  });
+
+  it("calls onReview when the Review concepts button is clicked", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, h);
+    root.querySelector<HTMLButtonElement>("button.review-open")!.click();
+    expect(h.onReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws the review rows instead of the scan view when state.review is set", () => {
+    const state: PanelState = {
+      session,
+      rows: [row(1, "greetings", "hola", false)],
+      status: { kind: "idle" },
+      review: [
+        { conceptId: 5, label: "ser", state: null, evidence: "" },
+        { conceptId: 6, label: "estar", state: "known", evidence: "" },
+      ],
+    };
+    renderPanel(root, state, handlers());
+    expect([...root.querySelectorAll("li.review-row span.label")].map((s) => s.textContent)).toEqual([
+      "ser",
+      "estar",
+    ]);
+    expect(root.querySelector("section.group")).toBeNull();
+    expect(root.querySelector("button.review-open")).toBeNull();
+    expect(root.querySelector("button.back")?.textContent).toBe("Back");
+  });
+
+  it("sends the chosen state to onSetConcept from a review row", async () => {
+    const h = handlers();
+    const state: PanelState = {
+      session,
+      rows: [],
+      status: { kind: "idle" },
+      review: [{ conceptId: 5, label: "ser", state: null, evidence: "" }],
+    };
+    renderPanel(root, state, h);
+    const learning = [...root.querySelectorAll<HTMLButtonElement>("button.state-button")].find(
+      (b) => b.textContent === "learning",
+    )!;
+    learning.click();
+    await vi.waitFor(() => expect(h.onSetConcept).toHaveBeenCalledTimes(1));
+    expect(h.onSetConcept).toHaveBeenCalledWith(5, "learning");
+  });
+
+  it("Back calls onCloseReview and the scan view returns once review is cleared", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, review: [] }, h);
+    root.querySelector<HTMLButtonElement>("button.back")!.click();
+    expect(h.onCloseReview).toHaveBeenCalledTimes(1);
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, review: null }, h);
+    expect(root.querySelector("button.review-open")).not.toBeNull();
+    expect(root.querySelector("button.back")).toBeNull();
   });
 });
