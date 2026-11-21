@@ -2,15 +2,20 @@
 # Every gate for one checkout, safe to run in several worktrees at the same time.
 # Stops at the first red step.
 #
-#   scripts/dev/check-all.sh          full chain: ruff, mypy, pytest (with coverage), extension build,
-#                                     extension test (with coverage), then the jscpd duplication report
-#   scripts/dev/check-all.sh --py     ruff, mypy, pytest (with coverage) only
+#   scripts/dev/check-all.sh          full chain: ruff, mypy, smoke tests (-m smoke), pytest (with
+#                                     coverage, -m 'not flaky'), extension build, extension test (with
+#                                     coverage), then the jscpd duplication report
+#   scripts/dev/check-all.sh --unit   ruff, mypy, pytest -m 'not integration and not e2e and not smoke'
+#   scripts/dev/check-all.sh --py     ruff, mypy, pytest (with coverage) only: the Python part of the
+#                                     full run, without the -m filter
+#   scripts/dev/check-all.sh --merge  pytest -m 'not e2e' (with coverage), extension build and test
 #   scripts/dev/check-all.sh --ext    extension build and test (with coverage) only
 #   Coverage prints term tables into the log. The jscpd report prints a duplicate summary and
 #   never fails the gate: it has no threshold and its exit code is ignored.
 #   scripts/dev/check-all.sh --setup  create .venv and extension/node_modules when missing, run nothing
 #                                     (the pipeline's worktree_setup uses it, so a new worktree starts ready)
 #   Mode flags exclude each other: a combination exits 2.
+#   Smoke tests are picked by hand (-m smoke). pytest exits 5 when none is selected; that is not red.
 #
 # Isolation between concurrent runs:
 #   - .venv and extension/node_modules are per checkout, created when missing.
@@ -34,7 +39,7 @@ QRUN="${KATA_QRUN:-}"
 MODE_FLAG=""
 for arg in "$@"; do
   case "$arg" in
-    --py|--ext|--setup)
+    --unit|--py|--merge|--ext|--setup)
       if [ -n "$MODE_FLAG" ]; then
         echo "check-all: mode flags cannot be combined: $MODE_FLAG $arg" >&2
         exit 2
@@ -59,14 +64,18 @@ trap 'rm -rf "$RUN_TMP"' EXIT
 export TMPDIR="$RUN_TMP"
 
 # step <name> <command...>: run one command through qrun when KATA_QRUN is set, else directly.
+run_cmd() {
+  if [ -n "$QRUN" ] && [ -f "$QRUN" ]; then
+    python3 -I "$QRUN" -- "$@"
+  else
+    "$@"
+  fi
+}
+
 step() {
   local name="$1"
   shift
-  if [ -n "$QRUN" ] && [ -f "$QRUN" ]; then
-    python3 -I "$QRUN" -- "$@" && return 0
-  else
-    "$@" && return 0
-  fi
+  run_cmd "$@" && return 0
   echo "CHECK-ALL FAILED at $name"
   exit 1
 }
@@ -100,10 +109,29 @@ start_postgres() {
   eval "$(scripts/dev/pg.sh env)"
 }
 
-run_python() {
+run_lint() {
   step ruff .venv/bin/ruff check .
   step mypy .venv/bin/mypy core
-  step pytest .venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term
+}
+
+# pytest with coverage. Extra arguments select tests, for example -m 'not flaky'.
+run_tests() {
+  step pytest .venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term "$@"
+}
+
+run_python() {
+  run_lint
+  run_tests
+}
+
+# Smoke tests are selected by hand. pytest exit 5 means none is selected yet: not red.
+run_smoke() {
+  local rc=0
+  run_cmd .venv/bin/python -m pytest tests -m smoke || rc=$?
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then
+    echo "CHECK-ALL FAILED at smoke"
+    exit 1
+  fi
 }
 
 run_extension() {
@@ -121,8 +149,10 @@ setup_python
 setup_extension
 case "$MODE" in
   setup) ;;
-  py)   start_postgres; run_python ;;
-  ext)  run_extension ;;
-  full) start_postgres; run_python; run_extension; run_reports ;;
+  unit)  run_lint; run_tests -m 'not integration and not e2e and not smoke' ;;
+  py)    start_postgres; run_python ;;
+  merge) start_postgres; run_tests -m 'not e2e'; run_extension ;;
+  ext)   run_extension ;;
+  full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky'; run_extension; run_reports ;;
 esac
 echo "CHECK-ALL OK ($MODE)"

@@ -15,13 +15,16 @@ scripts/dev/check-all.sh
 ```
 
 It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), runs
-`npm ci` in `extension/`, starts a throwaway Postgres, runs ruff, mypy, pytest and the
+`npm ci` in `extension/`, starts a throwaway Postgres, runs ruff, mypy, the smoke tests
+(`-m smoke`, none picked yet: pytest exit 5 is not red), pytest with `-m 'not flaky'`, and the
 extension build and tests. It is safe to run in several worktrees at once: they share one
 Postgres (started under a lock, never stopped by the script; stop it with
 `scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. Flags:
-`--py` runs ruff, mypy and pytest only, `--ext` runs the extension build and tests only, `--setup`
-only creates `.venv` and `extension/node_modules` when they are missing (no tests, no Postgres), so a
-fresh git worktree can be made ready in a couple of seconds.
+`--unit` runs ruff, mypy and pytest with `-m 'not integration and not e2e and not smoke'`;
+`--py` runs ruff, mypy and pytest only (the Python part of the full run, no `-m` filter); `--merge`
+runs pytest with `-m 'not e2e'` plus the extension build and tests; `--ext` runs the extension build
+and tests only; `--setup` only creates `.venv` and `extension/node_modules` when they are missing
+(no tests, no Postgres), so a fresh git worktree can be made ready in a couple of seconds.
 
 ### Output of the full run
 
