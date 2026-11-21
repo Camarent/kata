@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import select
 import subprocess
+import termios
 from collections.abc import Callable, Mapping
 
 POLL_SECONDS = 0.1  # bounded select timeout: the loop re-checks the child at this rate
@@ -100,10 +101,15 @@ def _relay(
                 stdin_open = False
                 _send(master, EOF_BYTE)
             else:
+                # Echo is read before the send: it is the state the typed chunk arrived under.
+                echo = _echo_on(master)
                 if not _send(master, data):
                     stdin_open = False
                     continue
-                _feed_line(data.decode("utf-8", errors="replace"), line, on_command)
+                if echo:
+                    _feed_line(data.decode("utf-8", errors="replace"), line, on_command)
+                else:
+                    line.clear()  # typed with echo off (a password): never kept, never reported
 
 
 def _feed_line(text: str, line: list[str], on_command: Callable[[str], None]) -> None:
@@ -129,6 +135,14 @@ def _scan_errors(text: str, tail: str, on_error: Callable[[str], None]) -> str:
         if window.find(needle, max(0, old - len(needle) + 1)) != -1:
             on_error(kind)
     return window[-_TAIL_LEN:] if _TAIL_LEN else ""
+
+
+def _echo_on(master: int) -> bool:
+    """True when the pty echoes typed input; a failed termios read counts as echo on."""
+    try:
+        return bool(termios.tcgetattr(master)[3] & termios.ECHO)
+    except termios.error:
+        return True
 
 
 def _send(master: int, data: bytes) -> bool:
