@@ -89,6 +89,6 @@ def load_embedder(cfg: Config) -> Embedder:
                 "retrieval.embedder = 'model' needs the sentence_transformers package, "
                 "which is not installed"
             ) from exc
-        model_id = str(cfg.get("retrieval", "model"))
+        model_id = str(cfg.get("retrieval", "model_name"))
         return _ModelEmbedder(st.SentenceTransformer(model_id), model_id)
     raise ValueError(f"retrieval.embedder must be 'fake' or 'model', got {kind!r}")

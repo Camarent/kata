@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import sys
+import types
 
 import pytest
 from kata_core.config import Config
@@ -74,3 +75,23 @@ def test_load_embedder_model_missing_raises_clear_error(monkeypatch: pytest.Monk
     monkeypatch.setitem(sys.modules, "sentence_transformers", None)
     with pytest.raises(RuntimeError, match="sentence_transformers"):
         load_embedder(_cfg("model"))
+
+
+def test_load_embedder_model_reads_model_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A fake package in sys.modules records the model id the embedder passes on.
+    seen: list[str] = []
+
+    class FakeSentenceTransformer:
+        def __init__(self, model_id: str) -> None:
+            seen.append(model_id)
+
+        def get_sentence_embedding_dimension(self) -> int:
+            return 4
+
+    fake_package = types.SimpleNamespace(SentenceTransformer=FakeSentenceTransformer)
+    monkeypatch.setitem(sys.modules, "sentence_transformers", fake_package)
+    cfg = Config(sections={"retrieval": {"embedder": "model", "model_name": "fake-model-id"}})
+    embedder = load_embedder(cfg)
+    assert seen == ["fake-model-id"]
+    assert embedder.name == "model:fake-model-id"
+    assert embedder.dimensions == 4
