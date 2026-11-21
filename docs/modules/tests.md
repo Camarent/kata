@@ -5,7 +5,7 @@ summary: pytest suites - core (API, repositories, auth, queue, import; needs Pos
 # tests
 
 ## Purpose
-Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`, `tests/scripts/` (lesson-check bench in `scripts/bench/`).
+Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`, `tests/scripts/` (lesson-check bench in `scripts/bench/`), `tests/browser/` (side panel in real Firefox and Chrome through selenium).
 
 ## Public surface
 - `tests/core/conftest.py:21` `ScratchDatabase` - per-test database helper.
@@ -25,6 +25,8 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/worker/test_worker_lesson_check.py` - lesson-check payload and `CoreClient.lesson_check` against `tests/fakes/fake_core.py`.
 - `tests/foundation/` - config, docs, gates, extension, package metadata.
 - `tests/scripts/test_bench_lesson_check.py` - lesson-check bench runner on a scratch DB (fake embedder only); `test_bench_scoring.py` - pure three-state scoring; `test_bench_results_note.py` - the block in `docs/research/benchmarks/RESULTS.md` equals the bench output (paste the printed block when stale).
+- `tests/browser/conftest.py:40` `browser_name` (param `firefox`, `chrome`), `:47` `page_server` (local lesson page), `:105` `driver` (selenium driver per browser), `:96` `_require_extension` (needs `extension/dist/<browser>/manifest.json`).
+- `tests/browser/test_panel_flow.py:59` `test_panel_flow` - side panel flow in each browser; `tests/browser/pages/lesson.html` is its page.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
 - `tests/e2e/test_driver.py` - driver alone against a fake core (scan, tag, mark; auth error exits 1).
@@ -36,6 +38,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - The DB user needs `CREATEDB`; tests create and drop their own databases.
 - Every test cleans up its databases; `no_leaked_test_databases` (`tests/core/conftest.py:61`) checks for leftovers.
 - E2e tests need Node and `npm install` in `extension/` (esbuild, jsdom); they fail, not skip, when a prerequisite is missing (`docs/e2e.md`).
+- Browser tests carry the `browser` marker and are excluded from every other gate mode; a missing Firefox, geckodriver, Chrome or chromedriver skips the case (`tests/browser/conftest.py:81`, `:91`), but a missing built extension fails it (`:96`).
 - Run: `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests` (`docs/api.md`); gate cmd `.venv/bin/python -m pytest tests ...` with coverage and `-m 'not flaky'` (`tools/gates.json:6`).
 
 ## Depends on / used by

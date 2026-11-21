@@ -44,6 +44,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Page content is read only when the user has the page open; never crawl (`docs/design/overview.md`).
 - Review screen: a stored concept mark wins over the lesson-check result; with no mark, an abstaining check shows the row unset (state null).
 - Review keyboard: Tab moves focus through the rows and buttons; ArrowUp/ArrowDown move between rows; keys 1, 2, 3 set known, learning, new.
+- No `extension/manifest.json` in the repo: `extension/build/build.mjs:47` writes one into each `dist/<browser>/`; edit `manifest.base.json` or `build/manifest.mjs`.
 - Firefox first; Chrome later from the same code.
 - Adding a permission widens what users grant; keep the list minimal.
 
