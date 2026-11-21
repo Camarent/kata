@@ -33,6 +33,8 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/panel_page.py:25` `panel_url`, `:31` `open_panel`, `:39` `force_dark_scheme` - shared panel helpers.
 - `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
 - `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:182`); missing key raises at construction (`:245`).
+- `tests/worker/test_scanner.py` - secret scanner: expected kinds (`:33`), rule table coverage (`:37`), offset (`:42`), findings hold no text (`:48`), frozen (`:54`), low-entropy token not flagged (`:60`).
+- `tests/worker/test_scanner_guard.py` - guard: clean text reaches inner provider (`:36`), a secret blocks the call with one event per finding (`:45`, `:65`), no secret text in errors or events (`:75`), local passes unscanned (`:92`), no skip parameter (`:116`), cloud classes not named outside guard (`:138`, `:174`).
 - `tests/fakes/fake_provider.py:13` `FakeProvider` - scripted provider for tests; records calls.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
