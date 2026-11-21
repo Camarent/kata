@@ -7,7 +7,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, Postgres storage.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
 - [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate).
-- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/scripts` (bench).
+- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/browser` (real Firefox and Chrome through selenium; only `check-all.sh --browser`), `tests/scripts` (bench).
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
@@ -37,7 +37,7 @@ Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py -
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
-E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`).
+E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests").
 
 ## Known gaps
 - `pyproject.toml:5` comment says "stdlib only" but dependencies (`pyproject.toml:6`) are fastapi, psycopg, httpx, uvicorn.

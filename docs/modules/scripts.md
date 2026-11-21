@@ -5,9 +5,11 @@ summary: Operator DB CLI (create, migrate, drop) and the lesson-check benchmark 
 # scripts
 
 ## Purpose
-Two tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate.
+Three tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests).
 
 ## Public surface
+- `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
+- `scripts/dev/check-all.sh:46` mode flags, `:142` `run_browser` (`--browser`: prints a skip line and exits 0 when the install status fails, else runs `tests/browser -m browser`); every other mode excludes `browser` (`:129`, `:133`, `:163-168`).
 - `scripts/db/kata_db.py:35` `main(argv)` - subcommands `create NAME`, `migrate [--name NAME]`, `drop NAME`.
 - `scripts/db/kata_db.py:20` `_parser()` - argparse setup; `--config` at `:24`.
 - `scripts/db/kata_db.py:55` `if __name__ == "__main__"` - run as script.
@@ -27,6 +29,8 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/lesson_check_bench.py` - bench runner: seed, check, score, render.
 - `scripts/bench/scoring.py` - stdlib-only case loader and scorer; no DB, no `kata_core` import.
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
+- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
+- `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
 
 ## Invariants and gotchas
 - `kata_db.py` needs the `core` package on `PYTHONPATH`; it imports `kata_core` directly.
@@ -37,9 +41,10 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - A concept with a mark has expected = mark (`scripts/bench/scoring.py:83`); expected `new` needs mark `new` (`scripts/bench/scoring.py:81`), because retrieval never gives `new`.
 - `abstain_rate` is over all cases; `abstain_precision` is `None` when nothing was predicted abstain (`scripts/bench/scoring.py:121`).
 - Report never prints entry text (tested by `test_rendered_report_has_no_entry_text`).
+- `install-browsers.sh` fails closed: an empty sha256 pin refuses the install. Chromedriver is not pinned; Chrome is found on `PATH`.
 - `docs/research/benchmarks/RESULTS.md` holds a pasted block between `bench:lesson-check` markers; `tests/scripts/test_bench_results_note.py` fails when it differs from the bench output.
 
 ## Depends on / used by
 - Depends on: `core/kata_core/config.py` (`load_config`, `ConfigError`), `core/kata_core/storage/provision.py` (`connect`, `create_database`, `drop_database`, `migrate`), psycopg.
 - Bench also depends on `kata_core` lesson_check, retrieval, storage (`check_lesson`, `Retriever`, `add_entry`, `load_embedder`, concepts, taxonomy, users).
-- Used by: operators by hand; `tests/core/test_provision.py` covers the CLI parser; `tests/scripts/test_bench_*.py` cover the bench; `docs/research/benchmarks/SUITE.md` line 3 points to `scripts/bench/`.
+- Used by: operators by hand; `tests/browser/conftest.py` calls `install-browsers.sh --print-dir`; `check-all.sh` runs every mode; `tests/core/test_provision.py` covers the CLI parser; `tests/scripts/test_bench_*.py` cover the bench; `docs/research/benchmarks/SUITE.md` line 3 points to `scripts/bench/`.

@@ -43,7 +43,7 @@ and tests only; `--setup` only creates `.venv` and `extension/node_modules` when
 CI is `.github/workflows/ci.yml`. It has three jobs:
 
 - `checks`: installs `pyproject.toml` with uv, then runs ruff (`ruff check .`), mypy
-  (`mypy core`), pytest (`pytest tests -m 'not flaky'`, no coverage), the extension build and
+  (`mypy core`), pytest (`pytest tests -m 'not flaky and not browser'`, no coverage), the extension build and
   `npm test`. It has no separate smoke step; the smoke tests run inside the pytest step, which
   does not deselect them.
 - `secrets`: gitleaks over the full history.
@@ -58,15 +58,18 @@ The test tiers are markers in `pyproject.toml`:
 | `e2e` | runs a live core, worker and fake model (`tests/e2e`) |
 | `smoke` | quick end-to-end sanity check, selected by hand |
 | `flaky` | known intermittent test, kept out of the gate until fixed |
+| `browser` | real Firefox and Chrome through selenium (`tests/browser`), run only by `--browser` |
 
 Which `scripts/dev/check-all.sh` flag runs which tier:
 
-- no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky'` with coverage, extension build and
-  tests, then the jscpd report. The closest local run to CI, plus the extras.
-- `--unit`: ruff, mypy, pytest without the `integration`, `e2e` and `smoke` tiers.
-- `--py`: ruff, mypy, pytest with every test, `flaky` included.
-- `--merge`: pytest `-m 'not e2e'` with coverage, then the extension build and tests.
+- no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky and not browser'` with coverage,
+  extension build and tests, then the jscpd report. The closest local run to CI, plus the extras.
+- `--unit`: ruff, mypy, pytest without the `integration`, `e2e`, `smoke` and `browser` tiers.
+- `--py`: ruff, mypy, pytest with every test except `browser`, `flaky` included.
+- `--merge`: pytest `-m 'not e2e and not browser'` with coverage, then the extension build and tests.
 - `--ext`: extension build and tests only.
+- `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
+  without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md`.
 
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
 `-m 'not flaky'`, extension build, extension test), each as a plain command with no `cs-qrun`
@@ -110,6 +113,17 @@ To load Firefox: open `about:debugging#/runtime/this-firefox`, choose "Load Temp
 To load Chrome: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick `extension/dist/chrome/`.
 
 Firefox loads the add-on under the id `kata@kata.local` and needs version 128.0 or later (see `docs/decisions.md`). The core must be running on `http://127.0.0.1:8080` for the panel to show marks.
+
+## Browser tests
+
+The real-browser tests need a user-level Firefox and geckodriver, installed once:
+
+```
+scripts/dev/install-browsers.sh
+scripts/dev/check-all.sh --browser
+```
+
+The install goes to `$HOME/.cache/kata-browsers` (or `$KATA_BROWSERS_DIR`) with sha256 checks; `scripts/dev/install-browsers.sh --status` checks it. Without the install, `--browser` skips with a message. Build the extension first (`npm run build` in `extension/`). Details and skip behaviour: `docs/e2e.md`, "Browser tests".
 
 ## Postgres for tests
 

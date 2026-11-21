@@ -176,3 +176,23 @@ Decided 2026-11-21. `browser_specific_settings.gecko.id` is `kata@kata.local` an
 ## Extension build writes each browser to dist/<browser>/
 
 Decided 2026-11-21. `npm run build` in `extension/` runs `build/build.mjs`, which writes `extension/dist/chrome/` and `extension/dist/firefox/`. Each folder holds its own `manifest.json`, the bundled scripts and a copy of `sidepanel.html`, so each folder loads on its own. Reason: one shared `dist/` cannot hold two manifests that differ. `node build/build.mjs firefox` builds one browser only.
+
+## Browser e2e drives the browsers through selenium and geckodriver
+
+Decided 2026-11-21. The real-browser tests in `tests/browser/` use selenium (`requirements-browser.txt`, pinned `selenium==4.53.0`) with a Firefox driver: geckodriver from `scripts/dev/install-browsers.sh`, and Chrome through chromedriver on `PATH`. Reason: the tests run the stock Firefox and geckodriver binaries that the install script pins with sha256, one install path for both the test driver and the browser. Playwright was not chosen: it brings its own browser downloads and a second install path next to the pinned one. The repo does not record a longer comparison; this entry is the decision, not a benchmark.
+
+## Browser tools install per user with pinned sha256
+
+Decided 2026-11-21. `scripts/dev/install-browsers.sh` downloads Firefox 140.0esr and geckodriver 0.36.0 (linux x86_64) into `$KATA_BROWSERS_DIR`, default `$HOME/.cache/kata-browsers`. It needs no sudo, changes nothing system-wide, and verifies each archive against a pinned sha256 before it unpacks. An empty pin refuses the install (fail closed). Reason: a user-level, pinned install is reproducible and leaves the system browser alone. Chromedriver is not pinned: Chrome is looked up on `PATH` instead. `install-browsers.sh --status` checks the install with no network; `--print-dir` prints the directory.
+
+## Browser marker is excluded from every gate except --browser
+
+Decided 2026-11-21. Tests marked `browser` (`pyproject.toml`, marker `browser`) run only through `scripts/dev/check-all.sh --browser`. Every other mode excludes them with `-m 'not browser'`: `--py`, `--unit`, `--merge`, the smoke step and the full run. Reason: CI and the pipeline gate have no browser and no Firefox, so a browser test there would fail or skip for a reason that is not a code fault. The marker keeps the browser tier out of the default gate without deleting its tests.
+
+## Browser tests skip with a message when a browser is missing
+
+Decided 2026-11-21. With no Firefox or geckodriver from the install, `check-all.sh --browser` prints `check-all: browser tests skipped: ...` and exits 0. Each browser case also skips with a reason from `tests/browser/conftest.py` (`pytest.skip`) when its binary is missing. A missing built extension is a failure, not a skip: the case says to run `npm run build`. Reason: a developer without browsers keeps a green run, and a broken build still shows red.
+
+## Chrome browser case is unverified
+
+Decided 2026-11-21. The Chrome param of `tests/browser/test_panel_flow.py` has never run against a real Chrome: the only run so far skipped, because no chromedriver was on `PATH`. The Chrome extension id is derived in the test from a sha256 of the dist path, which is unverified. Branded Chrome 137 and later may ignore `--load-extension`, so the Chrome flow may not load the extension at all. The Firefox case is the one the stage relies on. Reason for recording it here: a green Chrome skip must not be read as a passing Chrome flow.
