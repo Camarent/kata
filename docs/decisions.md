@@ -77,7 +77,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   click. Background prefetch for a user without a worker is a setting, off by default.
 - **Scan target.** 30 seconds counts the card (all blocks tagged, counts and top gaps); the
   summary appears when ready, with no deadline.
-- **Marks.** Milestone 0 marks at topic level; concept-level marks come in a later slice.
+- **Marks.** Topic marks (`marks`) stay as they are. Concept marks (`concept_marks`) shipped in milestone 2: each user marks a concept `known`, `learning` or `new`, with optional evidence. Concept marks are private to their user.
 - **Chunk sharing.** Chunks are shared by content hash; the user-to-chunk link stays private so
   the store does not reveal who studies what.
 - **Language.** The vector table is built for a multilingual embedding model from the start.

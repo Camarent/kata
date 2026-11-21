@@ -28,12 +28,18 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/marks` | bearer | none | 200 list of `{"topic_id", "category", "topic", "status"}` | |
 | PUT | `/marks/{topic_id}` | bearer | `{"status": "known"}` | 200 `{"topic_id", "category", "topic", "status"}` | 404 topic not found |
 | DELETE | `/marks/{topic_id}` | bearer | none | 204 | 404 mark not found |
+| POST | `/concepts` | bearer | `{"topic_id": int, "label": str}` | 200 `{"id", "topic_id", "label"}` | 404 topic not found |
+| GET | `/concepts/marks` | bearer | none | 200 list of `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | |
+| PUT | `/concepts/{concept_id}/mark` | bearer | `{"state": "known" \| "learning" \| "new", "evidence": str = ""}` | 200 `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | 404 concept not found; 422 unknown state |
+| DELETE | `/concepts/{concept_id}/mark` | bearer | none | 204 | 404 mark not found |
 
 Notes:
 
 - `GET /jobs/next` answers 204 when nothing is queued. The worker polls it; there is no push channel.
 - `known` in `GET /jobs/{job_id}` is computed from the caller's marks. The model only picks the topic.
 - A topic created with `private: false` (the default) is shared. A private topic and a private alias belong to the caller.
+- Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.
+- A concept made through `POST /concepts` belongs to its creator. A repeated label under the same topic and owner hits the unique index; the route does not map that error to a 4xx yet.
 
 ## Skill list file format
 

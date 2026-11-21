@@ -19,6 +19,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 4. Request: route module in `core/kata_core/api/routes/` -> repository in `core/kata_core/storage/` -> Postgres. `user_id` always comes from the token.
 5. Import: `POST /import` parses the skill-list text (`importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
 6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next` (204 when empty), leases a job for `lease_seconds`, and posts `result` or `fail`. Expired leases are reclaimed (`jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
+7. Concept marks: concepts sit under a topic (`/concepts`, `core/kata_core/api/routes/concepts.py`). Each user marks a concept `known`, `learning` or `new` with optional evidence; these marks live in `concept_marks` next to the topic-level `marks` table, which is unchanged. Concept marks are private to their user.
 
 ## Entry points
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).

@@ -13,6 +13,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/routes/__init__.py:14` `include_routers(app)` - includes every module that defines `router`.
 - `core/kata_core/api/deps.py:22` `get_cfg`, `:27` `get_conn`, `:33` `get_authenticator`, `:37` `current_user` - request dependencies.
 - `core/kata_core/api/routes/auth.py:38` `POST /enrol`, `:51` `GET /me`, `:59` `DELETE /devices/{device_id}`.
+- `core/kata_core/api/routes/concepts.py:56` `POST /concepts`, `:65` `GET /concepts/marks`, `:83` `PUT /concepts/{id}/mark`, `:104` `DELETE /concepts/{id}/mark`; request models `ConceptIn` `:31`, `ConceptMarkIn` `:42`.
 - `core/kata_core/api/routes/importing.py:25` `POST /import`.
 - `core/kata_core/api/routes/jobs.py:69` `POST /jobs`, `:75` `GET /jobs/next`, `:89` `POST /jobs/{id}/result`, `:102` `POST /jobs/{id}/fail`, `:110` `GET /jobs/{id}`.
 - `core/kata_core/api/routes/marks.py:35` `GET /marks`, `:44` `PUT /marks/{topic_id}`, `:57` `DELETE /marks/{topic_id}`.
@@ -25,8 +26,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/storage/devices.py:13` `add_device`, `:23` `find_by_token_hash`, `:32` `revoke_device`.
 - `core/kata_core/storage/users.py:15` `create_user`, `:40` `create_enrolment`, `:55` `consume_enrolment`.
 - `core/kata_core/storage/marks.py:15` `set_mark`, `:46` `is_known`.
+- `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:19` `create_concept`, `:35` `concept_visible`, `:49` `set_concept_mark`, `:70` `list_concept_marks_detail`, `:87` `get_concept_mark_detail`, `:103` `clear_concept_mark`.
 - `core/kata_core/storage/taxonomy.py:26` `ensure_topic`, `:46` `add_alias`, `:61` `topic_visible`, `:70` `find_topic`.
 - `core/migrations/0001_init.sql` tables: `users` `:4`, `enrolment_codes` `:10`, `devices` `:18`, `categories` `:27`, `topics` `:32`, `topic_aliases` `:44`, `marks` `:51`, `jobs` `:59`.
+- `core/migrations/0002_concepts.sql` tables: `concepts` `:5` (unique label index per topic and owner at `:14`), `concept_marks` `:17` (PK `user_id, concept_id`; cascade on user delete).
 
 ## Key files
 - `core/kata_core/api/` - FastAPI app, dependencies, route modules (`routes/`).
@@ -45,6 +48,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Import is atomic: a bad line returns 422 with line number and changes nothing (`docs/api.md`).
 - Cross-user access returns "not found", not "forbidden" (`get_job`, `complete`).
 - Private topics and aliases belong to their creator; shared topics are visible to all users.
+- Concept marks are private: every `concept_marks` row carries `user_id`, and `GET /concepts/marks` returns only the caller's rows. A concept is visible when its topic is visible and it is shared or owned by the caller (`concept_visible`, `core/kata_core/storage/concepts.py:35`); a mark on a hidden concept gets 404 (`LookupError` in `set_concept_mark`).
 - `pyproject.toml:5` comment says "stdlib only", but `pyproject.toml:6` lists fastapi, psycopg, httpx, uvicorn. Comment is stale (code fix outside docs/).
 - Migration files match `MIGRATION_GLOB` (`[0-9][0-9][0-9][0-9]_*.sql`, `core/kata_core/storage/provision.py:21`); applied state is tracked in `schema_migrations` (`core/kata_core/storage/provision.py:20`).
 
