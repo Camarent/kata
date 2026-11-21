@@ -1,6 +1,6 @@
 ---
 paths: [tests/]
-summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client, providers, scanner and guard, cost, router), e2e (one full lesson round trip)
+summary: pytest suites - core (API, repositories, auth, queue, import; needs Postgres), foundation (config, docs, gates, extension scaffold), worker (loop, model, core client, providers, guard, cost, router), e2e (one full lesson round trip)
 ---
 # tests
 
@@ -36,7 +36,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
 - `tests/worker/test_router.py` - router: first success wins and later providers are not called (`:74`); policy-denied cloud skipped without call (`:81`); over-cap and failing providers fall to the next (`:92`, `:101`); secret block falls to local (`:116`); exhausted names skipped and failed only (`:130`); no implicit local fallback (`:152`); `build_router` config errors (`:174`-`:195`); guard runs before cap (`:203`).
 - `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:182`); missing key raises at construction (`:245`).
-- `tests/worker/test_scanner.py` - secret scanner: expected kinds (`:33`), rule table coverage (`:37`), offset (`:42`), findings hold no text (`:48`), frozen (`:54`), low-entropy token not flagged (`:60`).
+- `tests/core/test_scanner.py` - secret scanner (`kata_core.egress.scanner`): expected kinds (`:33`), rule table coverage (`:37`), offset (`:42`), findings hold no text (`:48`), frozen (`:54`), low-entropy token not flagged (`:60`).
 - `tests/worker/test_scanner_guard.py` - guard: clean text reaches inner provider (`:36`), a secret blocks the call with one event per finding (`:45`, `:65`), no secret text in errors or events (`:75`), local passes unscanned (`:92`), no skip parameter (`:116`), cloud classes not named outside guard (`:138`, `:174`).
 - `tests/fakes/fake_provider.py:13` `FakeProvider` - scripted provider for tests; records calls.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.

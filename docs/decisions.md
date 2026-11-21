@@ -224,7 +224,7 @@ Decided 2026-11-21. `worker/kata_worker/providers/guard.py` wraps every cloud pr
 
 ## Secret scanner lives in core egress
 
-Decided 2026-11-21. The scanner rule set moves to `core/kata_core/egress/scanner.py`, so the worker, the later MCP server and the pre-commit check share one rule set instead of copies. Reason: one place to fix a pattern, and one test suite for it. Limit: the move is a code change tracked in task-1 of this stage; until it lands, the scanner is still in `worker/kata_worker/providers/scanner.py`.
+Decided 2026-11-21. The scanner rule set moves to `core/kata_core/egress/scanner.py`, so the worker, the later MCP server and the pre-commit check share one rule set instead of copies. Reason: one place to fix a pattern, and one test suite for it. Landed in task-1 of this stage: no copy remains under `worker/`, and `worker/kata_worker/providers/guard.py` imports `scan` from core.
 
 ## M3 leftovers for M4
 

@@ -41,7 +41,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/retrieval/store.py:16` `add_entry(...)` (stores body, embedding and `embedder.name`), `:35` `keyword_search(conn, user_id, query, limit)` (`websearch_to_tsquery('simple', ...)`, `:44-46`).
 - `core/kata_core/retrieval/retriever.py:22` `Hit`, `:29` `Retriever`, `:43` `from_config(conn, cfg)` (reads `[retrieval] rrf_k` `:47` and `candidate_limit` `:48`), `:51` `search(user_id, query, limit)`, `:72` `_vector_ranking` (cosine in Python over visible entries of the same `embedder.name`).
 
+- `core/kata_core/egress/scanner.py:45` `scan(text) -> list[Finding]` - secret rules; findings hold rule kind and offset only; `Finding` at `:15`, `RULES` at `:29`. Used by the worker guard.
+
 ## Key files
+- `core/kata_core/egress/scanner.py` - secret scanner rules (shared by worker guard).
 - `core/kata_core/api/` - FastAPI app, dependencies, route modules (`routes/`).
 - `core/kata_core/auth/` - token issue/redeem/revoke, admin CLI.
 - `core/kata_core/storage/` - repository layer (SQL lives here, not in routes).
