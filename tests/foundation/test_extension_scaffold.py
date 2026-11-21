@@ -10,13 +10,21 @@ def _load(name):
     return json.loads((EXTENSION / name).read_text(encoding="utf-8"))
 
 
-def test_manifest_is_mv3_with_expected_fields():
-    manifest = _load("manifest.json")
+def test_manifest_base_is_mv3_with_expected_fields():
+    manifest = _load("manifest.base.json")
     assert manifest["manifest_version"] == 3
     assert manifest["name"] == "kata"
     assert manifest["version"] == "0.0.0"
-    assert "side_panel" in manifest
-    assert manifest["permissions"] == ["storage", "sidePanel", "activeTab"]
+    assert manifest["permissions"] == ["storage", "activeTab"]
+    assert manifest["host_permissions"] == ["http://127.0.0.1:8080/*"]
+    assert manifest["action"] == {}
+
+
+def test_manifest_base_content_script_is_narrowed():
+    script = _load("manifest.base.json")["content_scripts"][0]
+    assert script["matches"] == ["http://*/*", "https://*/*"]
+    assert "<all_urls>" not in script["matches"]
+    assert script["js"] == ["content.js"]
 
 
 def test_package_json_scripts_and_dev_dependencies():
