@@ -54,7 +54,7 @@ Run it from the repository root. To run only the round trip: `python3 -m pytest 
 Test files:
 
 - `tests/browser/test_panel_a11y.py`: keyboard order and focus indicator of the sign-in view. Asserts the Tab order `code`, `deviceLabel`, submit button, that each focused control is inside `form.signin`, and that each shows an outline or box-shadow.
-- `tests/browser/test_panel_contrast.py`: dark-theme WCAG 2.x contrast of the sign-in view. Asserts every text element reaches a 4.5:1 ratio against its effective background, with dark mode forced; skips with a reason when the browser does not report dark mode.
+- `tests/browser/test_panel_contrast.py`: dark-theme WCAG 2.x contrast of the sign-in view. Asserts every text element reaches a 4.5 to 1 ratio against its effective background, with dark mode forced; skips with a reason when the browser does not report dark mode.
 
 Prerequisites:
 
