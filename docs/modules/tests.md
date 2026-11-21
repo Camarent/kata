@@ -22,7 +22,6 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/test_api_*.py` - HTTP routes end to end.
 - `tests/core/test_repo_*.py`, `test_job_queue.py`, `test_importer.py`, `test_provision.py` - storage and queue units.
 - `tests/core/test_lesson_check.py`, `tests/core/test_api_lesson_check.py` - lesson-check rule order (checker) and `POST /lesson-check` over HTTP.
-- `tests/worker/test_worker_lesson_check.py` - lesson-check payload and `CoreClient.lesson_check` against `tests/fakes/fake_core.py`.
 - `tests/foundation/` - config, docs, gates, extension, package metadata.
 - `tests/scripts/test_bench_lesson_check.py` - lesson-check bench runner on a scratch DB (fake embedder only); `test_bench_scoring.py` - pure three-state scoring; `test_bench_results_note.py` - the block in `docs/research/benchmarks/RESULTS.md` equals the bench output (paste the printed block when stale).
 - `tests/scripts/test_install_browsers.py` - `scripts/dev/install-browsers.sh`: install dir, `--status` exit codes, sha256 check; no network.

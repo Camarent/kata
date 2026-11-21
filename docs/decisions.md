@@ -145,9 +145,9 @@ A retrieval hit counts as evidence only when its fused RRF score is at least `[l
 
 `min_score` 0.02, `known_hits` 3 and `search_limit` 5 in `config/kata.example.toml:43-46` are starting values, not measured ones. They are set for the benchmark phase to check on labelled data; change them in config, not in code.
 
-## Lesson check: worker job not wired into loop.py yet
+## Lesson check stays synchronous in the core
 
-The worker has a `lesson_check` job (`worker/kata_worker/lesson_check.py`) and `CoreClient.lesson_check`, but `worker/kata_worker/loop.py` does not dispatch it yet. Until it does, only the `POST /lesson-check` route runs lesson checks.
+Lesson check runs synchronously in the core via `POST /lesson-check`. No worker job runs it. Reason: there is no consumer and no result channel (`POST /jobs/{id}/result` takes only category and topic and creates a shared topic), so a job could not return a check result. Revisit when embedding gets heavy.
 
 ## Model config key is `model_name`
 
