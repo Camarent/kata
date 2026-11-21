@@ -36,7 +36,7 @@ From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:27`). It refuses any embedder but `fake`.
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
-Extension (from `extension/package.json`): `npm run build` (tsc, then two esbuild bundles), `npm test` (vitest run). Node install: TODO(verify).
+Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
 E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`).
 
 ## Known gaps
