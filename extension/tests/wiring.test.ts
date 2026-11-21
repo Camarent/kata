@@ -119,6 +119,18 @@ describe("background wiring", () => {
     await vi.waitFor(async () => expect(await area.get("kata.pending")).toEqual({ "kata.pending": [] }));
   });
 
+  it("opens the panel through sidebarAction when the browser has no sidePanel", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    const sidebarOpen = vi.fn(async () => undefined);
+    const api: ChromeLike = { ...chrome.api, sidePanel: undefined, sidebarAction: { open: sidebarOpen } };
+    wireBackground(api, createBackend(api, area, fetchImpl));
+    chrome.click({ windowId: 2 });
+    expect(sidebarOpen).toHaveBeenCalledOnce();
+    expect(chrome.open).not.toHaveBeenCalled();
+  });
+
   it("known click while the core is offline returns queued", async () => {
     const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
     const fetchImpl = vi.fn(async () => {
