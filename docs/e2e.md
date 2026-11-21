@@ -51,6 +51,11 @@ Run it from the repository root. To run only the round trip: `python3 -m pytest 
 
 `tests/browser/` drives a real browser with selenium: the built extension loads in Firefox, the content script scans a static lesson page served on `127.0.0.1`, and the side panel page loads (`tests/browser/test_panel_flow.py`). It is parametrized over `firefox` and `chrome`. Decision and reasons: `docs/decisions.md`.
 
+Test files:
+
+- `tests/browser/test_panel_a11y.py`: keyboard order and focus indicator of the sign-in view. Asserts the Tab order `code`, `deviceLabel`, submit button, that each focused control is inside `form.signin`, and that each shows an outline or box-shadow.
+- `tests/browser/test_panel_contrast.py`: dark-theme WCAG 2.x contrast of the sign-in view. Asserts every text element reaches a 4.5:1 ratio against its effective background, with dark mode forced; skips with a reason when the browser does not report dark mode.
+
 Prerequisites:
 
 - **Browser install.** `scripts/dev/install-browsers.sh` installs Firefox 140.0esr and geckodriver 0.36.0 into `$KATA_BROWSERS_DIR` (default `$HOME/.cache/kata-browsers`), with sha256 checks. Run it once; `scripts/dev/install-browsers.sh --status` checks it with no network. Chrome and chromedriver are not installed by the script: they are looked up on `PATH`.

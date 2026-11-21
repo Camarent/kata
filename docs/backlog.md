@@ -7,7 +7,8 @@ Project items after Milestone 0.
 - [ ] Load the extension in a real browser (side panel, content script, background wiring,
       real sign-in and "I know this" against a running core). Milestone 0 only checked the
       panel with stubs.
-- [ ] Side panel: check dark-theme contrast and keyboard focus and tab order.
+- [x] Side panel: check dark-theme contrast and keyboard focus and tab order. Sign-in view only;
+      the review screen is not covered (see [`decisions.md`](decisions.md)).
 - [x] Coverage: vitest coverage for the extension, pytest-cov for core and worker, a
       recorded baseline and a jscpd duplicate-code report (report only, see
       [`development.md`](development.md)). Still open: a coverage floor (a minimum percentage
