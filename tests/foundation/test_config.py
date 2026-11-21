@@ -47,10 +47,12 @@ def test_example_has_required_sections() -> None:
         "client",
         "retrieval",
         "lesson_check",
+        "cost",
         "providers",
         "provider_local",
         "provider_anthropic",
     }
+    assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}

@@ -36,6 +36,8 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
 | `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
 | `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
+| `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
+| `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
 | `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
 | `provider_local.task_classes` | "tag,explain" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
 | `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |

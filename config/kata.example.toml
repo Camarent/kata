@@ -45,6 +45,10 @@ min_score = 0.02
 known_hits = 3
 search_limit = 5
 
+[cost]
+cap_micro_usd = 2000000
+warn_micro_usd = 1500000
+
 [providers]
 cloud_enabled = false
 
