@@ -11,13 +11,13 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/manifest.json:3` name `kata`; `:5` permissions `storage`, `sidePanel`, `activeTab`; `:6` host permission `http://127.0.0.1:8080/*`; `:8` service worker `dist/background.js`; `:14` content script `dist/content.js`; `:18` `side_panel` key.
 - `extension/package.json:6` `build` = `tsc && npm run build:content && npm run build:sidepanel`; `:9` `test` = `vitest run`; devDependencies `esbuild`, `jsdom`, `typescript`, `vitest`.
 - `extension/tsconfig.json:6` `strict: true`; `:7` `outDir: dist`.
-- `extension/src/background.ts:41` `createBackend`, `:109` `wireBackground`.
+- `extension/src/background.ts:53` `createBackend`, `:159` `wireBackground`.
 - `extension/src/content.ts:23` `handleContentMessage`, `:44` `registerContentScript`.
 - `extension/src/scanner.ts:96` `scanBlocks`; `extension/src/scanSession.ts:33` `runScan`.
-- `extension/src/coreClient.ts:57` `CoreClient`; `:118` `listConceptMarks`, `:123` `setConceptMark` (concept marks); error classes `CoreTimeoutError`, `CoreOfflineError`, `CoreAuthError`, `CoreHttpError`.
+- `extension/src/coreClient.ts:76` `CoreClient`; `:118` `listConceptMarks`, `:123` `setConceptMark` (concept marks); error classes `CoreTimeoutError`, `CoreOfflineError`, `CoreAuthError`, `CoreHttpError`.
 - `extension/src/offlineQueue.ts:31` `OfflineQueue`.
 - `extension/src/tokenStore.ts:21` `TokenStore`.
-- `extension/src/sidepanel.ts:161` `renderPanel`; `extension/src/sidepanelBoot.ts:16` `bootPanel`.
+- `extension/src/sidepanel.ts:178` `renderPanel`; `extension/src/sidepanelBoot.ts:17` `bootPanel`.
 - `extension/src/reviewScreen.ts:32` `renderReview` (one row per concept, three-state control); types `ReviewRow`, `ReviewState`.
 - `extension/src/background.ts:28` message `panel:review` (`:95` `review()` merges marks with lesson-check); `:29` message `panel:setConcept` (`:117` `setConcept`).
 - `extension/src/sidepanelBoot.ts:41` sends `panel:review`; `:50` `onSetConcept` sends `panel:setConcept`.
