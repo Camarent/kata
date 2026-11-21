@@ -18,6 +18,7 @@ function fakeCollection(): { collection: vscode.DiagnosticCollection; calls: Cal
     delete: (uri) => {
       calls.push({ op: "delete", uri });
     },
+    dispose: () => {},
   };
   return { collection, calls };
 }
