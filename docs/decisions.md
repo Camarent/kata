@@ -279,7 +279,7 @@ Decided 2026-11-21. Each pre-commit block and each post-commit bypass appends on
 
 ## Marker holds the staged tree hash and is cleared after every commit
 
-Decided 2026-11-21. A passing pre-commit writes the staged tree hash to `<git_dir>/kata/marker` (`core/kata_device/marker.py`). The post-commit hook compares that hash with the committed tree: a different hash, or no marker, queues a `bypassed` record. The marker is cleared after every post-commit, except a post-commit run while a rebase, merge, revert or cherry-pick is in progress (marker kept), so a stale marker never outlives a normal commit. Reason: a tree hash detects a skipped check (for example `--no-verify`) without storing any file content.
+Decided 2026-11-21. A passing pre-commit writes the staged tree hash to `<git_dir>/kata/marker` (`core/kata_device/marker.py`). The post-commit hook compares that hash with the committed tree: a different hash, or no marker, queues a `bypassed` record. The marker is cleared after every post-commit, except a post-commit run while a rebase, merge, revert or cherry-pick is in progress (marker kept) or after an unexpected error before the clear (marker kept), so a stale marker never outlives a normal commit. Reason: a tree hash detects a skipped check (for example `--no-verify`) without storing any file content.
 
 ## Installer never overwrites a hook or core.hooksPath
 

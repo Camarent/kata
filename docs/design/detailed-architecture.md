@@ -665,7 +665,7 @@ Failure branches: core unreachable: local signals still work; the journal entry 
 
 #### 8.7 Pre-commit
 
-1. The pre-commit hook runs gitleaks locally on the staged changes with a 5 s limit.
+1. The pre-commit hook runs gitleaks locally on the staged changes with a 5 s limit. (Superseded: the hook scans in process with the core scanner, no gitleaks, no time limit; see `docs/decisions.md`, "Pre-commit scans staged lines in process with the one scanner".)
 2. Finding: the commit is blocked with the rule name and location. No content leaves the machine; only a `precommit.result` event with rule ids and counts is queued. No finding: the hook writes a marker with the staged tree hash.
 3. With time left in the 5 s, `kata precommit` posts the staged diff to `POST /v1/diffs/check`; hints (new concepts touched) come back as a character message. Timeout: skipped silently. This is the only contact with the core in the commit path, and it follows the code rules of 11.4.
 4. The post-commit hook compares the commit's tree with the marker and then deletes the marker. No marker, or a marker for another tree, means the pre-commit hook was bypassed: it queues `precommit.bypassed`. This is how an override with `--no-verify` reaches the journal, because that option skips the pre-commit hook but not the post-commit hook.
