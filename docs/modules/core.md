@@ -28,7 +28,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/storage/devices.py:13` `add_device`, `:23` `find_by_token_hash`, `:32` `revoke_device`.
 - `core/kata_core/storage/users.py:15` `create_user`, `:40` `create_enrolment`, `:55` `consume_enrolment`.
 - `core/kata_core/storage/marks.py:15` `set_mark`, `:46` `is_known`.
-- `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:19` `create_concept`, `:35` `concept_visible`, `:49` `set_concept_mark`, `:70` `list_concept_marks_detail`, `:87` `get_concept_mark_detail`, `:103` `clear_concept_mark`.
+- `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:19` `create_concept`, `:35` `concept_visible`, `:49` `set_concept_mark`, `:70` `list_concept_marks_detail`, `:87` `get_concept_mark_detail`, `:103` `clear_concept_mark`, `:112` `concept_label`.
 - `core/kata_core/storage/taxonomy.py:26` `ensure_topic`, `:46` `add_alias`, `:61` `topic_visible`, `:70` `find_topic`.
 - `core/migrations/0001_init.sql` tables: `users` `:4`, `enrolment_codes` `:10`, `devices` `:18`, `categories` `:27`, `topics` `:32`, `topic_aliases` `:44`, `marks` `:51`, `jobs` `:59`.
 - `core/migrations/0002_concepts.sql` tables: `concepts` `:5` (unique label index per topic and owner at `:14`), `concept_marks` `:17` (PK `user_id, concept_id`; cascade on user delete).
@@ -48,6 +48,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
+- `core/kata_core/lesson_check/checker.py` - per-concept known/learning/abstain rule (`check_lesson`); route in `api/routes/lesson_check.py`.
 - `core/kata_core/retrieval/` - hybrid retrieval: `embedder.py` (embedder interface, fake and model embedders), `fusion.py` (RRF), `store.py` (entry writes and keyword search), `retriever.py` (keyword plus vector ranks fused).
 
 ## Invariants and gotchas

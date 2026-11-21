@@ -139,7 +139,7 @@ Only a mark can say a concept is `new`. Absence of retrieval entries is not proo
 
 ## Lesson check: abstain below min_score on the RRF scale
 
-A retrieval hit counts as evidence only when its fused RRF score is at least `[lesson_check] min_score` (`checker.py:79`). The score is a sum of `1 / (rrf_k + rank)` over the keyword and vector lists. With `rrf_k` 60, one list gives at most 1/61 (about 0.0164), so the example `min_score` 0.02 passes a hit only when both lists rank it. Below the threshold the concept abstains.
+A retrieval hit counts as evidence only when its fused RRF score is at least `[lesson_check] min_score` (`core/kata_core/lesson_check/checker.py:79`). The score is a sum of `1 / (rrf_k + rank)` over the keyword and vector lists. With `rrf_k` 60, one list gives at most 1/61 (about 0.0164), so the example `min_score` 0.02 passes a hit only when both lists rank it. Below the threshold the concept abstains.
 
 ## Lesson check: thresholds are placeholders for the benchmark phase
 

@@ -21,6 +21,8 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/conftest.py` - DB fixtures and leak guard.
 - `tests/core/test_api_*.py` - HTTP routes end to end.
 - `tests/core/test_repo_*.py`, `test_job_queue.py`, `test_importer.py`, `test_provision.py` - storage and queue units.
+- `tests/core/test_lesson_check.py`, `tests/core/test_api_lesson_check.py` - lesson-check rule order (checker) and `POST /lesson-check` over HTTP.
+- `tests/worker/test_worker_lesson_check.py` - lesson-check payload and `CoreClient.lesson_check` against `tests/fakes/fake_core.py`.
 - `tests/foundation/` - config, docs, gates, extension, package metadata.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
