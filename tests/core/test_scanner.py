@@ -8,7 +8,7 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-from kata_worker.providers.scanner import RULES, Finding, scan
+from kata_core.egress.scanner import RULES, Finding, scan
 
 AWS_KEY = "AKIA" + "ABCDEFGH" + "IJKLMNOP"
 GITHUB_TOKEN = "gh" + "p_" + "a1B2c3D4e5" + "F6g7H8i9J0" + "k1L2m3N4o5" + "P6q7R8"
