@@ -39,6 +39,8 @@ SCHEMA_TABLES = {
     "retrieval_entries",
     "usage_daily",
     "journal_entry",
+    "event",
+    "message",
 }
 
 
