@@ -54,6 +54,25 @@ export interface MarkRow {
   status: string;
 }
 
+/** One concept mark of `GET /concepts/marks`. */
+export interface ConceptMark {
+  concept_id: number;
+  label: string;
+  state: "known" | "learning" | "new";
+  evidence: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One answer of `POST /lesson-check`. `state` is "abstain" when the core has no evidence. */
+export interface LessonCheckResult {
+  concept_id: number;
+  label: string;
+  state: "known" | "learning" | "abstain";
+  source: string;
+  evidence: string;
+}
+
 export class CoreClient {
   private readonly baseUrl: string;
   private token: string | undefined;
@@ -93,6 +112,24 @@ export class CoreClient {
   /** All marks of the caller. */
   listMarks(): Promise<MarkRow[]> {
     return this.request<MarkRow[]>("GET", "/marks");
+  }
+
+  /** All concept marks of the caller. */
+  listConceptMarks(): Promise<ConceptMark[]> {
+    return this.request<ConceptMark[]>("GET", "/concepts/marks");
+  }
+
+  /** Set the state of one concept mark; `evidence` is optional free text. */
+  setConceptMark(conceptId: number, state: ConceptMark["state"], evidence = ""): Promise<ConceptMark> {
+    return this.request<ConceptMark>("PUT", `/concepts/${conceptId}/mark`, { state, evidence });
+  }
+
+  /** Check which of the given concepts the caller knows; results come in input order. */
+  async lessonCheck(conceptIds: number[]): Promise<LessonCheckResult[]> {
+    const res = await this.request<{ results: LessonCheckResult[] }>("POST", "/lesson-check", {
+      concept_ids: conceptIds,
+    });
+    return res.results;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
