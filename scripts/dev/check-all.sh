@@ -15,7 +15,7 @@
 #   scripts/dev/check-all.sh --setup  create .venv and extension/node_modules when missing, run nothing
 #                                     (the pipeline's worktree_setup uses it, so a new worktree starts ready)
 #   Mode flags exclude each other: a combination exits 2.
-#   Smoke tests are picked by hand (-m smoke). pytest exits 5 when none is selected; that is not red.
+#   Smoke tests (-m smoke) live in tests/e2e/test_fixtures.py (2 today). An empty selection is red.
 #
 # Isolation between concurrent runs:
 #   - .venv and extension/node_modules are per checkout, created when missing.
@@ -63,7 +63,7 @@ RUN_TMP="$(mktemp -d "${TMPDIR:-/tmp}/kata-check.XXXXXX")"
 trap 'rm -rf "$RUN_TMP"' EXIT
 export TMPDIR="$RUN_TMP"
 
-# step <name> <command...>: run one command through qrun when KATA_QRUN is set, else directly.
+# Run one command through qrun when KATA_QRUN is set, else directly.
 run_cmd() {
   if [ -n "$QRUN" ] && [ -f "$QRUN" ]; then
     python3 -I "$QRUN" -- "$@"
@@ -72,6 +72,7 @@ run_cmd() {
   fi
 }
 
+# step <name> <command...>: run one command through run_cmd; exit 1 with CHECK-ALL FAILED at <name> on red.
 step() {
   local name="$1"
   shift
@@ -124,14 +125,8 @@ run_python() {
   run_tests
 }
 
-# Smoke tests are selected by hand. pytest exit 5 means none is selected yet: not red.
 run_smoke() {
-  local rc=0
-  run_cmd .venv/bin/python -m pytest tests -m smoke || rc=$?
-  if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then
-    echo "CHECK-ALL FAILED at smoke"
-    exit 1
-  fi
+  step smoke .venv/bin/python -m pytest tests -m smoke
 }
 
 run_extension() {
