@@ -39,6 +39,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/importer/skill_list.py` - skill list parser and import.
 - `core/kata_core/storage/provision.py` - create/drop DB, apply migrations.
 - `core/migrations/0001_init.sql` - schema.
+- `core/migrations/0002_concepts.sql` - concepts and concept marks.
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.
