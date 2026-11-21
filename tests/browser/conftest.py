@@ -145,6 +145,8 @@ def driver(browser_name: str) -> Iterator[Any]:
             "extensions.webextensions.uuids",
             json.dumps({FIREFOX_GECKO_ID: FIREFOX_EXTENSION_UUID}),
         )
+        # 0 = dark: every page this driver opens reports prefers-color-scheme: dark (see panel_page.py).
+        options.set_preference("layout.css.prefers-color-scheme.content-override", 0)
         service = FirefoxService(executable_path=str(geckodriver))
         drv = webdriver.Firefox(service=service, options=options)
         try:
