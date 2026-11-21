@@ -106,3 +106,19 @@ class CoreClient:
         status, _ = self._call("POST", f"/jobs/{job_id}/fail")
         if status != NO_CONTENT:
             raise CoreError(f"POST /jobs/{job_id}/fail -> {status}")
+
+    def record_usage(self, micro_usd: int) -> None:
+        """Add spend in micro-USD to today's total on the core."""
+        status, _ = self._call("POST", "/usage", {"micro_usd": micro_usd})
+        if status != NO_CONTENT:
+            raise CoreError(f"POST /usage -> {status}")
+
+    def usage_today(self) -> int:
+        """Today's spend in micro-USD as the core counts it."""
+        status, raw = self._call("GET", "/usage")
+        if status != 200:
+            raise CoreError(f"GET /usage -> {status}")
+        try:
+            return int(json.loads(raw)["micro_usd"])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise CoreError("GET /usage: unreadable usage body") from exc
