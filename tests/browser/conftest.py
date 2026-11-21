@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import subprocess
+import tempfile
 import threading
+import urllib.request
 from collections.abc import Iterator
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -25,9 +28,13 @@ EXTENSION_DIST = REPO / "extension" / "dist"
 PAGES_DIR = TESTS_BROWSER / "pages"
 INSTALL_SCRIPT = REPO / "scripts" / "dev" / "install-browsers.sh"
 PRINT_DIR_TIMEOUT_SECONDS = 10
+CDP_TIMEOUT_SECONDS = 20
 FIREFOX_GECKO_ID = "kata@kata.local"
 # Fixed uuid for the Firefox extension origin: moz-extension://<uuid>/sidepanel.html is known.
 FIREFOX_EXTENSION_UUID = "6f1c3d2e-8a4b-4c5d-9e7f-0a1b2c3d4e5f"
+# Chrome creates its singleton socket under TMPDIR; unix socket paths are limited to 108 bytes, so a
+# long TMPDIR (a scratch dir) makes Chrome exit at start. Chrome gets its own short temp dir here.
+CHROME_TMP_ROOT = "/tmp"
 BROWSER_NAMES = ["firefox", "chrome"]
 
 
@@ -101,6 +108,26 @@ def _require_extension(browser: str) -> Path:
     return path
 
 
+def _load_chrome_extension(driver: Any, path: Path) -> None:
+    """Install the unpacked extension via the browser's CDP Extensions domain; fail on an error reply."""
+    import websocket
+
+    debugger = driver.capabilities["goog:chromeOptions"]["debuggerAddress"]
+    with urllib.request.urlopen(f"http://{debugger}/json/version", timeout=CDP_TIMEOUT_SECONDS) as resp:
+        ws_url = json.load(resp)["webSocketDebuggerUrl"]
+    conn = websocket.create_connection(ws_url, timeout=CDP_TIMEOUT_SECONDS)
+    try:
+        conn.send(json.dumps({"id": 1, "method": "Extensions.loadUnpacked", "params": {"path": str(path)}}))
+        while True:
+            reply = json.loads(conn.recv())
+            if reply.get("id") == 1:
+                break
+    finally:
+        conn.close()
+    if "error" in reply:
+        pytest.fail(f"Extensions.loadUnpacked {path} failed: {reply['error']}")
+
+
 @pytest.fixture
 def driver(browser_name: str) -> Iterator[Any]:
     """A headless selenium driver with the built extension loaded. Quit at teardown."""
@@ -134,10 +161,18 @@ def driver(browser_name: str) -> Iterator[Any]:
         options = ChromeOptions()
         options.binary_location = str(chrome)
         options.add_argument("--headless=new")
-        options.add_argument(f"--load-extension={extension}")
-        service = ChromeService(executable_path=str(chromedriver))
-        drv = webdriver.Chrome(service=service, options=options)
-        try:
-            yield drv
-        finally:
-            drv.quit()
+        # Branded Chrome 137+ ignores --load-extension; the extension is installed over CDP instead.
+        options.add_argument("--enable-unsafe-extension-debugging")
+        # The CDP websocket below comes from this test process; the debugger port is local only.
+        options.add_argument("--remote-allow-origins=*")
+        with tempfile.TemporaryDirectory(dir=CHROME_TMP_ROOT) as chrome_tmp:
+            service = ChromeService(
+                executable_path=str(chromedriver),
+                env={**os.environ, "TMPDIR": chrome_tmp},
+            )
+            drv = webdriver.Chrome(service=service, options=options)
+            try:
+                _load_chrome_extension(drv, extension)
+                yield drv
+            finally:
+                drv.quit()
