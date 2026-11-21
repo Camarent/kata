@@ -52,8 +52,20 @@ def test_example_has_required_sections() -> None:
         "providers",
         "provider_local",
         "provider_anthropic",
+        "policy",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
+    assert set(data["policy"]) == {
+        "quiet_mark_enabled",
+        "quiet_mark_idle_seconds",
+        "nudge_enabled",
+        "nudge_error_threshold",
+        "nudge_window_seconds",
+        "stop_enabled",
+        "stop_error_threshold",
+        "rate_limit_seconds",
+        "late_event_seconds",
+    }
     assert set(data["routing"]) == {"tag", "explain", "summary", "batch"}
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
