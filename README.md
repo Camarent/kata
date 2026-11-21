@@ -36,6 +36,16 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
 | `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
 | `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
+| `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
+| `provider_local.task_classes` | "tag,explain" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |
+| `provider_anthropic.task_classes` | "explain,summary,batch" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
+| `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
+| `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
+| `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
+| `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
+| `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 

@@ -32,6 +32,9 @@ test the foundation, so it waits for a later milestone.
 - Adapters: (a) any OpenAI-compatible endpoint (local runtimes and hosted providers that offer
   that API); (b) a first-party API key; (c) optionally a vendor CLI as a subprocess, only for
   the large task class because start-up takes seconds.
+- Cloud is off by default. A cloud call needs both the provider's `allow_cloud` and the global
+  `[providers] cloud_enabled` set to true. Task classes are tag, explain, summary and batch.
+  The API key is read from the env var named by `api_key_env`, never from the config file.
 - A cost cap is built into the core and spend is tracked per call, per user.
 - Chat subscriptions and APIs are billed separately; subscription tokens must not be used in
   application code. The application uses API keys through its adapters.

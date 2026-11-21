@@ -44,3 +44,19 @@ dimensions = 64
 min_score = 0.02
 known_hits = 3
 search_limit = 5
+
+[providers]
+cloud_enabled = false
+
+[provider_local]
+task_classes = "tag,explain"
+
+[provider_anthropic]
+allow_cloud = false
+task_classes = "explain,summary,batch"
+base_url = "https://api.anthropic.com"
+model_name = "claude-model"
+api_key_env = "KATA_ANTHROPIC_API_KEY"
+timeout_seconds = 60
+max_tokens = 1024
+api_version = "2023-06-01"
