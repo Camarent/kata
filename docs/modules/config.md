@@ -14,7 +14,7 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 - `core/kata_core/config.py:18` `CONFIG_ENV` = `"KATA_CONFIG"` - env var that names the file when no path is passed.
 - `core/kata_core/config.py:19` `ENV_PREFIX` = `"KATA"` - prefix of override env vars.
 - `core/kata_core/config.py:20` `EXAMPLE_PATH` - `config/kata.example.toml`.
-- `config/kata.example.toml:4` `[core]`, `:8` `[database]`, `:15` `[auth]`, `:19` `[worker]`, `:23` `[jobs]` (`lease_seconds = 300` at `:24`), `:26` `[model]`, `:31` `[client]`.
+- `config/kata.example.toml:4` `[core]`, `:8` `[database]`, `:15` `[auth]`, `:19` `[worker]`, `:25` `[jobs]` (`lease_seconds = 300` at `:26`), `:28` `[model]`, `:33` `[client]`, `:36` `[retrieval]` (keys `embedder`, `model_name`, `rrf_k`, `candidate_limit`, `dimensions`; read by `core/kata_core/retrieval/`), `:43` `[lesson_check]` (keys `min_score` 0.02, `known_hits` 3, `search_limit` 5; read by `core/kata_core/lesson_check/checker.py:51-53`; env overrides `KATA_LESSON_CHECK_MIN_SCORE`, `KATA_LESSON_CHECK_KNOWN_HITS`, `KATA_LESSON_CHECK_SEARCH_LIMIT`, see README).
 
 ## Key files
 - `core/kata_core/config.py` - loader, `Config`, cast rules.
@@ -28,4 +28,4 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 
 ## Depends on / used by
 - Depends on: stdlib `tomllib`.
-- Used by: `core/kata_core/auth/admin.py` and `scripts/db/kata_db.py` (call `load_config`); `core/kata_core/api/deps.py` and `core/kata_core/api/app.py` (take a `Config`).
+- Used by: `core/kata_core/auth/admin.py` and `scripts/db/kata_db.py` (call `load_config`); `core/kata_core/api/deps.py` and `core/kata_core/api/app.py` (take a `Config`); `core/kata_core/retrieval/embedder.py` `load_embedder` (`:79`) and `retriever.py` `Retriever.from_config` (`:43`).

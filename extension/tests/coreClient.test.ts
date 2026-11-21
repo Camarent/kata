@@ -95,6 +95,47 @@ describe("CoreClient routes", () => {
     expect(calls[0].url).toBe(`${BASE}/marks`);
   });
 
+  it("listConceptMarks gets /concepts/marks and returns the rows", async () => {
+    const rows = [
+      { concept_id: 3, label: "fractions", state: "learning", evidence: "", created_at: "t0", updated_at: "t1" },
+    ];
+    const { fn, calls } = fakeFetch(200, rows);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.listConceptMarks()).toEqual(rows);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/concepts/marks`);
+    expect(calls[0].body).toBeUndefined();
+  });
+
+  it("setConceptMark puts state and evidence to /concepts/{id}/mark", async () => {
+    const answer = { concept_id: 3, label: "fractions", state: "known", evidence: "quiz", created_at: "t0", updated_at: "t1" };
+    const { fn, calls } = fakeFetch(200, answer);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.setConceptMark(3, "known", "quiz")).toEqual(answer);
+    expect(calls[0].method).toBe("PUT");
+    expect(calls[0].url).toBe(`${BASE}/concepts/3/mark`);
+    expect(calls[0].body).toEqual({ state: "known", evidence: "quiz" });
+  });
+
+  it("setConceptMark sends empty evidence when none is given", async () => {
+    const { fn, calls } = fakeFetch(200, {});
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    await client.setConceptMark(5, "new");
+    expect(calls[0].body).toEqual({ state: "new", evidence: "" });
+  });
+
+  it("lessonCheck posts concept_ids to /lesson-check and returns the results array", async () => {
+    const results = [
+      { concept_id: 3, label: "fractions", state: "abstain", source: "none", evidence: "" },
+    ];
+    const { fn, calls } = fakeFetch(200, { results });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.lessonCheck([3, 4])).toEqual(results);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/lesson-check`);
+    expect(calls[0].body).toEqual({ concept_ids: [3, 4] });
+  });
+
   it("sends no Authorization header when there is no token", async () => {
     const { fn, calls } = fakeFetch(200, []);
     const client = new CoreClient({ baseUrl: `${BASE}/`, timeoutMs: 1000, fetchImpl: fn });
@@ -138,6 +179,14 @@ describe("CoreClient errors", () => {
     const { fn } = fakeFetch(404, { detail: "job not found" });
     const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
     const err = await client.jobStatus(3).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(404);
+  });
+
+  it("throws CoreHttpError with 404 when a concept is missing", async () => {
+    const { fn } = fakeFetch(404, { detail: "concept not found" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.setConceptMark(99, "known").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CoreHttpError);
     expect((err as CoreHttpError).status).toBe(404);
   });

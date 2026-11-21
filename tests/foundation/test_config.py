@@ -37,7 +37,17 @@ def _toml_value(v: object) -> str:
 
 def test_example_has_required_sections() -> None:
     data = tomllib.loads(EXAMPLE_PATH.read_text(encoding="utf-8"))
-    assert set(data) == {"core", "database", "auth", "worker", "jobs", "model", "client"}
+    assert set(data) == {
+        "core",
+        "database",
+        "auth",
+        "worker",
+        "jobs",
+        "model",
+        "client",
+        "retrieval",
+        "lesson_check",
+    }
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
@@ -50,6 +60,14 @@ def test_example_has_required_sections() -> None:
     assert set(data["jobs"]) == {"lease_seconds"}
     assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds"}
     assert set(data["client"]) == {"request_timeout_seconds"}
+    assert set(data["retrieval"]) == {
+        "embedder",
+        "model_name",
+        "rrf_k",
+        "candidate_limit",
+        "dimensions",
+    }
+    assert set(data["lesson_check"]) == {"min_score", "known_hits", "search_limit"}
     assert data["core"]["host"] == "127.0.0.1"
     assert data["database"]["host"] == "127.0.0.1"
 

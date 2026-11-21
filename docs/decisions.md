@@ -77,7 +77,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   click. Background prefetch for a user without a worker is a setting, off by default.
 - **Scan target.** 30 seconds counts the card (all blocks tagged, counts and top gaps); the
   summary appears when ready, with no deadline.
-- **Marks.** Milestone 0 marks at topic level; concept-level marks come in a later slice.
+- **Marks.** Topic marks (`marks`) stay as they are. Concept marks (`concept_marks`) shipped in milestone 2: each user marks a concept `known`, `learning` or `new`, with optional evidence. Concept marks are private to their user.
 - **Chunk sharing.** Chunks are shared by content hash; the user-to-chunk link stays private so
   the store does not reveal who studies what.
 - **Language.** The vector table is built for a multilingual embedding model from the start.
@@ -89,3 +89,62 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   address.
 - **Terminal tracking.** Opt-in per session through an explicit command, not an always-on shell
   hook. A spike must confirm that capture inside an SSH session works.
+
+## Python dependencies stay pinned with ==, no lock file
+
+Runtime and dev dependencies are pinned with `==` in `pyproject.toml`. `scripts/dev/check-all.sh`
+and `.github/workflows/ci.yml` both install from that file, so the pins are the one source. No
+`uv lock` file and no new tool are added: a lock file would be a second list to keep in step
+with the pins. Revisit only if a transitive dependency must be pinned for reproducible installs.
+
+## Embeddings are real[] with cosine in Python, no pgvector yet
+
+Embeddings are stored in a plain `real[]` column (`core/migrations/0003_retrieval.sql:10`).
+The vector side loads the candidate rows and ranks them by cosine in Python
+(`core/kata_core/retrieval/retriever.py:72`). pgvector is not added yet: a few entries scan
+fast enough. Revisit when an entry count makes the scan slow, and then move the ranking into
+Postgres behind the repository interface.
+
+## Full-text search uses the simple FTS configuration
+
+Keyword search uses the `simple` text search configuration, both in the stored `tsv` column
+(`core/migrations/0003_retrieval.sql:9`) and in queries (`core/kata_core/retrieval/store.py:44`).
+`simple` does no stemming and no stop-word removal, so it does not depend on one language.
+
+## Rank fusion is reciprocal rank fusion with k = 60
+
+Keyword and vector rankings are merged with reciprocal rank fusion: an item at rank r scores
+1 / (k + r) in each list (`core/kata_core/retrieval/fusion.py:6`). The shipped `[retrieval] rrf_k`
+value is 60 (`config/kata.example.toml:39`). RRF needs no score scale matching between the
+keyword and the cosine side, so the two rankings combine without tuning.
+
+## Tests use FakeEmbedder only; the CPU model is never run in CI
+
+`[retrieval] embedder = "fake"` is the shipped default (`config/kata.example.toml:37`). The
+tests use `FakeEmbedder`, a deterministic hashing embedder with no model download. The real
+model is `embedder = "model"`, a small CPU model loaded through sentence_transformers
+(`core/kata_core/retrieval/embedder.py:79`). It is set by configuration only and is never run
+in CI, so CI stays fast and needs no model weights.
+
+## Retrieval entries are private per owner or shared
+
+A `retrieval_entries` row with `owner_user_id` set is private to that user. A row with
+`owner_user_id` NULL is shared and visible to every user (`core/migrations/0003_retrieval.sql:6`,
+`core/kata_core/retrieval/store.py:45`). Both the keyword and the vector side filter on the
+caller's id, so a private entry never reaches another user.
+
+## Lesson check: retrieval never yields 'new'
+
+Only a mark can say a concept is `new`. Absence of retrieval entries is not proof that the user has not met the concept, so a concept with no kept evidence gets `abstain`, not `new` (`core/kata_core/lesson_check/checker.py:6`).
+
+## Lesson check: abstain below min_score on the RRF scale
+
+A retrieval hit counts as evidence only when its fused RRF score is at least `[lesson_check] min_score` (`core/kata_core/lesson_check/checker.py:79`). The score is a sum of `1 / (rrf_k + rank)` over the keyword and vector lists. With `rrf_k` 60, one list gives at most 1/61 (about 0.0164), so the example `min_score` 0.02 passes a hit only when both lists rank it. Below the threshold the concept abstains.
+
+## Lesson check: thresholds are placeholders for the benchmark phase
+
+`min_score` 0.02, `known_hits` 3 and `search_limit` 5 in `config/kata.example.toml:43-46` are starting values, not measured ones. They are set for the benchmark phase to check on labelled data; change them in config, not in code.
+
+## Lesson check: worker job not wired into loop.py yet
+
+The worker has a `lesson_check` job (`worker/kata_worker/lesson_check.py`) and `CoreClient.lesson_check`, but `worker/kata_worker/loop.py` does not dispatch it yet. Until it does, only the `POST /lesson-check` route runs lesson checks.

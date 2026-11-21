@@ -15,11 +15,14 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `worker/kata_worker/core_client.py:45` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
 - `worker/kata_worker/model.py:62` `ModelAdapter(config)`; `:70` `tag(block_text) -> (category, topic)`.
 - `worker/kata_worker/model.py:21` `ModelError`.
+- `worker/kata_worker/core_client.py:110` `CoreClient.lesson_check(concept_ids)` - `POST /lesson-check`; returns the core's `results`, `CoreError` on non-200 or bad body.
+- `worker/kata_worker/lesson_check.py:12` `KIND` (`"lesson_check"`); `:19` `parse_payload(payload)` (ValueError before any request); `:35` `run_job(client, payload)`.
 
 ## Key files
 - `worker/kata_worker/loop.py` - pull loop and per-job handling.
 - `worker/kata_worker/core_client.py` - HTTP client to the core, loopback-only.
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
+- `worker/kata_worker/lesson_check.py` - lesson-check job payload parsing and run; not yet wired into `loop.py`.
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
@@ -28,6 +31,7 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - A tagging exception fails only that job (`worker/kata_worker/loop.py:29` `client.fail`); the worker keeps running.
 - Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `_parse_tag`).
 - Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:43`).
+- Lesson-check jobs (`kind` `lesson_check`) are not dispatched by `loop.py`; `run_job` has no caller in the worker yet.
 
 ## Depends on / used by
 - Depends on: `core/` (`kata_core.config.Config`) for settings; the core HTTP API (`/jobs/next`, `/jobs/{id}/result`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.

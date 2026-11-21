@@ -38,6 +38,40 @@ and tests only; `--setup` only creates `.venv` and `extension/node_modules` when
 - The gate stops at the first red step; a failing pytest run means the extension steps and the
   jscpd report do not run.
 
+## CI and test tiers
+
+CI is `.github/workflows/ci.yml`. It has three jobs:
+
+- `checks`: installs `pyproject.toml` with uv, then runs ruff (`ruff check .`), mypy
+  (`mypy core`), pytest (`pytest tests -m 'not flaky'`, no coverage), the extension build and
+  `npm test`. It has no separate smoke step; the smoke tests run inside the pytest step, which
+  does not deselect them.
+- `secrets`: gitleaks over the full history.
+- `privacy`: the personal-address blocklist check (skipped when the `PRIVACY_BLOCKLIST` secret
+  is not set).
+
+The test tiers are markers in `pyproject.toml`:
+
+| Marker | Meaning |
+|---|---|
+| `integration` | needs the database (`tests/core`) |
+| `e2e` | runs a live core, worker and fake model (`tests/e2e`) |
+| `smoke` | quick end-to-end sanity check, selected by hand |
+| `flaky` | known intermittent test, kept out of the gate until fixed |
+
+Which `scripts/dev/check-all.sh` flag runs which tier:
+
+- no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky'` with coverage, extension build and
+  tests, then the jscpd report. The closest local run to CI, plus the extras.
+- `--unit`: ruff, mypy, pytest without the `integration`, `e2e` and `smoke` tiers.
+- `--py`: ruff, mypy, pytest with every test, `flaky` included.
+- `--merge`: pytest `-m 'not e2e'` with coverage, then the extension build and tests.
+- `--ext`: extension build and tests only.
+
+`tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
+`-m 'not flaky'`, extension build, extension test), each as a plain command with no `cs-qrun`
+wrapper. The pipeline runs `check-all` through `cs-qrun`; on a clean clone, run `check-all.sh`.
+
 ## Coverage baseline
 
 Recorded 2026-11-20 at git commit `b0ae863`, from the output of the run above.

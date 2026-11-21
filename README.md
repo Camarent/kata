@@ -28,6 +28,14 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
 | `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
 | `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
+| `retrieval.embedder` | "fake" | `KATA_RETRIEVAL_EMBEDDER` |
+| `retrieval.model_name` | "" | `KATA_RETRIEVAL_MODEL_NAME` |
+| `retrieval.rrf_k` | 60 | `KATA_RETRIEVAL_RRF_K` |
+| `retrieval.candidate_limit` | 50 | `KATA_RETRIEVAL_CANDIDATE_LIMIT` |
+| `retrieval.dimensions` | 64 | `KATA_RETRIEVAL_DIMENSIONS` |
+| `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
+| `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
+| `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 

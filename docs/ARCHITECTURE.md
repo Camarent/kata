@@ -4,10 +4,10 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 
 ## Modules
 - [config](modules/config.md) - TOML loader and env overrides; source of all settings.
-- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, Postgres storage.
+- [core](modules/core.md) - Python/FastAPI HTTP API, tokens, skill-list import, job queue, concept marks, retrieval library, Postgres storage.
 - [extension](modules/extension.md) - MV3 browser extension: manifest, package, TypeScript sources in `extension/src/`.
-- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases.
-- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node).
+- [scripts](modules/scripts.md) - `kata_db.py` CLI: create, migrate, drop databases; `scripts/bench/` lesson-check benchmark (fake embedder, three-state accuracy and abstain rate).
+- [tests](modules/tests.md) - pytest suites: `tests/core` (needs Postgres), `tests/foundation`, `tests/worker`, `tests/e2e` (full lesson loop; needs Postgres and Node), `tests/scripts` (bench).
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
@@ -19,6 +19,9 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 4. Request: route module in `core/kata_core/api/routes/` -> repository in `core/kata_core/storage/` -> Postgres. `user_id` always comes from the token.
 5. Import: `POST /import` parses the skill-list text (`importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
 6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next` (204 when empty), leases a job for `lease_seconds`, and posts `result` or `fail`. Expired leases are reclaimed (`jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
+7. Concept marks: concepts sit under a topic (`/concepts`, `core/kata_core/api/routes/concepts.py`). Each user marks a concept `known`, `learning` or `new` with optional evidence; these marks live in `concept_marks` next to the topic-level `marks` table, which is unchanged. Concept marks are private to their user.
+8. Retrieval (library, no HTTP route yet): `core/kata_core/retrieval/` stores text entries (`store.py`, shared when `owner_user_id` is NULL), ranks by full-text and by cosine over embeddings, and fuses the two lists with RRF (`retriever.py`, `fusion.py`). Config `[retrieval]`; tests use the fake embedder only.
+9. Lesson check: `POST /lesson-check` (`core/kata_core/api/routes/lesson_check.py:54`) returns each concept's state for the caller. A concept mark wins; otherwise the concept label is searched in retrieval and the hits decide `known`, `learning` or `abstain` (`core/kata_core/lesson_check/checker.py:40`). Thresholds in `[lesson_check]`. The worker's `lesson_check` job (`worker/kata_worker/lesson_check.py`) calls it through `CoreClient.lesson_check`; `loop.py` does not run that job yet.
 
 ## Entry points
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
@@ -27,10 +30,10 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 - Extension: `extension/manifest.json` loads `dist/background.js` (service worker), `dist/content.js` and `sidepanel.html`; built by `npm run build` in `extension/`.
 
 ## Build and test commands
-From `tools/gates.json` (also `pipeline.json`):
-- `cs-qrun -- ruff check .`
-- `cs-qrun -- mypy core`
-- `cs-qrun -- python3 -m pytest tests`
+From `tools/gates.json` (plain commands, no `cs-qrun`): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
+`pipeline.json` runs `cs-qrun -- scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
+
+Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:27`). It refuses any embedder but `fake`.
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (tsc, then two esbuild bundles), `npm test` (vitest run). Node install: TODO(verify).
