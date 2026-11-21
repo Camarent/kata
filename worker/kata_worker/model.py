@@ -43,7 +43,8 @@ def reply_content(response: httpx.Response) -> str:
     return content
 
 
-def _parse_tag(reply: str) -> tuple[str, str]:
+def parse_tag(reply: str) -> tuple[str, str]:
+    """Return (category, topic) from a JSON tag reply; raise ModelError when the reply is unusable."""
     try:
         fields = json.loads(_strip_fence(reply))
     except ValueError as exc:
@@ -86,4 +87,4 @@ class ModelAdapter:
             raise ModelError(f"model request failed: {exc}") from exc
         if response.status_code != httpx.codes.OK:
             raise ModelError(f"model returned status {response.status_code}")
-        return _parse_tag(reply_content(response))
+        return parse_tag(reply_content(response))
