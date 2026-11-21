@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
-import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from kata_core.api.deps import current_user, get_cfg, get_conn
+from kata_core.api.deps import Conn, current_user, get_cfg
 from kata_core.auth.service import AuthContext, redeem, revoke
 from kata_core.config import Config
 from kata_core.storage.devices import list_devices
 from kata_core.storage.users import get_user
 
 router = APIRouter(prefix="/auth")
-
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 
 
 class EnrolRequest(BaseModel):

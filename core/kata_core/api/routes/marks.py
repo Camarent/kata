@@ -5,19 +5,17 @@ The user id always comes from `current_user`, never from the body or the path.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
-import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from kata_core.api.deps import current_user, get_conn
+from kata_core.api.deps import Conn, current_user
 from kata_core.auth.service import AuthContext
 from kata_core.storage.marks import clear_mark, list_marks_detail, set_mark
 
 router = APIRouter(prefix="/marks")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 Caller = Annotated[AuthContext, Depends(current_user)]
 
 

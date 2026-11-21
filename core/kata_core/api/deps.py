@@ -30,12 +30,15 @@ def get_conn(cfg: Annotated[Config, Depends(get_cfg)]) -> Iterator[psycopg.Conne
         yield conn
 
 
+Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
+
+
 def get_authenticator() -> Authenticator:
     return TokenAuthenticator()
 
 
 def current_user(
-    conn: Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")],
+    conn: Conn,
     authenticator: Annotated[Authenticator, Depends(get_authenticator)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthContext:

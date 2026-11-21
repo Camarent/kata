@@ -5,13 +5,12 @@ The caller comes from `current_user`; a private topic or alias is owned by the c
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
-import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from kata_core.api.deps import current_user, get_conn
+from kata_core.api.deps import Conn, current_user
 from kata_core.auth.service import AuthContext
 from kata_core.storage.taxonomy import (
     add_alias,
@@ -23,7 +22,6 @@ from kata_core.storage.taxonomy import (
 
 router = APIRouter(prefix="/topics")
 
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 Caller = Annotated[AuthContext, Depends(current_user)]
 
 

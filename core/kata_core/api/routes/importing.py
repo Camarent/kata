@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
-import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from kata_core.api.deps import current_user, get_conn
+from kata_core.api.deps import Conn, current_user
 from kata_core.auth.service import AuthContext
 from kata_core.importer.skill_list import ParseError, import_list
 
 router = APIRouter(prefix="/import")
-
-Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
 
 
 class ImportResponse(BaseModel):
