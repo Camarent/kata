@@ -52,6 +52,10 @@ SCHEMA_TABLES = {
     "syllabus",
     "syllabus_module",
     "syllabus_module_concept",
+    "track",
+    "track_item",
+    "planning_budget",
+    "decision_point",
 }
 
 
