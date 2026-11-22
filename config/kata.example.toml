@@ -83,6 +83,7 @@ api_key_env = "KATA_ANTHROPIC_API_KEY"
 timeout_seconds = 60
 max_tokens = 1024
 api_version = "2023-06-01"
+cache_system = false
 
 [policy]
 quiet_mark_enabled = true

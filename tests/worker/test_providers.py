@@ -178,9 +178,10 @@ def test_fake_provider_satisfies_usage_protocol() -> None:
 def _anthropic(
     handler: Callable[[httpx.Request], httpx.Response],
     key: str | None = ANTHROPIC_KEY,
+    extra: dict[str, str] | None = None,
 ) -> AnthropicProvider:
     """Anthropic provider on an in-process MockTransport: no socket, no network."""
-    env = {"KATA_PROVIDER_ANTHROPIC_BASE_URL": ANTHROPIC_BASE}
+    env = {"KATA_PROVIDER_ANTHROPIC_BASE_URL": ANTHROPIC_BASE, **(extra or {})}
     if key is not None:
         env[ANTHROPIC_KEY_ENV] = key
     config = load_config(EXAMPLE_PATH, env=env)
@@ -221,6 +222,34 @@ def test_anthropic_request_shape_carries_key_and_version() -> None:
     assert body["max_tokens"] > 0
     assert body["system"] == SYSTEM
     assert body["messages"] == [{"role": "user", "content": USER}]
+
+
+def test_anthropic_cache_system_off_sends_plain_system_string() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+    _anthropic(handler).complete(SYSTEM, USER)
+
+    assert json.loads(seen[0].content)["system"] == SYSTEM
+
+
+def test_anthropic_cache_system_on_marks_system_block_ephemeral() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+    _anthropic(handler, extra={"KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM": "true"}).complete(
+        SYSTEM, USER
+    )
+
+    assert json.loads(seen[0].content)["system"] == [
+        {"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}
+    ]
 
 
 def test_anthropic_reply_joins_text_blocks_and_skips_other_blocks() -> None:

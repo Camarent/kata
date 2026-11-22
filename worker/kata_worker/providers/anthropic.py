@@ -23,6 +23,7 @@ MAX_TOKENS = 1024
 TEXT_BLOCK = "text"
 CACHE_CREATION_FIELD = "cache_creation_input_tokens"
 CACHE_READ_FIELD = "cache_read_input_tokens"
+CACHE_CONTROL_TYPE = "ephemeral"
 
 
 def _reply_text(response: httpx.Response) -> str:
@@ -93,12 +94,19 @@ class AnthropicProvider:
         self._base_url = str(config.get(SECTION, "base_url"))
         self._model_name = str(config.get(SECTION, "model_name"))
         self._timeout = float(config.get(SECTION, "timeout_seconds"))
+        self._cache_system = bool(config.get(SECTION, "cache_system"))
         key_env = str(config.get(SECTION, "api_key_env"))
         api_key = env.get(key_env, "")
         if not api_key:
             raise ProviderError(f"anthropic API key missing: set {key_env}")
         self._headers = {"x-api-key": api_key, "anthropic-version": API_VERSION}
         self._transport = transport
+
+    def _system_field(self, system: str) -> str | list[dict[str, object]]:
+        """The `system` value: the plain string, or one text block marked for prompt caching when opted in."""
+        if not self._cache_system:
+            return system
+        return [{"type": TEXT_BLOCK, "text": system, "cache_control": {"type": CACHE_CONTROL_TYPE}}]
 
     def complete(self, system: str, user: str) -> str:
         """Return the reply text for one system and one user message; raise ProviderError on failure."""
@@ -109,7 +117,7 @@ class AnthropicProvider:
         payload = {
             "model": self._model_name,
             "max_tokens": MAX_TOKENS,
-            "system": system,
+            "system": self._system_field(system),
             "messages": [{"role": "user", "content": user}],
         }
         url = f"{self._base_url.rstrip('/')}{MESSAGES_PATH}"

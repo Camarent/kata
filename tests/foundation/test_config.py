@@ -111,6 +111,7 @@ def test_example_has_required_sections() -> None:
         "timeout_seconds",
         "max_tokens",
         "api_version",
+        "cache_system",
     }
     assert data["providers"]["cloud_enabled"] is False
     assert data["provider_anthropic"]["allow_cloud"] is False
