@@ -280,3 +280,110 @@ def test_memory_ledger_satisfies_the_cost_ledger_protocol(smoke: ModuleType) -> 
     assert ledger.usage_today() == 12
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"usage": {"prompt_tokens": 12, "completion_tokens": 34}}, TokenUsage(12, 34)),
+        ({"choices": []}, None),
+        ({"usage": {"prompt_tokens": 12}}, None),
+        ({"usage": {"prompt_tokens": "12", "completion_tokens": 34}}, None),
+        ({"usage": {"prompt_tokens": True, "completion_tokens": 34}}, None),
+        ({"usage": {"prompt_tokens": -1, "completion_tokens": 34}}, None),
+        ({"usage": "12 tokens"}, None),
+        ([1, 2], None),
+    ],
+)
+def test_openai_reply_usage_reads_prompt_and_completion(
+    smoke: ModuleType, body: object, expected: TokenUsage | None
+) -> None:
+    assert smoke.openai_reply_usage(httpx.Response(200, json=body)) == expected
+
+
+def test_openai_reply_usage_is_none_for_a_non_json_body(smoke: ModuleType) -> None:
+    assert smoke.openai_reply_usage(httpx.Response(502, text="<html>bad gateway</html>")) is None
+
+
+def test_usage_transport_with_openai_reader_records_usage(smoke: ModuleType) -> None:
+    def openai_reply(request: httpx.Request) -> httpx.Response:
+        body = {"choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 6}}
+        return httpx.Response(200, json=body)
+
+    usage = smoke.UsageTransport(httpx.MockTransport(openai_reply), smoke.openai_reply_usage)
+    with httpx.Client(transport=usage) as client:
+        client.post("https://example.invalid/v1/chat/completions", json={})
+    assert usage.usage == [TokenUsage(input_tokens=5, output_tokens=6)]
+
+
+def test_usage_transport_with_openai_reader_skips_missing_usage(smoke: ModuleType) -> None:
+    def no_usage(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": []})
+
+    usage = smoke.UsageTransport(httpx.MockTransport(no_usage), smoke.openai_reply_usage)
+    with httpx.Client(transport=usage) as client:
+        client.post("https://example.invalid/v1/chat/completions", json={})
+    assert usage.usage == []
+
+
+def _timed(
+    smoke: ModuleType,
+    *,
+    passed: bool = True,
+    completion: int = 20,
+    seconds: float = 2.0,
+    excerpt: str = "ok",
+) -> Any:
+    return smoke.TimedResult(
+        case_id="explain",
+        task_class="explain",
+        prompt_tokens=10,
+        completion_tokens=completion,
+        seconds=seconds,
+        passed=passed,
+        reason="",
+        excerpt=excerpt,
+    )
+
+
+def test_timed_result_tokens_per_second_is_zero_without_time(smoke: ModuleType) -> None:
+    assert _timed(smoke, completion=20, seconds=2.0).tokens_per_second == 10.0
+    assert _timed(smoke, seconds=0.0).tokens_per_second == 0.0
+
+
+def test_format_timed_line_pins_the_report_format(smoke: ModuleType) -> None:
+    result = smoke.TimedResult(
+        case_id="explain",
+        task_class="explain",
+        prompt_tokens=12,
+        completion_tokens=34,
+        seconds=2.0,
+        passed=False,
+        reason='bad "shape"',
+        excerpt='say "hi"\nnext',
+    )
+    assert smoke.format_timed_line(result) == (
+        'explain FAIL class=explain prompt_tokens=12 completion_tokens=34 seconds=2.00 '
+        'tokens_per_s=17.0 reason="bad \\"shape\\"" excerpt="say \\"hi\\"\\nnext"'
+    )
+
+
+def test_format_timed_line_caps_the_excerpt(smoke: ModuleType) -> None:
+    line = smoke.format_timed_line(_timed(smoke, excerpt="w" * 500))
+    assert line.endswith('excerpt="' + "w" * smoke.EXCERPT_CHARS + '"')
+
+
+def test_summarize_model_counts_passes_and_means(smoke: ModuleType) -> None:
+    results = [
+        _timed(smoke, passed=True, completion=20, seconds=2.0),
+        _timed(smoke, passed=False, completion=10, seconds=4.0),
+    ]
+    assert smoke.summarize_model(HAIKU, results) == smoke.ModelSummary(
+        model=HAIKU, cases=2, passes=1, mean_seconds=3.0, mean_tokens_per_second=6.25
+    )
+
+
+def test_summarize_model_with_no_cases_is_safe(smoke: ModuleType) -> None:
+    assert smoke.summarize_model(HAIKU, []) == smoke.ModelSummary(
+        model=HAIKU, cases=0, passes=0, mean_seconds=0.0, mean_tokens_per_second=0.0
+    )
+
+

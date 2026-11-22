@@ -75,17 +75,48 @@ def require_allowed(config: Config) -> str:
     return model
 
 
-class UsageTransport(httpx.BaseTransport):
-    """Wraps an inner transport and keeps the token usage of each reply, in call order."""
+UsageReader = Callable[[httpx.Response], TokenUsage | None]
 
-    def __init__(self, inner: httpx.BaseTransport) -> None:
+
+def _tokens(usage: dict[str, object], key: str) -> int | None:
+    """One non-negative int from the usage block; None when absent, not an int, or negative."""
+    value = usage.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def openai_reply_usage(response: httpx.Response) -> TokenUsage | None:
+    """Read an OpenAI-style `usage` block (prompt_tokens, completion_tokens); None when missing or malformed."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    usage = body.get("usage") if isinstance(body, dict) else None
+    if not isinstance(usage, dict):
+        return None
+    prompt = _tokens(usage, "prompt_tokens")
+    completion = _tokens(usage, "completion_tokens")
+    if prompt is None or completion is None:
+        return None
+    return TokenUsage(input_tokens=prompt, output_tokens=completion)
+
+
+class UsageTransport(httpx.BaseTransport):
+    """Wraps an inner transport and keeps the token usage of each reply, in call order.
+
+    `read_usage` picks the usage format: the Anthropic Messages block by default.
+    """
+
+    def __init__(self, inner: httpx.BaseTransport, read_usage: UsageReader = reply_usage) -> None:
         self._inner = inner
+        self._read_usage = read_usage
         self.usage: list[TokenUsage] = []
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         response = self._inner.handle_request(request)
         response.read()
-        found = reply_usage(response)
+        found = self._read_usage(response)
         if found is not None:
             self.usage.append(found)
         return response
@@ -255,4 +286,58 @@ def format_line(result: CaseResult) -> str:
         f"{result.case_id} {verdict} class={result.task_class} "
         f"in_tokens={result.in_tokens} out_tokens={result.out_tokens} "
         f"cost_micro_usd={result.cost_micro_usd} excerpt={json.dumps(result.excerpt)}"
+    )
+
+
+@dataclass(frozen=True)
+class TimedResult:
+    """One timed case on a local model: token counts from the reply, seconds from the caller's clock."""
+
+    case_id: str
+    task_class: str
+    prompt_tokens: int
+    completion_tokens: int
+    seconds: float
+    passed: bool
+    reason: str
+    excerpt: str
+
+    @property
+    def tokens_per_second(self) -> float:
+        """Completion tokens per second; 0.0 when no time was measured."""
+        return self.completion_tokens / self.seconds if self.seconds > 0 else 0.0
+
+
+def format_timed_line(result: TimedResult) -> str:
+    """One timed report line; reason and excerpt are JSON text, the excerpt cut to EXCERPT_CHARS."""
+    verdict = PASS if result.passed else FAIL
+    return (
+        f"{result.case_id} {verdict} class={result.task_class} "
+        f"prompt_tokens={result.prompt_tokens} completion_tokens={result.completion_tokens} "
+        f"seconds={result.seconds:.2f} tokens_per_s={result.tokens_per_second:.1f} "
+        f"reason={json.dumps(result.reason)} "
+        f"excerpt={json.dumps(result.excerpt[:EXCERPT_CHARS])}"
+    )
+
+
+@dataclass(frozen=True)
+class ModelSummary:
+    model: str
+    cases: int
+    passes: int
+    mean_seconds: float
+    mean_tokens_per_second: float
+
+
+def summarize_model(model: str, results: Sequence[TimedResult]) -> ModelSummary:
+    """Summary of one model's timed cases; with no cases the counts are 0 and the means 0.0."""
+    count = len(results)
+    if count == 0:
+        return ModelSummary(model=model, cases=0, passes=0, mean_seconds=0.0, mean_tokens_per_second=0.0)
+    return ModelSummary(
+        model=model,
+        cases=count,
+        passes=sum(1 for result in results if result.passed),
+        mean_seconds=sum(result.seconds for result in results) / count,
+        mean_tokens_per_second=sum(result.tokens_per_second for result in results) / count,
     )
