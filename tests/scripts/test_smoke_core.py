@@ -1,0 +1,266 @@
+"""Smoke core with the fake transport only: allow-list, usage capture, cases, cap and report line.
+
+No network: every provider call goes to an httpx.MockTransport that records the requests it sees.
+The API key lives in a dict passed to the provider, never in os.environ.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from collections.abc import Iterator
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import httpx
+import pytest
+from kata_core.config import Config, load_config
+
+REPO_ROOT = Path(__file__).parents[2]
+WORKER_DIR = REPO_ROOT / "worker"
+# tests/worker/conftest.py puts worker/ on sys.path only for its own folder; restore it after import.
+_SAVED_PATH = list(sys.path)
+sys.path.insert(0, str(WORKER_DIR))
+try:
+    from kata_worker.handlers.course import COURSE_SYSTEM_PROMPT
+    from kata_worker.handlers.syllabus import SYLLABUS_SYSTEM_PROMPT
+    from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
+    from kata_worker.providers.anthropic import AnthropicProvider
+    from kata_worker.providers.cost import CappedProvider, Ledger, cost_micro_usd
+finally:
+    sys.path[:] = _SAVED_PATH
+
+SMOKE_PATH = REPO_ROOT / "scripts" / "smoke" / "smoke_core.py"
+EXAMPLE_PATH = REPO_ROOT / "config" / "kata.example.toml"
+MODULE_NAME = "smoke_core_under_test"
+HAIKU = "claude-haiku-5-5"
+REFUSED_MODELS = ("claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-5")
+KEY_ENV = "KATA_ANTHROPIC_API_KEY"
+KEY = "sk-ant-test-SECRET-0123456789"
+CAP = 1_000_000_000
+EXPECTED_IDS = ["explain", "summary", "generate_course", "extract_syllabus"]
+
+
+@pytest.fixture
+def smoke(monkeypatch: pytest.MonkeyPatch) -> Iterator[ModuleType]:
+    """Load scripts/smoke/smoke_core.py as a module; sys.modules is restored by monkeypatch."""
+    spec = importlib.util.spec_from_file_location(MODULE_NAME, SMOKE_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, MODULE_NAME, module)
+    spec.loader.exec_module(module)
+    yield module
+
+
+class Recorder:
+    """A MockTransport handler: records each request and answers with a fixed Messages reply."""
+
+    def __init__(
+        self, text: str = "a short answer", in_tokens: int = 12, out_tokens: int = 7
+    ) -> None:
+        self.text = text
+        self.in_tokens = in_tokens
+        self.out_tokens = out_tokens
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        body = {
+            "content": [{"type": "text", "text": self.text}],
+            "usage": {"input_tokens": self.in_tokens, "output_tokens": self.out_tokens},
+        }
+        return httpx.Response(200, json=body)
+
+
+def _config(model: str = HAIKU, allowed: str = HAIKU) -> Config:
+    """The example config with the provider model and the allow-list overridden."""
+    base = load_config(EXAMPLE_PATH, env={})
+    sections: dict[str, Any] = dict(base.sections)
+    sections[PROVIDER_SECTION] = {**base.sections[PROVIDER_SECTION], "model_name": model}
+    sections["smoke"] = {**base.sections["smoke"], "allowed_models": allowed}
+    return Config(sections=sections)
+
+
+def _stack(
+    smoke: ModuleType, recorder: Recorder, cap: int = CAP
+) -> tuple[CappedProvider, Ledger, Any]:
+    """Real AnthropicProvider over the recording transport, behind the cap, with a ledger."""
+    usage = smoke.UsageTransport(httpx.MockTransport(recorder))
+    inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
+    ledger = smoke.MemoryLedger()
+    capped = CappedProvider(inner, ledger, HAIKU, cap, cap, lambda message: None)
+    return capped, ledger, usage
+
+
+def _case(smoke: ModuleType, case_id: str) -> Any:
+    return next(case for case in smoke.load_cases() if case.id == case_id)
+
+
+def test_allow_list_reads_config_and_passes_haiku(smoke: ModuleType) -> None:
+    config = _config(allowed=f"{HAIKU}, claude-other-1")
+    assert smoke.allowed_models(config) == frozenset({HAIKU, "claude-other-1"})
+    assert smoke.require_allowed(config) == HAIKU
+
+
+@pytest.mark.parametrize("model", REFUSED_MODELS)
+def test_refused_model_sends_no_request(smoke: ModuleType, model: str) -> None:
+    recorder = Recorder()
+    _stack(smoke, recorder)
+    config = _config(model=model)
+    with pytest.raises(smoke.SmokeRefused):
+        smoke.require_allowed(config)
+    assert recorder.requests == []
+
+
+def test_refused_model_is_refused_by_the_check_itself(smoke: ModuleType) -> None:
+    for model in REFUSED_MODELS:
+        with pytest.raises(smoke.SmokeRefused):
+            smoke.check_model(model, {HAIKU})
+
+
+def test_usage_transport_records_tokens_and_keeps_body(smoke: ModuleType) -> None:
+    recorder = Recorder(in_tokens=12, out_tokens=34)
+    usage = smoke.UsageTransport(httpx.MockTransport(recorder))
+    with httpx.Client(transport=usage) as client:
+        response = client.post("https://example.invalid/v1/messages", json={"x": 1})
+    assert response.json()["content"][0]["text"] == "a short answer"
+    assert usage.usage == [smoke.Usage(12, 34)]
+
+
+def test_usage_transport_skips_reply_without_usage(smoke: ModuleType) -> None:
+    def no_usage(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "x"}]})
+
+    usage = smoke.UsageTransport(httpx.MockTransport(no_usage))
+    with httpx.Client(transport=usage) as client:
+        response = client.post("https://example.invalid/v1/messages", json={})
+    assert response.status_code == 200
+    assert usage.usage == []
+
+
+def test_usage_transport_skips_non_json_body(smoke: ModuleType) -> None:
+    def not_json(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, text="<html>bad gateway</html>")
+
+    usage = smoke.UsageTransport(httpx.MockTransport(not_json))
+    with httpx.Client(transport=usage) as client:
+        response = client.post("https://example.invalid/v1/messages", json={})
+    assert response.status_code == 502
+    assert usage.usage == []
+
+
+def test_load_cases_lists_four_cases_with_inputs(smoke: ModuleType) -> None:
+    cases = smoke.load_cases()
+    assert [case.id for case in cases] == EXPECTED_IDS
+    for case in cases:
+        assert case.input_path.is_file(), case.input_path
+    assert _case(smoke, "generate_course").system == COURSE_SYSTEM_PROMPT
+    assert _case(smoke, "extract_syllabus").system == SYLLABUS_SYSTEM_PROMPT
+
+
+def test_run_case_plain_text_pass_with_usage_and_ledger_cost(smoke: ModuleType) -> None:
+    recorder = Recorder(text="Two short sentences.", in_tokens=12, out_tokens=7)
+    provider, ledger, usage = _stack(smoke, recorder)
+    case = _case(smoke, "explain")
+    result = smoke.run_case(case, provider, ledger, usage, secret=KEY)
+    user = case.input_path.read_text(encoding="utf-8")
+    assert result.passed is True
+    assert (result.in_tokens, result.out_tokens) == (12, 7)
+    assert result.cost_micro_usd == cost_micro_usd(HAIKU, case.system + user, "Two short sentences.")
+    assert result.cost_micro_usd == ledger.usage_today()
+    assert len(recorder.requests) == 1
+
+
+def test_run_case_empty_reply_fails(smoke: ModuleType) -> None:
+    recorder = Recorder(text="   ")
+    provider, ledger, usage = _stack(smoke, recorder)
+    result = smoke.run_case(_case(smoke, "summary"), provider, ledger, usage, secret=KEY)
+    assert result.passed is False
+
+
+def test_run_case_json_shape_checks(smoke: ModuleType) -> None:
+    cases = (
+        ("generate_course", '{"items": []}', True),
+        ("generate_course", '{"items": "not a list"}', False),
+        ("generate_course", "not json", False),
+        ("extract_syllabus", '{"modules": [{"title": "a", "body": "b"}]}', True),
+        ("extract_syllabus", '{"modules": [{"title": "a"}]}', False),
+        ("extract_syllabus", "plain words", False),
+    )
+    for case_id, reply, expected in cases:
+        provider, ledger, usage = _stack(smoke, Recorder(text=reply))
+        result = smoke.run_case(_case(smoke, case_id), provider, ledger, usage, secret=KEY)
+        assert result.passed is expected, (case_id, reply)
+
+
+def test_excerpt_is_capped_at_200_characters(smoke: ModuleType) -> None:
+    provider, ledger, usage = _stack(smoke, Recorder(text="w" * 500))
+    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, secret=KEY)
+    assert len(result.excerpt) == smoke.EXCERPT_CHARS == 200
+
+
+def test_key_never_reaches_a_line_even_when_the_reply_echoes_it(smoke: ModuleType) -> None:
+    echo = f"my key is {KEY} and more text"
+    provider, ledger, usage = _stack(smoke, Recorder(text=echo))
+    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, secret=KEY)
+    line = smoke.format_line(result)
+    assert KEY not in line
+    assert smoke.SECRET_MASK in result.excerpt
+
+
+def test_provider_error_is_a_fail_not_a_stop(smoke: ModuleType) -> None:
+    def server_error(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    usage = smoke.UsageTransport(httpx.MockTransport(server_error))
+    inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
+    ledger = smoke.MemoryLedger()
+    capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, lambda message: None)
+    result = smoke.run_case(_case(smoke, "explain"), capped, ledger, usage, secret=KEY)
+    assert result.passed is False
+    assert KEY not in smoke.format_line(result)
+
+
+def test_cap_reached_stops_the_run(smoke: ModuleType) -> None:
+    recorder = Recorder()
+    provider, ledger, usage = _stack(smoke, recorder, cap=1)
+    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, secret=KEY)
+    assert outcome.stopped is True
+    assert [result.case_id for result in outcome.results] == ["explain"]
+    assert len(recorder.requests) == 1
+
+
+def test_run_cases_without_cap_runs_all_four(smoke: ModuleType) -> None:
+    recorder = Recorder()
+    provider, ledger, usage = _stack(smoke, recorder)
+    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, secret=KEY)
+    assert outcome.stopped is False
+    assert [result.case_id for result in outcome.results] == EXPECTED_IDS
+    assert len(recorder.requests) == 4
+
+
+def test_format_line_pins_the_report_format(smoke: ModuleType) -> None:
+    result = smoke.CaseResult(
+        case_id="explain",
+        task_class="explain",
+        in_tokens=12,
+        out_tokens=34,
+        cost_micro_usd=56,
+        passed=True,
+        excerpt='say "hi"\nnext',
+    )
+    assert smoke.format_line(result) == (
+        'explain PASS class=explain in_tokens=12 out_tokens=34 cost_micro_usd=56 '
+        'excerpt="say \\"hi\\"\\nnext"'
+    )
+
+
+def test_memory_ledger_satisfies_the_cost_ledger_protocol(smoke: ModuleType) -> None:
+    ledger = smoke.MemoryLedger()
+    assert isinstance(ledger, Ledger)
+    ledger.record_usage(5)
+    ledger.record_usage(7)
+    assert ledger.usage_today() == 12
+
+
