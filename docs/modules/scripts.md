@@ -5,7 +5,7 @@ summary: Operator DB CLI (create, migrate, drop) and the lesson-check benchmark 
 # scripts
 
 ## Purpose
-Three tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests).
+Four tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests). `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
 
 ## Public surface
 - `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
@@ -17,6 +17,10 @@ Three tools. `scripts/db/` provisions Postgres databases for kata: a thin wrappe
 - `scripts/bench/lesson_check_bench.py:169` `_parser()` - flags `--config`, `--cases` (default `cases.json` beside the script), `--format text|markdown`.
 - `scripts/bench/lesson_check_bench.py:92` `run_bench(cfg, cases)` -> `BenchResult`; creates scratch DB, seeds, runs `check_lesson`, drops DB in `finally`.
 - `scripts/bench/lesson_check_bench.py:133` `render_markdown(result)`, `:155` `render_text(result)` - report shapes; labels and numbers only.
+- `scripts/deploy/check_image_rules.py:135` `main(argv)` - checks `deploy/Dockerfile` and `.dockerignore` (pinned base image, non-root user, healthcheck, no secret paths copied); `:91` `check(dockerfile, dockerignore)` -> list of problems.
+- `scripts/deploy/validate_stack.py:153` `main(argv)` - checks `deploy/compose.yaml` (`:97` `check_compose`: published ports bound to loopback or the tailnet, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:140` `check_config_keys`). The model comes from `docker compose config` (`:52` `load_compose`); without docker it fails, it does not fall back to a parser.
+- `scripts/deploy/replay_tombstone.py:71` `main(argv)` - replays the tombstone file kept beside a dump (`:38` `parse`, `:55` `replay`).
+- `scripts/deploy/verify_counts.py:54` `main(argv)` - content-free row counts per table (`:34` `table_counts`, `:47` `differing_tables`) for the restore drill; prints counts and names only.
 - `scripts/bench/scoring.py:108` `score(expected, got)` -> `Score` (accuracy, abstain_rate, abstain_precision, per_state).
 - `scripts/bench/scoring.py:94` `load_cases(path)` -> `Cases`; validates every field, raises on malformed input.
 - `scripts/bench/scoring.py:16` `STATES` (`known`, `learning`, `new`, `abstain`), `:17` `MARKS`.
@@ -31,6 +35,9 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
+- `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
+- `scripts/deploy/validate_stack.py` - compose and config template rules; tested by `tests/scripts/test_validate_stack.py`.
+- `scripts/deploy/replay_tombstone.py`, `scripts/deploy/verify_counts.py` - restore drill helpers; tested by `tests/scripts/test_restore.py` and `tests/scripts/test_relocate.py`.
 
 ## Invariants and gotchas
 - `kata_db.py` needs the `core` package on `PYTHONPATH`; it imports `kata_core` directly.

@@ -149,6 +149,10 @@ overrides, which `pg.sh env` prints; no config file is copied or generated.
 | `KATA_PG_MODE` | auto | `local` or `docker` |
 | `KATA_PG_IMAGE` | `postgres:17` | Docker image |
 
+## Deployment checks
+
+The VM stack (Dockerfile, compose, backup, restore, provisioning) has its own runbook: [`deployment.md`](deployment.md). Its scripts are tested in `tests/scripts/` (`test_*.py` for backup, restore, relocate, provision, stack, image rules and Caddyfile) with no network and no real VM; `scripts/deploy/validate_stack.py` needs `docker compose` on the PATH.
+
 ## Notes
 
 - The tests that start the API with real tokens use the real clock; do not pin them to a fixed
