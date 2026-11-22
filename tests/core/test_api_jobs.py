@@ -7,10 +7,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psycopg
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from kata_core.api.deps import get_conn
+from kata_core.api.deps import get_conn, get_registry, require_feature
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
+from kata_core.jobs.queue import enqueue
+from kata_core.jobs.runner import Registry
 from kata_core.storage.marks import set_mark
 from kata_core.storage.users import create_user
 from support.scratch_db import ScratchDatabase
@@ -197,3 +200,107 @@ def test_expired_lease_is_reclaimed(client: TestClient, db: ScratchDatabase, cfg
     assert row is not None
     attempts: Any = row[0]
     assert attempts == 2
+
+
+def _enqueue_kind(db: ScratchDatabase, user_id: int, kind: str) -> int:
+    with db.connect() as conn:
+        return enqueue(conn, user_id, "payload", kind)
+
+
+def _record_hook(client: TestClient, kind: str) -> list[tuple[int, dict[str, Any]]]:
+    """Register one output hook for `kind` on the app; return the list it appends to."""
+    calls: list[tuple[int, dict[str, Any]]] = []
+
+    def _hook(conn: psycopg.Connection[Any], job: Any, output: dict[str, Any]) -> None:
+        calls.append((job.id, output))
+
+    client.app.dependency_overrides[get_registry] = lambda: Registry(output_hooks={kind: _hook})
+    return calls
+
+
+def test_next_takes_kind_filter(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue_kind(db, _user_id(client, headers), "course.generate")
+    assert client.get("/jobs/next", headers=headers).status_code == 204  # no kind: tag only
+    resp = client.get("/jobs/next", params={"kind": ["tag", "course.generate"]}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == job_id
+
+
+def test_output_stores_and_runs_hook(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    calls = _record_hook(client, "course.generate")
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue_kind(db, _user_id(client, headers), "course.generate")
+    assert client.get("/jobs/next", params={"kind": "course.generate"}, headers=headers).status_code == 200
+    resp = client.post(f"/jobs/{job_id}/output", json={"output": {"ok": True}}, headers=headers)
+    assert resp.status_code == 204
+    assert calls == [(job_id, {"ok": True})]
+    with db.connect() as conn:
+        row = conn.execute("SELECT output FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    assert row[0] == {"ok": True}
+
+
+def test_output_without_lease_is_404_and_runs_no_hook(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    calls = _record_hook(client, "course.generate")
+    ana = _user_token(client, db, cfg, "ana")
+    bob = _user_token(client, db, cfg, "bob")
+    job_id = _enqueue_kind(db, _user_id(client, ana), "course.generate")
+    body = {"output": {"ok": True}}
+    assert client.post(f"/jobs/{job_id}/output", json=body, headers=ana).status_code == 404  # queued
+    assert client.get("/jobs/next", params={"kind": "course.generate"}, headers=ana).status_code == 200
+    assert client.post(f"/jobs/{job_id}/output", json=body, headers=bob).status_code == 404
+    assert calls == []
+    with db.connect() as conn:
+        row = conn.execute("SELECT output FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    assert row[0] is None
+
+
+def test_output_above_cap_is_413(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    calls = _record_hook(client, "course.generate")
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue_kind(db, _user_id(client, headers), "course.generate")
+    assert client.get("/jobs/next", params={"kind": "course.generate"}, headers=headers).status_code == 200
+    cap = int(cfg.get("jobs", "max_output_bytes"))
+    resp = client.post(f"/jobs/{job_id}/output", json={"output": {"t": "x" * cap}}, headers=headers)
+    assert resp.status_code == 413
+    assert calls == []
+
+
+def test_output_without_hook_is_422_and_stores_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    client.app.dependency_overrides[get_registry] = lambda: Registry()
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue(client, headers, "tag this")
+    assert client.get("/jobs/next", headers=headers).status_code == 200
+    resp = client.post(f"/jobs/{job_id}/output", json={"output": {"ok": 1}}, headers=headers)
+    assert resp.status_code == 422
+    with db.connect() as conn:
+        row = conn.execute("SELECT output FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    assert row[0] is None
+
+
+def _feature_client(enabled: bool) -> TestClient:
+    app = FastAPI()
+    app.state.cfg = Config(sections={"trainer": {"enabled": enabled}})
+
+    @app.get("/probe", dependencies=[Depends(require_feature("trainer"))])
+    def _probe() -> dict[str, str]:
+        return {"ok": "yes"}
+
+    return TestClient(app)
+
+
+def test_require_feature_on_passes() -> None:
+    assert _feature_client(True).get("/probe").status_code == 200
+
+
+def test_require_feature_off_is_404() -> None:
+    resp = _feature_client(False).get("/probe")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "feature disabled: trainer"}

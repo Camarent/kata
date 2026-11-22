@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 JOB_COLUMNS = (
     "id, user_id, payload, status, lease_expires_at, attempts, result_topic_id, kind, output"
@@ -101,6 +102,24 @@ def complete(
         (topic_id, job_id, user_id),
     ).fetchone()
     return row is not None
+
+
+def store_output(
+    conn: psycopg.Connection[Any],
+    job_id: int,
+    user_id: int,
+    output: dict[str, Any],
+) -> Job | None:
+    """Store `output` on a job of `user_id` that is leased by that user; return the job.
+
+    Returns None when the job is not leased by that user (other owner, or not leased).
+    """
+    row = conn.execute(
+        f"UPDATE jobs SET output = %s WHERE id = %s AND user_id = %s AND status = 'leased' "  # nosec B608 - JOB_COLUMNS is a module constant, no user input reaches the SQL text
+        f"RETURNING {JOB_COLUMNS}",
+        (Jsonb(output), job_id, user_id),
+    ).fetchone()
+    return None if row is None else _job(row)
 
 
 def fail(conn: psycopg.Connection[Any], job_id: int, user_id: int) -> bool:
