@@ -21,7 +21,7 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 - `config/kata.example.toml:65` `[providers]` (`cloud_enabled = false` at `:66`), `:68` `[provider_local]`, `:71` `[provider_anthropic]`; read by `worker/kata_worker/providers/policy.py:50` `Policy.from_config`.
 - `config/kata.example.toml:93` `[trainer]` (`enabled`, `command` `:96` as a TOML array, `timeout_seconds` `:98`, `max_concepts` `:100`, `items_per_concept` `:102`, `min_items` `:104`, `max_artifact_bytes` `:106`, `max_progress_bytes` `:108`); read by `core/kata_core/trainer/build.py:55`, `core/kata_core/api/routes/courses.py:115`, `core/kata_core/api/routes/course_progress.py:149`. `enabled` gates the course and progress routes (`core/kata_core/api/deps.py:46` `require_feature`).
 - `config/kata.example.toml:110` `[knowledge]` (`trainer_step` `:112`, `trainer_max_step` `:113`, `known_threshold` `:115`, `learning_threshold` `:116`, `assertion_hold` `:118`, `base_known` `:120`, `base_learning` `:121`, `base_new` `:122`); read by `core/kata_core/api/routes/courses.py:114` (thresholds, base scores) and `core/kata_core/api/routes/course_progress.py:77` (step values); `core/kata_core/knowledge/` itself takes the numbers as arguments.
-- `config/kata.example.toml:124` `[syllabus]` and `:131` `[planning]`: no code in `core/` or `worker/` reads them yet (grep, this run). Their keys are placeholders for later work.
+- `config/kata.example.toml:124` `[syllabus]` and `:131` `[planning]`: read by `core/kata_core/planning/syllabus_flow.py` (`[syllabus] max_bytes`, `[planning]` keys) and `core/kata_core/api/routes/tracks.py` (`[planning] minutes_learn`) (grep, this run).
 
 ## Key files
 - `core/kata_core/config.py` - loader, `Config`, cast rules.
