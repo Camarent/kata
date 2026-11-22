@@ -84,13 +84,13 @@ The `postgres` image tag in `deploy/compose.yaml` pins the major version (17). A
 
 1. Find the cause: `df -h`, `docker system df`, `du -sh /var/lib/docker/* /var/backups/kata 2>/dev/null`.
 2. Remove unused Docker data: `docker image prune -f` and `docker builder prune -f`. Do not prune volumes: `pgdata` holds the database.
-3. Lower `KATA_BACKUP_RETENTION_DAYS` in `/etc/kata/backup.env` (default 14) and delete the oldest dumps, each `.dump.enc` with its `.tombstone`.
+3. Lower `KATA_BACKUP_RETENTION_DAYS` in `/etc/kata/backup.env` (default 14) and delete the oldest dumps, each `.dump.enc` with its `.dump.enc.hmac` and `.tombstone`.
 4. If Postgres stopped on a full disk, free space first, then `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d`.
 5. Still full: grow the disk in Proxmox, then extend the partition and filesystem inside the VM.
 
 ## Backup
 
-Nightly dump: a host systemd timer runs `deploy/backup.sh` (D20). It writes `kata-<UTC stamp>.dump.enc` (pg_dump, encrypted with openssl and a passphrase file) and a `.tombstone` copy beside it, and deletes dumps older than the retention.
+Nightly dump: a host systemd timer runs `deploy/backup.sh` (D20). It writes `kata-<UTC stamp>.dump.enc` (pg_dump, encrypted with openssl and a passphrase file), a `kata-<UTC stamp>.dump.enc.hmac` sidecar (HMAC-SHA256 of the dump, keyed from the passphrase file), and a `.tombstone` copy beside it, and deletes dumps older than the retention with their sidecar and tombstone.
 
 1. Write `/etc/kata/backup.env` with `KATA_BACKUP_DIR`, `KATA_BACKUP_PASSPHRASE_FILE`, `KATA_DATABASE_HOST`, `KATA_DATABASE_PORT`, `KATA_DATABASE_USER`, `KATA_DATABASE_NAME`, and optionally `KATA_BACKUP_TOMBSTONE_FILE` and `KATA_BACKUP_RETENTION_DAYS`. The Postgres container publishes no port: point the host at it by its address on the compose `data` network, or run the script inside a container that reaches it. `pg_dump` reads the password from `PGPASSWORD`: add `PGPASSWORD=<postgres password>` to `/etc/kata/backup.env` and make the file root-only (mode 0600), because the unit loads only that file.
 2. Create the passphrase file with mode 0600 outside the repo. Keep a copy elsewhere: a dump is useless without it.
@@ -108,7 +108,7 @@ deploy/restore.sh --dry-run
 deploy/restore.sh <dump.enc> <target-database> [counts.json]
 ```
 
-It refuses a non-empty target, decrypts and runs `pg_restore`, replays the tombstone file kept beside the dump (design 12.2), runs `python -m kata_core.migrate --check`, and with `counts.json` (from `scripts/deploy/verify_counts.py --write`) compares row counts. Run the drill on a scratch database, never on the live one.
+It refuses a dump whose `<dump.enc>.hmac` sidecar is missing or does not match (an unauthenticated dump is never decrypted), refuses a non-empty target, decrypts and runs `pg_restore`, replays the tombstone file kept beside the dump (design 12.2), runs `python -m kata_core.migrate --check`, and with `counts.json` (from `scripts/deploy/verify_counts.py --write`) compares row counts. Run the drill on a scratch database, never on the live one.
 
 Relocation (design 4.3) to a new host:
 

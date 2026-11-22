@@ -19,8 +19,8 @@ Runs kata on one Ubuntu VM with Docker compose. One image (`kata:local`, `deploy
 - `deploy/versions.env:7` `PY_BASE_IMAGE`; `:8` `PY_BASE_DIGEST`; `:11` `GITLEAKS_VERSION`; `:15` `TRAINER_URL`; `:20` `EMBED_MODEL_ID`. Empty values are filled by hand.
 - `deploy/env/small.env:4` (`KATA_MEM_CORE=768m`, default for the 3 GB VM); `deploy/env/large.env:3`.
 - `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`.
-- `deploy/backup.sh:23` needs `KATA_BACKUP_DIR`; `:56` `pg_dump -Fc`; `:61` `openssl enc -aes-256-cbc -pbkdf2`.
-- `deploy/restore.sh:4` usage `[--dry-run] <dump.enc> <target-database> [counts.json]`; `:27` `--dry-run`.
+- `deploy/backup.sh:25` needs `KATA_BACKUP_DIR`; `:68` `pg_dump -Fc`; `:73` `openssl enc -aes-256-cbc -pbkdf2`; `:80` writes the `.dump.enc.hmac` sidecar.
+- `deploy/restore.sh:4` usage `[--dry-run] <dump.enc> <target-database> [counts.json]`; `:28` `--dry-run`; `:76` `verify_sidecar` (refuses a dump without a matching `.hmac`).
 - `deploy/relocate.sh:4` usage; `:39` `--dry-run`; `:40` `--confirm-maintenance` (real run needs it).
 - `deploy/provision-vm.sh:171` `main`; `:174` `--dry-run` (any user); without it, needs root.
 - `deploy/systemd/kata-backup.timer:5` `OnCalendar=*-*-* 02:30:00`; `deploy/systemd/kata-backup.service:11` `ExecStart=/opt/kata/deploy/backup.sh`.
