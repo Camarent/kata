@@ -1,8 +1,25 @@
-"""Unit tests for the pure triage rules (D10): concept matching, triage, action and effort. No database, no clock."""
+"""Unit tests for the pure triage rules (D10): concept matching, triage, action and effort. No clock.
+
+The last tests run the syllabus flow (import and triage view) against a migrated Postgres.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from typing import Any
+
+import psycopg
 import pytest
+from kata_core.config import Config
+from kata_core.knowledge.store import set_mastery
+from kata_core.planning.syllabus_flow import (
+    SyllabusNotFound,
+    SyllabusTooLarge,
+    import_syllabus,
+    triage_view,
+)
+from kata_core.planning.syllabus_store import get_syllabus
 from kata_core.planning.triage import (
     ACTION_LEARN,
     ACTION_PRACTICE,
@@ -18,6 +35,9 @@ from kata_core.planning.triage import (
     match_concepts,
     triage,
 )
+from kata_core.storage.concepts import create_concept
+from kata_core.storage.taxonomy import ensure_category
+from support.scratch_db import ScratchDatabase
 
 KNOWN_T = 0.9
 LEARNING_T = 0.5
@@ -104,6 +124,97 @@ def test_effort_units_round_up_and_are_at_least_one() -> None:
     assert effort(ACTION_LEARN, 1, MINUTES, WORDS_PER_UNIT) == 30
     assert effort(ACTION_LEARN, 400, MINUTES, WORDS_PER_UNIT) == 30
     assert effort(ACTION_LEARN, 401, MINUTES, WORDS_PER_UNIT) == 60
+
+
+@pytest.fixture
+def conn(db: ScratchDatabase) -> Iterator[psycopg.Connection[Any]]:
+    with db.connect() as connection:
+        yield connection
+
+
+MASTERED_AT = datetime(2026, 11, 22, tzinfo=UTC)
+SYLLABUS_TEXT = (
+    "## Alpha unit\nAlpha only.\n"
+    "## Bravo unit\nBravo Charlie Delta.\n"
+    "## Echo unit\nEcho Foxtrot Golf.\n"
+    "## Hotel unit\nHotel, with a private Zulu term.\n"
+)
+
+
+def _user(conn: psycopg.Connection[Any], name: str) -> int:
+    row = conn.execute("INSERT INTO users (name) VALUES (%s) RETURNING id", (name,)).fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def _concept(conn: psycopg.Connection[Any], label: str, score: float | None, *, owner: int) -> int:
+    """A concept private to `owner`, with `owner`'s stored mastery when `score` is given."""
+    category_id = ensure_category(conn, "music")
+    row = conn.execute(
+        "INSERT INTO topics (category_id, label) VALUES (%s, %s) RETURNING id",
+        (category_id, label),
+    ).fetchone()
+    assert row is not None
+    concept_id = create_concept(conn, int(row[0]), label, owner)
+    if score is not None:
+        # contrary_rows 0 and a fixed timestamp keep the test clock-free.
+        set_mastery(conn, owner, concept_id, score, 0, MASTERED_AT)
+    return concept_id
+
+
+def test_syllabus_modules_get_skip_skim_practice_learn(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    alice = _user(conn, "alice")
+    _concept(conn, "Alpha", 1.0, owner=alice)
+    _concept(conn, "Bravo", 1.0, owner=alice)
+    _concept(conn, "Charlie", 1.0, owner=alice)
+    _concept(conn, "Delta", 0.0, owner=alice)
+    _concept(conn, "Echo", 1.0, owner=alice)
+    _concept(conn, "Foxtrot", 0.0, owner=alice)
+    _concept(conn, "Golf", 0.0, owner=alice)
+    _concept(conn, "Hotel", None, owner=alice)
+    syllabus_id = import_syllabus(conn, alice, "Course", SYLLABUS_TEXT, cfg)
+    views = triage_view(conn, alice, syllabus_id, cfg)
+    assert [(v.title, v.triage, v.action) for v in views] == [
+        ("Alpha unit", TRIAGE_KNOWN, ACTION_SKIP),
+        ("Bravo unit", TRIAGE_PARTLY_KNOWN, ACTION_SKIM),
+        ("Echo unit", TRIAGE_PARTLY_KNOWN, ACTION_PRACTICE),
+        ("Hotel unit", TRIAGE_NEW, ACTION_LEARN),
+    ]
+
+
+def test_triage_view_stores_nothing(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    alice = _user(conn, "alice")
+    _concept(conn, "Alpha", 1.0, owner=alice)
+    _concept(conn, "Bravo", 0.0, owner=alice)
+    syllabus_id = import_syllabus(conn, alice, "Course", SYLLABUS_TEXT, cfg)
+    before = conn.execute("SELECT count(*) FROM concept_mastery").fetchone()
+    triage_view(conn, alice, syllabus_id, cfg)
+    assert conn.execute("SELECT count(*) FROM concept_mastery").fetchone() == before
+
+
+def test_import_links_only_visible_concepts(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    alice = _user(conn, "alice")
+    bob = _user(conn, "bob")
+    _concept(conn, "Zulu", None, owner=bob)
+    syllabus_id = import_syllabus(conn, alice, "Course", SYLLABUS_TEXT, cfg)
+    stored = get_syllabus(conn, alice, syllabus_id)
+    assert stored is not None
+    assert all(module.concept_ids == [] for module in stored.modules)
+
+
+def test_import_rejects_text_over_max_bytes(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    alice = _user(conn, "alice")
+    too_big = "x" * (int(cfg.get("syllabus", "max_bytes")) + 1)
+    with pytest.raises(SyllabusTooLarge):
+        import_syllabus(conn, alice, "Big", too_big, cfg)
+
+
+def test_triage_view_of_foreign_syllabus_is_not_found(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    alice = _user(conn, "alice")
+    bob = _user(conn, "bob")
+    syllabus_id = import_syllabus(conn, alice, "Course", SYLLABUS_TEXT, cfg)
+    with pytest.raises(SyllabusNotFound):
+        triage_view(conn, bob, syllabus_id, cfg)
 
 
 def test_effort_uses_the_minutes_it_is_given() -> None:
