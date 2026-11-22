@@ -34,6 +34,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/scoring.py` - stdlib-only case loader and scorer; no DB, no `kata_core` import.
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
 - `scripts/smoke/real_model.py` - opt-in real-model smoke CLI; `scripts/smoke/smoke_core.py` - case loader, checks, masking; tested by `tests/scripts/test_smoke_cli.py` and `tests/scripts/test_smoke_core.py`.
+- `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
 - `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
@@ -50,6 +51,21 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - Checks per case (`scripts/smoke/smoke_core.py:191-202`): the reply is non-empty; a JSON case must parse, and `generate_course` and `extract_syllabus` must also pass `parse_drafts` and `parse_modules` (`smoke_core.py:44-47`).
 - Exit codes (`real_model.py:54-56`, `:145`): 0 when every case passes; 1 when a case fails or the cost cap stops the run; 2 when refused.
 - The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`smoke_core.py:181`, `:256-262`, `real_model.py:132`).
+
+## scripts/smoke: local model
+`scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
+
+`KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_model.py`
+
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_LOCAL=1` and a base URL is given: `--base-url` wins over `KATA_SMOKE_LOCAL_BASE_URL` (`local_model.py:230-234`). Also refused when the config does not load, the cases do not load, or no model is named (`local_model.py:236-245`).
+- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`local_model.py:243`, `:104`). The example is `models = "kata-l"` (`config/kata.example.toml:67-68`).
+- Config keys in `[smoke_local]` (`config/kata.example.toml:67-71`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
+- Warm-up: each model gets one request first (`local_model.py:131-136`, `:196-199`). Its result is neither printed nor counted, so a slow cold load does not fail a case.
+- Context warning: a case whose prompt estimate is over 75 percent of `num_ctx` prints `WARN model=... case=... prompt_estimate_tokens=... num_ctx=... over 75 percent` before it is sent (`local_model.py:61-62`, `:139-147`). It does not stop the case.
+- Output, one line per case (`scripts/smoke/smoke_core.py:311-320`): `<case> PASS|FAIL class=... prompt_tokens=... completion_tokens=... seconds=... tokens_per_s=... reason=<JSON> excerpt=<JSON>`. The excerpt is cut to 200 characters. Then one summary line per model: `summary model=... passes=N/M mean_seconds=... mean_tokens_per_s=...` (`local_model.py:214-219`).
+- Failure reasons (`local_model.py:66-69`): `timeout`, `connection refused`, `missing usage`, `shape check failed`, or the provider's own short reason (cut to 120 characters, `:70`, `:121-128`). A case passes only when the call succeeds, the usage is present, and the shape check passes.
+- Exit codes (`local_model.py:71-73`, `:254-259`): 0 only when every case of every model passes; 1 when any case fails or a model has no cases; 2 when refused.
+- The base URL never reaches stdout or stderr. A reply reaches stdout only as the masked excerpt above (`local_model.py:7`).
 
 ## Invariants and gotchas
 - `kata_db.py` needs the `core` package on `PYTHONPATH`; it imports `kata_core` directly.
