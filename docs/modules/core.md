@@ -88,6 +88,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0010_mastery.sql` - `concept_marks.source` (`user` or `trainer`), `trainer_evidence`, `concept_mastery`; also creates `trainer_progress`, which no code reads or writes.
 - `core/migrations/0011_progress_doc.sql` - `trainer_progress_doc` (`course_id` primary key, `user_id`, `revision`, `doc`).
 - `core/kata_core/trainer/` and `core/kata_core/knowledge/` - course generation, progress saves, mastery rules (see "Trainer (M5)").
+- `core/migrations/0012_syllabus.sql` - `syllabus`, `syllabus_module`, `syllabus_module_concept`.
+- `core/migrations/0013_tracks.sql` - `track`, `track_item`, `planning_budget`, `decision_point`.
+- `core/kata_core/planning/` - planning (see "Planning (M5)"): `syllabus_store.py`, `tracks_store.py` (every query filters by `user_id`), `triage.py` and `allocate.py` (pure), `plan.py` (`build_plan`), `decisions.py` (`open_point`, `decide`), `syllabus_flow.py`, `job_kinds.py`.
+- `core/kata_core/importer/syllabus.py` - syllabus text to modules (`parse_modules`) and extracted-module check (`validate_extracted`); pure, no database.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
@@ -140,7 +144,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Used by: `tests/core/` (API and repository tests), `scripts/db/kata_db.py` (provisioning). Model worker client: TODO(verify), not found in repo.
 
 ## Trainer (M5)
-Course generation, progress saves and the mastery they move. Packages: `core/kata_core/trainer/`, `core/kata_core/knowledge/`, the job runner `core/kata_core/jobs/runner.py`. Feature flag `[trainer] enabled`; `[syllabus]` and `[planning]` in the example config are not read by any code yet (grep, this run).
+Course generation, progress saves and the mastery they move. Packages: `core/kata_core/trainer/`, `core/kata_core/knowledge/`, the job runner `core/kata_core/jobs/runner.py`. Feature flag `[trainer] enabled`. The planning sections of the config are described under "Planning (M5)".
 Flow:
 1. `POST /v1/courses` (`core/kata_core/api/routes/courses.py:100`) picks concepts: the named ids, else gaps (non-`known` and score below `[knowledge] known_threshold`), ordered learning, new, score, id, capped by `[trainer] max_concepts` (`core/kata_core/trainer/gaps.py:20` `select_gaps`). Course row (`queued`) and a `course.generate` job are written in one transaction. 422 when no gap or unknown id.
 2. The worker's `course.generate` handler (`worker/kata_worker/handlers/course.py:40`) posts `{"items": [{concept_id, prompt, answer}]}` to `POST /jobs/{id}/output`.
@@ -160,6 +164,25 @@ Invariants and gotchas (trainer):
 - `[knowledge]` thresholds must satisfy `learning <= known` (`mastery.state_for` raises otherwise).
 - `course.build` loads config inside the handler (`core/kata_core/trainer/build.py:53`), so the runner process needs `KATA_CONFIG`.
 - The trainer binary is a config-supplied command, not part of this repo: `[trainer] command = ["kata-trainer"]` is a placeholder name (`config/kata.example.toml:94`).
+
+## Planning (M5)
+Syllabi, triage, study tracks, the weekly budget and decision points. Packages: `core/kata_core/planning/`, `core/kata_core/importer/syllabus.py`; migrations `0012_syllabus.sql` and `0013_tracks.sql` (`0011` is the trainer progress document).
+Feature flags: `[syllabus] enabled` guards `/v1/syllabi`; `[planning] enabled` guards `/v1/plan`, `/v1/tracks` and `/v1/decision-points`. A disabled feature answers 404 `feature disabled: <name>` (`core/kata_core/api/deps.py:46` `require_feature`).
+Routes: `POST /v1/syllabi`, `GET /v1/syllabi` (paged), `GET` and `DELETE /v1/syllabi/{id}` (`core/kata_core/api/routes/syllabi.py`); `GET /v1/plan`, `GET` and `PUT /v1/plan/budget` (`routes/plan.py`); `POST` and `GET /v1/tracks`, `GET`, `PATCH` and `DELETE /v1/tracks/{id}`, `POST /v1/tracks/{id}/decision-points`, `POST /v1/decision-points/{id}/decide` (`routes/tracks.py`).
+Flow:
+1. Import: `POST /v1/syllabi` (`syllabi.py:111`) calls `import_syllabus` (`planning/syllabus_flow.py`). `parse_modules` (`importer/syllabus.py`) splits the text on markdown headings, else numbered lines, else one module for the whole text; input above `[syllabus] max_bytes` is refused. Each module is linked to the user's visible concepts whose label occurs in it (`syllabus_module_concept`).
+2. Extraction: when no structure is found and `[syllabus] model_extract` is on, a `syllabus.extract` job is queued in the same transaction (`syllabi.py:131`) and the answer is 202. The worker's `syllabus.extract` handler (`worker/kata_worker/handlers/syllabus.py:43`) posts the modules; the core output hook (`planning/job_kinds.py`) keeps them only when each body is a substring of the source and each title is short enough (`validate_extracted`), else it falls back to one module for the whole text.
+3. Triage (`planning/triage.py`, pure, no clock): per module, no matched concept gives `new`; every matched score at or above `[knowledge] known_threshold` gives `known`; any score at or above `learning_threshold` gives `partly_known`; otherwise `new`. Action: `known` gives `skip`; `partly_known` gives `skim` when the known share is at or above `[planning] skim_share`, else `practice`; `new` gives `learn`. Effort is the action's minutes (`[planning] minutes_skip`, `minutes_skim`, `minutes_practice`, `minutes_learn`) times the module's units (`ceil(words / words_per_unit)`, at least 1). `triage_view` writes nothing.
+4. Tracks and budget: a track has an optional deadline, priority and ordered items (a module or a label). `planning_budget` holds the weekly minutes per user (`GET` and `PUT /v1/plan/budget`).
+5. Allocation (`planning/allocate.py`, pure, clock injected): capacity of a deadline is `floor(minutes_per_week * days / 7)`, where `days` is the whole days from today to the deadline, never below 0. Active tracks run in order (deadline, -priority, id); items run in position order. An item is allocated while the running total stays within the capacity of its track's deadline. The first item that does not fit, and every later item of that track, is deferred; other tracks are still tried.
+6. Decision points (D12): `POST /v1/tracks/{id}/decision-points` opens a point at a track position (`open_point`). An open point holds its track's items after that position (`plan.py` `build_plan`, passed to `allocate` as `hold_after`). `POST /v1/decision-points/{id}/decide` (`decisions.py` `decide`) changes the track and writes the `plan.decision` journal entry in one transaction.
+7. Plan: `GET /v1/plan` (`planning/plan.py` `build_plan`) loads the user's tracks, budget and open points, then calls `allocate`. The clock is injected, so tests pass a fixed date.
+
+Invariants and gotchas (planning):
+- Every planning query filters by `user_id` from the token. Another user's syllabus, track, budget or point reads as not found (404) and writes as nothing (`syllabus_store.py`, `tracks_store.py`).
+- Module and item rows are written only after the ownership check passes.
+- `allocate` never plans more minutes than a track's deadline capacity allows, and never plans an item after an open decision point on its track (tests: `tests/core/test_allocate.py`, `tests/core/test_plan_service.py`).
+- Triage and allocation are pure: no database, no wall clock. Only the route and the store touch I/O.
 
 ## Device tool (`core/kata_device/`)
 

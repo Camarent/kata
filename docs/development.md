@@ -155,3 +155,4 @@ overrides, which `pg.sh env` prints; no config file is copied or generated.
   date.
 - End-to-end tests need `node` and `npm ci` in `extension/`; without them they fail with a
   message that says so.
+- Planning tests (`tests/core/test_allocate.py`, `test_triage.py`, `test_plan_service.py`, `test_api_plan.py`, `test_api_tracks.py`, `test_api_syllabi.py`, `tests/worker/test_handler_syllabus.py`) run in the normal pytest step. `test_allocate.py` runs 200 fixed seeds (`range(200)`); `pytest tests/core/test_allocate.py -k test_allocation_fits_budget` runs all of them.

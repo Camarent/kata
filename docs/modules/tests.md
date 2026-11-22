@@ -50,6 +50,8 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/fakes/fake_core.py:27` `FakeCore` - in-process fake of the core HTTP API for worker tests (`start` `:154`, `stop` `:163`).
 - `tests/fakes/fake_trainer_cli.py:32` `main(argv)` - fake trainer binary (`next-id`, `add`, `validate`, `lock`, `build`) for course build tests.
 - M5 trainer tests (paths only): `tests/core/test_api_courses.py`, `test_api_course_progress.py`, `test_api_jobs.py`, `test_course_build.py`, `test_course_rules.py`, `test_job_runner.py`, `test_job_queue.py`, `test_knowledge_store.py`, `test_mastery_rules.py`, `test_progress_store.py`, `test_trainer_cli.py`, `test_trainer_store.py`; worker: `tests/worker/test_handlers.py`, `test_core_client.py`, `test_loop.py`.
+- M5 planning tests (paths only): core `tests/core/test_api_syllabi.py`, `test_api_tracks.py`, `test_api_plan.py`, `test_syllabus_parser.py`, `test_planning_store.py`, `test_triage.py`, `test_allocate.py`, `test_decision_points.py`, `test_plan_service.py`; worker `tests/worker/test_handler_syllabus.py`.
+- `tests/core/test_allocate.py:133` `test_allocation_fits_budget` - parametrized over fixed seeds `range(200)` (seeds 0..199), so every run checks the same 200 random inputs; a failure names its seed.
 - `tests/e2e/conftest.py` - live core, enrolment, fake model, running worker, driver bundle.
 - `tests/e2e/driver.ts` - Node driver that runs the real extension modules in jsdom.
 - `tests/e2e/test_driver.py` - driver alone against a fake core (scan, tag, mark; auth error exits 1).

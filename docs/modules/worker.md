@@ -5,7 +5,7 @@ summary: Tagging worker (Python) - pulls queued blocks from the core, asks a loc
 # worker
 
 ## Purpose
-Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a handler, runs that handler, and posts `result`, `output` or `fail` back to the core. Kinds: `tag` (block tagging through the provider router to a chat model) and `course.generate` (item drafts for a course). The worker never decides known/new; the core does.
+Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a handler, runs that handler, and posts `result`, `output` or `fail` back to the core. Kinds: `tag` (block tagging through the provider router to a chat model) `course.generate` (item drafts for a course) and `syllabus.extract` (course modules from syllabus text). The worker never decides known/new; the core does.
 `worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, a cloud policy (`Policy`) and a secret guard (`guarded`) that scans cloud text. `providers/cost.py` adds a daily cost cap (`capped`) for cloud calls, with spend kept on the core. The loop tags through `Router` (`worker/kata_worker/providers/router.py:60`), which walks the `[routing]` chain of the task class; `Policy`, `guarded` and `capped` gate each provider in that chain.
 
 ## Public surface
@@ -15,6 +15,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/handlers/__init__.py:21` `load_handlers() -> dict[str, Handler]` - finds every module in `handlers/` that defines `KIND` and `handle`; two modules with one kind raise `RuntimeError`.
 - `worker/kata_worker/handlers/tag.py:15` `KIND = "tag"`, `:16` `TAG_CLASS = "tag"`, `:21` `handle(job, router, client)` - tags the job text, reports `(category, topic)` or fails the job.
 - `worker/kata_worker/handlers/course.py:15` `KIND = "course.generate"`, `:16` `COURSE_CLASS = "generate_course"`, `:26` `parse_drafts(reply)`, `:40` `handle(job, router, client)` - posts `{"items": [...]}` as the job output (`CoreClient.output`) or fails the job.
+- `worker/kata_worker/handlers/syllabus.py:15` `KIND = "syllabus.extract"`, `:16` `SYLLABUS_CLASS = "extract_syllabus"`, `:43` `handle(job, router, client)` - asks the router for course modules and posts them as the job output, or fails the job; the core checks the modules (`core/kata_core/planning/job_kinds.py`).
 - `worker/kata_worker/core_client.py:57` `CoreClient` - `next_job` (`:86`), `report` (`:108`), `output` (`:116`), `fail` (`:122`); errors raise `CoreError` (`:27`).
 - `worker/kata_worker/core_client.py:48` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
 - `worker/kata_worker/model.py:63` `ModelAdapter(config)`; `:71` `tag(block_text) -> (category, topic)`. Not called by the loop (the `tag` handler uses `parse_tag`, `worker/kata_worker/handlers/tag.py:25`); only `tests/worker/test_model.py` uses it.
@@ -24,7 +25,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/router.py:38` `Routed` - `reply`, `provider` (name of the answering provider).
 - `worker/kata_worker/providers/router.py:33` `RouteExhausted(ProviderError)` - every provider skipped or failed; `:29` `RoutingError` - bad `[routing]` or chain.
 - `worker/kata_worker/providers/router.py:108` `build_router(cfg, ledger, env, audit, log) -> Router` - builds chains from `[routing]`, providers (`:97` `_build_providers`) and `Policy`.
-- `worker/kata_worker/providers/base.py:11` `TASK_CLASSES` = `("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")`. `extract_syllabus` has no handler in the worker yet.
+- `worker/kata_worker/providers/base.py:11` `TASK_CLASSES` = `("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")`. `extract_syllabus` is served by the `syllabus.extract` handler.
 - `worker/kata_worker/providers/base.py:19` `Provider` protocol - `name`, `is_cloud`, `complete(system, user) -> str` (`:25`); `ProviderError` at `:14`.
 - `worker/kata_worker/providers/local.py:15` `LocalProvider(config)` - `name = "local"`, `is_cloud = False`; `complete` at `:26`.
 - `worker/kata_worker/providers/anthropic.py:46` `AnthropicProvider(config, env, transport)` - `name = "anthropic"`, `is_cloud = True`; `complete` at `:68`.
@@ -39,7 +40,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 
 ## Key files
 - `worker/kata_worker/loop.py` - pull loop; claims the handler kinds and calls the handler of the job's kind.
-- `worker/kata_worker/handlers/` - one module per job kind (`tag.py`, `course.py`), discovered by `load_handlers`.
+- `worker/kata_worker/handlers/` - one module per job kind (`tag.py`, `course.py`, `syllabus.py`), discovered by `load_handlers`.
 - `worker/kata_worker/core_client.py` - HTTP client to the core, loopback-only.
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
 - `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
@@ -58,6 +59,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - A tagging or generation exception fails only that job (`worker/kata_worker/handlers/tag.py:30`, `worker/kata_worker/handlers/course.py:49` `client.fail`); the worker keeps running.
 - A job kind has one handler: the loop asks the core only for kinds in `load_handlers()` (`worker/kata_worker/loop.py:29`), so a new kind needs a new module in `handlers/`, not an edit to the loop.
 - `course.generate` output is posted with `POST /jobs/{id}/output`; the core checks it and queues `course.build` (`worker/kata_worker/handlers/course.py:52`). The worker does not build courses.
+- A `syllabus.extract` failure fails only that job (`worker/kata_worker/handlers/syllabus.py:51`); the core's output hook falls back to one module when the output is not a valid module list.
 - Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `parse_tag`).
 - Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:54-56`).
 - A cloud call is allowed only when `[providers] cloud_enabled`, the provider's `allow_cloud` and the task class in its `task_classes` all agree (`worker/kata_worker/providers/policy.py:67-69`). Local needs only the task class (`:67-68`).
