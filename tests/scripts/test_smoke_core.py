@@ -28,7 +28,7 @@ try:
     from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
     from kata_worker.providers.anthropic import AnthropicProvider
     from kata_worker.providers.base import TokenUsage
-    from kata_worker.providers.cost import CappedProvider, Ledger, cost_from_usage
+    from kata_worker.providers.cost import CappedProvider, Ledger, cost_from_usage, cost_micro_usd
 finally:
     sys.path[:] = _SAVED_PATH
 
@@ -126,7 +126,7 @@ def test_usage_transport_records_tokens_and_keeps_body(smoke: ModuleType) -> Non
     with httpx.Client(transport=usage) as client:
         response = client.post("https://example.invalid/v1/messages", json={"x": 1})
     assert response.json()["content"][0]["text"] == "a short answer"
-    assert usage.usage == [smoke.Usage(12, 34)]
+    assert usage.usage == [TokenUsage(input_tokens=12, output_tokens=34)]
 
 
 def test_usage_transport_skips_reply_without_usage(smoke: ModuleType) -> None:
@@ -164,7 +164,7 @@ def test_run_case_plain_text_pass_with_usage_and_ledger_cost(smoke: ModuleType) 
     recorder = Recorder(text="Two short sentences.", in_tokens=12, out_tokens=7)
     provider, ledger, usage = _stack(smoke, recorder)
     case = _case(smoke, "explain")
-    result = smoke.run_case(case, provider, ledger, usage, secret=KEY)
+    result = smoke.run_case(case, provider, ledger, usage, model=HAIKU, secret=KEY)
     assert result.passed is True
     assert (result.in_tokens, result.out_tokens) == (12, 7)
     # The reported usage prices the call (12 in, 7 out), not the text estimate.
@@ -174,10 +174,21 @@ def test_run_case_plain_text_pass_with_usage_and_ledger_cost(smoke: ModuleType) 
     assert len(recorder.requests) == 1
 
 
+def test_estimate_prices_case_texts_and_billed_prices_usage(smoke: ModuleType) -> None:
+    recorder = Recorder(text="Two short sentences.", in_tokens=12, out_tokens=7)
+    provider, ledger, usage = _stack(smoke, recorder)
+    case = _case(smoke, "explain")
+    result = smoke.run_case(case, provider, ledger, usage, model=HAIKU, secret=KEY)
+    user = case.input_path.read_text(encoding="utf-8")
+    text_estimate = cost_micro_usd(HAIKU, case.system + user, "Two short sentences.")
+    assert result.estimated_micro_usd == text_estimate
+    assert smoke.billed_micro_usd(HAIKU, usage.usage) == result.cost_micro_usd == 47
+
+
 def test_run_case_empty_reply_fails(smoke: ModuleType) -> None:
     recorder = Recorder(text="   ")
     provider, ledger, usage = _stack(smoke, recorder)
-    result = smoke.run_case(_case(smoke, "summary"), provider, ledger, usage, secret=KEY)
+    result = smoke.run_case(_case(smoke, "summary"), provider, ledger, usage, model=HAIKU, secret=KEY)
     assert result.passed is False
 
 
@@ -192,20 +203,20 @@ def test_run_case_json_shape_checks(smoke: ModuleType) -> None:
     )
     for case_id, reply, expected in cases:
         provider, ledger, usage = _stack(smoke, Recorder(text=reply))
-        result = smoke.run_case(_case(smoke, case_id), provider, ledger, usage, secret=KEY)
+        result = smoke.run_case(_case(smoke, case_id), provider, ledger, usage, model=HAIKU, secret=KEY)
         assert result.passed is expected, (case_id, reply)
 
 
 def test_excerpt_is_capped_at_200_characters(smoke: ModuleType) -> None:
     provider, ledger, usage = _stack(smoke, Recorder(text="w" * 500))
-    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, secret=KEY)
+    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, model=HAIKU, secret=KEY)
     assert len(result.excerpt) == smoke.EXCERPT_CHARS == 200
 
 
 def test_key_never_reaches_a_line_even_when_the_reply_echoes_it(smoke: ModuleType) -> None:
     echo = f"my key is {KEY} and more text"
     provider, ledger, usage = _stack(smoke, Recorder(text=echo))
-    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, secret=KEY)
+    result = smoke.run_case(_case(smoke, "explain"), provider, ledger, usage, model=HAIKU, secret=KEY)
     line = smoke.format_line(result)
     assert KEY not in line
     assert smoke.SECRET_MASK in result.excerpt
@@ -219,7 +230,7 @@ def test_provider_error_is_a_fail_not_a_stop(smoke: ModuleType) -> None:
     inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
     ledger = smoke.MemoryLedger()
     capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, 150, lambda message: None)
-    result = smoke.run_case(_case(smoke, "explain"), capped, ledger, usage, secret=KEY)
+    result = smoke.run_case(_case(smoke, "explain"), capped, ledger, usage, model=HAIKU, secret=KEY)
     assert result.passed is False
     assert KEY not in smoke.format_line(result)
 
@@ -229,7 +240,7 @@ def test_cap_reached_stops_the_run(smoke: ModuleType) -> None:
     # 5000 after the first call. The pre-call guard (short prompts, far under 5000) lets that call through.
     recorder = Recorder(out_tokens=1000)
     provider, ledger, usage = _stack(smoke, recorder, cap=5000)
-    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, secret=KEY)
+    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, model=HAIKU, secret=KEY)
     assert outcome.stopped is True
     assert [result.case_id for result in outcome.results] == ["explain"]
     assert len(recorder.requests) == 1
@@ -238,7 +249,7 @@ def test_cap_reached_stops_the_run(smoke: ModuleType) -> None:
 def test_run_cases_without_cap_runs_all_four(smoke: ModuleType) -> None:
     recorder = Recorder()
     provider, ledger, usage = _stack(smoke, recorder)
-    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, secret=KEY)
+    outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, model=HAIKU, secret=KEY)
     assert outcome.stopped is False
     assert [result.case_id for result in outcome.results] == EXPECTED_IDS
     assert len(recorder.requests) == 4
@@ -251,6 +262,7 @@ def test_format_line_pins_the_report_format(smoke: ModuleType) -> None:
         in_tokens=12,
         out_tokens=34,
         cost_micro_usd=56,
+        estimated_micro_usd=78,
         passed=True,
         excerpt='say "hi"\nnext',
     )

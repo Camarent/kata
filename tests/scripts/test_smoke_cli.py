@@ -35,6 +35,8 @@ TINY_BUDGET = 1
 EXAMPLE_BUDGET = int(load_config(EXAMPLE_PATH, env={}).get("smoke", "budget_micro_usd"))
 CONFIG_ARGS = ["--config", str(EXAMPLE_PATH)]
 GOOD_ENV = {SMOKE_ENV: "1", KEY_ENV: KEY}
+ESTIMATED_MICRO_USD = 448
+BILLED_MICRO_USD = 188
 COURSE_REPLY = '{"items": []}'
 SYLLABUS_REPLY = '{"modules": [{"title": "a", "body": "b"}]}'
 
@@ -131,10 +133,13 @@ def test_default_model_is_first_allowed_and_all_pass_exit_0(
     for request in recorder.requests:
         assert json.loads(request.content)["model"] == HAIKU
     lines = capsys.readouterr().out.splitlines()
-    assert [line.split(" ")[0] for line in lines[:-1]] == EXPECTED_IDS
-    assert all(" PASS " in line for line in lines[:-1])
-    assert lines[-1].startswith("total cases=4 pass=4 ")
-    assert f"budget_micro_usd={EXAMPLE_BUDGET}" in lines[-1]
+    assert [line.split(" ")[0] for line in lines[:-2]] == EXPECTED_IDS
+    assert all(" PASS " in line for line in lines[:-2])
+    assert lines[-2].startswith("total cases=4 pass=4 ")
+    assert f"budget_micro_usd={EXAMPLE_BUDGET}" in lines[-2]
+    assert lines[-1] == (
+        f"estimated_micro_usd={ESTIMATED_MICRO_USD} billed_micro_usd={BILLED_MICRO_USD}"
+    )
 
 
 def test_failing_case_exits_1_and_prints_fail(
@@ -145,7 +150,7 @@ def test_failing_case_exits_1_and_prints_fail(
     lines = capsys.readouterr().out.splitlines()
     assert code == EXIT_FAILED
     assert " FAIL " in lines[1]
-    assert lines[-1].startswith("total cases=4 pass=3 ")
+    assert lines[-2].startswith("total cases=4 pass=3 ")
 
 
 def test_budget_from_config_caps_the_run_and_exits_1(
@@ -159,7 +164,7 @@ def test_budget_from_config_caps_the_run_and_exits_1(
     assert code == EXIT_FAILED
     assert len(recorder.requests) == 0
     assert "cap reached" in captured.err
-    assert captured.out.splitlines()[-1].startswith("total cases=0 pass=0 ")
+    assert captured.out.splitlines()[-2].startswith("total cases=0 pass=0 ")
 
 
 def test_key_never_reaches_stdout_or_stderr(

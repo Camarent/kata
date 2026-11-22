@@ -56,7 +56,7 @@ def _count(usage: dict[str, object], key: str, *, optional: bool) -> int | None:
     return value
 
 
-def _reply_usage(response: httpx.Response) -> TokenUsage | None:
+def reply_usage(response: httpx.Response) -> TokenUsage | None:
     """Read the Messages `usage` block; None when it is missing or malformed. Never raises."""
     try:
         body = response.json()
@@ -130,7 +130,7 @@ class AnthropicProvider:
             raise ProviderError(f"anthropic request failed: {exc}") from exc
         if response.status_code != httpx.codes.OK:
             raise ProviderError(f"anthropic returned status {response.status_code}")
-        return Completion(text=_reply_text(response), usage=_reply_usage(response))
+        return Completion(text=_reply_text(response), usage=reply_usage(response))
 
 
 def build_cloud(
