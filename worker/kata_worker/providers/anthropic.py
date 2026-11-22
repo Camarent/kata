@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import httpx
 from kata_core.config import Config
 
-from kata_worker.providers.base import Provider, ProviderError
+from kata_worker.providers.base import Completion, Provider, ProviderError, TokenUsage
 from kata_worker.providers.cost import Ledger, LogSink, capped
 from kata_worker.providers.guard import AuditSink, guarded
 
@@ -21,6 +21,8 @@ MESSAGES_PATH = "/v1/messages"
 API_VERSION = "2023-06-01"
 MAX_TOKENS = 1024
 TEXT_BLOCK = "text"
+CACHE_CREATION_FIELD = "cache_creation_input_tokens"
+CACHE_READ_FIELD = "cache_read_input_tokens"
 
 
 def _reply_text(response: httpx.Response) -> str:
@@ -41,6 +43,39 @@ def _reply_text(response: httpx.Response) -> str:
     if not texts:
         raise ProviderError("anthropic reply has no text block")
     return "".join(texts)
+
+
+def _count(usage: dict[str, object], key: str, *, optional: bool) -> int | None:
+    """One non-negative int from the usage block; an optional key may be absent or null (then 0)."""
+    value = usage.get(key)
+    if optional and value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _reply_usage(response: httpx.Response) -> TokenUsage | None:
+    """Read the Messages `usage` block; None when it is missing or malformed. Never raises."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    usage = body.get("usage") if isinstance(body, dict) else None
+    if not isinstance(usage, dict):
+        return None
+    input_tokens = _count(usage, "input_tokens", optional=False)
+    output_tokens = _count(usage, "output_tokens", optional=False)
+    cache_creation = _count(usage, CACHE_CREATION_FIELD, optional=True)
+    cache_read = _count(usage, CACHE_READ_FIELD, optional=True)
+    if input_tokens is None or output_tokens is None or cache_creation is None or cache_read is None:
+        return None
+    return TokenUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_creation_input_tokens=cache_creation,
+        cache_read_input_tokens=cache_read,
+    )
 
 
 class AnthropicProvider:
@@ -67,6 +102,10 @@ class AnthropicProvider:
 
     def complete(self, system: str, user: str) -> str:
         """Return the reply text for one system and one user message; raise ProviderError on failure."""
+        return self.complete_with_usage(system, user).text
+
+    def complete_with_usage(self, system: str, user: str) -> Completion:
+        """Return the reply text and reported usage (None when absent or malformed); raise ProviderError on failure."""
         payload = {
             "model": self._model_name,
             "max_tokens": MAX_TOKENS,
@@ -83,7 +122,7 @@ class AnthropicProvider:
             raise ProviderError(f"anthropic request failed: {exc}") from exc
         if response.status_code != httpx.codes.OK:
             raise ProviderError(f"anthropic returned status {response.status_code}")
-        return _reply_text(response)
+        return Completion(text=_reply_text(response), usage=_reply_usage(response))
 
 
 def build_cloud(
