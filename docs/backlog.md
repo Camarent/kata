@@ -60,3 +60,13 @@ Project items after Milestone 0.
       mask list, spool flush). Not proven in a live session, see [`decisions.md`](decisions.md).
 - [ ] Event retention and journal text: `design/architecture.md` promises 90-day removal of
       stored terminal history; no runner deletes events yet, and the journal text does not say so.
+- [ ] Trainer: real trainer binary test. Run the trainer binary against a running core on the
+      owner PC; the current tests use stubs only.
+- [ ] Trainer: real model test. Run one lesson through a real local or cloud model on the owner
+      PC; no test calls a live model yet.
+- [ ] Trainer: real-browser checks. Drive the trainer screens in a real browser against a
+      running core (sign-in, lesson flow, "I know this"); stubs only so far.
+- [ ] Trainer: origin and handoff. Check the trainer origin and the handoff back to the
+      extension and core end to end; not covered by any test yet.
+- [ ] Trainer: read-only plan/course view (D16). Show the stored plan and course read-only; not
+      built yet (decision D16).
