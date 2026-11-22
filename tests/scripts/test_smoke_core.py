@@ -27,7 +27,8 @@ try:
     from kata_worker.handlers.syllabus import SYLLABUS_SYSTEM_PROMPT
     from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
     from kata_worker.providers.anthropic import AnthropicProvider
-    from kata_worker.providers.cost import CappedProvider, Ledger, cost_micro_usd
+    from kata_worker.providers.base import TokenUsage
+    from kata_worker.providers.cost import CappedProvider, Ledger, cost_from_usage
 finally:
     sys.path[:] = _SAVED_PATH
 
@@ -164,10 +165,11 @@ def test_run_case_plain_text_pass_with_usage_and_ledger_cost(smoke: ModuleType) 
     provider, ledger, usage = _stack(smoke, recorder)
     case = _case(smoke, "explain")
     result = smoke.run_case(case, provider, ledger, usage, secret=KEY)
-    user = case.input_path.read_text(encoding="utf-8")
     assert result.passed is True
     assert (result.in_tokens, result.out_tokens) == (12, 7)
-    assert result.cost_micro_usd == cost_micro_usd(HAIKU, case.system + user, "Two short sentences.")
+    # The reported usage prices the call (12 in, 7 out), not the text estimate.
+    usage_cost = cost_from_usage(HAIKU, TokenUsage(input_tokens=12, output_tokens=7))
+    assert result.cost_micro_usd == usage_cost == 47
     assert result.cost_micro_usd == ledger.usage_today()
     assert len(recorder.requests) == 1
 

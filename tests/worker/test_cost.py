@@ -9,6 +9,7 @@ import pytest
 from fakes.fake_provider import FakeProvider
 from kata_core.config import Config
 from kata_worker.providers import ProviderError
+from kata_worker.providers.base import TokenUsage
 from kata_worker.providers.cost import (
     PRICES,
     CappedProvider,
@@ -16,6 +17,7 @@ from kata_worker.providers.cost import (
     Ledger,
     PricingError,
     capped,
+    cost_from_usage,
     cost_micro_usd,
     estimate_tokens,
 )
@@ -210,3 +212,81 @@ def test_cap_boundary_is_inclusive() -> None:
     with pytest.raises(CapReached):
         capped(inner, ledger, MODEL, _config(), lambda _line: None).complete(SYSTEM, USER)
     assert inner.calls == []
+
+
+HAIKU = "claude-haiku-5-5"
+
+
+def _cloud_usage(usage: TokenUsage | None) -> FakeProvider:
+    return FakeProvider(name="cloud", is_cloud=True, script=[REPLY], usage_script=[usage])
+
+
+def test_cost_from_usage_is_exact_for_known_usage() -> None:
+    # 522 in * 1_000_000 + 1051 out * 5_000_000 = 5_777_000_000 / 1_000_000 = 5777.
+    assert cost_from_usage(HAIKU, TokenUsage(input_tokens=522, output_tokens=1051)) == 5777
+
+
+def test_cost_from_usage_prices_cache_write_at_1_25x_input() -> None:
+    # 800 * 1_000_000 * 1.25 = 1_000_000_000 / 1_000_000 = 1000.
+    usage = TokenUsage(cache_creation_input_tokens=800)
+    assert cost_from_usage(HAIKU, usage) == 1000
+
+
+def test_cost_from_usage_prices_cache_read_at_0_1x_input() -> None:
+    # 10_000 * 1_000_000 * 0.1 = 1_000_000_000 / 1_000_000 = 1000.
+    usage = TokenUsage(cache_read_input_tokens=10_000)
+    assert cost_from_usage(HAIKU, usage) == 1000
+
+
+def test_cost_from_usage_rounds_fractional_micro_usd_up() -> None:
+    # One cache-read token is 0.1 micro-USD and rounds up to 1.
+    assert cost_from_usage(HAIKU, TokenUsage(cache_read_input_tokens=1)) == 1
+    assert cost_from_usage(HAIKU, TokenUsage()) == 0
+
+
+def test_cost_from_usage_sums_all_four_counts() -> None:
+    usage = TokenUsage(
+        input_tokens=522,
+        output_tokens=1051,
+        cache_creation_input_tokens=800,
+        cache_read_input_tokens=10_000,
+    )
+    assert cost_from_usage(HAIKU, usage) == 5777 + 1000 + 1000
+
+
+def test_cost_from_usage_unknown_model_raises_pricing_error() -> None:
+    with pytest.raises(PricingError):
+        cost_from_usage("no-such-model", TokenUsage(input_tokens=1))
+
+
+def test_capped_records_cost_from_reported_usage() -> None:
+    inner = _cloud_usage(TokenUsage(input_tokens=522, output_tokens=1051))
+    ledger = FakeLedger(spent=0)
+    reply = capped(inner, ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)
+    assert reply == REPLY
+    assert ledger.recorded == [5777]
+
+
+def test_capped_falls_back_to_text_estimate_when_usage_missing() -> None:
+    inner = _cloud_usage(None)
+    ledger = FakeLedger(spent=0)
+    capped(inner, ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)
+    assert ledger.recorded == [cost_micro_usd(HAIKU, SYSTEM + USER, REPLY)]
+
+
+def test_warn_logged_when_reported_usage_crosses_warn() -> None:
+    inner = _cloud_usage(TokenUsage(input_tokens=522, output_tokens=1051))
+    ledger = FakeLedger(spent=1_500_000 - 5777)
+    lines, log = _log_sink()
+    capped(inner, ledger, HAIKU, _config(), log).complete(SYSTEM, USER)
+    assert lines == [f"cost warn: spent {1_500_000} of warn {1_500_000} micro-USD"]
+
+
+def test_cap_checks_spend_including_reported_usage() -> None:
+    # Spend just under the cap passes the pre-call check; the reported usage then takes spend over it.
+    inner = _cloud_usage(TokenUsage(input_tokens=522, output_tokens=1051))
+    ledger = FakeLedger(spent=2_000_000 - 1)
+    capped(inner, ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)
+    with pytest.raises(CapReached):
+        capped(_cloud(), ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)
+    assert ledger.recorded == [5777]

@@ -2,7 +2,8 @@
 
 `CappedProvider` wraps a Provider the way `GuardedProvider` does. For a cloud provider it checks
 the ledger's spend today before the call, raises `CapReached` at or over the cap, and after a
-successful call records the estimated cost and logs once when spend reaches the warn level.
+successful call records the cost (from the reported usage, else the text estimate) and logs once
+when spend reaches the warn level.
 Local providers pass through with no ledger access. There is no flag, config or env switch that
 skips the cap.
 """
@@ -14,7 +15,7 @@ from typing import Protocol, runtime_checkable
 
 from kata_core.config import Config
 
-from kata_worker.providers.base import Provider, ProviderError
+from kata_worker.providers.base import Provider, ProviderError, TokenUsage, UsageProvider
 
 # Pinned prices: model name -> (input, output) micro-USD per 1M tokens.
 PRICES: dict[str, tuple[int, int]] = {
@@ -25,6 +26,10 @@ PRICES: dict[str, tuple[int, int]] = {
 
 TOKEN_CHARS = 4
 MICRO_PER_TOKEN_UNIT = 1_000_000
+HUNDREDTHS = 100
+# Cache prices as hundredths of the input price: a cache write costs 1.25x, a cache read 0.1x.
+CACHE_WRITE_HUNDREDTHS = 125
+CACHE_READ_HUNDREDTHS = 10
 
 
 class PricingError(ProviderError):
@@ -66,6 +71,22 @@ def cost_micro_usd(model: str, in_text: str, out_text: str) -> int:
     return -(-total // MICRO_PER_TOKEN_UNIT)
 
 
+def cost_from_usage(model: str, usage: TokenUsage) -> int:
+    """Cost of one call in micro-USD from the usage the backend reported, rounded up.
+
+    Cache writes cost `CACHE_WRITE_HUNDREDTHS` and cache reads `CACHE_READ_HUNDREDTHS` hundredths
+    of the input price. Integer math only: the sum is kept in hundredths until the final division.
+    """
+    if model not in PRICES:
+        raise PricingError(f"no pinned price for model {model}")
+    price_in, price_out = PRICES[model]
+    base = usage.input_tokens * price_in + usage.output_tokens * price_out
+    cache_write = usage.cache_creation_input_tokens * price_in * CACHE_WRITE_HUNDREDTHS
+    cache_read = usage.cache_read_input_tokens * price_in * CACHE_READ_HUNDREDTHS
+    total = HUNDREDTHS * base + cache_write + cache_read
+    return -(-total // (HUNDREDTHS * MICRO_PER_TOKEN_UNIT))
+
+
 class CappedProvider:
     """A Provider that enforces the daily cost cap on cloud calls. Built with `capped`."""
 
@@ -95,8 +116,16 @@ class CappedProvider:
         spent = self._ledger.usage_today()
         if spent >= self._cap:
             raise CapReached(spent, self._cap)
-        reply = self._inner.complete(system, user)
-        self._ledger.record_usage(cost_micro_usd(self._model, system + user, reply))
+        if isinstance(self._inner, UsageProvider):
+            completion = self._inner.complete_with_usage(system, user)
+            reply, usage = completion.text, completion.usage
+        else:
+            reply, usage = self._inner.complete(system, user), None
+        if usage is not None:
+            cost = cost_from_usage(self._model, usage)
+        else:
+            cost = cost_micro_usd(self._model, system + user, reply)
+        self._ledger.record_usage(cost)
         total = self._ledger.usage_today()
         if total >= self._warn:
             self._log(f"cost warn: spent {total} of warn {self._warn} micro-USD")
