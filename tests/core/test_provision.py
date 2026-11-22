@@ -41,6 +41,21 @@ SCHEMA_TABLES = {
     "journal_entry",
     "event",
     "message",
+    "course",
+    "course_file",
+    "course_artifact",
+    "course_item_map",
+    "trainer_progress",
+    "trainer_progress_doc",
+    "trainer_evidence",
+    "concept_mastery",
+    "syllabus",
+    "syllabus_module",
+    "syllabus_module_concept",
+    "track",
+    "track_item",
+    "planning_budget",
+    "decision_point",
 }
 
 

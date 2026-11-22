@@ -1,5 +1,6 @@
-"""Pull loop: take one job from the core, tag it with the model, report the topic or fail the job.
+"""Pull loop: take one job from the core and hand it to the handler of its kind.
 
+The handlers come from kata_worker.handlers; the loop claims only the kinds it has a handler for.
 The poll interval comes from the [worker] section; the loop sleeps only when no job was pending.
 """
 
@@ -9,35 +10,31 @@ import http.client
 import logging
 import os
 import threading
+from collections.abc import Mapping
 
 from kata_core.config import Config
 
 from kata_worker.core_client import CoreClient, CoreError
-from kata_worker.model import SYSTEM_PROMPT, parse_tag
+from kata_worker.handlers import Handler, load_handlers
 from kata_worker.providers.guard import AuditEvent
 from kata_worker.providers.router import Router, build_router
 
-TAG_CLASS = "tag"
+HANDLERS: Mapping[str, Handler] = load_handlers()
 
 log = logging.getLogger(__name__)
 
 
-def run_once(client: CoreClient, router: Router) -> bool:
+def run_once(client: CoreClient, router: Router, handlers: Mapping[str, Handler] = HANDLERS) -> bool:
     """Handle at most one queued job; return True when a job was handled, False when idle."""
-    job = client.next_job()
+    job = client.next_job(tuple(sorted(handlers)))
     if job is None:
         return False
-    try:
-        routed = router.route(TAG_CLASS, SYSTEM_PROMPT, job.payload)
-        category, topic = parse_tag(routed.reply)
-    except CoreError:
-        raise  # a ledger call failed inside the router: run_forever logs it and goes on
-    except Exception as exc:  # noqa: BLE001 - a tagging bug must fail this job, not stop the worker
-        log.warning("job %s failed while tagging: %s", job.id, exc)
+    handler = handlers.get(job.kind)
+    if handler is None:
+        log.warning("job %s has kind %r with no handler: failing it", job.id, job.kind)
         client.fail(job.id)
         return True
-    log.info("job %s tagged by provider %s", job.id, routed.provider)
-    client.report(job.id, category, topic)
+    handler(job, router, client)
     return True
 
 

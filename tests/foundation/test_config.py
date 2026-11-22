@@ -53,6 +53,10 @@ def test_example_has_required_sections() -> None:
         "provider_local",
         "provider_anthropic",
         "policy",
+        "trainer",
+        "knowledge",
+        "syllabus",
+        "planning",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
     assert set(data["policy"]) == {
@@ -66,7 +70,14 @@ def test_example_has_required_sections() -> None:
         "rate_limit_seconds",
         "late_event_seconds",
     }
-    assert set(data["routing"]) == {"tag", "explain", "summary", "batch"}
+    assert set(data["routing"]) == {
+        "tag",
+        "explain",
+        "summary",
+        "batch",
+        "generate_course",
+        "extract_syllabus",
+    }
     assert set(data["core"]) == {"host", "port"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
@@ -76,7 +87,7 @@ def test_example_has_required_sections() -> None:
         "core_url",
         "token_env",
     }
-    assert set(data["jobs"]) == {"lease_seconds"}
+    assert set(data["jobs"]) == {"lease_seconds", "runner_poll_seconds", "max_output_bytes"}
     assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds"}
     assert set(data["client"]) == {"request_timeout_seconds"}
     assert set(data["retrieval"]) == {

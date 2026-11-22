@@ -6,7 +6,7 @@ to point at the test database.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Annotated, Any
 
 import psycopg
@@ -14,6 +14,7 @@ from fastapi import Depends, Header, HTTPException, Request
 
 from kata_core.auth.service import AuthContext, Authenticator, TokenAuthenticator
 from kata_core.config import Config
+from kata_core.jobs.runner import Registry, load_registry
 from kata_core.storage.provision import connect
 
 BEARER_PREFIX = "Bearer "
@@ -31,6 +32,25 @@ def get_conn(cfg: Annotated[Config, Depends(get_cfg)]) -> Iterator[psycopg.Conne
 
 
 Conn = Annotated[psycopg.Connection[Any], Depends(get_conn, scope="function")]
+
+
+def get_registry(request: Request) -> Registry:
+    """The app's one job Registry, loaded on first use and cached on `app.state`."""
+    registry: Registry | None = getattr(request.app.state, "registry", None)
+    if registry is None:
+        registry = load_registry()
+        request.app.state.registry = registry
+    return registry
+
+
+def require_feature(name: str) -> Callable[[Config], None]:
+    """Dependency: 404 `feature disabled: <name>` when `[<name>] enabled` is off in the config."""
+
+    def _check(cfg: Annotated[Config, Depends(get_cfg)]) -> None:
+        if not cfg.get(name, "enabled"):
+            raise HTTPException(status_code=404, detail=f"feature disabled: {name}")
+
+    return _check
 
 
 def get_authenticator() -> Authenticator:

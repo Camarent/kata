@@ -11,11 +11,13 @@ Single source of truth for the knowledge model, taxonomy and marks. Exposes the 
 HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. No server launcher found in the repo: TODO(verify) how uvicorn is started.
 - `core/kata_core/api/routes/__init__.py:14` `include_routers(app)` - includes every module that defines `router`.
-- `core/kata_core/api/deps.py:22` `get_cfg`, `:27` `get_conn`, `:36` `get_authenticator`, `:40` `current_user` - request dependencies.
+- `core/kata_core/api/deps.py:23` `get_cfg`, `:28` `get_conn`, `:37` `get_registry`, `:46` `require_feature(name)` (404 `feature disabled: <name>` when `[<name>] enabled` is off), `:56` `get_authenticator`, `:60` `current_user` - request dependencies.
 - `core/kata_core/api/routes/auth.py:35` `POST /enrol`, `:48` `GET /me`, `:56` `DELETE /devices/{device_id}`.
 - `core/kata_core/api/routes/concepts.py:56` `POST /concepts`, `:65` `GET /concepts/marks`, `:83` `PUT /concepts/{id}/mark`, `:104` `DELETE /concepts/{id}/mark`; request models `ConceptIn` `:31`, `ConceptMarkIn` `:42`.
 - `core/kata_core/api/routes/importing.py:22` `POST /import`.
-- `core/kata_core/api/routes/jobs.py:69` `POST /jobs`, `:75` `GET /jobs/next`, `:92` `POST /jobs/{id}/result`, `:107` `POST /jobs/{id}/fail`, `:115` `GET /jobs/{id}`.
+- `core/kata_core/api/routes/jobs.py:83` `POST /jobs`, `:89` `GET /jobs/next` (`?kind=` repeatable, default `tag`), `:108` `POST /jobs/{id}/result`, `:123` `POST /jobs/{id}/output` (`report_output`; 413 above `[jobs] max_output_bytes`), `:151` `POST /jobs/{id}/fail`, `:159` `GET /jobs/{id}`.
+- `core/kata_core/api/routes/courses.py:30` router `/v1/courses` (gated by `require_feature("trainer")`): `:100` `POST /v1/courses` (202; picks gaps or explicit concepts, enqueues `course.generate`), `:128` `GET /v1/courses` (paged, `before_id`), `:142` `GET /v1/courses/{course_id}`, `:151` `DELETE /v1/courses/{course_id}`.
+- `core/kata_core/api/routes/course_progress.py:26` router `/v1/courses` (gated by `require_feature("trainer")`): `:123` `GET /v1/courses/{course_id}/progress` (returns `ETag`), `:132` `PUT /v1/courses/{course_id}/progress` (needs `If-Match` revision).
 - `core/kata_core/api/routes/lesson_check.py:54` `POST /lesson-check` (`lesson_check_route` `:55`); request `LessonCheckIn` `:26`, response `LessonCheckOut` `:44`.
 - `core/kata_core/lesson_check/checker.py:30` `ConceptCheck`, `:40` `check_lesson(conn, retriever, cfg, user_id, concept_ids)`, `:60` `_check_one` (the rule order below).
 - `core/kata_core/api/routes/marks.py:33` `GET /marks`, `:42` `PUT /marks/{topic_id}`, `:55` `DELETE /marks/{topic_id}`.
@@ -24,14 +26,17 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/auth/admin.py:32` `build_parser`, `:55` `run`, `:77` `main`; CLI `python3 -m kata_core.auth.admin` (`:91`).
 - `core/kata_core/api/routes/usage.py:33` `POST /usage` (`record_usage`, 204), `:40` `GET /usage` (`read_usage`, returns `UsageOut` `:27`); request model `UsageIn` `:23`.
 - `core/kata_core/storage/usage.py:14` `add_usage(conn, user_id, day, micro_usd)` - one atomic upsert, raises `ValueError` (`:17`) when negative; `:26` `get_usage(conn, user_id, day) -> (micro_usd, calls)`.
+- Trainer and mastery: see "Trainer (M5)" below for the routes, job kinds, tables and mastery rules.
 - `core/migrations/0004_usage.sql` table `usage_daily` `:4` (PK `user_id, day`; `micro_usd` bigint CHECK `>= 0`; `calls` integer).
 - `core/kata_core/importer/skill_list.py:45` `parse(text)`, `:73` `import_list(conn, user_id, text)`, `:23` `ParseError`.
-- `core/kata_core/jobs/queue.py:34` `enqueue`, `:46` `claim_next` (lease), `:76` `complete`, `:94` `fail`, `:104` `get_job`.
+- `core/kata_core/jobs/queue.py:40` `enqueue(conn, user_id, payload, kind=...)`, `:58` `claim_next(..., kinds)` (lease), `:89` `complete` (returns bool), `:107` `store_output` (returns `Job`), `:125` `fail`, `:135` `get_job`. `Job.kind` defaults to `tag` (`:20` `DEFAULT_KIND`).
+- `core/kata_core/jobs/runner.py:40` `Registry` (`handlers`, `output_hooks`), `:45` `load_registry()` (imports every `kata_core.<pkg>.job_kinds`; a kind registered twice raises `ValueError`), `:100` `run_once(conn, registry, now, lease_seconds)` (claims one job with a handler; a handler error marks it failed), `:128` `run_output_hook`, `:141` `serve(...)`, `:167` `run_forever(cfg, registry)`.
+- `core/kata_core/jobs/__main__.py:17` `main` - entry for `python -m kata_core.jobs` (core-run job runner; `run_forever`).
 - `core/kata_core/storage/provision.py:34` `connect`, `:52` `create_database`, `:58` `drop_database`, `:70` `migrate`.
 - `core/kata_core/storage/devices.py:13` `add_device`, `:30` `find_by_token_hash`, `:46` `revoke_device`.
 - `core/kata_core/storage/users.py:15` `create_user`, `:41` `create_enrolment`, `:57` `consume_enrolment`.
 - `core/kata_core/storage/marks.py:15` `set_mark`, `:46` `is_known`.
-- `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:19` `create_concept`, `:35` `concept_visible`, `:49` `set_concept_mark`, `:70` `list_concept_marks_detail`, `:87` `get_concept_mark_detail`, `:103` `clear_concept_mark`, `:112` `concept_label`.
+- `core/kata_core/storage/concepts.py:16` `CONCEPT_STATES`, `:17` `MARK_SOURCES` (`user`, `trainer`), `:20` `create_concept`, `:36` `concept_visible`, `:50` `set_concept_mark(..., source=...)`, `:75` `concept_mark_source`, `:86` `list_concept_marks_detail`, `:103` `get_concept_mark_detail`, `:119` `clear_concept_mark`, `:128` `concept_label`.
 - `core/kata_core/storage/taxonomy.py:27` `ensure_topic`, `:48` `add_alias`, `:64` `topic_visible`, `:73` `find_topic`.
 - `core/migrations/0001_init.sql` tables: `users` `:4`, `enrolment_codes` `:10`, `devices` `:18`, `categories` `:27`, `topics` `:32`, `topic_aliases` `:44`, `marks` `:51`, `jobs` `:59`.
 - `core/migrations/0002_concepts.sql` tables: `concepts` `:5` (unique label index per topic and owner at `:14`), `concept_marks` `:17` (PK `user_id, concept_id`; cascade on user delete).
@@ -78,6 +83,15 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/delivery/messages.py` - message queue: enqueue, once-only delivery, policy decisions as messages.
 - `core/migrations/0006_events.sql` - `event` and `message` tables.
 - `core/migrations/0007_token_scope.sql` - `devices.scope` (`api` default, or `mcp`); pre-existing tokens stay `api`.
+- `core/migrations/0008_job_kind.sql` - `jobs.kind` (default `tag`), `jobs.output` (jsonb) and `jobs_kind_status` index.
+- `core/migrations/0009_trainer.sql` - `course` (status `queued`, `generating`, `building`, `ready`, `failed`), `course_file`, `course_artifact`, `course_item_map`.
+- `core/migrations/0010_mastery.sql` - `concept_marks.source` (`user` or `trainer`), `trainer_evidence`, `concept_mastery`; also creates `trainer_progress`, which no code reads or writes.
+- `core/migrations/0011_progress_doc.sql` - `trainer_progress_doc` (`course_id` primary key, `user_id`, `revision`, `doc`).
+- `core/kata_core/trainer/` and `core/kata_core/knowledge/` - course generation, progress saves, mastery rules (see "Trainer (M5)").
+- `core/migrations/0012_syllabus.sql` - `syllabus`, `syllabus_module`, `syllabus_module_concept`.
+- `core/migrations/0013_tracks.sql` - `track`, `track_item`, `planning_budget`, `decision_point`.
+- `core/kata_core/planning/` - planning (see "Planning (M5)"): `syllabus_store.py`, `tracks_store.py` (every query filters by `user_id`), `triage.py` and `allocate.py` (pure), `plan.py` (`build_plan`), `decisions.py` (`open_point`, `decide`), `syllabus_flow.py`, `job_kinds.py`.
+- `core/kata_core/importer/syllabus.py` - syllabus text to modules (`parse_modules`) and extracted-module check (`validate_extracted`); pure, no database.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
 - `core/migrations/0003_retrieval.sql` - retrieval entries (full-text plus optional embedding).
@@ -93,7 +107,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Import is atomic: a bad line returns 422 with line number and changes nothing (`docs/api.md`).
 - Cross-user access returns "not found", not "forbidden" (`get_job`, `complete`).
 - Private topics and aliases belong to their creator; shared topics are visible to all users.
-- Concept marks are private: every `concept_marks` row carries `user_id`, and `GET /concepts/marks` returns only the caller's rows. A concept is visible when its topic is visible and it is shared or owned by the caller (`concept_visible`, `core/kata_core/storage/concepts.py:35`); a mark on a hidden concept gets 404 (`LookupError` in `set_concept_mark`).
+- Concept marks are private: every `concept_marks` row carries `user_id`, and `GET /concepts/marks` returns only the caller's rows. A concept is visible when its topic is visible and it is shared or owned by the caller (`concept_visible`, `core/kata_core/storage/concepts.py:36`); a mark on a hidden concept gets 404 (`LookupError` in `set_concept_mark`).
 - `pyproject.toml:5` comment says "stdlib only", but `pyproject.toml:6` lists fastapi, psycopg, httpx, uvicorn. Comment is stale (code fix outside docs/).
 - Migration files match `MIGRATION_GLOB` (`[0-9][0-9][0-9][0-9]_*.sql`, `core/kata_core/storage/provision.py:21`); applied state is tracked in `schema_migrations` (`core/kata_core/storage/provision.py:20`).
 - Retrieval entries are private per owner or shared (`owner_user_id` NULL). Both the keyword and the vector side filter on `owner_user_id IS NULL OR owner_user_id = <caller>`, so a private entry of one user never reaches another (`core/kata_core/retrieval/store.py:45`, `core/kata_core/retrieval/retriever.py:78`).
@@ -124,9 +138,51 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 
 ## Depends on / used by
 - Depends on: `config` (Config), Postgres via psycopg, FastAPI.
+- Trainer: `trainer/` and `knowledge/` use `jobs/queue.py` (`enqueue`, `complete`, `fail`), `jobs/runner.py` (`Handler`, `OutputHook`), `journal/store.py` (`write_entry`), `storage/concepts.py` (marks and visibility), and the external trainer command from `[trainer] command`.
 - Events: `events/` and `delivery/` use `policy` (`Policy.observe`) and `journal/store.py` (`write_entry`); `api/routes/events.py` wires them.
 - MCP depends on: `egress/scanner.py` (`scan`), `journal/store.py` (`write_entry`), `retrieval/retriever.py` (`Retriever`), `storage/concepts.py` (`list_concept_marks_detail`), `auth/service.py` (`authenticate`, scope `mcp`).
 - Used by: `tests/core/` (API and repository tests), `scripts/db/kata_db.py` (provisioning). Model worker client: TODO(verify), not found in repo.
+
+## Trainer (M5)
+Course generation, progress saves and the mastery they move. Packages: `core/kata_core/trainer/`, `core/kata_core/knowledge/`, the job runner `core/kata_core/jobs/runner.py`. Feature flag `[trainer] enabled`. The planning sections of the config are described under "Planning (M5)".
+Flow:
+1. `POST /v1/courses` (`core/kata_core/api/routes/courses.py:100`) picks concepts: the named ids, else gaps (non-`known` and score below `[knowledge] known_threshold`), ordered learning, new, score, id, capped by `[trainer] max_concepts` (`core/kata_core/trainer/gaps.py:20` `select_gaps`). Course row (`queued`) and a `course.generate` job are written in one transaction. 422 when no gap or unknown id.
+2. The worker's `course.generate` handler (`worker/kata_worker/handlers/course.py:40`) posts `{"items": [{concept_id, prompt, answer}]}` to `POST /jobs/{id}/output`.
+3. Output hook `generate_output_hook` (`core/kata_core/trainer/job_kinds.py:30`) runs `check_drafts` (`:57`): concept ids must be in the job's set, text non-empty, at most 2000 characters, no control characters. Good drafts become `course_file` rows (`drafts/NNNN.json`), status `building`, and a `course.build` job. Bad drafts set status `failed` (`fail_course`, `core/kata_core/trainer/build.py:171`).
+4. `course.build` handler (`core/kata_core/trainer/build.py:51` `handle` -> `run_build` `:61`) runs the trainer CLI (`[trainer] command`; `SubprocessTrainerCli` `core/kata_core/trainer/cli.py:41`; subcommands `next-id`, `add`, `validate`, `lock`, `build`; each must print a JSON object). It keeps the valid items, fails the course below `[trainer] min_items`, caps artifacts at `max_artifact_bytes`, writes `course_artifact` and `course_item_map` (item id to concept id), then status `ready`. Any `TrainerError` or `BuildRejected` sets `failed` with the reason.
+5. Progress: `PUT /v1/courses/{id}/progress` (`core/kata_core/api/routes/course_progress.py:132`) takes `{"items": {"<item_id>": {"ok": n, "bad": n}}}`. The save is a compare-and-swap on `revision` (`core/kata_core/trainer/progress.py:82` `save_progress`): 428 without `If-Match`, 412 with the current document on mismatch, 413 above `[trainer] max_progress_bytes`, 409 unless the course is `ready`.
+6. Evidence: each item whose `ok` or `bad` rose writes one `trainer_evidence` row (dedup by the new counters) and calls `apply_evidence_delta` (`core/kata_core/knowledge/store.py:60`). A falling counter writes nothing.
+7. Mastery (`knowledge/mastery.py`, pure): start from the stored score, or `[knowledge] base_*` for the concept's mark state (`base_score` `:21`); delta `trainer_step * (ok - bad)` clamped to `trainer_max_step` (`step_delta` `:33`); clamp to [0, 1]; state by `known_threshold` and `learning_threshold` (`state_for` `:45`).
+8. Marks: the trainer writes the concept mark with source `trainer` when the concept has no mark or a trainer mark. A user mark that disagrees is kept until `[knowledge] assertion_hold` contrary trainer updates, then overwritten (`hold_overrides` `:56`). Every update journals `knowledge.trainer_update` (`TRAINER_UPDATE_KIND`, `core/kata_core/knowledge/store.py:20`).
+9. Job runner: `python -m kata_core.jobs` (`core/kata_core/jobs/__main__.py:17`) runs `run_forever` (`core/kata_core/jobs/runner.py:167`). `load_registry` (`:45`) imports every `kata_core.<pkg>.job_kinds` module; `trainer/job_kinds.py` provides `HANDLERS` (`course.build`) and `OUTPUT_HOOKS` (`course.generate`). `run_once` (`:100`) leases one core-run job, runs it in a savepoint, and marks it done or failed. Poll `[jobs] runner_poll_seconds`.
+
+Invariants and gotchas (trainer):
+- Course and progress routes are per user: `course.user_id` comes from the token; another user's course is 404.
+- A progress save writes all evidence and the revision in one transaction; a `LookupError` (course not the user's) rolls it back.
+- Evidence rows are unique per `(user, course, item, new counters)`: replaying the same document changes nothing.
+- A concept marked by the user is never changed by evidence until the hold count is reached; `source` is what tells user and trainer marks apart (`core/kata_core/storage/concepts.py:17`, migration `0010`).
+- `[knowledge]` thresholds must satisfy `learning <= known` (`mastery.state_for` raises otherwise).
+- `course.build` loads config inside the handler (`core/kata_core/trainer/build.py:53`), so the runner process needs `KATA_CONFIG`.
+- The trainer binary is a config-supplied command, not part of this repo: `[trainer] command = ["kata-trainer"]` is a placeholder name (`config/kata.example.toml:94`).
+
+## Planning (M5)
+Syllabi, triage, study tracks, the weekly budget and decision points. Packages: `core/kata_core/planning/`, `core/kata_core/importer/syllabus.py`; migrations `0012_syllabus.sql` and `0013_tracks.sql` (`0011` is the trainer progress document).
+Feature flags: `[syllabus] enabled` guards `/v1/syllabi`; `[planning] enabled` guards `/v1/plan`, `/v1/tracks` and `/v1/decision-points`. A disabled feature answers 404 `feature disabled: <name>` (`core/kata_core/api/deps.py:46` `require_feature`).
+Routes: `POST /v1/syllabi`, `GET /v1/syllabi` (paged), `GET` and `DELETE /v1/syllabi/{id}` (`core/kata_core/api/routes/syllabi.py`); `GET /v1/plan`, `GET` and `PUT /v1/plan/budget` (`routes/plan.py`); `POST` and `GET /v1/tracks`, `GET`, `PATCH` and `DELETE /v1/tracks/{id}`, `POST /v1/tracks/{id}/decision-points`, `POST /v1/decision-points/{id}/decide` (`routes/tracks.py`).
+Flow:
+1. Import: `POST /v1/syllabi` (`core/kata_core/api/routes/syllabi.py:111`) calls `import_syllabus` (`planning/syllabus_flow.py`). `parse_modules` (`importer/syllabus.py`) splits the text on markdown headings, else numbered lines, else one module for the whole text; input above `[syllabus] max_bytes` is refused. Each module is linked to the user's visible concepts whose label occurs in it (`syllabus_module_concept`).
+2. Extraction: when no structure is found and `[syllabus] model_extract` is on, a `syllabus.extract` job is queued in the same transaction (`core/kata_core/api/routes/syllabi.py:131`) and the answer is 202. The worker's `syllabus.extract` handler (`worker/kata_worker/handlers/syllabus.py:43`) posts the modules; the core output hook (`planning/job_kinds.py`) keeps them only when each body is a substring of the source and each title is short enough (`validate_extracted`), else it falls back to one module for the whole text.
+3. Triage (`planning/triage.py`, pure, no clock): per module, no matched concept gives `new`; every matched score at or above `[knowledge] known_threshold` gives `known`; any score at or above `learning_threshold` gives `partly_known`; otherwise `new`. Action: `known` gives `skip`; `partly_known` gives `skim` when the known share is at or above `[planning] skim_share`, else `practice`; `new` gives `learn`. Effort is the action's minutes (`[planning] minutes_skip`, `minutes_skim`, `minutes_practice`, `minutes_learn`) times the module's units (`ceil(words / words_per_unit)`, at least 1). `triage_view` writes nothing.
+4. Tracks and budget: a track has an optional deadline, priority and ordered items (a module or a label). `planning_budget` holds the weekly minutes per user (`GET` and `PUT /v1/plan/budget`).
+5. Allocation (`planning/allocate.py`, pure, clock injected): capacity of a deadline is `floor(minutes_per_week * days / 7)`, where `days` is the whole days from today to the deadline, never below 0. Active tracks run in order (deadline, -priority, id); items run in position order. An item is allocated while the running total stays within the capacity of its track's deadline. The first item that does not fit, and every later item of that track, is deferred; other tracks are still tried.
+6. Decision points (D12): `POST /v1/tracks/{id}/decision-points` opens a point at a track position (`open_point`). An open point holds its track's items after that position (`plan.py` `build_plan`, passed to `allocate` as `hold_after`). `POST /v1/decision-points/{id}/decide` (`decisions.py` `decide`) changes the track and writes the `plan.decision` journal entry in one transaction.
+7. Plan: `GET /v1/plan` (`planning/plan.py` `build_plan`) loads the user's tracks, budget and open points, then calls `allocate`. The clock is injected, so tests pass a fixed date.
+
+Invariants and gotchas (planning):
+- Every planning query filters by `user_id` from the token. Another user's syllabus, track, budget or point reads as not found (404) and writes as nothing (`syllabus_store.py`, `tracks_store.py`).
+- Module and item rows are written only after the ownership check passes.
+- `allocate` never plans more minutes than a track's deadline capacity allows, and never plans an item after an open decision point on its track (tests: `tests/core/test_allocate.py`, `tests/core/test_plan_service.py`).
+- Triage and allocation are pure: no database, no wall clock. Only the route and the store touch I/O.
 
 ## Device tool (`core/kata_device/`)
 

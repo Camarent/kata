@@ -41,6 +41,41 @@ def test_next_job_returns_none_on_204(fake_core: FakeCore) -> None:
     assert client.next_job() is None
 
 
+def test_next_job_sends_one_kind_param_per_kind_and_returns_its_kind(fake_core: FakeCore) -> None:
+    fake_core.enqueue({"id": 9, "kind": "course.generate", "payload": "outline"})
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    job = client.next_job(("tag", "course.generate"))
+
+    assert job == Job(id=9, payload="outline", kind="course.generate")
+    assert [r.path for r in fake_core.requests] == ["/jobs/next?kind=tag&kind=course.generate"]
+
+
+def test_next_job_kind_defaults_to_tag_when_core_omits_it(fake_core: FakeCore) -> None:
+    fake_core.enqueue({"id": 9, "payload": "text"})
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    assert client.next_job() == Job(id=9, payload="text", kind="tag")
+
+
+def test_output_posts_object_under_output_key_with_bearer_header(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
+
+    client.output(7, {"syllabus": ["intro"]})
+
+    [req] = fake_core.requests
+    assert (req.method, req.path) == ("POST", "/jobs/7/output")
+    assert req.authorization == f"Bearer {fake_core.token}"
+    assert json.loads(req.body) == {"output": {"syllabus": ["intro"]}}
+
+
+def test_output_with_wrong_token_raises(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg(fake_core.url), token="wrong")
+
+    with pytest.raises(CoreError, match="output -> 401"):
+        client.output(7, {"x": 1})
+
+
 def test_report_posts_category_and_topic_with_bearer_header(fake_core: FakeCore) -> None:
     client = CoreClient(_cfg(fake_core.url), token=fake_core.token)
 

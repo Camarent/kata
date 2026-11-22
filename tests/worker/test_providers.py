@@ -68,7 +68,14 @@ def _provider(base_url: str, timeout: str | None = None) -> LocalProvider:
 
 
 def test_task_classes_are_fixed() -> None:
-    assert TASK_CLASSES == ("tag", "explain", "summary", "batch")
+    assert TASK_CLASSES == (
+        "tag",
+        "explain",
+        "summary",
+        "batch",
+        "generate_course",
+        "extract_syllabus",
+    )
 
 
 def test_local_provider_identity_and_protocol() -> None:

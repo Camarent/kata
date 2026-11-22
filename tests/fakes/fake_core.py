@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 BEARER_PREFIX = "Bearer "
+# Kind claimed when a pull names none, as the core does (D2).
+DEFAULT_KIND = "tag"
 
 
 @dataclass
@@ -44,9 +48,13 @@ class FakeCore:
         with self._lock:
             self.requests.append(req)
 
-    def pop_job(self) -> dict[str, Any] | None:
+    def pop_job(self, kinds: Collection[str] = (DEFAULT_KIND,)) -> dict[str, Any] | None:
+        """Remove and return the oldest queued job whose kind is named; jobs without a kind are `tag`."""
         with self._lock:
-            return self.queue.pop(0) if self.queue else None
+            for index, job in enumerate(self.queue):
+                if job.get("kind", DEFAULT_KIND) in kinds:
+                    return self.queue.pop(index)
+            return None
 
     def add_usage(self, micro_usd: int) -> None:
         with self._lock:
@@ -113,9 +121,11 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
             if not self._authorized():
                 self._send(401, {"error": "unauthorized"})
                 return
-            parts = self.path.strip("/").split("/")
-            if method == "GET" and self.path == "/jobs/next":
-                job = core.pop_job()
+            url = urlsplit(self.path)
+            parts = url.path.strip("/").split("/")
+            if method == "GET" and url.path == "/jobs/next":
+                kinds = parse_qs(url.query).get("kind") or [DEFAULT_KIND]
+                job = core.pop_job(kinds)
                 if job is None:
                     self._send(204)
                 else:
@@ -124,7 +134,9 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
             if self.path == "/usage" and method in ("GET", "POST"):
                 self._usage(method, body)
                 return
-            is_outcome = len(parts) == 3 and parts[0] == "jobs" and parts[2] in ("result", "fail")
+            is_outcome = (
+                len(parts) == 3 and parts[0] == "jobs" and parts[2] in ("result", "fail", "output")
+            )
             if method == "POST" and is_outcome:
                 self._send(204)
                 return

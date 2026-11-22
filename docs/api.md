@@ -8,6 +8,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 - Bodies are JSON unless noted. Responses are JSON unless the status is 204 (no body).
 - Every route except `POST /auth/enrol` needs `Authorization: Bearer <token>`. A missing or malformed header returns 401 `missing bearer token`. An unknown or revoked token returns 401 `invalid or revoked token`.
 - The user id always comes from the token, never from the body or the path.
+- A route marked with a feature (`trainer`, `syllabus`, `planning`) answers 404 `{"detail": "feature disabled: <name>"}` when that feature is off in the config (`[<name>] enabled`).
 
 ## Routes
 
@@ -21,10 +22,31 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/topics/{topic_id}/aliases` | bearer | `{"alias": str}` | 200 `{"id", "topic_id", "alias", "private": true}` | 404 topic not found |
 | POST | `/import` | bearer | raw UTF-8 text, skill list format (see below) | 200 `{"created_topics": int, "marked": int}` | 422 bad line or body not UTF-8; nothing changes |
 | POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | |
-| GET | `/jobs/next` | bearer | none | 200 `{"id": int, "payload": str}` | 204 nothing queued |
+| GET | `/jobs/next?kind=` | bearer | query: repeated `kind`, optional | 200 `{"id": int, "payload": str}` | 204 nothing queued; no `kind` means `tag` only |
 | POST | `/jobs/{job_id}/result` | bearer | `{"category": str, "topic": str}` | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/fail` | bearer | none | 204 | 404 job not found or not leased by the caller |
+| POST | `/jobs/{job_id}/output` | bearer | `{"output": {...}}` (JSON object) | 204; runs the kind's output hook in the same transaction | 404 job not found or not leased by the caller; 413 output above `[jobs] max_output_bytes`; 422 the job kind has no output hook (nothing stored) |
 | GET | `/jobs/{job_id}` | bearer | none | 200 `{"status": str, "topic": {"id", "category", "label"} or null, "known": bool or null}` | 404 job not found |
+| POST | `/v1/courses` | bearer, `trainer` feature | `{"concept_ids": [int, ...] \| null, "title": str = ""}` | 202 course fields plus `"job_id"` | 422 the gap rule finds nothing to study, or a named concept is not visible to the caller |
+| GET | `/v1/courses?limit=50&before_id=N` | bearer, `trainer` feature | query: `limit` 1..100 (default 50), `before_id` optional | 200 `{"items": [course, ...], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..100; `next_before_id` is null unless the page is full |
+| GET | `/v1/courses/{course_id}` | bearer, `trainer` feature | none | 200 course: `{"id", "title", "status", "concept_ids", "error", "created_at", "updated_at"}` | 404 course not found or not the caller's |
+| DELETE | `/v1/courses/{course_id}` | bearer, `trainer` feature | none | 204 | 404 course not found or not the caller's |
+| GET | `/v1/courses/{course_id}/progress` | bearer, `trainer` feature | none | 200 `{"revision": int, "doc": {...}}`, with `ETag: "<revision>"` | 404 course not found or not the caller's |
+| PUT | `/v1/courses/{course_id}/progress` | bearer, `trainer` feature; `If-Match: "<revision>"` required | progress document JSON object | 200 `{"revision", "evidence_written", "skipped_items"}`, with `ETag` | 428 no `If-Match`; 400 `If-Match` not a revision number or body malformed; 413 above `[trainer] max_progress_bytes`; 412 revision mismatch, body `{"revision", "doc"}` holds the current document; 409 course not ready; 404 course not found or not the caller's |
+| POST | `/v1/syllabi` | bearer, `syllabus` feature | `{"title": str, "text": str}` | 201 syllabus with its modules and triage; 202 `{...syllabus, "job_id": int}` when `[syllabus] model_extract` is on and the parser found no structure (queues `syllabus.extract`) | 413 text over `[syllabus] max_bytes`; 422 blank text or parse error |
+| GET | `/v1/syllabi?limit=50&before_id=N` | bearer, `syllabus` feature | query: `limit` 1..100 (default 50), `before_id` optional | 200 `{"items": [{"id", "title", "status", "created_at", "module_count"}], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..100; `next_before_id` is null unless the page is full |
+| GET | `/v1/syllabi/{syllabus_id}` | bearer, `syllabus` feature | none | 200 syllabus: `{"id", "title", "status", "created_at", "modules": [{"id", "position", "title", "triage", "action", "effort_minutes"}]}` | 404 syllabus not found or not the caller's |
+| DELETE | `/v1/syllabi/{syllabus_id}` | bearer, `syllabus` feature | none | 204 | 404 syllabus not found or not the caller's |
+| POST | `/v1/tracks` | bearer, `planning` feature | `{"name": str, "deadline": date, "priority": int = 0, "items": [item, ...] = []}`; item: `module_id` int or `label` + `minutes` int, `action` str = `learn` | 201 track; journal `plan.track_changed` (`change` `created`) | 422 invalid body, or an item `module_id` not in the caller's syllabus |
+| GET | `/v1/tracks?limit=50&before_id=N` | bearer, `planning` feature | query: `limit` 1..100 (default 50), `before_id` optional | 200 `{"items": [track, ...], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..100; `next_before_id` is null unless the page is full |
+| GET | `/v1/tracks/{track_id}` | bearer, `planning` feature | none | 200 track: `{"id", "name", "deadline", "priority", "status", "items": [{"position", "module_id", "label", "action", "minutes"}], "created_at", "updated_at"}` | 404 track not found or not the caller's |
+| PATCH | `/v1/tracks/{track_id}` | bearer, `planning` feature | any of `name`, `deadline`, `priority`, `status` (`active`, `paused`, `dropped`), `items` (replaces all items; same item shape as POST) | 200 track; journal `plan.track_changed` (`change` `updated`) | 404 track not found or not the caller's; 422 invalid body or foreign module |
+| DELETE | `/v1/tracks/{track_id}` | bearer, `planning` feature | none | 204; deletes the track with its items and points; journal `plan.track_changed` (`change` `deleted`) | 404 track not found or not the caller's |
+| POST | `/v1/tracks/{track_id}/decision-points` | bearer, `planning` feature | `{"after_position": int >= 0, "due_on": date}` | 201 point: `{"id", "track_id", "after_position", "due_on", "status", "choice", "target_track_id", "decided_at", "created_at"}`; no journal entry | 404 track not found or not the caller's; 422 invalid body |
+| POST | `/v1/decision-points/{point_id}/decide` | bearer, `planning` feature | `{"choice": "continue" \| "switch" \| "drop", "target_track_id": int \| null}` | 200 point (same shape as above); journal `plan.decision` with `point_id`, `choice`, `target_track_id`, in the same transaction as the track change | 404 point missing, not the caller's, already decided, or a switch target that is not the caller's track; 422 unknown `choice` |
+| GET | `/v1/plan/budget` | bearer, `planning` feature | none | 200 `{"minutes_per_week": int \| null}`; null when no budget is set | |
+| PUT | `/v1/plan/budget` | bearer, `planning` feature | `{"minutes_per_week": int >= 0}` | 200 `{"minutes_per_week": int}`; journal `plan.budget_changed` | 422 negative or non-integer minutes |
+| GET | `/v1/plan` | bearer, `planning` feature | none | 200 `{"tracks": [{"track_id", "allocated": [{"position", "minutes"}], "deferred": [int]}]}`: per track, the placed items and the deferred item positions; no journal entry | |
 | GET | `/marks` | bearer | none | 200 list of `{"topic_id", "category", "topic", "status"}` | |
 | PUT | `/marks/{topic_id}` | bearer | `{"status": "known"}` | 200 `{"topic_id", "category", "topic", "status"}` | 404 topic not found |
 | DELETE | `/marks/{topic_id}` | bearer | none | 204 | 404 mark not found |
@@ -48,6 +70,7 @@ Notes:
 - Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.
 - A concept made through `POST /concepts` belongs to its creator. A repeated label under the same topic and owner hits the unique index; the route does not map that error to a 4xx yet.
 - `POST /lesson-check` gives the state of each concept for the caller. `state` is `known`, `learning` or `abstain` from retrieval; a caller's mark gives its own state, which may be `new`. Retrieval never gives `new`: it cannot prove absence. `source` is `mark` when the caller's concept mark decides; then `evidence` is the mark's text. Otherwise `source` is `retrieval` and `evidence` is a list of `{"source_ref", "score"}` hits. An abstain has `source` `none` and `evidence` `[]`. The user id comes from the token, never from the body.
+- `POST /v1/courses` queues the worker job `course.generate`. Its output hook checks the drafts with the trainer and queues `course.build`, which builds the course or sets its `error`. The course `status` follows these two jobs.
 
 ## Events and messages
 
