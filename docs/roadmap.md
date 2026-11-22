@@ -73,13 +73,26 @@ as a diagnostic, hook installer command).
 real MCP client; a real terminal test on the owner's PC; event retention (no expiry of stored
 events yet).
 
-## Milestone 5: practice courses and planning
+## Milestone 5: practice courses and planning (done)
 
 **Scope.** Gap to mini-course through the trainer tool with a two-way loop, triage of a
 syllabus, time-boxed tracks sharing one time budget, decision points between tracks.
 
 **Success criteria.** Results from the trainer update the knowledge model. A syllabus import
 yields a per-module action plan that fits the time budget.
+
+## Milestone 6: deployment on the web VM
+
+**Scope.** Run kata on the owner's Proxmox VM `web` (Ubuntu Server LTS, 2 cores, 3 GB memory,
+32 GB disk) with Docker, Tailscale and no public access. Images for core and migrate, a compose
+stack (core, migrate, Postgres, reverse proxy with TLS over the tailnet), a nightly encrypted
+dump, a tested restore drill, a provisioning script and a runbook. Nothing waits for the VM:
+everything is tested without it.
+
+**Success criteria.** One documented command sequence turns a fresh Ubuntu Server VM with
+Docker and Tailscale into a running kata (core, migrate, Postgres, reverse proxy with TLS over
+the tailnet). A deep health check passes. A nightly encrypted dump runs. The restore drill
+(design 4.3 steps 3 to 5) is scripted and tested against a temporary Postgres.
 
 ## Later
 

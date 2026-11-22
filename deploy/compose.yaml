@@ -1,0 +1,136 @@
+# Compose stack for the VM: core, migrate (one-shot), postgres and caddy (reverse proxy).
+#   Up:   set -a; . deploy/versions.env; set +a; docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d
+#   (versions.env supplies the image build args; the env file supplies the limits.)
+#   Ports: only caddy publishes a port, on KATA_BIND_ADDR (default loopback). Core and postgres
+#   publish nothing. Override any ${VAR} with the environment; the env file sets the limits.
+# Secrets: files under deploy/secrets/ (layout in deploy/secrets.example/README.md), mounted at
+# /run/secrets/<name>. No password or token is written in this file.
+# Config: deploy/kata.host.toml is mounted read-only as /config/kata.toml (KATA_CONFIG).
+
+name: kata
+
+x-core-env: &core-env
+  KATA_CONFIG: /config/kata.toml
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?fill in deploy/versions.env}@${POSTGRES_DIGEST:?fill in deploy/versions.env}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kata_dev
+      POSTGRES_DB: kata_dev
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - data
+    mem_limit: ${KATA_MEM_POSTGRES:?set KATA_MEM_POSTGRES, e.g. with --env-file deploy/env/small.env}
+    cpus: ${KATA_CPU_POSTGRES:?set KATA_CPU_POSTGRES, e.g. with --env-file deploy/env/small.env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U kata_dev -d kata_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    image: kata:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE}
+        PY_BASE_DIGEST: ${PY_BASE_DIGEST}
+        GITLEAKS_VERSION: ${GITLEAKS_VERSION}
+        GITLEAKS_SHA256: ${GITLEAKS_SHA256}
+        TRAINER_URL: ${TRAINER_URL}
+        TRAINER_SHA256: ${TRAINER_SHA256}
+        EMBED_MODEL_ID: ${EMBED_MODEL_ID}
+        EMBED_MODEL_REVISION: ${EMBED_MODEL_REVISION}
+    restart: "no"
+    environment: *core-env
+    # Reads the password from the secret file into the env var core reads (core reads no *_FILE).
+    command:
+      - sh
+      - -c
+      - export KATA_DATABASE_PASSWORD="$$(cat /run/secrets/postgres_password)" && exec python -m kata_core.migrate
+    secrets:
+      - postgres_password
+    volumes:
+      - ./kata.host.toml:/config/kata.toml:ro
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: ${KATA_MEM_CORE:?set KATA_MEM_CORE, e.g. with --env-file deploy/env/small.env}
+    cpus: ${KATA_CPU_CORE:?set KATA_CPU_CORE, e.g. with --env-file deploy/env/small.env}
+
+  core:
+    image: kata:local
+    restart: unless-stopped
+    environment: *core-env
+    command:
+      - sh
+      - -c
+      - export KATA_DATABASE_PASSWORD="$$(cat /run/secrets/postgres_password)" KATA_WORKER_TOKEN="$$(cat /run/secrets/worker_token)" && exec python -m kata_core
+    secrets:
+      - postgres_password
+      - worker_token
+    volumes:
+      - ./kata.host.toml:/config/kata.toml:ro
+    networks:
+      - data
+      - edge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: ${KATA_MEM_CORE:?set KATA_MEM_CORE, e.g. with --env-file deploy/env/small.env}
+    cpus: ${KATA_CPU_CORE:?set KATA_CPU_CORE, e.g. with --env-file deploy/env/small.env}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health/deep', timeout=4)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: ${CADDY_IMAGE:?fill in deploy/versions.env}@${CADDY_DIGEST:?fill in deploy/versions.env}
+    restart: unless-stopped
+    environment:
+      KATA_TAILNET_NAME: ${KATA_TAILNET_NAME:?set KATA_TAILNET_NAME, the node tailnet name}
+    depends_on:
+      core:
+        condition: service_healthy
+    ports:
+      - "${KATA_BIND_ADDR:-127.0.0.1}:443:443"
+    volumes:
+      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from `tailscale cert` run on the host (D19, see Caddyfile).
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - ${KATA_TAILSCALE_SOCKET_DIR:-/var/run/tailscale}:/var/run/tailscale:ro
+    networks:
+      - edge
+    mem_limit: ${KATA_MEM_PROXY:?set KATA_MEM_PROXY, e.g. with --env-file deploy/env/small.env}
+    cpus: ${KATA_CPU_PROXY:?set KATA_CPU_PROXY, e.g. with --env-file deploy/env/small.env}
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  worker_token:
+    file: ./secrets/worker_token
+
+networks:
+  data:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+  caddy-data: {}

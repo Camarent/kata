@@ -67,6 +67,27 @@ def _migration_files(migrations_dir: Path) -> list[Path]:
     return sorted(migrations_dir.glob(MIGRATION_GLOB), key=lambda path: path.name)
 
 
+def pending_migrations(
+    conn: psycopg.Connection[Any],
+    migrations_dir: Path | None = None,
+) -> list[str]:
+    """Versions in the migrations dir not yet recorded in the migrations table, in name order.
+
+    Read only. A missing migrations table means every version is pending; a missing
+    migrations dir raises FileNotFoundError.
+    """
+    directory = MIGRATIONS_DIR if migrations_dir is None else migrations_dir
+    available = [path.stem for path in _migration_files(directory)]
+    table_exists = conn.execute("SELECT to_regclass(%s)", (MIGRATIONS_TABLE,)).fetchone()
+    if table_exists is None or table_exists[0] is None:
+        return available
+    rows = conn.execute(
+        sql.SQL("SELECT version FROM {}").format(sql.Identifier(MIGRATIONS_TABLE))
+    ).fetchall()
+    done = {str(row[0]) for row in rows}
+    return [version for version in available if version not in done]
+
+
 def migrate(
     conn: psycopg.Connection[Any],
     migrations_dir: Path = MIGRATIONS_DIR,

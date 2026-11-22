@@ -26,6 +26,8 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 ## Key files
 - `core/kata_core/config.py` - loader, `Config`, cast rules.
 - `config/kata.example.toml` - reference values; every key must exist here.
+- `deploy/kata.host.toml` - host config template for the VM stack (M6). Its keys must exist in the example file: `scripts/deploy/validate_stack.py:140` `check_config_keys` checks it, run by `scripts/deploy/validate_stack.py:153` `main`.
+- `deploy/env/small.env` (3 GB VM) and `deploy/env/large.env` (real server) - named memory and CPU profiles, passed to compose with `--env-file` (see `docs/deployment.md`, Profiles).
 - `core/kata_core/api/deps.py` `require_feature` - feature sections with `enabled` (`[trainer]`) gate their routes.
 
 ## Invariants and gotchas

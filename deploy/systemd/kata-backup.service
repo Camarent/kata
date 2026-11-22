@@ -1,0 +1,11 @@
+[Unit]
+Description=kata nightly encrypted database dump
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Environment for deploy/backup.sh: KATA_BACKUP_DIR, KATA_BACKUP_PASSPHRASE_FILE, the
+# KATA_DATABASE_* connection and, optionally, KATA_BACKUP_TOMBSTONE_FILE and KATA_BACKUP_RETENTION_DAYS.
+EnvironmentFile=/etc/kata/backup.env
+ExecStart=/opt/kata/deploy/backup.sh
