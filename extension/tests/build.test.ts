@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import ts from "typescript";
+import { Script } from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /** `npm --prefix extension test` runs with the extension folder as cwd. */
@@ -11,14 +11,6 @@ const BUILD_TIMEOUT_MS = 120_000;
 const BROWSERS = ["firefox", "chrome"] as const;
 /** Files every browser output folder must contain. */
 const OUTPUT_FILES = ["manifest.json", "background.js", "content.js", "sidepanelBoot.js", "sidepanel.html"];
-
-/** True when a top-level statement is an import, an export, or carries an export modifier. */
-function isModuleSyntax(statement: ts.Statement): boolean {
-  if (ts.isImportDeclaration(statement)) return true;
-  if (ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) return true;
-  const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
-  return modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
-}
 
 function distPath(browser: string, file: string): string {
   return join(EXTENSION_DIR, "dist", browser, file);
@@ -41,9 +33,8 @@ describe("built extension", () => {
 
   it.each(BROWSERS)("dist/%s/content.js is a classic script: no top-level import or export", (browser) => {
     const source = readFileSync(distPath(browser, "content.js"), "utf8");
-    const file = ts.createSourceFile("content.js", source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
-    const offending = file.statements.filter(isModuleSyntax).map((statement) => statement.getText(file));
-    expect(offending).toEqual([]);
+    // A classic script compiles as one; a top-level import or export is a SyntaxError.
+    expect(() => new Script(source, { filename: "content.js" })).not.toThrow();
   });
 
   it("firefox manifest uses sidebar_action and the gecko id, not side_panel", () => {
