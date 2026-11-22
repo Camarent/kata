@@ -5,23 +5,26 @@ summary: Tagging worker (Python) - pulls queued blocks from the core, asks a loc
 # worker
 
 ## Purpose
-Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends its text through the provider router to a chat model, and posts `result` or `fail` back to the core. The worker never decides known/new; the core does.
+Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a handler, runs that handler, and posts `result`, `output` or `fail` back to the core. Kinds: `tag` (block tagging through the provider router to a chat model) and `course.generate` (item drafts for a course). The worker never decides known/new; the core does.
 `worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, a cloud policy (`Policy`) and a secret guard (`guarded`) that scans cloud text. `providers/cost.py` adds a daily cost cap (`capped`) for cloud calls, with spend kept on the core. The loop tags through `Router` (`worker/kata_worker/providers/router.py:60`), which walks the `[routing]` chain of the task class; `Policy`, `guarded` and `capped` gate each provider in that chain.
 
 ## Public surface
 - `worker/kata_worker/__main__.py:28` `main` - entry for `python -m kata_worker`; runs until SIGINT or SIGTERM (`:20` `_stop_on_signal`).
-- `worker/kata_worker/loop.py:25` `run_once(client, router) -> bool` - handles at most one job; `False` when idle; tags with task class `tag` (`:20` `TAG_CLASS`).
-- `worker/kata_worker/loop.py:49` `run_forever(cfg, stop_event)` - loop; waits `poll_interval_seconds` only when idle.
-- `worker/kata_worker/core_client.py:54` `CoreClient` - `next_job`, `report`, `fail`; errors raise `CoreError` (`:25`).
-- `worker/kata_worker/core_client.py:45` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
-- `worker/kata_worker/model.py:63` `ModelAdapter(config)`; `:71` `tag(block_text) -> (category, topic)`. Not called by the loop (`run_once` uses `parse_tag`, `worker/kata_worker/loop.py:32`); only `tests/worker/test_model.py` uses it.
+- `worker/kata_worker/loop.py:27` `run_once(client, router, handlers=HANDLERS) -> bool` - asks the core for one job of the handler kinds (`next_job(sorted kinds)`); `False` when idle; a job with no handler is failed; otherwise calls the handler of its kind.
+- `worker/kata_worker/loop.py:46` `run_forever(cfg, stop_event)` - loop; waits `poll_interval_seconds` only when idle.
+- `worker/kata_worker/handlers/__init__.py:21` `load_handlers() -> dict[str, Handler]` - finds every module in `handlers/` that defines `KIND` and `handle`; two modules with one kind raise `RuntimeError`.
+- `worker/kata_worker/handlers/tag.py:15` `KIND = "tag"`, `:16` `TAG_CLASS = "tag"`, `:21` `handle(job, router, client)` - tags the job text, reports `(category, topic)` or fails the job.
+- `worker/kata_worker/handlers/course.py:15` `KIND = "course.generate"`, `:16` `COURSE_CLASS = "generate_course"`, `:26` `parse_drafts(reply)`, `:40` `handle(job, router, client)` - posts `{"items": [...]}` as the job output (`CoreClient.output`) or fails the job.
+- `worker/kata_worker/core_client.py:57` `CoreClient` - `next_job` (`:86`), `report` (`:108`), `output` (`:116`), `fail` (`:122`); errors raise `CoreError` (`:27`).
+- `worker/kata_worker/core_client.py:48` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
+- `worker/kata_worker/model.py:63` `ModelAdapter(config)`; `:71` `tag(block_text) -> (category, topic)`. Not called by the loop (the `tag` handler uses `parse_tag`, `worker/kata_worker/handlers/tag.py:25`); only `tests/worker/test_model.py` uses it.
 - `worker/kata_worker/model.py:46` `parse_tag(reply) -> (category, topic)` - strict reply parser used by `run_once`.
 - `worker/kata_worker/model.py:21` `ModelError`; `:36` `reply_content(response)` - reads the chat reply text, shared with `LocalProvider`.
 - `worker/kata_worker/providers/router.py:60` `Router(chains, providers, policy, log)` - `route(task_class, system, user) -> Routed` (`:76`); tries each provider of the chain in order, first reply wins.
 - `worker/kata_worker/providers/router.py:38` `Routed` - `reply`, `provider` (name of the answering provider).
 - `worker/kata_worker/providers/router.py:33` `RouteExhausted(ProviderError)` - every provider skipped or failed; `:29` `RoutingError` - bad `[routing]` or chain.
 - `worker/kata_worker/providers/router.py:108` `build_router(cfg, ledger, env, audit, log) -> Router` - builds chains from `[routing]`, providers (`:97` `_build_providers`) and `Policy`.
-- `worker/kata_worker/providers/base.py:11` `TASK_CLASSES` = `("tag", "explain", "summary", "batch")`.
+- `worker/kata_worker/providers/base.py:11` `TASK_CLASSES` = `("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")`. `extract_syllabus` has no handler in the worker yet.
 - `worker/kata_worker/providers/base.py:19` `Provider` protocol - `name`, `is_cloud`, `complete(system, user) -> str` (`:25`); `ProviderError` at `:14`.
 - `worker/kata_worker/providers/local.py:15` `LocalProvider(config)` - `name = "local"`, `is_cloud = False`; `complete` at `:26`.
 - `worker/kata_worker/providers/anthropic.py:46` `AnthropicProvider(config, env, transport)` - `name = "anthropic"`, `is_cloud = True`; `complete` at `:68`.
@@ -29,13 +32,14 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `core/kata_core/egress/scanner.py:45` `scan(text) -> list[Finding]` - secret findings ordered by offset; `Finding(kind, offset)` at `:15`; fixed `RULES` at `:29`. Lives in core; the guard imports it (`worker/kata_worker/providers/guard.py:14`).
 - `worker/kata_worker/providers/guard.py:57` `guarded(inner, audit) -> GuardedProvider` - the only way to build a guarded provider; `GuardedProvider` at `:38` (`complete` at `:47`); `SecretBlocked(ProviderError)` at `:30`; `AuditEvent(kind, offset)` at `:20`; `AuditSink` at `:27`.
 - `worker/kata_worker/providers/cost.py:68` `CappedProvider(inner, ledger, model, cap, warn, log)` - `complete` at `:89`; built by `capped` (`:105`) from `[cost]`.
-- `worker/kata_worker/providers/cost.py:43` `Ledger` (Protocol) - `record_usage(micro_usd)` (`:46`), `usage_today() -> int` (`:48`); `CoreClient` implements it (`worker/kata_worker/core_client.py:110`, `:116`).
+- `worker/kata_worker/providers/cost.py:43` `Ledger` (Protocol) - `record_usage(micro_usd)` (`:46`), `usage_today() -> int` (`:48`); `CoreClient` implements it (`worker/kata_worker/core_client.py:128`, `:134`).
 - `worker/kata_worker/providers/cost.py:54` `estimate_tokens(text) -> int`; `:59` `cost_micro_usd(model, in_text, out_text) -> int` (integer micro-USD, rounded up).
 - `worker/kata_worker/providers/cost.py:20` `PRICES` - pinned `(input, output)` micro-USD per 1M tokens, keyed by model name; `:29` `PricingError(ProviderError)`; `:33` `CapReached(ProviderError)` with `spent` and `cap`.
 - `worker/kata_worker/providers/__init__.py:7` `__all__` - re-exports `TASK_CLASSES`, `GuardedProvider`, `LocalProvider`, `Provider`, `ProviderError`, `SecretBlocked`, `guarded` only (`AnthropicProvider`, `Policy` and `scan` are imported from their modules).
 
 ## Key files
-- `worker/kata_worker/loop.py` - pull loop and per-job handling.
+- `worker/kata_worker/loop.py` - pull loop; claims the handler kinds and calls the handler of the job's kind.
+- `worker/kata_worker/handlers/` - one module per job kind (`tag.py`, `course.py`), discovered by `load_handlers`.
 - `worker/kata_worker/core_client.py` - HTTP client to the core, loopback-only.
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
 - `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
@@ -49,11 +53,13 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
-- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:38` and `:41`).
-- The token comes from an env var, never from the config file; a missing variable raises `ValueError` (`worker/kata_worker/core_client.py:50`).
-- A tagging exception fails only that job (`worker/kata_worker/loop.py:37` `client.fail`); the worker keeps running.
+- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:41` and `:44`).
+- The token comes from an env var, never from the config file; a missing variable raises `ValueError` (`worker/kata_worker/core_client.py:53`).
+- A tagging or generation exception fails only that job (`worker/kata_worker/handlers/tag.py:30`, `worker/kata_worker/handlers/course.py:49` `client.fail`); the worker keeps running.
+- A job kind has one handler: the loop asks the core only for kinds in `load_handlers()` (`worker/kata_worker/loop.py:29`), so a new kind needs a new module in `handlers/`, not an edit to the loop.
+- `course.generate` output is posted with `POST /jobs/{id}/output`; the core checks it and queues `course.build` (`worker/kata_worker/handlers/course.py:52`). The worker does not build courses.
 - Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `parse_tag`).
-- Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:57-59`).
+- Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:54-56`).
 - A cloud call is allowed only when `[providers] cloud_enabled`, the provider's `allow_cloud` and the task class in its `task_classes` all agree (`worker/kata_worker/providers/policy.py:67-69`). Local needs only the task class (`:67-68`).
 - `Policy.allows` returns False for an unknown provider name (`worker/kata_worker/providers/policy.py:65-66`) and raises `PolicyError` for an unknown task class (`worker/kata_worker/providers/policy.py:63`); `from_config` raises it for a bad `task_classes` entry (`worker/kata_worker/providers/policy.py:27`).
 - Anthropic key is read once, at construction, from the env var named in `api_key_env`; missing raises `ProviderError` (`worker/kata_worker/providers/anthropic.py:64`). The key never appears in an error.
@@ -71,10 +77,10 @@ Runs the pull loop that tags blocks. Takes one job from `GET /jobs/next`, sends 
 - No implicit local fallback: local is tried only when the task class's chain lists it (`worker/kata_worker/providers/router.py:80`; `tests/worker/test_router.py:152`).
 - `build_router` raises `RoutingError` for a missing `[routing]` section, a missing task class, an unknown class or provider, or an empty chain (`worker/kata_worker/providers/router.py:112-117`, `:45-53`).
 - Cloud provider is `guarded(capped(inner))` (`worker/kata_worker/providers/anthropic.py:106`): the guard runs before the cap, so a blocked text never reads the ledger (`tests/worker/test_router.py:203`). No key: cloud is absent and the router skips it (`worker/kata_worker/providers/router.py:102-104`).
-- `run_once` re-raises `CoreError` from a router ledger call, so `run_forever` logs it and the job is not failed as a tagging error (`worker/kata_worker/loop.py:33-34`).
+- Handlers re-raise `CoreError` from a router ledger call, so `run_forever` logs it and the job is not failed as a tagging error (`worker/kata_worker/handlers/tag.py:26-27`, `worker/kata_worker/handlers/course.py:45-46`).
 
 ## Depends on / used by
-- Depends on: `core/` (`kata_core.config.Config`) for settings; `kata_core.egress.scanner` (`scan`, used by `providers/guard.py`); the core HTTP API (`/jobs/next`, `/jobs/{id}/result`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
+- Depends on: `core/` (`kata_core.config.Config`) for settings; `kata_core.egress.scanner` (`scan`, used by `providers/guard.py`); the core HTTP API (`/jobs/next` with `kind` query, `/jobs/{id}/result`, `/jobs/{id}/output`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
 - Providers: `kata_worker.model` (`CHAT_PATH`, `ModelError`, `reply_content`) used by `providers/local.py`; Anthropic Messages API at `[provider_anthropic] base_url` (`/v1/messages`).
 - Provider config: `[routing]` chain per task class (`config/kata.example.toml:52`); `[providers]` `cloud_enabled` (`:60`); `[provider_local]` `task_classes` (`:63`); `[provider_anthropic]` `allow_cloud` (`:66`), `task_classes` (`:67`), `api_key_env` (`:70`).
 - Cost config: `[cost]` `cap_micro_usd` and `warn_micro_usd` (`config/kata.example.toml:49-50`); spend goes to the core `POST /usage` and is read from `GET /usage` (`docs/api.md`).
