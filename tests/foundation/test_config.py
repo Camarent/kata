@@ -57,8 +57,10 @@ def test_example_has_required_sections() -> None:
         "knowledge",
         "syllabus",
         "planning",
+        "smoke",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
+    assert set(data["smoke"]) == {"allowed_models", "budget_micro_usd"}
     assert set(data["policy"]) == {
         "quiet_mark_enabled",
         "quiet_mark_idle_seconds",
@@ -122,6 +124,12 @@ def test_load_returns_frozen_dataclass(tmp_path: Path) -> None:
     assert cfg.get("core", "port") == 8080
     with pytest.raises(dataclasses.FrozenInstanceError):
         cfg.sections = {}  # type: ignore[misc]  # frozen-check test needs a write
+
+
+def test_load_reads_smoke_section(tmp_path: Path) -> None:
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert cfg.get("smoke", "allowed_models") == "claude-haiku-5-5"
+    assert cfg.get("smoke", "budget_micro_usd") == 500000
 
 
 def test_path_from_env_when_no_arg(tmp_path: Path) -> None:

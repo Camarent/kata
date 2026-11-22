@@ -121,7 +121,7 @@ start_postgres() {
 
 run_lint() {
   step ruff .venv/bin/ruff check .
-  step mypy .venv/bin/mypy core
+  step mypy env MYPYPATH=worker .venv/bin/mypy core scripts/smoke/real_model.py scripts/smoke/smoke_core.py
 }
 
 # pytest with coverage. Extra arguments select tests, for example -m 'not flaky'.

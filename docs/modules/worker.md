@@ -81,6 +81,10 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Cloud provider is `guarded(capped(inner))` (`worker/kata_worker/providers/anthropic.py:106`): the guard runs before the cap, so a blocked text never reads the ledger (`tests/worker/test_router.py:203`). No key: cloud is absent and the router skips it (`worker/kata_worker/providers/router.py:102-104`).
 - Handlers re-raise `CoreError` from a router ledger call, so `run_forever` logs it and the job is not failed as a tagging error (`worker/kata_worker/handlers/tag.py:26-27`, `worker/kata_worker/handlers/course.py:45-46`).
 
+## Smoke settings and prices
+- `PRICES` has `claude-haiku-5-5` at `(1_000_000, 5_000_000)` micro-USD per 1M tokens (`worker/kata_worker/providers/cost.py:23`); an unpriced model is refused.
+- The real-model smoke (`scripts/smoke/real_model.py`) uses this worker code. Its settings are the `[smoke]` section: `allowed_models = "claude-haiku-5-5"` and `budget_micro_usd = 500000` (`config/kata.example.toml:58-60`). The run is opt-in and never part of check-all or CI; see [scripts](scripts.md).
+
 ## Depends on / used by
 - Depends on: `core/` (`kata_core.config.Config`) for settings; `kata_core.egress.scanner` (`scan`, used by `providers/guard.py`); the core HTTP API (`/jobs/next` with `kind` query, `/jobs/{id}/result`, `/jobs/{id}/output`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
 - Providers: `kata_worker.model` (`CHAT_PATH`, `ModelError`, `reply_content`) used by `providers/local.py`; Anthropic Messages API at `[provider_anthropic] base_url` (`/v1/messages`).
