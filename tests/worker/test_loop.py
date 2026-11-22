@@ -8,6 +8,7 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from fakes import fake_model as fake_model_module
@@ -16,6 +17,7 @@ from fakes.fake_model import FakeModel
 from fakes.fake_provider import FakeProvider
 from kata_core.config import Config, load_config
 from kata_worker.core_client import CoreClient
+from kata_worker.handlers import course as course_handler
 from kata_worker.handlers import load_handlers
 from kata_worker.handlers import tag as tag_handler
 from kata_worker.handlers.tag import TAG_CLASS
@@ -180,7 +182,11 @@ def test_run_once_claims_only_handled_kinds_and_leaves_other_jobs_queued(
     assert run_once(client, _local_router(cfg)) is True
 
     gets = [r.path for r in fake_core.requests if r.method == "GET"]
-    assert gets == ["/jobs/next?kind=tag"]
+    assert len(gets) == 1
+    claim = urlsplit(gets[0])
+    assert claim.path == "/jobs/next"
+    # the kinds come in handler-discovery order, so compare them as a set
+    assert sorted(value for _, value in parse_qsl(claim.query)) == sorted(load_handlers())
     assert [job["id"] for job in fake_core.queue] == [5]
     posts = [(r.path, json.loads(r.body)) for r in fake_core.requests if r.method == "POST"]
     assert posts == [("/jobs/6/result", {"category": "food", "topic": "pasta"})]
@@ -200,8 +206,11 @@ def test_job_of_kind_without_handler_is_failed_not_run(
     assert fake_model.requests == []
 
 
-def test_handler_registry_discovers_tag_handler() -> None:
-    assert load_handlers() == {tag_handler.KIND: tag_handler.handle}
+def test_handler_registry_discovers_tag_and_course_handlers() -> None:
+    assert load_handlers() == {
+        tag_handler.KIND: tag_handler.handle,
+        course_handler.KIND: course_handler.handle,
+    }
     assert tag_handler.KIND == "tag"
 
 
