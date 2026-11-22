@@ -187,7 +187,7 @@ Invariants and gotchas (planning):
 ## Deep health and migrate (M6)
 
 - `GET /v1/health/deep` (`core/kata_core/api/routes/health.py:55`, router prefix `/v1/health` at `:25`): unauthenticated; `_run_checks` (`:45`) runs a DB probe and `_migrations_current` (`:30`: every migration file on disk recorded as applied). 200 when all pass, 503 with the failed check names. Carries booleans and names only, never row content, config values or driver error text.
-- `python -m kata_core.migrate` (`core/kata_core/migrate.py:67` `main`, `:48` `run`, `:32` `pending_versions`): applies pending migrations; `--check` lists pending versions and exits 1 when any. The image runs it as `kata-migrate` before `kata-core` (`deploy/compose.yaml`).
+- `python -m kata_core.migrate` (`core/kata_core/migrate.py:67` `main`, `:48` `run`, `:32` `pending_versions`): applies pending migrations; `--check` lists pending versions and exits 1 when any. Compose runs it as the `migrate` service (image `kata:local`) before the `core` service (`deploy/compose.yaml`).
 - Tests: `tests/core/test_api_health.py`, `tests/core/test_migrate_cli.py`.
 - Invariant: the health route takes no token by design (`tests/core/test_core_flow.py:88`); keep it free of anything beyond the boolean checks.
 
