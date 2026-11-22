@@ -259,7 +259,45 @@ def test_timeout_reason_is_exactly_timeout(
     assert all('reason="timeout"' in line and " FAIL " in line for line in cases)
 
 
-def test_http_500_is_a_fail_line_with_status_reason(
+SECRET_HOST = "secret-host.invalid"
+SECRET_BASE_URL = f"{SECRET_HOST}:1234"
+
+
+@pytest.mark.parametrize(
+    ("error", "kind"),
+    [
+        (
+            lambda request: httpx.UnsupportedProtocol(
+                f"Request URL is missing an 'http://' or 'https://' protocol: {SECRET_BASE_URL}",
+                request=request,
+            ),
+            "UnsupportedProtocol",
+        ),
+        (
+            lambda request: httpx.ProtocolError(f"http://{SECRET_HOST}/x", request=request),
+            "ProtocolError",
+        ),
+    ],
+)
+def test_transport_error_reason_hides_host_and_url(
+    cli: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+    error: Callable[[httpx.Request], Exception],
+    kind: str,
+) -> None:
+    def fail(request: httpx.Request) -> httpx.Response:
+        raise error(request)
+
+    code, lines = _run(cli, capsys, ["--base-url", SECRET_BASE_URL], GOOD_ENV, fail)
+    assert code == EXIT_FAILED
+    cases = _case_lines(lines)
+    assert len(cases) == CASE_COUNT
+    assert all(f'reason="{cli.UNEXPECTED_REASON_PREFIX}{kind}"' in line for line in cases)
+    assert lines[0].startswith("warmup model=kata-l FAIL")
+    assert all(SECRET_HOST not in line and "http" not in line for line in lines)
+
+
+def test_http_500_is_a_fail_line_with_type_reason(
     cli: ModuleType, capsys: pytest.CaptureFixture[str]
 ) -> None:
     recorder = Recorder(status=500, raw=b"boom")
@@ -267,7 +305,7 @@ def test_http_500_is_a_fail_line_with_status_reason(
     assert code == EXIT_FAILED
     cases = _case_lines(lines)
     assert len(cases) == CASE_COUNT
-    assert all('reason="model returned status 500"' in line for line in cases)
+    assert all(f'reason="{cli.UNEXPECTED_REASON_PREFIX}ProviderError"' in line for line in cases)
 
 
 def test_invalid_json_body_is_a_fail_line(
@@ -278,7 +316,7 @@ def test_invalid_json_body_is_a_fail_line(
     assert code == EXIT_FAILED
     cases = _case_lines(lines)
     assert len(cases) == CASE_COUNT
-    assert all('reason="model reply has no message content"' in line for line in cases)
+    assert all(f'reason="{cli.UNEXPECTED_REASON_PREFIX}ModelError"' in line for line in cases)
 
 
 def test_missing_usage_is_a_fail_line(cli: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:

@@ -67,7 +67,7 @@ TIMEOUT_REASON = "timeout"
 REFUSED_REASON = "connection refused"
 MISSING_USAGE_REASON = "missing usage"
 SHAPE_REASON = "shape check failed"
-REASON_CHARS = 120
+UNEXPECTED_REASON_PREFIX = "unexpected error: "
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_REFUSED = 2
@@ -125,7 +125,9 @@ def _reason(exc: ProviderError) -> str:
         return TIMEOUT_REASON
     if isinstance(cause, httpx.ConnectError):
         return REFUSED_REASON
-    return str(exc)[:REASON_CHARS]
+    # Never str(exc): transport messages carry the base URL and host. The type name is enough.
+    kind = type(cause if cause is not None else exc).__name__
+    return f"{UNEXPECTED_REASON_PREFIX}{kind}"
 
 
 def _warmup(provider: LocalProvider, model: str) -> None:
