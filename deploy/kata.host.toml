@@ -76,6 +76,7 @@ budget_micro_usd = 500000
 models = "kata-l"
 case_timeout_seconds = 180
 warmup_timeout_seconds = 600
+num_ctx = 8192
 
 [routing]
 # Per task class: comma list of provider names, tried in order.

@@ -46,6 +46,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `smoke_local.models` | "kata-l" | `KATA_SMOKE_LOCAL_MODELS` |
 | `smoke_local.case_timeout_seconds` | 180 | `KATA_SMOKE_LOCAL_CASE_TIMEOUT_SECONDS` |
 | `smoke_local.warmup_timeout_seconds` | 600 | `KATA_SMOKE_LOCAL_WARMUP_TIMEOUT_SECONDS` |
+| `smoke_local.num_ctx` | 8192 | `KATA_SMOKE_LOCAL_NUM_CTX` |
 | `routing.tag` | "local" | `KATA_ROUTING_TAG` |
 | `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
 | `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |
