@@ -113,6 +113,47 @@ def test_failing_provider_falls_to_next() -> None:
     ]
 
 
+def test_local_failure_falls_to_allowed_cloud_with_room() -> None:
+    inner = _cloud()
+    cloud = capped(inner, FakeLedger(spent=0), MODEL, _config(cloud=True), lambda _: None)
+    router = _router(
+        {EXPLAIN: ("local", "anthropic")},
+        {"local": _local([ProviderError("boom")]), "anthropic": cloud},
+    )
+    assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=CLOUD_REPLY, provider="anthropic")
+    assert len(inner.calls) == 1
+
+
+def test_local_failure_with_cloud_disallowed_exhausts_without_cloud_call() -> None:
+    inner = _cloud()
+    router = _router(
+        {EXPLAIN: ("local", "anthropic")},
+        {"local": _local([ProviderError("boom")]), "anthropic": inner},
+        cloud=False,
+    )
+    with pytest.raises(RouteExhausted) as info:
+        router.route(EXPLAIN, SYSTEM, USER)
+    assert str(info.value) == (
+        "route exhausted for explain: local=ProviderError, anthropic=skipped"
+    )
+    assert inner.calls == []
+
+
+def test_local_failure_with_cloud_over_cap_exhausts_without_cloud_call() -> None:
+    inner = _cloud()
+    cloud = capped(inner, FakeLedger(spent=2_000_000), MODEL, _config(cloud=True), lambda _: None)
+    router = _router(
+        {EXPLAIN: ("local", "anthropic")},
+        {"local": _local([ProviderError("boom")]), "anthropic": cloud},
+    )
+    with pytest.raises(RouteExhausted) as info:
+        router.route(EXPLAIN, SYSTEM, USER)
+    assert str(info.value) == (
+        "route exhausted for explain: local=ProviderError, anthropic=CapReached"
+    )
+    assert inner.calls == []
+
+
 def test_secret_blocked_cloud_falls_to_local() -> None:
     inner = _cloud()
     cloud = guarded(inner, lambda _: None)
