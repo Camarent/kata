@@ -161,6 +161,34 @@ def delete_syllabus(conn: psycopg.Connection[Any], user_id: int, syllabus_id: in
     return cur.rowcount == 1
 
 
+def replace_modules(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    syllabus_id: int,
+    modules: Sequence[tuple[str, str]],
+) -> bool:
+    """Replace the modules of the syllabus of `user_id` with `modules` as (title, body) pairs.
+
+    Old modules and their concept links cascade away. False, with nothing written, when the
+    syllabus is missing or foreign.
+    """
+    with conn.transaction():
+        owned = conn.execute(
+            "SELECT id FROM syllabus WHERE id = %s AND user_id = %s",
+            (syllabus_id, user_id),
+        ).fetchone()
+        if owned is None:
+            return False
+        conn.execute("DELETE FROM syllabus_module WHERE syllabus_id = %s", (syllabus_id,))
+        for position, (module_title, body) in enumerate(modules):
+            conn.execute(
+                "INSERT INTO syllabus_module (syllabus_id, position, title, body, words) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (syllabus_id, position, module_title, body, len(body.split())),
+            )
+    return True
+
+
 def set_module_concepts(
     conn: psycopg.Connection[Any],
     user_id: int,

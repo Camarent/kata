@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from typing import Any
 
 import psycopg
 import pytest
+from kata_core.jobs.queue import Job
+from kata_core.planning.job_kinds import OUTPUT_HOOKS, SYLLABUS_EXTRACT_KIND
 from kata_core.planning.syllabus_store import (
     create_syllabus,
     delete_syllabus,
@@ -169,3 +172,90 @@ def test_set_module_concepts_refuses_foreign_private_and_unknown_concepts(
     after = get_syllabus(conn, alice, made.id)
     assert after is not None
     assert after.modules[0].concept_ids == sorted([shared, alices])
+
+
+SOURCE = "# Intro\nalpha body\n# Loops\nbeta body"
+
+
+def _extract_job(user_id: int, syllabus_id: int, text: str) -> Job:
+    payload = json.dumps({"syllabus_id": syllabus_id, "text": text})
+    return Job(
+        id=1,
+        user_id=user_id,
+        payload=payload,
+        status="running",
+        lease_expires_at=None,
+        attempts=1,
+        result_topic_id=None,
+        kind=SYLLABUS_EXTRACT_KIND,
+        output=None,
+    )
+
+
+def test_extract_hook_is_registered() -> None:
+    assert SYLLABUS_EXTRACT_KIND in OUTPUT_HOOKS
+
+
+def test_extract_hook_stores_valid_modules(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    made = create_syllabus(conn, alice, "Music", [("old", "old body")])
+    output = {
+        "modules": [
+            {"title": "Intro", "body": "alpha body"},
+            {"title": "Loops", "body": "beta body"},
+        ]
+    }
+    OUTPUT_HOOKS[SYLLABUS_EXTRACT_KIND](conn, _extract_job(alice, made.id, SOURCE), output)
+    after = get_syllabus(conn, alice, made.id)
+    assert after is not None
+    assert [(m.title, m.body) for m in after.modules] == [
+        ("Intro", "alpha body"),
+        ("Loops", "beta body"),
+    ]
+
+
+def test_extract_hook_falls_back_on_body_not_in_source(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    made = create_syllabus(conn, alice, "Music", [("old", "old body")])
+    output = {
+        "modules": [
+            {"title": "Intro", "body": "alpha body"},
+            {"title": "Made up", "body": "gamma body"},
+        ]
+    }
+    OUTPUT_HOOKS[SYLLABUS_EXTRACT_KIND](conn, _extract_job(alice, made.id, SOURCE), output)
+    after = get_syllabus(conn, alice, made.id)
+    assert after is not None
+    assert [(m.title, m.body) for m in after.modules] == [("# Intro", SOURCE)]
+
+
+def test_extract_hook_falls_back_on_long_title(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    made = create_syllabus(conn, alice, "Music", [("old", "old body")])
+    output = {"modules": [{"title": "T" * 121, "body": "alpha body"}]}
+    OUTPUT_HOOKS[SYLLABUS_EXTRACT_KIND](conn, _extract_job(alice, made.id, SOURCE), output)
+    after = get_syllabus(conn, alice, made.id)
+    assert after is not None
+    assert [(m.title, m.body) for m in after.modules] == [("# Intro", SOURCE)]
+
+
+def test_extract_hook_falls_back_on_malformed_output(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    made = create_syllabus(conn, alice, "Music", [("old", "old body")])
+    output = {"modules": ["not an object"]}
+    OUTPUT_HOOKS[SYLLABUS_EXTRACT_KIND](conn, _extract_job(alice, made.id, SOURCE), output)
+    after = get_syllabus(conn, alice, made.id)
+    assert after is not None
+    assert [(m.title, m.body) for m in after.modules] == [("# Intro", SOURCE)]
+
+
+def test_extract_hook_refuses_foreign_syllabus(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    bob = _user(conn, "bob")
+    made = create_syllabus(conn, alice, "Music", [("old", "old body")])
+    output = {"modules": [{"title": "Intro", "body": "alpha body"}]}
+    with pytest.raises(LookupError):
+        OUTPUT_HOOKS[SYLLABUS_EXTRACT_KIND](conn, _extract_job(bob, made.id, SOURCE), output)
+    after = get_syllabus(conn, alice, made.id)
+    assert after is not None
+    assert [(m.title, m.body) for m in after.modules] == [("old", "old body")]
