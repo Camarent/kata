@@ -6,6 +6,8 @@ built at runtime and lives only in a temp file.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import secrets
 import shutil
@@ -139,6 +141,21 @@ def test_dump_is_encrypted_and_decrypts_to_custom_format(
     assert passphrase not in result.stderr
 
 
+def test_sidecar_is_hmac_of_the_encrypted_dump(
+    cfg: Config, scratch_db: str, backup_dir: Path, passphrase_file: Path
+):
+    result = _run(_env(cfg, backup_dir, passphrase_file), database=scratch_db)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+
+    dump = _dumps(backup_dir)[0]
+    sidecar = dump.with_name(dump.name + ".hmac")
+    # Key: sha256 of ('kata-backup-mac' newline + passphrase file bytes); the MAC is HMAC-SHA256.
+    key = hashlib.sha256(b"kata-backup-mac\n" + passphrase_file.read_bytes()).digest()
+    expected = hmac.new(key, dump.read_bytes(), hashlib.sha256).hexdigest()
+    assert sidecar.read_text(encoding="utf-8").split() == [expected]
+    assert [p.name for p in backup_dir.glob(".*")] == [], "temporary sidecar left behind"
+
+
 def test_wrong_passphrase_does_not_decrypt(
     cfg: Config, scratch_db: str, backup_dir: Path, passphrase_file: Path
 ):
@@ -171,12 +188,13 @@ def test_retention_removes_old_dump_and_its_tombstone(
     old_stamp = "20000101T000000Z"
     old_dump = backup_dir / f"kata-{old_stamp}.dump.enc"
     old_tomb = backup_dir / f"kata-{old_stamp}.tombstone"
+    old_mac = backup_dir / f"kata-{old_stamp}.dump.enc.hmac"
     recent_dump = backup_dir / "kata-20990101T000000Z.dump.enc"
-    for path in (old_dump, old_tomb, recent_dump):
+    for path in (old_dump, old_tomb, old_mac, recent_dump):
         path.write_bytes(b"old")
-    # Fake mtimes: 30 days old for the old pair, 3 days old for the recent one (window is 14).
+    # Fake mtimes: 30 days old for the old set, 3 days old for the recent one (window is 14).
     now = time.time()
-    for path in (old_dump, old_tomb):
+    for path in (old_dump, old_tomb, old_mac):
         os.utime(path, (now - 30 * DAY_SECONDS, now - 30 * DAY_SECONDS))
     os.utime(recent_dump, (now - 3 * DAY_SECONDS, now - 3 * DAY_SECONDS))
 
@@ -185,6 +203,7 @@ def test_retention_removes_old_dump_and_its_tombstone(
 
     assert not old_dump.exists()
     assert not old_tomb.exists()
+    assert not old_mac.exists()
     assert recent_dump.exists()
     assert len(_dumps(backup_dir)) == 2  # the recent fake one and the new dump
 

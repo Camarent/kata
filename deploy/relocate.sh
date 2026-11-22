@@ -158,6 +158,10 @@ if [ ! -f "${dump%.dump.enc}.tombstone" ]; then
   echo "relocate: the tombstone copy beside the dump is missing" >&2
   exit 1
 fi
+if [ ! -f "$dump.hmac" ]; then
+  echo "relocate: the HMAC sidecar beside the dump is missing" >&2
+  exit 1
+fi
 
 echo "relocate: step 4 (new host): restore into $target_db"
 echo "relocate: step 5 (new host): verify row counts of $target_db"

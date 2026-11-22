@@ -150,6 +150,42 @@ def test_restore_then_verify_passes_and_row_delete_fails(
     assert "users" not in bad.stderr
 
 
+def _public_tables(cfg: Config, database: str) -> int:
+    with connect(cfg, database) as conn:
+        row = conn.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"
+        ).fetchone()
+    return row[0]
+
+
+def test_tampered_dump_fails_authentication_and_restores_nothing(
+    cfg: Config, work_dir: Path, source_db: str, target_db: str
+):
+    _seed(cfg, source_db)
+    dump = _backup(cfg, work_dir, source_db)
+    data = bytearray(dump.read_bytes())
+    data[len(data) // 2] ^= 0x01
+    dump.write_bytes(bytes(data))
+
+    result = _run(["bash", str(RESTORE), str(dump), target_db], _env(cfg, work_dir))
+    assert result.returncode == 1
+    assert "dump failed authentication" in result.stderr
+    assert _public_tables(cfg, target_db) == 0
+
+
+def test_missing_sidecar_fails_restore_and_restores_nothing(
+    cfg: Config, work_dir: Path, source_db: str, target_db: str
+):
+    _seed(cfg, source_db)
+    dump = _backup(cfg, work_dir, source_db)
+    dump.with_name(dump.name + ".hmac").unlink()
+
+    result = _run(["bash", str(RESTORE), str(dump), target_db], _env(cfg, work_dir))
+    assert result.returncode == 1
+    assert "dump failed authentication" in result.stderr
+    assert _public_tables(cfg, target_db) == 0
+
+
 def test_restore_refuses_non_empty_target(
     cfg: Config, work_dir: Path, source_db: str, target_db: str
 ):
@@ -199,7 +235,7 @@ def test_restore_dry_run_changes_nothing():
         ["bash", str(RESTORE), "--dry-run"], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0
-    assert result.stdout.count("would ") == 5
+    assert result.stdout.count("would ") == 6
 
 
 def test_restore_refuses_leftover_table_in_other_schema(

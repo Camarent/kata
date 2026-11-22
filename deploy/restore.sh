@@ -3,7 +3,8 @@
 #
 #   deploy/restore.sh [--dry-run] <dump.enc> <target-database> [counts.json]
 #
-# Steps: refuse a non-empty target; decrypt and pg_restore into it; replay the tombstone file
+# Steps: check the HMAC sidecar (<dump>.hmac, written by deploy/backup.sh) before anything else;
+# refuse a non-empty target; decrypt and pg_restore into it; replay the tombstone file
 # (design 12.2) kept beside the dump; run python -m kata_core.migrate --check on the target.
 # The target database must exist and have no tables, views or other relations in any non-system
 # schema. With counts.json (from verify_counts.py --write) the last step runs
@@ -37,6 +38,7 @@ tombstone="${KATA_RESTORE_TOMBSTONE_FILE:-${dump%.dump.enc}.tombstone}"
 
 if [ "$dry_run" -eq 1 ]; then
   echo "would check that database $target has no tables"
+  echo "would check the HMAC sidecar of $dump before decrypting it"
   echo "would decrypt $dump and pg_restore it into $target"
   echo "would replay tombstone file $tombstone if it exists"
   echo "would run python -m kata_core.migrate --check on $target"
@@ -59,6 +61,26 @@ fi
 if [ ! -r "$dump" ]; then
   echo "restore: dump is not readable" >&2
   exit 2
+fi
+
+# HMAC-SHA256 of the file in $1. The key is sha256 of ('kata-backup-mac' newline + passphrase file
+# bytes), the same key deploy/backup.sh uses; the passphrase is never on a command line.
+backup_mac() {
+  local key
+  key="$({ printf 'kata-backup-mac\n'; cat "$passphrase_file"; } | openssl dgst -sha256 -r | cut -d' ' -f1)"
+  openssl dgst -sha256 -mac HMAC -macopt "hexkey:$key" -r "$1" | cut -d' ' -f1
+}
+# Sidecar check: a missing sidecar, or one that does not match the dump, fails.
+verify_sidecar() {
+  local stored expected
+  [ -f "$1.hmac" ] || return 1
+  stored="$(head -n 1 "$1.hmac")"
+  expected="$(backup_mac "$1")"
+  [ -n "$expected" ] && [ "$stored" = "$expected" ]
+}
+if ! verify_sidecar "$dump"; then
+  echo "restore: dump failed authentication" >&2
+  exit 1
 fi
 
 tables="$(psql -h "$host" -p "$port" -U "$user" -d "$target" -At -v ON_ERROR_STOP=1 \
