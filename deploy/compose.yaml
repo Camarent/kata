@@ -103,6 +103,8 @@ services:
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
+    environment:
+      KATA_TAILNET_NAME: ${KATA_TAILNET_NAME:?set KATA_TAILNET_NAME, the node tailnet name}
     depends_on:
       core:
         condition: service_healthy
