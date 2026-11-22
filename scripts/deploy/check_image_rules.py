@@ -18,6 +18,10 @@ import argparse
 import sys
 from pathlib import Path
 
+# Run with -I, which leaves the script directory off sys.path: add it to find _rules.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _rules import _image_pinned
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO_ROOT / "deploy" / "Dockerfile"
 DOCKERIGNORE = REPO_ROOT / ".dockerignore"
@@ -57,16 +61,6 @@ def instructions(text: str) -> list[Instruction]:
     if pending.strip():
         out.append(_instruction(pending))
     return out
-
-
-def _image_pinned(image: str) -> bool:
-    """A digest pins the image; otherwise the last path part needs a tag other than latest."""
-    if "@" in image:
-        return True
-    last = image.rsplit("/", 1)[-1]
-    if ":" not in last:
-        return False
-    return last.rsplit(":", 1)[1] != "latest"
 
 
 def _copy_sources(rest: str) -> list[str]:

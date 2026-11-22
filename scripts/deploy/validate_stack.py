@@ -29,6 +29,10 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+# Run with -I, which leaves the script directory off sys.path: add it to find _rules.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _rules import _image_pinned
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = REPO_ROOT / "deploy" / "compose.yaml"
 ENV_FILE = REPO_ROOT / "deploy" / "env" / "small.env"
@@ -82,16 +86,6 @@ def _loopback_or_tailscale(host_ip: str) -> bool:
     except ValueError:
         return False
     return address.is_loopback or address in TAILSCALE_NET
-
-
-def _image_pinned(image: str) -> bool:
-    """A digest pins the image; otherwise the last path part needs a tag other than latest."""
-    if "@" in image:
-        return True
-    last = image.rsplit("/", 1)[-1]
-    if ":" not in last:
-        return False
-    return last.rsplit(":", 1)[1] != "latest"
 
 
 def check_compose(model: Model) -> list[str]:
