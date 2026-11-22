@@ -84,7 +84,8 @@ def test_every_route_needs_a_token(client: TestClient, cfg: Config) -> None:
     for template, operations in paths.items():
         concrete = PATH_PARAM.sub("1", template)
         for method in operations:
-            if (method.upper(), template) == ("POST", "/auth/enrol"):
+            # Enrol and the deep health probe answer without a token by design.
+            if (method.upper(), template) in {("POST", "/auth/enrol"), ("GET", "/v1/health/deep")}:
                 continue
             resp = client.request(method.upper(), concrete)
             assert resp.status_code == 401, f"{method.upper()} {template} -> {resp.status_code}"
