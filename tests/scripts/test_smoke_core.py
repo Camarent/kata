@@ -90,7 +90,7 @@ def _stack(
     usage = smoke.UsageTransport(httpx.MockTransport(recorder))
     inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
     ledger = smoke.MemoryLedger()
-    capped = CappedProvider(inner, ledger, HAIKU, cap, cap, lambda message: None)
+    capped = CappedProvider(inner, ledger, HAIKU, cap, cap, 150, lambda message: None)
     return capped, ledger, usage
 
 
@@ -218,15 +218,17 @@ def test_provider_error_is_a_fail_not_a_stop(smoke: ModuleType) -> None:
     usage = smoke.UsageTransport(httpx.MockTransport(server_error))
     inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
     ledger = smoke.MemoryLedger()
-    capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, lambda message: None)
+    capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, 150, lambda message: None)
     result = smoke.run_case(_case(smoke, "explain"), capped, ledger, usage, secret=KEY)
     assert result.passed is False
     assert KEY not in smoke.format_line(result)
 
 
 def test_cap_reached_stops_the_run(smoke: ModuleType) -> None:
-    recorder = Recorder()
-    provider, ledger, usage = _stack(smoke, recorder, cap=1)
+    # The reply reports 1000 output tokens: 5000 micro-USD on Haiku, which alone reaches the cap of
+    # 5000 after the first call. The pre-call guard (short prompts, far under 5000) lets that call through.
+    recorder = Recorder(out_tokens=1000)
+    provider, ledger, usage = _stack(smoke, recorder, cap=5000)
     outcome = smoke.run_cases(smoke.load_cases(), provider, ledger, usage, secret=KEY)
     assert outcome.stopped is True
     assert [result.case_id for result in outcome.results] == ["explain"]

@@ -54,12 +54,25 @@ def _log_sink() -> tuple[list[str], Any]:
     return lines, lines.append
 
 
-def _config(cap: int = 2_000_000, warn: int = 1_500_000) -> Config:
-    return Config(sections={"cost": {"cap_micro_usd": cap, "warn_micro_usd": warn}})
+def _config(cap: int = 2_000_000, warn: int = 1_500_000, safety: int = 150) -> Config:
+    return Config(
+        sections={
+            "cost": {
+                "cap_micro_usd": cap,
+                "warn_micro_usd": warn,
+                "estimate_safety_percent": safety,
+            }
+        }
+    )
 
 
 def _cost() -> int:
     return cost_micro_usd(MODEL, SYSTEM + USER, REPLY)
+
+
+def _guard(safety: int = 150) -> int:
+    # The pre-call guard: the input estimate of SYSTEM + USER, raised by the safety percent, rounded up.
+    return -(-cost_micro_usd(MODEL, SYSTEM + USER, "") * safety // 100)
 
 
 def test_prices_are_pinned_ints_for_known_models() -> None:
@@ -129,7 +142,7 @@ def test_cap_reached_is_a_provider_error() -> None:
 
 def test_just_under_cap_still_calls_inner() -> None:
     inner = _cloud()
-    ledger = FakeLedger(spent=1_999_999)
+    ledger = FakeLedger(spent=2_000_000 - _guard() - 1)
     capped(inner, ledger, MODEL, _config(), lambda _line: None).complete(SYSTEM, USER)
     assert inner.calls == [(SYSTEM, USER)]
 
@@ -201,17 +214,40 @@ def test_capped_provider_keeps_identity_and_is_built_from_config() -> None:
 
 def test_capped_has_no_bypass_parameter() -> None:
     params = list(inspect.signature(CappedProvider.__init__).parameters)
-    assert params == ["self", "inner", "ledger", "model", "cap", "warn", "log"]
+    assert params == ["self", "inner", "ledger", "model", "cap", "warn", "safety_percent", "log"]
     assert list(inspect.signature(capped).parameters) == ["inner", "ledger", "model", "cfg", "log"]
 
 
 def test_cap_boundary_is_inclusive() -> None:
     # Mutation check: changing `>=` to `>` in the cap check makes this test fail.
     inner = _cloud()
-    ledger = FakeLedger(spent=2_000_000)
+    ledger = FakeLedger(spent=2_000_000 - _guard())
     with pytest.raises(CapReached):
         capped(inner, ledger, MODEL, _config(), lambda _line: None).complete(SYSTEM, USER)
     assert inner.calls == []
+    assert ledger.recorded == []
+
+
+def test_estimate_pushing_past_cap_is_refused_before_inner_call() -> None:
+    inner = _cloud()
+    ledger = FakeLedger(spent=2_000_000 - _guard() + 1)
+    with pytest.raises(CapReached) as info:
+        capped(inner, ledger, MODEL, _config(), lambda _line: None).complete(SYSTEM, USER)
+    assert info.value.spent == 2_000_000 - _guard() + 1
+    assert inner.calls == []
+    assert ledger.recorded == []
+
+
+def test_safety_percent_of_100_adds_no_margin() -> None:
+    inner = _cloud()
+    ledger = FakeLedger(spent=2_000_000 - _guard(100) - 1)
+    capped(inner, ledger, MODEL, _config(safety=100), lambda _line: None).complete(SYSTEM, USER)
+    assert inner.calls == [(SYSTEM, USER)]
+
+
+def test_safety_percent_below_100_is_rejected() -> None:
+    with pytest.raises(ProviderError, match="estimate_safety_percent"):
+        capped(_cloud(), FakeLedger(), MODEL, _config(safety=99), lambda _line: None)
 
 
 HAIKU = "claude-haiku-5-5"
@@ -285,7 +321,7 @@ def test_warn_logged_when_reported_usage_crosses_warn() -> None:
 def test_cap_checks_spend_including_reported_usage() -> None:
     # Spend just under the cap passes the pre-call check; the reported usage then takes spend over it.
     inner = _cloud_usage(TokenUsage(input_tokens=522, output_tokens=1051))
-    ledger = FakeLedger(spent=2_000_000 - 1)
+    ledger = FakeLedger(spent=2_000_000 - 5777)
     capped(inner, ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)
     with pytest.raises(CapReached):
         capped(_cloud(), ledger, HAIKU, _config(), lambda _line: None).complete(SYSTEM, USER)

@@ -60,6 +60,9 @@ search_limit = 5
 [cost]
 cap_micro_usd = 2000000
 warn_micro_usd = 1500000
+# Pre-call guard: a cloud call is refused when spent + its estimated input cost * this percent / 100
+# reaches the cap. Must be at least 100.
+estimate_safety_percent = 150
 
 # Opt-in smoke run, started by the lead by hand (never by CI). allowed_models lists the
 # only models it may call; budget_micro_usd caps its spend. No secrets here: keys stay in env.

@@ -97,13 +97,17 @@ class CappedProvider:
         model: str,
         cap: int,
         warn: int,
+        safety_percent: int,
         log: LogSink,
     ) -> None:
+        if safety_percent < HUNDREDTHS:
+            raise ProviderError(f"estimate_safety_percent must be at least 100, got {safety_percent}")
         self._inner = inner
         self._ledger = ledger
         self._model = model
         self._cap = cap
         self._warn = warn
+        self._safety = safety_percent
         self._log = log
         self.name = inner.name
         self.is_cloud = inner.is_cloud
@@ -112,9 +116,11 @@ class CappedProvider:
         if not self.is_cloud:
             return self._inner.complete(system, user)
         # Price the model before any off-machine call, so an unpriced model cannot spend uncounted.
-        cost_micro_usd(self._model, "", "")
+        # The input estimate raised by the safety percent (rounded up) is what this call may add.
+        estimate = cost_micro_usd(self._model, system + user, "")
+        guard = -(-estimate * self._safety // HUNDREDTHS)
         spent = self._ledger.usage_today()
-        if spent >= self._cap:
+        if spent + guard >= self._cap:
             raise CapReached(spent, self._cap)
         if isinstance(self._inner, UsageProvider):
             completion = self._inner.complete_with_usage(system, user)
@@ -135,7 +141,8 @@ class CappedProvider:
 def capped(
     inner: Provider, ledger: Ledger, model: str, cfg: Config, log: LogSink
 ) -> CappedProvider:
-    """Wrap `inner` with the cap and warn levels from `[cost]` in the config."""
+    """Wrap `inner` with the cap, warn and estimate safety levels from `[cost]` in the config."""
     cap = int(cfg.get("cost", "cap_micro_usd"))
     warn = int(cfg.get("cost", "warn_micro_usd"))
-    return CappedProvider(inner, ledger, model, cap, warn, log)
+    safety = int(cfg.get("cost", "estimate_safety_percent"))
+    return CappedProvider(inner, ledger, model, cap, warn, safety, log)

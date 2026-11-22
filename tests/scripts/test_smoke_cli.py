@@ -155,10 +155,11 @@ def test_budget_from_config_caps_the_run_and_exits_1(
     config = _budget_config(tmp_path, TINY_BUDGET)
     code = cli.main(["--config", str(config)], GOOD_ENV, httpx.MockTransport(recorder))
     captured = capsys.readouterr()
+    # A 1 micro-USD budget is below the pre-call guard of the first case: refused before any request.
     assert code == EXIT_FAILED
-    assert len(recorder.requests) == 1
+    assert len(recorder.requests) == 0
     assert "cap reached" in captured.err
-    assert captured.out.splitlines()[-1].startswith("total cases=1 pass=1 ")
+    assert captured.out.splitlines()[-1].startswith("total cases=0 pass=0 ")
 
 
 def test_key_never_reaches_stdout_or_stderr(
