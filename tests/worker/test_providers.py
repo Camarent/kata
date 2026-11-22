@@ -102,6 +102,26 @@ def test_local_complete_posts_system_and_user_and_returns_reply(fake_model: Fake
     ]
 
 
+def test_local_transport_serves_reply_without_socket() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        body = {"choices": [{"message": {"role": "assistant", "content": "in-memory reply"}}]}
+        return httpx.Response(200, json=body)
+
+    config = load_config(EXAMPLE_PATH, env={"KATA_MODEL_BASE_URL": "http://model.test"})
+    provider = LocalProvider(config, transport=httpx.MockTransport(handler))
+
+    assert provider.complete(SYSTEM, USER) == "in-memory reply"
+    assert len(seen) == 1
+    assert str(seen[0].url) == f"http://model.test{fake_model_module.CHAT_PATH}"
+    assert json.loads(seen[0].content)["messages"] == [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": USER},
+    ]
+
+
 def test_local_non_200_raises_provider_error(fake_model: FakeModel) -> None:
     fake_model.add_reply(500)
 

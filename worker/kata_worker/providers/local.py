@@ -18,10 +18,11 @@ class LocalProvider:
     name = "local"
     is_cloud = False
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, *, transport: httpx.BaseTransport | None = None) -> None:
         self._base_url = str(config.get("model", "base_url"))
         self._model_name = str(config.get("model", "model_name"))
         self._timeout = float(config.get("model", "timeout_seconds"))
+        self._transport = transport
 
     def complete(self, system: str, user: str) -> str:
         """Return the reply text for one system and one user message; raise ProviderError on failure."""
@@ -34,7 +35,7 @@ class LocalProvider:
         }
         url = f"{self._base_url.rstrip('/')}{CHAT_PATH}"
         try:
-            with httpx.Client(timeout=self._timeout) as client:
+            with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
                 response = client.post(url, json=payload)
         except httpx.TimeoutException as exc:
             raise ProviderError(f"model timed out after {self._timeout}s") from exc
