@@ -31,7 +31,7 @@ def parse_drafts(reply: str) -> list[dict[str, Any]]:
     data = json.loads(reply)
     if not isinstance(data, dict) or not isinstance(data.get("items"), list):
         raise TypeError("reply is not an object with an items list")
-    items = data["items"]
+    items: list[dict[str, Any]] = data["items"]
     if not all(isinstance(item, dict) for item in items):
         raise TypeError("an item in the reply is not an object")
     return items

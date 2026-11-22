@@ -31,7 +31,7 @@ def parse_modules(reply: str) -> list[dict[str, Any]]:
     data = json.loads(reply)
     if not isinstance(data, dict) or not isinstance(data.get("modules"), list):
         raise TypeError("reply is not an object with a modules list")
-    modules = data["modules"]
+    modules: list[dict[str, Any]] = data["modules"]
     for module in modules:
         if not isinstance(module, dict):
             raise TypeError("a module in the reply is not an object")
