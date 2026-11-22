@@ -297,7 +297,7 @@ def test_transport_error_reason_hides_host_and_url(
     assert all(SECRET_HOST not in line and "http" not in line for line in lines)
 
 
-def test_http_500_is_a_fail_line_with_type_reason(
+def test_http_500_is_a_fail_line_with_provider_reason(
     cli: ModuleType, capsys: pytest.CaptureFixture[str]
 ) -> None:
     recorder = Recorder(status=500, raw=b"boom")
@@ -305,7 +305,7 @@ def test_http_500_is_a_fail_line_with_type_reason(
     assert code == EXIT_FAILED
     cases = _case_lines(lines)
     assert len(cases) == CASE_COUNT
-    assert all(f'reason="{cli.UNEXPECTED_REASON_PREFIX}ProviderError"' in line for line in cases)
+    assert all('reason="model returned status 500"' in line for line in cases)
 
 
 def test_invalid_json_body_is_a_fail_line(
@@ -316,7 +316,7 @@ def test_invalid_json_body_is_a_fail_line(
     assert code == EXIT_FAILED
     cases = _case_lines(lines)
     assert len(cases) == CASE_COUNT
-    assert all(f'reason="{cli.UNEXPECTED_REASON_PREFIX}ModelError"' in line for line in cases)
+    assert all('reason="model reply has no message content"' in line for line in cases)
 
 
 def test_missing_usage_is_a_fail_line(cli: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
