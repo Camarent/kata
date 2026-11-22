@@ -70,6 +70,7 @@ Notes:
 - Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.
 - A concept made through `POST /concepts` belongs to its creator. A repeated label under the same topic and owner hits the unique index; the route does not map that error to a 4xx yet.
 - `POST /lesson-check` gives the state of each concept for the caller. `state` is `known`, `learning` or `abstain` from retrieval; a caller's mark gives its own state, which may be `new`. Retrieval never gives `new`: it cannot prove absence. `source` is `mark` when the caller's concept mark decides; then `evidence` is the mark's text. Otherwise `source` is `retrieval` and `evidence` is a list of `{"source_ref", "score"}` hits. An abstain has `source` `none` and `evidence` `[]`. The user id comes from the token, never from the body.
+- `POST /v1/courses` queues the worker job `course.generate`. Its output hook checks the drafts with the trainer and queues `course.build`, which builds the course or sets its `error`. The course `status` follows these two jobs.
 
 ## Events and messages
 
