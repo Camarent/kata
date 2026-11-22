@@ -396,3 +396,35 @@ Decided 2026-11-21. Keys added to `config/kata.example.toml`: `[jobs] runner_pol
 ## D16 Info surfaces
 
 Decided 2026-11-21. No existing contract shows courses or plans (extension side panel, editor, MCP tools). M5 adds no view. The backlog gets the entry "read-only plan/course view" (phase 02).
+
+## D17 M6 phases in one stage
+
+Decided 2026-11-22. The seven M6 phases (images, stack, proxy, backup, provision, finish) run as one stage with one task per phase, not one stage each. Reason: the owner is away and the phases share files (compose, config template, scripts); splitting them adds merge steps without a gain. Each phase still lands as its own commit and task, and the success criteria of the roadmap cover all of them.
+
+## D18 No pgvector
+
+Decided 2026-11-22. Postgres runs as the plain `postgres` image without the pgvector extension. Reason: the code does not use it. Embeddings are plain `real[]` (`core/migrations/0003_retrieval.sql:2`). Revisit only if retrieval moves to a vector index.
+
+## D19 Reverse proxy: Caddy bound to the tailnet IP, one name with paths
+
+Decided 2026-11-22. Caddy runs as a compose container and listens on the Tailscale IP of the VM only. Its TLS certificate comes from the tailscaled socket, which issues certificates for the node name. Reason: Tailscale gives one name per node, so the two names of design 4.2 become one name with paths. The phone page needs a secure context, and a Tailscale certificate provides it. Tailscale serve was rejected because the proxy settings the design needs (no buffering on stream routes, idle timeout above 15 s and 60 s) are set in one config file in Caddy.
+
+## D20 Nightly backup by a host systemd timer, encrypted with openssl
+
+Decided 2026-11-22. The nightly dump runs from a systemd timer on the host, not from a compose sidecar. Reason: the timer survives a stack restart and needs no extra container. Encryption uses `openssl enc -aes-256-cbc -pbkdf2` with a passphrase file, because no `age` binary is in the gate image. The passphrase file path comes from config and is never committed.
+
+## D21 Memory and CPU profiles as env files
+
+Decided 2026-11-22. Two profiles: `deploy/env/small.env` (for the 3 GB VM) and `deploy/env/large.env` (for a real server). Each sets named variables for container memory and CPU limits; the compose file reads them and the same names can be overridden by the environment. Reason: the design budget (12.5) is larger than the VM, so the small profile is the default and the large one is documented, not tuned.
+
+## D22 Migrate command and deep health route
+
+Decided 2026-11-22. A `kata_core.migrate` module provides the migrate command with a `--check` mode that reports pending migrations without applying them. A deep health route checks the database and the migration state, which the design (health checks) requires. Reason: the migrate one-shot in compose needs a command that can run before core starts, and the deep check needs a route to call.
+
+## D23 Shell and Dockerfile linters are not in the gate
+
+Decided 2026-11-22. shellcheck and hadolint are not in the gate image. Reason: the gate has no network and they are not installed. Tests check the image content rules and the script rules by script (for example, a non-root `USER`, a pinned base image, no `latest` tags). shellcheck and hadolint run as a documented manual step in `docs/deployment.md`.
+
+## D24 Notes are git-excluded and updated by the lead
+
+Decided 2026-11-22. Files under `.notes/` are git-excluded. Reason: they hold owner-local steps (for example `.notes/run-on-vm.md`) that must not reach the repo. Agents do not edit them; the lead updates them when the stage finishes.

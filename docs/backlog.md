@@ -4,6 +4,10 @@ Project items after Milestone 0.
 
 ## Open items
 
+- M5 leftovers blocking deployment: none. The open items below are not on the VM deploy path
+  (the core runs on the VM and is reached over the tailnet); the manifest host permission
+  item only matters when the extension talks to a tailnet name.
+
 - [ ] Load the extension in a real browser (side panel, content script, background wiring,
       real sign-in and "I know this" against a running core). Milestone 0 only checked the
       panel with stubs.
