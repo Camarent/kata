@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,8 @@ TEMPLATE = REPO_ROOT / "deploy" / "kata.host.toml"
 EXAMPLE = REPO_ROOT / "config" / "kata.example.toml"
 COMPOSE_TIMEOUT_SECONDS = 60
 TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+# Host-specific required variables that no env file sets; a placeholder lets compose interpolate.
+HOST_VARS = {"KATA_TAILNET_NAME": "validate.example.ts.net"}
 MIGRATE = "migrate"
 CORE = "core"
 MIGRATE_DONE = "service_completed_successfully"
@@ -55,9 +58,10 @@ def load_compose(compose: Path, env_file: Path) -> Model:
             "install docker (compose v2) to validate the stack"
         )
     cmd = [docker, "compose", "--env-file", str(env_file), "-f", str(compose), "config", "--format", "json"]
+    env = {**HOST_VARS, **os.environ}
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=COMPOSE_TIMEOUT_SECONDS, check=False
+            cmd, capture_output=True, text=True, timeout=COMPOSE_TIMEOUT_SECONDS, check=False, env=env
         )
     except subprocess.TimeoutExpired as exc:
         raise StackError(f"validate_stack: docker compose config timed out: {exc}") from exc
