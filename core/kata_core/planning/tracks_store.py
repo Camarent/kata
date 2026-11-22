@@ -199,6 +199,25 @@ def list_tracks(
     return [_track(row, items[int(row[0])]) for row in rows]
 
 
+def list_all_tracks(conn: psycopg.Connection[Any], user_id: int) -> list[Track]:
+    """Return every track of `user_id` with its items, oldest id first (the planner needs all of them)."""
+    rows = conn.execute(
+        f"SELECT {_TRACK_COLUMNS} FROM track WHERE user_id = %s ORDER BY id",
+        (user_id,),
+    ).fetchall()
+    items = _load_items(conn, [int(row[0]) for row in rows])
+    return [_track(row, items[int(row[0])]) for row in rows]
+
+
+def list_open_points(conn: psycopg.Connection[Any], user_id: int) -> list[DecisionPoint]:
+    """Return the open decision points of `user_id`, oldest id first."""
+    rows = conn.execute(
+        f"SELECT {_POINT_COLUMNS} FROM decision_point WHERE user_id = %s AND status = 'open' ORDER BY id",
+        (user_id,),
+    ).fetchall()
+    return [_point(row) for row in rows]
+
+
 def update_track(
     conn: psycopg.Connection[Any],
     user_id: int,
