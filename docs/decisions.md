@@ -428,3 +428,7 @@ Decided 2026-11-22. shellcheck and hadolint are not in the gate image. Reason: t
 ## D24 Notes are git-excluded and updated by the lead
 
 Decided 2026-11-22. Files under `.notes/` are git-excluded. Reason: they hold owner-local steps (for example `.notes/run-on-vm.md`) that must not reach the repo. Agents do not edit them; the lead updates them when the stage finishes.
+
+## Cloud smoke is opt-in, Haiku only, capped by budget, run by the lead
+
+Decided 2026-11-22. `scripts/smoke/real_model.py` sends the prepared cases to the Anthropic API. It runs only when `KATA_SMOKE_REAL=1` is set, the key is in the env, and the model is on `[smoke] allowed_models` (`claude-haiku-5-5`). Spend is capped by `[smoke] budget_micro_usd` (500000 micro-USD, 0.50 USD in the example config); the run stops at the cap and exits 1. The lead runs it by hand. check-all and CI never run it. Reason: a real call costs money and needs a secret, so it stays out of every automatic gate, and one model with a hard cap keeps the spend bounded. Limit: the smoke checks only that replies are non-empty and that JSON replies parse with their task shape; it does not judge answer quality.

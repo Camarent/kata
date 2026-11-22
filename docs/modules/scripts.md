@@ -5,7 +5,7 @@ summary: Operator DB CLI (create, migrate, drop) and the lesson-check benchmark 
 # scripts
 
 ## Purpose
-Four tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests). `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
+Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests). `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. `scripts/smoke/` runs the opt-in real-model smoke (see the smoke section below). The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
 
 ## Public surface
 - `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
@@ -33,11 +33,23 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/lesson_check_bench.py` - bench runner: seed, check, score, render.
 - `scripts/bench/scoring.py` - stdlib-only case loader and scorer; no DB, no `kata_core` import.
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
+- `scripts/smoke/real_model.py` - opt-in real-model smoke CLI; `scripts/smoke/smoke_core.py` - case loader, checks, masking; tested by `tests/scripts/test_smoke_cli.py` and `tests/scripts/test_smoke_core.py`.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
 - `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
 - `scripts/deploy/validate_stack.py` - compose and config template rules; tested by `tests/scripts/test_validate_stack.py`.
 - `scripts/deploy/replay_tombstone.py`, `scripts/deploy/verify_counts.py` - restore drill helpers; tested by `tests/scripts/test_restore.py` and `tests/scripts/test_relocate.py`.
+
+## scripts/smoke
+`scripts/smoke/real_model.py` runs the 4 prepared cases (`scripts/smoke/data/cases.json`) against the Anthropic API. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (env file holds `KATA_CONFIG` and the key in `KATA_ANTHROPIC_API_KEY`):
+
+`set -a; . <env file>; set +a; KATA_SMOKE_REAL=1 python scripts/smoke/real_model.py`
+
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_REAL=1`, the key env var is set, and the model is on `[smoke] allowed_models` (`real_model.py:104-119`). `--model` picks a model; the default is the first id in the list.
+- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:60`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`real_model.py:77-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
+- Checks per case (`scripts/smoke/smoke_core.py:191-202`): the reply is non-empty; a JSON case must parse, and `generate_course` and `extract_syllabus` must also pass `parse_drafts` and `parse_modules` (`smoke_core.py:44-47`).
+- Exit codes (`real_model.py:54-56`, `:145`): 0 when every case passes; 1 when a case fails or the cost cap stops the run; 2 when refused.
+- The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`smoke_core.py:181`, `:256-262`, `real_model.py:132`).
 
 ## Invariants and gotchas
 - `kata_db.py` needs the `core` package on `PYTHONPATH`; it imports `kata_core` directly.
