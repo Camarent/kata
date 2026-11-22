@@ -46,7 +46,7 @@ jobs:
           PY
           uv pip install --python .venv/bin/python -r requirements-ci.txt
       - run: .venv/bin/ruff check .
-      - run: MYPYPATH=worker .venv/bin/mypy core scripts/smoke/real_model.py scripts/smoke/smoke_core.py
+      - run: MYPYPATH=worker .venv/bin/mypy core scripts/smoke/real_model.py scripts/smoke/local_model.py scripts/smoke/smoke_core.py
       - run: npm --prefix extension ci
       - run: .venv/bin/python -m pytest tests -m 'not flaky and not browser'
       - run: npm --prefix extension run build

@@ -43,6 +43,10 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `cost.estimate_safety_percent` | 150 | `KATA_COST_ESTIMATE_SAFETY_PERCENT` |
 | `smoke.allowed_models` | "claude-haiku-5-5" | `KATA_SMOKE_ALLOWED_MODELS` |
 | `smoke.budget_micro_usd` | 500000 | `KATA_SMOKE_BUDGET_MICRO_USD` |
+| `smoke_local.models` | "kata-l" | `KATA_SMOKE_LOCAL_MODELS` |
+| `smoke_local.case_timeout_seconds` | 180 | `KATA_SMOKE_LOCAL_CASE_TIMEOUT_SECONDS` |
+| `smoke_local.warmup_timeout_seconds` | 600 | `KATA_SMOKE_LOCAL_WARMUP_TIMEOUT_SECONDS` |
+| `smoke_local.num_ctx` | 8192 | `KATA_SMOKE_LOCAL_NUM_CTX` |
 | `routing.tag` | "local" | `KATA_ROUTING_TAG` |
 | `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
 | `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |

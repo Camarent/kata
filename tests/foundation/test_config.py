@@ -58,9 +58,16 @@ def test_example_has_required_sections() -> None:
         "syllabus",
         "planning",
         "smoke",
+        "smoke_local",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd", "estimate_safety_percent"}
     assert set(data["smoke"]) == {"allowed_models", "budget_micro_usd"}
+    assert set(data["smoke_local"]) == {
+        "models",
+        "case_timeout_seconds",
+        "warmup_timeout_seconds",
+        "num_ctx",
+    }
     assert set(data["policy"]) == {
         "quiet_mark_enabled",
         "quiet_mark_idle_seconds",

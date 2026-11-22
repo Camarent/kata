@@ -86,6 +86,12 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Cloud provider is `guarded(capped(inner))` (`worker/kata_worker/providers/anthropic.py:106`): the guard runs before the cap, so a blocked text never reads the ledger (`tests/worker/test_router.py:203`). No key: cloud is absent and the router skips it (`worker/kata_worker/providers/router.py:102-104`).
 - Handlers re-raise `CoreError` from a router ledger call, so `run_forever` logs it and the job is not failed as a tagging error (`worker/kata_worker/handlers/tag.py:26-27`, `worker/kata_worker/handlers/course.py:45-46`).
 
+## Local provider transport and router fallback
+- `LocalProvider(config, *, transport=None)` (`worker/kata_worker/providers/local.py:21`) takes an optional `httpx` transport. Production passes none, so it makes real HTTP calls to `[model] base_url`. Tests and the local smoke pass a transport, so no socket is opened (`tests/worker/test_providers.py:105`, `scripts/smoke/local_model.py:201`).
+- Local transport errors (timeout, refused connection, non-200, unreadable body) all surface as `ProviderError` (`tests/worker/test_providers.py:125`, `:132`, `:146`, `:151`), so the router handles them like any other provider failure.
+- Router fallback is covered in `tests/worker/test_router.py`: a local failure with cloud disallowed exhausts the chain with no cloud call (`:127`); a local failure with cloud over cap exhausts it the same way (`:142`); a local failure falls to an allowed cloud provider with room (`:116`); an over-cap or blocked cloud call falls to local (`:92`, `:157`).
+- Local-first is only the default for the `tag` class (`config/kata.example.toml:75`); other classes list cloud first or cloud only (`:76-78`). The fallback is the chain order, never a hidden retry.
+
 ## Smoke settings and prices
 - `PRICES` has `claude-haiku-5-5` at `(1_000_000, 5_000_000)` micro-USD per 1M tokens (`worker/kata_worker/providers/cost.py:23`); an unpriced model is refused.
 - The real-model smoke (`scripts/smoke/real_model.py`) uses this worker code. Its settings are the `[smoke]` section: `allowed_models = "claude-haiku-5-5"` and `budget_micro_usd = 500000` (`config/kata.example.toml:58-60`). The run is opt-in and never part of check-all or CI; see [scripts](scripts.md).

@@ -62,6 +62,14 @@ estimate_safety_percent = 150
 allowed_models = "claude-haiku-5-5"
 budget_micro_usd = 500000
 
+# Opt-in local smoke run, started by the lead by hand (never by CI). The base URL comes from env
+# KATA_SMOKE_LOCAL_BASE_URL or the --base-url flag; it is never written here.
+[smoke_local]
+models = "kata-l"
+case_timeout_seconds = 180
+warmup_timeout_seconds = 600
+num_ctx = 8192
+
 [routing]
 # Per task class: comma list of provider names, tried in order.
 tag = "local"
