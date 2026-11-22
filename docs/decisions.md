@@ -407,7 +407,7 @@ Decided 2026-11-22. Postgres runs as the plain `postgres` image without the pgve
 
 ## D19 Reverse proxy: Caddy bound to the tailnet IP, one name with paths
 
-Decided 2026-11-22. Caddy runs as a compose container and listens on the Tailscale IP of the VM only. Its TLS certificate comes from the tailscaled socket, which issues certificates for the node name. Reason: Tailscale gives one name per node, so the two names of design 4.2 become one name with paths. The phone page needs a secure context, and a Tailscale certificate provides it. Tailscale serve was rejected because the proxy settings the design needs (no buffering on stream routes, idle timeout above 15 s and 60 s) are set in one config file in Caddy.
+Decided 2026-11-22. Caddy runs as a compose container and listens on the Tailscale IP of the VM only. Its TLS certificate is a Tailscale certificate for the node name. Caddy in a container cannot use the tailscaled socket, so the host runs `tailscale cert` and writes the files that compose mounts read-only (renewal about every 60 days). Reason: Tailscale gives one name per node, so the two names of design 4.2 become one name with paths. The phone page needs a secure context, and a Tailscale certificate provides it. Tailscale serve was rejected because the proxy settings the design needs (no buffering on stream routes, idle timeout above 15 s and 60 s) are set in one config file in Caddy.
 
 ## D20 Nightly backup by a host systemd timer, encrypted with openssl
 

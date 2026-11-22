@@ -111,7 +111,7 @@ services:
     ports:
       - "${KATA_BIND_ADDR:-127.0.0.1}:443:443"
     volumes:
-      # Caddyfile is task 9 (deploy/Caddyfile). TLS comes from the tailscaled socket (D19).
+      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from `tailscale cert` run on the host (D19, see Caddyfile).
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - ${KATA_TAILSCALE_SOCKET_DIR:-/var/run/tailscale}:/var/run/tailscale:ro
