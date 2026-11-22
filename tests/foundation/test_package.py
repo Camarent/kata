@@ -17,7 +17,7 @@ def test_project_metadata() -> None:
     assert project["version"] == "0.0.0"
     assert project["requires-python"] == ">=3.11"
     assert project["dependencies"] == [
-        "fastapi==0.162.5",
+        "fastapi==0.163.2",
         "psycopg[binary]==3.3.9",
         "httpx==0.28.1",
         "uvicorn==0.54.0",
