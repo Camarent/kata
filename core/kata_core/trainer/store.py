@@ -146,6 +146,24 @@ def add_files(
     return True
 
 
+def read_files(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    course_id: int,
+) -> dict[str, str] | None:
+    """Return the generated source files (path -> text) of a course of `user_id`, sorted by path.
+
+    None when the course is missing or foreign.
+    """
+    if not _owned(conn, user_id, course_id):
+        return None
+    rows = conn.execute(
+        "SELECT path, content FROM course_file WHERE course_id = %s ORDER BY path",
+        (course_id,),
+    ).fetchall()
+    return {str(path): str(content) for path, content in rows}
+
+
 def add_artifacts(
     conn: psycopg.Connection[Any],
     user_id: int,
