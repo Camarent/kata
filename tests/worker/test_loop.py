@@ -19,6 +19,7 @@ from kata_core.config import Config, load_config
 from kata_worker.core_client import CoreClient
 from kata_worker.handlers import course as course_handler
 from kata_worker.handlers import load_handlers
+from kata_worker.handlers import syllabus as syllabus_handler
 from kata_worker.handlers import tag as tag_handler
 from kata_worker.handlers.tag import TAG_CLASS
 from kata_worker.loop import run_forever, run_once
@@ -206,10 +207,11 @@ def test_job_of_kind_without_handler_is_failed_not_run(
     assert fake_model.requests == []
 
 
-def test_handler_registry_discovers_tag_and_course_handlers() -> None:
+def test_handler_registry_discovers_tag_course_and_syllabus_handlers() -> None:
     assert load_handlers() == {
         tag_handler.KIND: tag_handler.handle,
         course_handler.KIND: course_handler.handle,
+        syllabus_handler.KIND: syllabus_handler.handle,
     }
     assert tag_handler.KIND == "tag"
 
