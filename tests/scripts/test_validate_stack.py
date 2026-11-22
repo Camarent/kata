@@ -186,7 +186,8 @@ def _mutate_core_not_waiting(text: str) -> str:
 
 
 def _mutate_latest(text: str) -> str:
-    return _replace_once(text, "image: caddy:2.8-alpine", "image: caddy:latest")
+    caddy_pin = "    image: ${CADDY_IMAGE:?fill in deploy/versions.env}@${CADDY_DIGEST:?fill in deploy/versions.env}\n"
+    return _replace_once(text, caddy_pin, "    image: caddy:latest\n")
 
 
 # rule -> (compose mutation, template mutation); each case changes exactly one rule's input.

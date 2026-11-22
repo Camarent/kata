@@ -41,7 +41,16 @@ EXAMPLE = REPO_ROOT / "config" / "kata.example.toml"
 COMPOSE_TIMEOUT_SECONDS = 60
 TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 # Host-specific required variables that no env file sets; a placeholder lets compose interpolate.
-HOST_VARS = {"KATA_TAILNET_NAME": "validate.example.ts.net"}
+# The image pins come from deploy/versions.env, whose digests the owner fills; the placeholder digest
+# only satisfies compose's required-variable check (the no-latest rule checks that "@" is present).
+PLACEHOLDER_DIGEST = "sha256:" + "0" * 64
+HOST_VARS = {
+    "KATA_TAILNET_NAME": "validate.example.ts.net",
+    "POSTGRES_IMAGE": "postgres:17",
+    "POSTGRES_DIGEST": PLACEHOLDER_DIGEST,
+    "CADDY_IMAGE": "caddy:2.8-alpine",
+    "CADDY_DIGEST": PLACEHOLDER_DIGEST,
+}
 MIGRATE = "migrate"
 CORE = "core"
 MIGRATE_DONE = "service_completed_successfully"
