@@ -21,10 +21,17 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/topics/{topic_id}/aliases` | bearer | `{"alias": str}` | 200 `{"id", "topic_id", "alias", "private": true}` | 404 topic not found |
 | POST | `/import` | bearer | raw UTF-8 text, skill list format (see below) | 200 `{"created_topics": int, "marked": int}` | 422 bad line or body not UTF-8; nothing changes |
 | POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | |
-| GET | `/jobs/next` | bearer | none | 200 `{"id": int, "payload": str}` | 204 nothing queued |
+| GET | `/jobs/next?kind=` | bearer | query: repeated `kind`, optional | 200 `{"id": int, "payload": str}` | 204 nothing queued; no `kind` means `tag` only |
 | POST | `/jobs/{job_id}/result` | bearer | `{"category": str, "topic": str}` | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/fail` | bearer | none | 204 | 404 job not found or not leased by the caller |
+| POST | `/jobs/{job_id}/output` | bearer | `{"output": {...}}` (JSON object) | 204; runs the kind's output hook in the same transaction | 404 job not found or not leased by the caller; 413 output above `[jobs] max_output_bytes`; 422 the job kind has no output hook (nothing stored) |
 | GET | `/jobs/{job_id}` | bearer | none | 200 `{"status": str, "topic": {"id", "category", "label"} or null, "known": bool or null}` | 404 job not found |
+| POST | `/v1/courses` | bearer, `trainer` feature | `{"concept_ids": [int, ...] \| null, "title": str = ""}` | 202 course fields plus `"job_id"` | 422 the gap rule finds nothing to study, or a named concept is not visible to the caller |
+| GET | `/v1/courses?limit=50&before_id=N` | bearer, `trainer` feature | query: `limit` 1..100 (default 50), `before_id` optional | 200 `{"items": [course, ...], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..100; `next_before_id` is null unless the page is full |
+| GET | `/v1/courses/{course_id}` | bearer, `trainer` feature | none | 200 course: `{"id", "title", "status", "concept_ids", "error", "created_at", "updated_at"}` | 404 course not found or not the caller's |
+| DELETE | `/v1/courses/{course_id}` | bearer, `trainer` feature | none | 204 | 404 course not found or not the caller's |
+| GET | `/v1/courses/{course_id}/progress` | bearer, `trainer` feature | none | 200 `{"revision": int, "doc": {...}}`, with `ETag: "<revision>"` | 404 course not found or not the caller's |
+| PUT | `/v1/courses/{course_id}/progress` | bearer, `trainer` feature; `If-Match: "<revision>"` required | progress document JSON object | 200 `{"revision", "evidence_written", "skipped_items"}`, with `ETag` | 428 no `If-Match`; 400 `If-Match` not a revision number or body malformed; 413 above `[trainer] max_progress_bytes`; 412 revision mismatch, body `{"revision", "doc"}` holds the current document; 409 course not ready; 404 course not found or not the caller's |
 | GET | `/marks` | bearer | none | 200 list of `{"topic_id", "category", "topic", "status"}` | |
 | PUT | `/marks/{topic_id}` | bearer | `{"status": "known"}` | 200 `{"topic_id", "category", "topic", "status"}` | 404 topic not found |
 | DELETE | `/marks/{topic_id}` | bearer | none | 204 | 404 mark not found |
