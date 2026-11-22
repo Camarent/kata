@@ -40,6 +40,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
 | `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
 | `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
+| `cost.estimate_safety_percent` | 150 | `KATA_COST_ESTIMATE_SAFETY_PERCENT` |
 | `smoke.allowed_models` | "claude-haiku-5-5" | `KATA_SMOKE_ALLOWED_MODELS` |
 | `smoke.budget_micro_usd` | 500000 | `KATA_SMOKE_BUDGET_MICRO_USD` |
 | `routing.tag` | "local" | `KATA_ROUTING_TAG` |
@@ -58,6 +59,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
 | `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
 | `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
+| `provider_anthropic.cache_system` | false | `KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM` |
 | `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
 | `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
 | `policy.nudge_enabled` | true | `KATA_POLICY_NUDGE_ENABLED` |

@@ -32,10 +32,11 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/policy.py:43` `Policy` - `from_config(config)` (`:50`), `allows(provider, task_class) -> bool` (`:61`); `PolicyError` at `:19`; `PROVIDER_NAMES` at `:16`.
 - `core/kata_core/egress/scanner.py:45` `scan(text) -> list[Finding]` - secret findings ordered by offset; `Finding(kind, offset)` at `:15`; fixed `RULES` at `:29`. Lives in core; the guard imports it (`worker/kata_worker/providers/guard.py:14`).
 - `worker/kata_worker/providers/guard.py:57` `guarded(inner, audit) -> GuardedProvider` - the only way to build a guarded provider; `GuardedProvider` at `:38` (`complete` at `:47`); `SecretBlocked(ProviderError)` at `:30`; `AuditEvent(kind, offset)` at `:20`; `AuditSink` at `:27`.
-- `worker/kata_worker/providers/cost.py:68` `CappedProvider(inner, ledger, model, cap, warn, log)` - `complete` at `:89`; built by `capped` (`:105`) from `[cost]`.
-- `worker/kata_worker/providers/cost.py:43` `Ledger` (Protocol) - `record_usage(micro_usd)` (`:46`), `usage_today() -> int` (`:48`); `CoreClient` implements it (`worker/kata_worker/core_client.py:128`, `:134`).
-- `worker/kata_worker/providers/cost.py:54` `estimate_tokens(text) -> int`; `:59` `cost_micro_usd(model, in_text, out_text) -> int` (integer micro-USD, rounded up).
-- `worker/kata_worker/providers/cost.py:20` `PRICES` - pinned `(input, output)` micro-USD per 1M tokens, keyed by model name; `:29` `PricingError(ProviderError)`; `:33` `CapReached(ProviderError)` with `spent` and `cap`.
+- `worker/kata_worker/providers/base.py:20` `TokenUsage` - `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` (cache counts 0 when absent); `:30` `Completion(text, usage)` - `usage` is None when the backend gave none or a malformed one; `:48` `UsageProvider` (Protocol) - `complete_with_usage(system, user) -> Completion`. `complete` stays the text-only contract.
+- `worker/kata_worker/providers/cost.py:90` `CappedProvider(inner, ledger, model, cap, warn, safety_percent, log)` - `complete` at `:115`; built by `capped` (`:141`) from `[cost]`. Calls `complete_with_usage` when the inner provider is a `UsageProvider`.
+- `worker/kata_worker/providers/cost.py:49` `Ledger` (Protocol) - `record_usage(micro_usd)` (`:52`), `usage_today() -> int` (`:54`); `CoreClient` implements it (`worker/kata_worker/core_client.py:128`, `:134`).
+- `worker/kata_worker/providers/cost.py:60` `estimate_tokens(text) -> int`; `:65` `cost_micro_usd(model, in_text, out_text) -> int` (estimate from text, integer micro-USD, rounded up); `:74` `cost_from_usage(model, usage) -> int` (billed-style cost from real token counts, integer micro-USD, rounded up).
+- `worker/kata_worker/providers/cost.py:21` `PRICES` - pinned `(input, output)` micro-USD per 1M tokens, keyed by model name; `:35` `PricingError(ProviderError)`; `:39` `CapReached(ProviderError)` with `spent` and `cap`. Cache prices are fixed multiples of the input price: `CACHE_WRITE_HUNDREDTHS = 125`, `CACHE_READ_HUNDREDTHS = 10` (`:31-32`).
 - `worker/kata_worker/providers/__init__.py:7` `__all__` - re-exports `TASK_CLASSES`, `GuardedProvider`, `LocalProvider`, `Provider`, `ProviderError`, `SecretBlocked`, `guarded` only (`AnthropicProvider`, `Policy` and `scan` are imported from their modules).
 
 ## Key files
@@ -49,7 +50,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/policy.py` - which provider may run which task class.
 - `core/kata_core/egress/scanner.py` (core, not worker) - secret rules and `scan`; returns kind and offset only.
 - `worker/kata_worker/providers/guard.py` - `GuardedProvider`: scans system and user text of cloud calls before the inner provider runs.
-- `worker/kata_worker/providers/cost.py` - `CappedProvider`: daily cap check before a cloud call, spend recorded after it.
+- `worker/kata_worker/providers/cost.py` - `CappedProvider`: daily cap check before a cloud call (on the estimate), spend recorded after it from the reported usage (estimate only when no usage).
 - `worker/kata_worker/providers/router.py` - `Router`: walks a task class's chain, skips or fails providers, returns the first reply; `build_router` reads `[routing]`.
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
@@ -70,10 +71,14 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Findings and errors hold rule kind and offset only, never the matched text (`core/kata_core/egress/scanner.py:3`, `worker/kata_worker/providers/guard.py:20`).
 - Scanner rules: `high_entropy` needs a token of 20 or more `[A-Za-z0-9+/_=-]` characters with entropy of at least 4.0 bits (`core/kata_core/egress/scanner.py:27`, `:34`, `:58`); a match overlapping an earlier rule's match is dropped (`:56`), so rule order in `RULES` matters.
 - Cost cap applies only to cloud providers; a local provider passes through with no ledger access (`worker/kata_worker/providers/cost.py:90-91`).
-- An unpriced model raises `PricingError` before any cloud call (`worker/kata_worker/providers/cost.py:93`); prices live in `PRICES` (`:20`), not in config.
-- The cap is checked before the call: `CapReached` when today's spend is at or over `cap_micro_usd` (`worker/kata_worker/providers/cost.py:95-96`). Spend is recorded after the call, so one call may overshoot the cap by its own cost (`:98`).
-- Cost is estimated from text: ceil(chars / 4) tokens per side, priced in integer micro-USD, rounded up (`worker/kata_worker/providers/cost.py:54-65`). The input side is `system + user`, the output side is the reply.
-- The warn level writes one log line and does not block calls (`worker/kata_worker/providers/cost.py:100-101`).
+- An unpriced model raises `PricingError` before any cloud call (`worker/kata_worker/providers/cost.py:81` for the usage path, `:68` for the estimate path); prices live in `PRICES` (`:21`), not in config.
+- Ledger cost is real usage: when the provider returns `usage`, the recorded cost is `cost_from_usage` (input and output tokens at the `PRICES` rate, cache writes at 1.25x input, cache reads at 0.1x input, rounded up; `worker/kata_worker/providers/cost.py:74-87`). The text-length estimate is only the pre-call guard and the fallback when no usage is present (`:133`).
+- The pre-call guard uses the estimate: `guard = ceil(estimate_input * estimate_safety_percent / 100)` (`worker/kata_worker/providers/cost.py:120-121`). The call is refused when `spent + guard >= cap_micro_usd` (`:123-124`, `CapReached`). The estimate is not the billed cost; the safety percent covers the input side only. Output is not guarded, so the billed output can overshoot the cap by up to one call's cost.
+- Spend is recorded after the call, so one call may overshoot the cap by its own cost, which the guard bounds (`:134`).
+- Estimate (no usage): ceil(chars / 4) tokens per side, priced in integer micro-USD, rounded up (`worker/kata_worker/providers/cost.py:60-71`). The input side is `system + user`, the output side is the reply.
+- The warn level writes one log line and does not block calls (`worker/kata_worker/providers/cost.py:136-137`).
+- `estimate_safety_percent` must be at least 100 (`worker/kata_worker/providers/cost.py:103-104`); the example is 150 (`config/kata.example.toml:57`).
+- Prompt caching is opt-in: `[provider_anthropic] cache_system = false` by default (`config/kata.example.toml:89`). When true, the system block is sent with `cache_control: {"type": "ephemeral"}` (`worker/kata_worker/providers/anthropic.py:109`), and the cache counts in `usage` are priced by `cost_from_usage`. Anthropic caches a prompt only above a minimum length: about 2048 tokens for Haiku 4.5 class models (per the Anthropic docs; not checked against the live API here). The smoke prompts are far below that, so caching does not cut their cost; it helps the course-generation prompts once they are long. No test makes a real call.
 - Cost errors name amounts or the model only, never prompt or reply text (`worker/kata_worker/providers/cost.py:34-37`).
 - Router: a provider missing from `providers`, or one `Policy` denies for the class, is skipped with no call; a `ProviderError` is logged by name and the next provider is tried; all skipped or failed raises `RouteExhausted` (`worker/kata_worker/providers/router.py:79-94`).
 - No implicit local fallback: local is tried only when the task class's chain lists it (`worker/kata_worker/providers/router.py:80`; `tests/worker/test_router.py:152`).
@@ -89,6 +94,8 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Depends on: `core/` (`kata_core.config.Config`) for settings; `kata_core.egress.scanner` (`scan`, used by `providers/guard.py`); the core HTTP API (`/jobs/next` with `kind` query, `/jobs/{id}/result`, `/jobs/{id}/output`, `/jobs/{id}/fail`); an OpenAI-style chat endpoint at `[model] base_url`.
 - Providers: `kata_worker.model` (`CHAT_PATH`, `ModelError`, `reply_content`) used by `providers/local.py`; Anthropic Messages API at `[provider_anthropic] base_url` (`/v1/messages`).
 - Provider config: `[routing]` chain per task class (`config/kata.example.toml:52`); `[providers]` `cloud_enabled` (`:60`); `[provider_local]` `task_classes` (`:63`); `[provider_anthropic]` `allow_cloud` (`:66`), `task_classes` (`:67`), `api_key_env` (`:70`).
-- Cost config: `[cost]` `cap_micro_usd` and `warn_micro_usd` (`config/kata.example.toml:49-50`); spend goes to the core `POST /usage` and is read from `GET /usage` (`docs/api.md`).
+- Cost config: `[cost]` `cap_micro_usd` and `warn_micro_usd` (`config/kata.example.toml:53-54`), `estimate_safety_percent` (`:57`, pre-call guard only); spend goes to the core `POST /usage` and is read from `GET /usage` (`docs/api.md`).
+- Prompt caching config: `[provider_anthropic]` `cache_system` (`config/kata.example.toml:89`, default false; see the cost invariants above).
+- The smoke run prints the ledger cost from usage, the input and output token counts, and one line with the estimated versus billed cost per run (`scripts/smoke/real_model.py`).
 - Config keys: `[worker]` `poll_interval_seconds`, `request_timeout_seconds`, `core_url`, `token_env`; `[model]` `base_url`, `model_name`, `timeout_seconds` (`config/kata.example.toml:19`, `:28`). Env overrides follow the config module (`KATA_*`).
 - Used by: `tests/worker/`, and `tests/e2e/conftest.py:143` `running_worker` (`kata_worker.loop.run_forever` in a thread).

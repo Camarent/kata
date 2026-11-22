@@ -35,6 +35,7 @@ from smoke_core import (
     SmokeRefused,
     UsageTransport,
     allowed_models,
+    billed_micro_usd,
     check_model,
     format_line,
     load_cases,
@@ -127,13 +128,18 @@ def main(
         cases = load_cases()
     except SmokeError as exc:
         return _refuse(f"refused: {exc}")
-    outcome = run_cases(cases, provider, ledger, usage, secret=key)
+    outcome = run_cases(cases, provider, ledger, usage, model=model, secret=key)
     for result in outcome.results:
         print(format_line(result))
     passed = sum(1 for result in outcome.results if result.passed)
     print(
         f"total cases={len(outcome.results)} pass={passed} "
         f"cost_micro_usd={ledger.usage_today()} budget_micro_usd={budget}"
+    )
+    estimated = sum(result.estimated_micro_usd for result in outcome.results)
+    print(
+        f"estimated_micro_usd={estimated} "
+        f"billed_micro_usd={billed_micro_usd(model, usage.usage)}"
     )
     if outcome.stopped:
         print(

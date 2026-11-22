@@ -9,18 +9,19 @@ masked before the excerpt is cut.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
 import httpx
 from kata_core.config import Config
 from kata_worker.handlers.course import COURSE_SYSTEM_PROMPT, parse_drafts
 from kata_worker.handlers.syllabus import SYLLABUS_SYSTEM_PROMPT, parse_modules
 from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
-from kata_worker.providers.base import Provider, ProviderError
-from kata_worker.providers.cost import CapReached, Ledger
+from kata_worker.providers.anthropic import reply_usage
+from kata_worker.providers.base import Provider, ProviderError, TokenUsage
+from kata_worker.providers.cost import CapReached, Ledger, cost_from_usage, cost_micro_usd
 
 SMOKE_SECTION = "smoke"
 ALLOWED_KEY = "allowed_models"
@@ -55,11 +56,6 @@ class SmokeRefused(Exception):
     """The model is not on the [smoke] allow-list. Refused before any request is sent."""
 
 
-class Usage(NamedTuple):
-    input_tokens: int
-    output_tokens: int
-
-
 def allowed_models(config: Config) -> frozenset[str]:
     """The model ids the smoke run may call: the comma list at [smoke] allowed_models."""
     raw = str(config.get(SMOKE_SECTION, ALLOWED_KEY))
@@ -79,32 +75,17 @@ def require_allowed(config: Config) -> str:
     return model
 
 
-def _parse_usage(response: httpx.Response) -> Usage | None:
-    """Read `usage` from a Messages reply body; None when the body has no usable usage block."""
-    try:
-        usage = response.json().get("usage")
-    except (ValueError, AttributeError):
-        return None
-    if not isinstance(usage, dict):
-        return None
-    input_tokens = usage.get("input_tokens")
-    output_tokens = usage.get("output_tokens")
-    if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
-        return None
-    return Usage(input_tokens, output_tokens)
-
-
 class UsageTransport(httpx.BaseTransport):
     """Wraps an inner transport and keeps the token usage of each reply, in call order."""
 
     def __init__(self, inner: httpx.BaseTransport) -> None:
         self._inner = inner
-        self.usage: list[Usage] = []
+        self.usage: list[TokenUsage] = []
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         response = self._inner.handle_request(request)
         response.read()
-        found = _parse_usage(response)
+        found = reply_usage(response)
         if found is not None:
             self.usage.append(found)
         return response
@@ -142,6 +123,7 @@ class CaseResult:
     in_tokens: int
     out_tokens: int
     cost_micro_usd: int
+    estimated_micro_usd: int
     passed: bool
     excerpt: str
 
@@ -208,9 +190,14 @@ def run_case(
     ledger: Ledger,
     usage: UsageTransport,
     *,
+    model: str,
     secret: str,
 ) -> CaseResult:
-    """Run one case through `provider`; raise CapReached (not a FAIL) when the cap stops it."""
+    """Run one case through `provider`; raise CapReached (not a FAIL) when the cap stops it.
+
+    `estimated_micro_usd` prices the case texts (system + user in, reply out) with the text
+    estimate; a failed call has no reply, so its output counts as empty.
+    """
     user = case.input_path.read_text(encoding="utf-8")
     cost_before = ledger.usage_today()
     calls_before = len(usage.usage)
@@ -223,6 +210,7 @@ def run_case(
     except ProviderError as exc:
         passed = False
         text = str(exc)
+        reply = ""
     new_usage = usage.usage[calls_before:]
     return CaseResult(
         case_id=case.id,
@@ -230,9 +218,15 @@ def run_case(
         in_tokens=sum(item.input_tokens for item in new_usage),
         out_tokens=sum(item.output_tokens for item in new_usage),
         cost_micro_usd=ledger.usage_today() - cost_before,
+        estimated_micro_usd=cost_micro_usd(model, case.system + user, reply),
         passed=passed,
         excerpt=excerpt(text, secret),
     )
+
+
+def billed_micro_usd(model: str, calls: Sequence[TokenUsage]) -> int:
+    """Billed cost of the calls in micro-USD: each call priced from its reported usage."""
+    return sum(cost_from_usage(model, call) for call in calls)
 
 
 def run_cases(
@@ -241,13 +235,14 @@ def run_cases(
     ledger: Ledger,
     usage: UsageTransport,
     *,
+    model: str,
     secret: str,
 ) -> RunOutcome:
     """Run the cases in order; stop at the first case the cost cap refuses to send."""
     results: list[CaseResult] = []
     for case in cases:
         try:
-            results.append(run_case(case, provider, ledger, usage, secret=secret))
+            results.append(run_case(case, provider, ledger, usage, model=model, secret=secret))
         except CapReached:
             return RunOutcome(results=results, stopped=True)
     return RunOutcome(results=results, stopped=False)

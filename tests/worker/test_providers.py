@@ -16,6 +16,7 @@ from kata_worker.model import ModelError
 from kata_worker.providers import TASK_CLASSES, LocalProvider, Provider, ProviderError
 from kata_worker.providers import local as local_module
 from kata_worker.providers.anthropic import AnthropicProvider
+from kata_worker.providers.base import Completion, TokenUsage, UsageProvider
 
 SYSTEM = "You are a tutor."
 USER = "Explain TCP in one line."
@@ -159,12 +160,28 @@ def test_fake_provider_satisfies_protocol() -> None:
     assert isinstance(FakeProvider(name="fake", is_cloud=True), Provider)
 
 
+def test_fake_provider_reports_scripted_usage_per_call() -> None:
+    usage = TokenUsage(input_tokens=5, output_tokens=2)
+    fake = FakeProvider(script=["a", "b"], usage_script=[usage])
+
+    first = fake.complete_with_usage(SYSTEM, USER)
+    second = fake.complete_with_usage(SYSTEM, USER)
+
+    assert first == Completion(text="a", usage=usage)
+    assert second == Completion(text="b", usage=None)
+
+
+def test_fake_provider_satisfies_usage_protocol() -> None:
+    assert isinstance(FakeProvider(), UsageProvider)
+
+
 def _anthropic(
     handler: Callable[[httpx.Request], httpx.Response],
     key: str | None = ANTHROPIC_KEY,
+    extra: dict[str, str] | None = None,
 ) -> AnthropicProvider:
     """Anthropic provider on an in-process MockTransport: no socket, no network."""
-    env = {"KATA_PROVIDER_ANTHROPIC_BASE_URL": ANTHROPIC_BASE}
+    env = {"KATA_PROVIDER_ANTHROPIC_BASE_URL": ANTHROPIC_BASE, **(extra or {})}
     if key is not None:
         env[ANTHROPIC_KEY_ENV] = key
     config = load_config(EXAMPLE_PATH, env=env)
@@ -205,6 +222,34 @@ def test_anthropic_request_shape_carries_key_and_version() -> None:
     assert body["max_tokens"] > 0
     assert body["system"] == SYSTEM
     assert body["messages"] == [{"role": "user", "content": USER}]
+
+
+def test_anthropic_cache_system_off_sends_plain_system_string() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+    _anthropic(handler).complete(SYSTEM, USER)
+
+    assert json.loads(seen[0].content)["system"] == SYSTEM
+
+
+def test_anthropic_cache_system_on_marks_system_block_ephemeral() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+    _anthropic(handler, extra={"KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM": "true"}).complete(
+        SYSTEM, USER
+    )
+
+    assert json.loads(seen[0].content)["system"] == [
+        {"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}
+    ]
 
 
 def test_anthropic_reply_joins_text_blocks_and_skips_other_blocks() -> None:
@@ -263,3 +308,69 @@ def test_anthropic_key_absent_from_error_text() -> None:
         _anthropic(handler).complete(SYSTEM, USER)
     assert ANTHROPIC_KEY not in str(info.value)
     assert ANTHROPIC_KEY not in repr(info.value)
+
+
+def _usage_reply(body: dict[str, object]) -> Callable[[httpx.Request], httpx.Response]:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "hi"}], **body})
+
+    return handler
+
+
+def test_anthropic_complete_with_usage_reports_all_counts() -> None:
+    usage = {
+        "input_tokens": 11,
+        "output_tokens": 7,
+        "cache_creation_input_tokens": 3,
+        "cache_read_input_tokens": 4,
+    }
+
+    completion = _anthropic(_usage_reply({"usage": usage})).complete_with_usage(SYSTEM, USER)
+
+    assert completion == Completion(
+        text="hi",
+        usage=TokenUsage(
+            input_tokens=11,
+            output_tokens=7,
+            cache_creation_input_tokens=3,
+            cache_read_input_tokens=4,
+        ),
+    )
+
+
+def test_anthropic_cache_counts_default_to_zero_when_absent() -> None:
+    usage = {"input_tokens": 11, "output_tokens": 7}
+
+    completion = _anthropic(_usage_reply({"usage": usage})).complete_with_usage(SYSTEM, USER)
+
+    assert completion.usage == TokenUsage(input_tokens=11, output_tokens=7)
+
+
+def test_anthropic_complete_returns_text_and_ignores_usage() -> None:
+    usage = {"input_tokens": 1, "output_tokens": 1}
+
+    assert _anthropic(_usage_reply({"usage": usage})).complete(SYSTEM, USER) == "hi"
+
+
+def test_anthropic_usage_absent_is_none() -> None:
+    completion = _anthropic(_usage_reply({})).complete_with_usage(SYSTEM, USER)
+
+    assert completion == Completion(text="hi", usage=None)
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        "oops",
+        ["input_tokens", 1],
+        {"output_tokens": 7},
+        {"input_tokens": "11", "output_tokens": 7},
+        {"input_tokens": 11, "output_tokens": -1},
+        {"input_tokens": True, "output_tokens": 7},
+        {"input_tokens": 11, "output_tokens": 7, "cache_read_input_tokens": "x"},
+    ],
+)
+def test_anthropic_malformed_usage_is_none_and_keeps_text(usage: object) -> None:
+    completion = _anthropic(_usage_reply({"usage": usage})).complete_with_usage(SYSTEM, USER)
+
+    assert completion == Completion(text="hi", usage=None)

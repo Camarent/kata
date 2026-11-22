@@ -59,7 +59,7 @@ def test_example_has_required_sections() -> None:
         "planning",
         "smoke",
     }
-    assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd"}
+    assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd", "estimate_safety_percent"}
     assert set(data["smoke"]) == {"allowed_models", "budget_micro_usd"}
     assert set(data["policy"]) == {
         "quiet_mark_enabled",
@@ -111,6 +111,7 @@ def test_example_has_required_sections() -> None:
         "timeout_seconds",
         "max_tokens",
         "api_version",
+        "cache_system",
     }
     assert data["providers"]["cloud_enabled"] is False
     assert data["provider_anthropic"]["allow_cloud"] is False
