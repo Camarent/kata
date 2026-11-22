@@ -11,16 +11,10 @@ from typing import Annotated, Any
 import psycopg
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from psycopg import sql
 
 from kata_core.api.deps import get_cfg
 from kata_core.config import Config
-from kata_core.storage.provision import (
-    MIGRATION_GLOB,
-    MIGRATIONS_DIR,
-    MIGRATIONS_TABLE,
-    connect,
-)
+from kata_core.storage.provision import connect, pending_migrations
 
 router = APIRouter(prefix="/v1/health")
 
@@ -29,17 +23,10 @@ Cfg = Annotated[Config, Depends(get_cfg)]
 
 def _migrations_current(conn: psycopg.Connection[Any]) -> bool:
     """True when every migration file on disk is recorded as applied."""
-    if not MIGRATIONS_DIR.is_dir():
-        return False
     try:
-        rows = conn.execute(
-            sql.SQL("SELECT version FROM {}").format(sql.Identifier(MIGRATIONS_TABLE))
-        ).fetchall()
-    except psycopg.errors.UndefinedTable:
+        return not pending_migrations(conn)
+    except FileNotFoundError:
         return False
-    applied = {str(row[0]) for row in rows}
-    expected = {path.stem for path in MIGRATIONS_DIR.glob(MIGRATION_GLOB)}
-    return expected <= applied
 
 
 def _run_checks(cfg: Config) -> dict[str, bool]:

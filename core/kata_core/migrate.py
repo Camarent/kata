@@ -12,44 +12,20 @@ from __future__ import annotations
 import argparse
 import logging
 from collections.abc import Sequence
-from typing import Any
 
 import psycopg
-from psycopg import sql
 
 from kata_core.config import Config, ConfigError, load_config
-from kata_core.storage.provision import (
-    MIGRATION_GLOB,
-    MIGRATIONS_DIR,
-    MIGRATIONS_TABLE,
-    connect,
-    migrate,
-)
+from kata_core.storage.provision import connect, migrate, pending_migrations
 
 log = logging.getLogger(__name__)
-
-
-def pending_versions(conn: psycopg.Connection[Any]) -> list[str]:
-    """Versions in MIGRATIONS_DIR not yet recorded in the migrations table, in name order.
-
-    Read only: a missing migrations table means every version is pending.
-    """
-    available = sorted(path.stem for path in MIGRATIONS_DIR.glob(MIGRATION_GLOB))
-    table_exists = conn.execute("SELECT to_regclass(%s)", (MIGRATIONS_TABLE,)).fetchone()
-    if table_exists is None or table_exists[0] is None:
-        return available
-    rows = conn.execute(
-        sql.SQL("SELECT version FROM {}").format(sql.Identifier(MIGRATIONS_TABLE))
-    ).fetchall()
-    done = {row[0] for row in rows}
-    return [version for version in available if version not in done]
 
 
 def run(cfg: Config, *, check: bool, database: str | None = None) -> int:
     """Apply pending migrations on `database` (default: configured name), or only report them."""
     with connect(cfg, database) as conn:
         if check:
-            missing = pending_versions(conn)
+            missing = pending_migrations(conn)
             for version in missing:
                 print(f"pending: {version}")
             if missing:
