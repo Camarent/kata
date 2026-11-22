@@ -8,6 +8,8 @@ from typing import Any
 
 import psycopg
 import pytest
+from kata_core.journal.store import read_page
+from kata_core.planning.decisions import DECISION_KIND, decide, open_point
 from kata_core.planning.tracks_store import (
     ItemSpec,
     create_point,
@@ -206,3 +208,79 @@ def test_delete_switch_target_track_nulls_target(conn: psycopg.Connection[Any]) 
         "SELECT status, choice, target_track_id FROM decision_point WHERE id = %s", (point.id,)
     ).fetchone()
     assert row == ("decided", "switch", None)
+
+
+def _decisions(conn: psycopg.Connection[Any], user: int) -> list[dict[str, Any]]:
+    return [e.detail for e in read_page(conn, user, 100) if e.kind == DECISION_KIND]
+
+
+def test_open_point_rejects_foreign_track(conn: psycopg.Connection[Any]) -> None:
+    owner = _user(conn, "owner")
+    other = _user(conn, "other")
+    track = create_track(conn, owner, "algebra", DEADLINE, 0, ITEMS)
+    with pytest.raises(ValueError):
+        open_point(conn, other, track.id, 0, DUE)
+    point = open_point(conn, owner, track.id, 0, DUE)
+    assert point.status == "open"
+
+
+def test_decide_continue_keeps_tracks_and_journals(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    track = create_track(conn, user, "algebra", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, track.id, 0, DUE)
+    decide(conn, user, point.id, "continue", at=AT)
+    assert _status(conn, user, track.id) == "active"
+    assert _decisions(conn, user) == [{"point_id": point.id, "choice": "continue", "target_track_id": None}]
+
+
+def test_decide_switch_pauses_track_and_activates_target(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    current = create_track(conn, user, "current", DEADLINE, 0, ITEMS)
+    target = create_track(conn, user, "target", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, current.id, 0, DUE)
+    decide(conn, user, point.id, "switch", target_track_id=target.id, at=AT)
+    assert _status(conn, user, current.id) == "paused"
+    assert _status(conn, user, target.id) == "active"
+    assert _decisions(conn, user)[0]["target_track_id"] == target.id
+
+
+def test_decide_switch_without_target_raises(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    track = create_track(conn, user, "algebra", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, track.id, 0, DUE)
+    with pytest.raises(ValueError):
+        decide(conn, user, point.id, "switch", at=AT)
+    assert _status(conn, user, track.id) == "active"
+    assert _decisions(conn, user) == []
+
+
+def test_decide_drop_drops_track_and_journals(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    track = create_track(conn, user, "algebra", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, track.id, 0, DUE)
+    decide(conn, user, point.id, "drop", at=AT)
+    assert _status(conn, user, track.id) == "dropped"
+    assert [d["choice"] for d in _decisions(conn, user)] == ["drop"]
+
+
+def test_decide_twice_raises_and_journals_once(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    track = create_track(conn, user, "algebra", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, track.id, 0, DUE)
+    decide(conn, user, point.id, "continue", at=AT)
+    with pytest.raises(ValueError):
+        decide(conn, user, point.id, "drop", at=AT)
+    assert _status(conn, user, track.id) == "active"
+    assert len(_decisions(conn, user)) == 1
+
+
+def test_decide_switch_foreign_target_raises_and_changes_nothing(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "owner")
+    other = _user(conn, "other")
+    current = create_track(conn, user, "current", DEADLINE, 0, ITEMS)
+    foreign = create_track(conn, other, "foreign", DEADLINE, 0, ITEMS)
+    point = open_point(conn, user, current.id, 0, DUE)
+    with pytest.raises(ValueError):
+        decide(conn, user, point.id, "switch", target_track_id=foreign.id, at=AT)
+    assert _status(conn, user, current.id) == "active"
+    assert _decisions(conn, user) == []
