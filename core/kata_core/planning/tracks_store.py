@@ -354,3 +354,12 @@ def set_decided(
         # The row lock above makes this unreachable; raising rolls back the track writes.
         raise RuntimeError(f"set_decided: point {point_id} changed under lock")
     return True
+
+
+def get_point(conn: psycopg.Connection[Any], user_id: int, point_id: int) -> DecisionPoint | None:
+    """Return the decision point of `user_id` with `point_id`, or None when missing or foreign."""
+    row = conn.execute(
+        f"SELECT {_POINT_COLUMNS} FROM decision_point WHERE id = %s AND user_id = %s",
+        (point_id, user_id),
+    ).fetchone()
+    return None if row is None else _point(row)
