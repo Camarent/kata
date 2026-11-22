@@ -85,6 +85,12 @@ def test_cost_is_integer_micro_usd_from_pinned_prices() -> None:
     assert type(cost) is int
 
 
+def test_haiku_5_5_price_is_pinned_and_estimates_known_length() -> None:
+    # 4000 chars = 1000 tokens at 1_000_000 micro-USD/1M in = 1e9; 800 chars = 200 tokens at 5_000_000/1M out = 1e9; total 2e9 / 1e6 = 2000.
+    assert PRICES["claude-haiku-5-5"] == (1_000_000, 5_000_000)
+    assert cost_micro_usd("claude-haiku-5-5", "x" * 4000, "y" * 800) == 2000
+
+
 def test_unknown_model_raises_pricing_error_which_is_a_provider_error() -> None:
     assert issubclass(PricingError, ProviderError)
     with pytest.raises(PricingError):

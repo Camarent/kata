@@ -20,6 +20,7 @@ from kata_worker.providers.base import Provider, ProviderError
 PRICES: dict[str, tuple[int, int]] = {
     "claude-model": (3_000_000, 15_000_000),
     "claude-haiku": (1_000_000, 5_000_000),
+    "claude-haiku-5-5": (1_000_000, 5_000_000),
 }
 
 TOKEN_CHARS = 4
