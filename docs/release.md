@@ -4,7 +4,9 @@ Every change after the first release ships as a release made by the pipeline. Th
 
 ## Version
 
-The version lives in five files: `pyproject.toml`, `extension/package.json`, the root entry of `extension/package-lock.json`, `extension/manifest.base.json`, and the `__version__` line of `core/kata_core/__init__.py`. The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, made by the pipeline with `release: minor`. Audits and fix tasks must not change the version.
+The version lives in five files: `pyproject.toml`, `extension/package.json`, the root entry of `extension/package-lock.json`, `extension/manifest.base.json`, and the `__version__` line of `core/kata_core/__init__.py`. The code is MIT licensed (`LICENSE`). `pyproject.toml` and `extension/package.json` both carry `"MIT"` as their licence field. A release does not change the licence.
+
+The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, made by the pipeline with `release: minor`. Audits and fix tasks must not change the version.
 
 ## Pipeline step order
 

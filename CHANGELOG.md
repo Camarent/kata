@@ -14,6 +14,7 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - extension: browser extension client for Firefox and Chrome.
 - trainer: `dojo` trainer CLI runner, configured in the `[trainer]` section.
 - deploy: deployment scripts and a container image for the web VM.
+- licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
 ## [0.1.3] - 2026-11-23
 
