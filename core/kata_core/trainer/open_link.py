@@ -67,6 +67,9 @@ def load_signing_key(cfg: Config) -> bytes:
     if not path:
         raise ConfigError("trainer.open_link_key_file is empty")
     try:
+        # CodeQL py/path-injection false positive: `path` comes from server config
+        # [trainer] open_link_key_file only, never from request input. Callers
+        # (course_open.py, course_serve.py) pass the server Config, not client data.
         key = Path(path).read_bytes().strip()
     except OSError as exc:
         raise ConfigError(f"cannot read open link key {path}: {exc}") from exc
