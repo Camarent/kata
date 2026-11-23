@@ -467,7 +467,7 @@ Decided 2026-11-23. `PUT /v1/courses/{id}/progress?import=1` stores the document
 
 ## Course artifact serving contract
 
-Decided 2026-11-23. The build writes one course folder `D/<course_id>/`, where `D` is the build out dir and `<course_id>` is that folder's name (`_only_course_dir` in `core/kata_core/trainer/dojo_cli.py:155`). The files are served as static files: relative URLs only, and the page needs HTTP (it does not work from `file://`). Core keeps the files in `course_file`-style artifact rows (`add_artifacts`, `core/kata_core/trainer/build.py`), capped by `[trainer] max_artifact_bytes`. How the files reach the browser (route, proxy or export) is decided in the next stage. This stage adds no route. Limit: until that stage, a built course cannot be opened in a browser.
+Decided 2026-11-23. The build writes one course folder `D/<course_id>/`, where `D` is the build out dir and `<course_id>` is that folder's name (`_only_course_dir` in `core/kata_core/trainer/dojo_cli.py:155`). The files are served as static files: relative URLs only, and the page needs HTTP (it does not work from `file://`). Core keeps the files in `course_file`-style artifact rows (`add_artifacts`, `core/kata_core/trainer/build.py`), capped by `[trainer] max_artifact_bytes`. How the files reach the browser is decided in the next stage: signed open links and `GET /c/{token}/{path}`, both through the proxy (see `docs/api.md`, "Open links"). Limit: until that stage, a built course cannot be opened in a browser.
 
 Superseded by "Serving CSP and headers are fixed in code" (2026-11-23): `GET /c/{token}/{path}` serves the files now, so a built course can be opened in a browser.
 

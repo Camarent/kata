@@ -46,6 +46,9 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - The VM runs no builds: no `build:` key in `compose.yaml`; the image comes only from `ship.sh`. `ship.sh` copies only the `ship_files` list (`ship.sh:28`); the Dockerfile, `secrets/` and `compose.build.yaml` never reach the VM.
 - `KATA_TAILNET_NAME` and `KATA_BIND_ADDR` must be in the env file compose reads on the VM (`KATA_SHIP_ENV_FILE`, e.g. `env/vm.env`): `ship.sh` exports neither.
 - Secrets are mounted under `/run/secrets/`; core reads env vars only, so each service command exports them with `$$(cat ...)`. Never write a secret value into a file in the repo.
+- `/c/*` (course files, `core/kata_core/api/routes/course_serve.py:55`) goes through the same proxy: `deploy/Caddyfile` has one catch-all `reverse_proxy core:8080` with no path matcher. A path matcher added there must cover `/c/*`; `tests/scripts/test_caddyfile_rules.py` checks it.
+- `open_link_key` is a secret (`deploy/compose.yaml:145`, file `deploy/secrets/open_link_key`, made with `openssl rand -hex 32`, listed in `deploy/secrets.example/README.md`). Core signs and checks open links with it; it is mounted at `/run/secrets/open_link_key` and read from `[trainer] open_link_key_file` (`deploy/kata.host.toml:145`), a file path and not an env var. Core refuses to start without a usable key while the trainer is on.
+- `KATA_CORE_PUBLIC_URL` (host env, never a tracked file) sets `[core] public_url` for the open link (`deploy/compose.yaml:64-67`). Unset, the link uses the URL the request came in on.
 - `deploy/Dockerfile:1` comment names `kata-migrate`; no such entry point exists. Migrate runs as the compose command above.
 - Pins: `GITLEAKS_SHA256` and `TRAINER_SHA256` are checked at build; `PY_BASE_DIGEST`, `EMBED_MODEL_*` are not checked by the Dockerfile.
 - Backup passphrase file path comes from `KATA_BACKUP_PASSPHRASE_FILE`; never printed.

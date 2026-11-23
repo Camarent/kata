@@ -21,6 +21,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/offlineQueue.ts:31` `OfflineQueue`.
 - `extension/src/tokenStore.ts:21` `TokenStore`.
 - `extension/src/sidepanel.ts:178` `renderPanel`; `extension/src/sidepanelBoot.ts:17` `bootPanel`.
+- Side panel "Open course": `extension/src/sidepanel.ts:168` Courses section, one `Open course` button per ready course (`:175`); a failed open shows its error text. `extension/src/sidepanelBoot.ts:74` `onOpenCourse` sends `panel:openCourse`; `extension/src/background.ts:35` message type, `:148` `openCourse` checks the course is ready (`:151`), gets the link (`:154`), refuses a link outside the core (`:155` `isCoreUrl`) and opens it in a new tab (`:156`); `extension/src/coreClient.ts:186` `openCourse` calls `POST /v1/courses/{id}/open`.
+- Bridge stub and registration: `extension/src/bridge.ts:36` `injectStub` puts the page stub at document_start; `extension/src/bridgeRegister.ts:38` `bridgeMatchPatterns` builds `<core scheme>//*/c/*`, `:47` `registerBridge` re-registers `bridge.js` as `kata-bridge` on every install and startup (`:61` `wireBridgeRegistration`).
 - `extension/src/reviewScreen.ts:32` `renderReview` (one row per concept, three-state control); types `ReviewRow`, `ReviewState`.
 - `extension/src/background.ts:28` message `panel:review` (`:95` `review()` merges marks with lesson-check); `:29` message `panel:setConcept` (`:117` `setConcept`).
 - `extension/src/sidepanelBoot.ts:41` sends `panel:review`; `:50` `onSetConcept` sends `panel:setConcept`.
