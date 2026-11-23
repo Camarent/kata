@@ -150,6 +150,10 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);
     },
+    // Placeholder until the background delete message is wired (task-6): the panel shows this error.
+    async onDeleteCourse() {
+      throw new Error("Delete is not available yet");
+    },
   };
 
   // The origin permission was removed (here or in the browser UI): fall back to first-run.
