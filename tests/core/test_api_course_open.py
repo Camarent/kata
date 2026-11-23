@@ -37,7 +37,9 @@ def _ready_course(client: TestClient, db: ScratchDatabase, headers: dict[str, st
     concept = client.post(
         "/concepts", json={"topic_id": topic, "label": "lists"}, headers=headers
     ).json()["id"]
-    resp = client.post("/v1/courses", json={"concept_ids": [concept]}, headers=headers)
+    resp = client.post(
+        "/v1/courses", json={"title": f"Course {concept}", "concept_ids": [concept]}, headers=headers
+    )
     assert resp.status_code == 202, resp.text
     course_id = int(resp.json()["id"])
     with db.connect() as conn:
@@ -87,7 +89,9 @@ def test_open_course_not_ready_is_409(client: TestClient, db: ScratchDatabase, c
     concept = client.post(
         "/concepts", json={"topic_id": topic, "label": "lists"}, headers=headers
     ).json()["id"]
-    course = client.post("/v1/courses", json={"concept_ids": [concept]}, headers=headers).json()
+    course = client.post(
+        "/v1/courses", json={"title": "Not ready", "concept_ids": [concept]}, headers=headers
+    ).json()
     client.app.state.open_link_key = KEY
 
     resp = client.post(OPEN_URL.format(course["id"]), headers=headers)

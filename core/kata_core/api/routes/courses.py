@@ -15,11 +15,22 @@ from pydantic import BaseModel
 
 from kata_core.api.deps import Conn, current_user, get_cfg, require_feature
 from kata_core.auth.service import AuthContext
-from kata_core.config import Config
+from kata_core.config import MAX_COURSES_UNLIMITED, Config
 from kata_core.jobs.queue import enqueue
 from kata_core.knowledge.mastery import base_score
 from kata_core.trainer.gaps import GapRuleError, select_gaps
-from kata_core.trainer.store import Course, create_course, delete_course, get_course, list_courses
+from kata_core.trainer.store import (
+    Course,
+    DuplicateCourseTitle,
+    EmptyCourseTitle,
+    count_courses,
+    create_course,
+    delete_course,
+    get_course,
+    list_courses,
+    lock_user,
+    title_taken,
+)
 
 COURSE_GENERATE_KIND = "course.generate"
 MIN_COURSE_LIMIT = 1
@@ -55,6 +66,8 @@ class CourseAcceptedOut(CourseOut):
 class CoursePageOut(BaseModel):
     items: list[CourseOut]
     next_before_id: int | None
+    limit: int  # the per-user course limit setting; 0 means unlimited
+    total: int  # all the caller's courses, any status
 
 
 def _course_out(course: Course) -> CourseOut:
@@ -66,6 +79,30 @@ def _course_out(course: Course) -> CourseOut:
         error=course.error,
         created_at=course.created_at.isoformat(),
         updated_at=course.updated_at.isoformat(),
+    )
+
+
+def _course_limit(cfg: Config) -> int:
+    """The per-user course limit from `trainer.max_courses_per_user`; `MAX_COURSES_UNLIMITED` means none."""
+    return int(cfg.get("trainer", "max_courses_per_user"))
+
+
+def _check_title(title: str) -> None:
+    """422 `course_title_empty` for an empty or whitespace-only title."""
+    if not title.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "course_title_empty", "message": "course title is empty"},
+        )
+
+
+def _name_taken(title: str) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "course_name_taken",
+            "message": f"a course titled {title!r} already exists",
+        },
     )
 
 
@@ -101,9 +138,21 @@ def _gap_inputs(
 def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> CourseAcceptedOut:
     """Queue a course for the given concepts, or for the caller's gaps when none are named.
 
-    The course row and its `course.generate` job are written in one transaction. 422 when the rule
-    finds nothing to study or names a concept the caller cannot see.
+    The course row and its `course.generate` job are written in one transaction. 422 when the title
+    is empty, the rule finds nothing to study, or names a concept the caller cannot see. 409
+    `course_limit` when the caller is at the limit, 409 `course_name_taken` when the title is taken.
+    Errors return before the job is queued, so nothing is written.
     """
+    _check_title(body.title)
+    lock_user(conn, ctx.user_id)
+    limit = _course_limit(cfg)
+    if limit != MAX_COURSES_UNLIMITED and count_courses(conn, ctx.user_id) >= limit:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "course_limit", "message": f"course limit of {limit} reached"},
+        )
+    if title_taken(conn, ctx.user_id, body.title):
+        raise _name_taken(body.title)
     states, scores, labels = _gap_inputs(conn, ctx.user_id, cfg)
     explicit = [str(cid) for cid in body.concept_ids or []]
     try:
@@ -116,7 +165,14 @@ def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> Co
         )
     except GapRuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    course = create_course(conn, ctx.user_id, body.title, [int(cid) for cid in chosen])
+    try:
+        course = create_course(conn, ctx.user_id, body.title, [int(cid) for cid in chosen])
+    except EmptyCourseTitle as exc:
+        raise HTTPException(
+            status_code=422, detail={"code": "course_title_empty", "message": str(exc)}
+        ) from exc
+    except DuplicateCourseTitle as exc:
+        raise _name_taken(body.title) from exc
     payload: dict[str, Any] = {
         "course_id": course.id,
         "concepts": [{"id": int(cid), "label": labels[cid]} for cid in chosen],
@@ -129,14 +185,23 @@ def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> Co
 def list_courses_route(
     ctx: Caller,
     conn: Conn,
+    cfg: Cfg,
     limit: Annotated[int, Query(ge=MIN_COURSE_LIMIT, le=MAX_COURSE_LIMIT)] = DEFAULT_COURSE_LIMIT,
     before_id: Annotated[int | None, Query(ge=1, le=MAX_BIGINT)] = None,
 ) -> CoursePageOut:
-    """One page of the caller's courses, newest first. `next_before_id` is set when the page is full."""
+    """One page of the caller's courses, newest first. `next_before_id` is set when the page is full.
+
+    `limit` and `total` let the client show the course limit and how many courses are used.
+    """
     courses = list_courses(conn, ctx.user_id, limit, before_id)
     items = [_course_out(course) for course in courses]
     next_before_id = items[-1].id if len(items) == limit else None
-    return CoursePageOut(items=items, next_before_id=next_before_id)
+    return CoursePageOut(
+        items=items,
+        next_before_id=next_before_id,
+        limit=_course_limit(cfg),
+        total=count_courses(conn, ctx.user_id),
+    )
 
 
 @router.get("/{course_id}", response_model=CourseOut)

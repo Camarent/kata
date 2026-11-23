@@ -15,6 +15,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - trainer: `dojo` trainer CLI runner, configured in the `[trainer]` section.
 - deploy: deployment scripts and a container image for the web VM.
 
+## [0.1.1] - 2026-11-23
+
+- feat(trainer): course limit, unique course names, delete course in panel
+
 ## [0.1.0] - 2026-11-23
 
 - docs(release): prepare first release notes and install docs

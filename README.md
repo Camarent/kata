@@ -82,6 +82,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.web` | "" | `KATA_TRAINER_WEB` |
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
+| `trainer.max_courses_per_user` | 10 | `KATA_TRAINER_MAX_COURSES_PER_USER` |
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
 | `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |

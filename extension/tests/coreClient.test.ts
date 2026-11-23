@@ -8,6 +8,7 @@ import {
   CoreTimeoutError,
   CoreUnreachableError,
   NotKataServerError,
+  courseErrorText,
 } from "../src/coreClient";
 
 const BASE = "http://127.0.0.1:8080";
@@ -269,6 +270,121 @@ describe("CoreClient course routes", () => {
     const client = new CoreClient({ baseUrl: BASE, token: "bad", timeoutMs: 500, fetchImpl: fn });
     await expect(client.getProgress(5)).rejects.toBeInstanceOf(CoreAuthError);
     await expect(client.putProgress(5, "{}", 1)).rejects.toBeInstanceOf(CoreAuthError);
+  });
+});
+
+describe("CoreClient course create, delete and limits", () => {
+  const ready = { id: 2, title: "B", status: "ready", concept_ids: [1], error: null, created_at: "t", updated_at: "t" };
+
+  it("listCoursesMeta returns ready items plus limit and total", async () => {
+    const items = [ready, { ...ready, id: 1, status: "building" }];
+    const { fn, calls } = fakeFetch(200, { items, next_before_id: null, limit: 10, total: 2 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.listCoursesMeta()).toEqual({ items: [ready], limit: 10, total: 2 });
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses`);
+  });
+
+  it("listCourses keeps its shape when the page also carries limit and total", async () => {
+    const { fn } = fakeFetch(200, { items: [ready], next_before_id: null, limit: 10, total: 1 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.listCourses()).toEqual([ready]);
+  });
+
+  it("createCourse posts the title to /v1/courses and returns the accepted course", async () => {
+    const accepted = { ...ready, status: "building", job_id: 77 };
+    const { fn, calls } = fakeFetch(202, accepted);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.createCourse("Rust basics")).toEqual(accepted);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses`);
+    expect(calls[0].body).toEqual({ title: "Rust basics" });
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+  });
+
+  it("createCourse throws CoreHttpError carrying course_limit from a 409 body", async () => {
+    const { fn } = fakeFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.createCourse("X").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(409);
+    expect((err as CoreHttpError).code).toBe("course_limit");
+  });
+
+  it("createCourse carries course_name_taken from a 409 body", async () => {
+    const { fn } = fakeFetch(409, { detail: { code: "course_name_taken", message: "taken" } });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.createCourse("X").catch((e: unknown) => e);
+    expect((err as CoreHttpError).code).toBe("course_name_taken");
+  });
+
+  it("createCourse carries course_title_empty from a 422 body", async () => {
+    const { fn } = fakeFetch(422, { detail: { code: "course_title_empty", message: "course title is empty" } });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.createCourse("  ").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(422);
+    expect((err as CoreHttpError).code).toBe("course_title_empty");
+  });
+
+  it("CoreHttpError has no code when the body detail is a plain string or missing", async () => {
+    const plain = fakeFetch(404, { detail: "job not found" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: plain.fn });
+    const err = await client.jobStatus(3).catch((e: unknown) => e);
+    expect((err as CoreHttpError).code).toBeUndefined();
+
+    const bare = fakeFetch(500, {});
+    const client2 = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: bare.fn });
+    const err2 = await client2.jobStatus(3).catch((e: unknown) => e);
+    expect((err2 as CoreHttpError).code).toBeUndefined();
+  });
+
+  it("deleteCourse sends DELETE to /v1/courses/{id} and resolves true on 204", async () => {
+    const { fn, calls } = fakeFetch(204);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.deleteCourse(9)).toBe(true);
+    expect(calls[0].method).toBe("DELETE");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/9`);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+  });
+
+  it("deleteCourse resolves false on 404 (already gone)", async () => {
+    const { fn } = fakeFetch(404, { detail: { code: "course_not_found", message: "no such course" } });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.deleteCourse(9)).toBe(false);
+  });
+
+  it("deleteCourse throws CoreHttpError on other failures", async () => {
+    const { fn } = fakeFetch(500, {});
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.deleteCourse(9).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(500);
+  });
+
+  it("deleteCourse throws CoreAuthError on 401", async () => {
+    const { fn } = fakeFetch(401, { detail: "nope" });
+    const client = new CoreClient({ baseUrl: BASE, token: "bad", timeoutMs: 500, fetchImpl: fn });
+    await expect(client.deleteCourse(9)).rejects.toBeInstanceOf(CoreAuthError);
+  });
+
+  it("courseErrorText maps the three course codes to short texts", () => {
+    const withCode = (code: string) => new CoreHttpError(409, code);
+    expect(courseErrorText(withCode("course_limit"))).toBe(
+      "You have reached your course limit. Delete a course to add another.",
+    );
+    expect(courseErrorText(withCode("course_name_taken"))).toBe(
+      "A course with this name already exists. Choose another title.",
+    );
+    expect(courseErrorText(new CoreHttpError(422, "course_title_empty"))).toBe("Enter a course title.");
+  });
+
+  it("courseErrorText falls back to the generic text for other errors", () => {
+    const generic = "Could not save the course. Try again.";
+    expect(courseErrorText(new CoreHttpError(500))).toBe(generic);
+    expect(courseErrorText(new CoreHttpError(409, "something_new"))).toBe(generic);
+    expect(courseErrorText(new CoreOfflineError())).toBe(generic);
+    expect(courseErrorText("boom")).toBe(generic);
   });
 });
 

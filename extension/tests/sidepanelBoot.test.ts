@@ -272,24 +272,26 @@ describe("bootPanel", () => {
   });
 
   const courses = [{ id: 4, title: "Algebra" }];
+  const courseList = { items: courses, limit: 5, total: 1 };
 
   it("loads the ready courses at boot and draws one Open course button each", async () => {
-    const { api, sendMessage } = fakeChrome({ ok: true, data: courses }, signedIn);
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courseList }, signedIn);
     await bootPanel(mountPoint(), api);
     expect(sendMessage).toHaveBeenCalledWith({ type: "panel:courses" });
     expect(root.querySelector("section.courses .course-title")?.textContent).toBe("Algebra");
     expect(root.querySelector("section.courses button")?.textContent).toBe("Open course");
+    expect(root.querySelector("section.courses p.course-limit")?.textContent).toBe("1 of 5");
   });
 
   it("signed out at boot sends no courses request and draws no Courses section", async () => {
-    const { api, sendMessage } = fakeChrome({ ok: true, data: courses });
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courseList });
     await bootPanel(mountPoint(), api);
     expect(sendMessage).not.toHaveBeenCalled();
     expect(root.querySelector("section.courses")).toBeNull();
   });
 
   it("Open course sends panel:openCourse with the course id", async () => {
-    const { api, sendMessage } = fakeChrome({ ok: true, data: courses }, signedIn);
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courseList }, signedIn);
     await bootPanel(mountPoint(), api);
     root.querySelector<HTMLButtonElement>("section.courses button")!.click();
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: "panel:openCourse", courseId: 4 }));
@@ -298,7 +300,7 @@ describe("bootPanel", () => {
   it("a refused open shows the background error text next to the course", async () => {
     const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
       message.type === "panel:courses"
-        ? { ok: true, data: courses }
+        ? { ok: true, data: courseList }
         : { ok: false, error: "course link is outside the core" },
     );
     const api: PanelChromeLike = {
@@ -312,5 +314,101 @@ describe("bootPanel", () => {
       expect(root.querySelector("section.courses span.note")?.textContent).toBe("course link is outside the core"),
     );
     expect(root.querySelector<HTMLButtonElement>("section.courses button")!.disabled).toBe(false);
+  });
+
+  it("confirmed delete sends panel:deleteCourse, reloads the list and drops the course", async () => {
+    let listed = courseList;
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> => {
+      if (message.type === "panel:courses") return { ok: true, data: listed };
+      if (message.type === "panel:deleteCourse") {
+        listed = { items: [], limit: 5, total: 0 };
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>('section.courses button[aria-label="Delete Algebra"]')!.click();
+    root.querySelector<HTMLButtonElement>('section.courses button[aria-label="Confirm delete of Algebra"]')!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.courses .course-title")).toBeNull());
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:deleteCourse", courseId: 4 });
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(2);
+    expect(root.querySelector("section.courses p.course-limit")?.textContent).toBe("0 of 5");
+  });
+
+  it("a refused delete keeps the course listed and shows the error next to it", async () => {
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
+      message.type === "panel:courses"
+        ? { ok: true, data: courseList }
+        : { ok: false, error: "delete refused" },
+    );
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>('section.courses button[aria-label="Delete Algebra"]')!.click();
+    root.querySelector<HTMLButtonElement>('section.courses button[aria-label="Confirm delete of Algebra"]')!.click();
+    await vi.waitFor(() =>
+      expect(root.querySelector("section.courses span.note")?.textContent).toBe("delete refused"),
+    );
+    expect(root.querySelector("section.courses .course-title")?.textContent).toBe("Algebra");
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(1);
+  });
+
+  /** Types a title into the create-course form and submits it. */
+  function submitCreate(title: string) {
+    const form = root.querySelector<HTMLFormElement>("section.courses form.create-course")!;
+    form.querySelector<HTMLInputElement>('input[name="courseTitle"]')!.value = title;
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+  }
+
+  it("a successful create sends panel:createCourse with the title and reloads the list", async () => {
+    let listed = courseList;
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> => {
+      if (message.type === "panel:courses") return { ok: true, data: listed };
+      if (message.type === "panel:createCourse") {
+        listed = { items: [...courseList.items, { id: 6, title: "Rust basics" }], limit: 5, total: 2 };
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    submitCreate("Rust basics");
+    await vi.waitFor(() => expect(root.querySelectorAll("section.courses .course-title")).toHaveLength(2));
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:createCourse", title: "Rust basics" });
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(2);
+    expect(root.querySelector("section.courses p.course-note")?.textContent).toBe("");
+  });
+
+  it("a refused create shows the course error text and does not reload the list", async () => {
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
+      message.type === "panel:courses"
+        ? { ok: true, data: courseList }
+        : { ok: false, error: "course limit of 3 reached", status: 409, code: "course_limit" },
+    );
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    submitCreate("Rust basics");
+    await vi.waitFor(() =>
+      expect(root.querySelector("section.courses p.course-note")?.textContent).toBe(
+        "You have reached your course limit. Delete a course to add another.",
+      ),
+    );
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(1);
   });
 });

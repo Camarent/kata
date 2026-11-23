@@ -83,6 +83,10 @@ Project items after Milestone 0.
       extension and core end to end; not covered by any test yet.
 - [ ] Trainer: read-only plan/course view (D16). Show the stored plan and course read-only; not
       built yet (decision D16).
+- [ ] Trainer: course rename route (M16). No route renames a course; a title is set at create.
+      A rename needs the same per-user unique check as create (decision "Course limit and unique names (M16)").
+- [ ] Trainer: real-browser check of the course panel (M16): create, delete with confirm, "n of
+      limit" and the error texts. Vitest checks them with fake browser APIs only.
 
 ## Deployment (M6) follow-ups
 

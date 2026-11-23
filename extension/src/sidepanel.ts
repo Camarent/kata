@@ -2,6 +2,7 @@ import type { CourseLink } from "./background";
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
 import type { Session } from "./types";
+import { courseErrorText } from "./coreClient";
 import { renderReview, type ReviewRow, type ReviewState } from "./reviewScreen";
 
 /** Group heading for rows whose block has no topic. */
@@ -35,6 +36,10 @@ export interface PanelState {
   changing?: boolean;
   review?: ReviewRow[] | null;
   courses?: CourseLink[];
+  /** Course limit of the server; the Courses section shows "n of limit" when it is above 0. */
+  courseLimit?: number;
+  /** Courses counted against the limit; defaults to the number of listed courses. */
+  courseTotal?: number;
 }
 
 /** Values typed into the sign-in form: pairing code and device label. */
@@ -59,6 +64,8 @@ export interface PanelHandlers {
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
   onCloseReview: () => void;
   onOpenCourse: (courseId: number) => Promise<void>;
+  onDeleteCourse: (courseId: number) => Promise<void>;
+  onCreateCourse: (title: string) => Promise<void>;
 }
 
 /** Creates an element with text content; never parses markup. */
@@ -213,30 +220,107 @@ function renderGroups(rows: PanelRow[], handlers: PanelHandlers): HTMLElement {
   return root;
 }
 
-/** Courses section: one "Open course" button per ready course; a failed open shows its error text. */
-function renderCourses(courses: CourseLink[], handlers: PanelHandlers): HTMLElement {
+/** Native button with an accessible label that names the course. */
+function courseButton(text: string, label: string, hidden = false): HTMLButtonElement {
+  const button = el("button", text);
+  button.type = "button";
+  button.setAttribute("aria-label", label);
+  button.hidden = hidden;
+  return button;
+}
+
+/**
+ * Create-course form: a title input and a Create button. A blank title is not sent. The input clears
+ * on click; a failed create shows its text (courseErrorText) in the note and the button is disabled while it runs.
+ */
+function renderCreateCourse(handlers: PanelHandlers): HTMLFormElement {
+  const form = el("form", undefined, "create-course");
+  const titleLabel = el("label", "New course title");
+  const title = el("input");
+  title.name = "courseTitle";
+  title.type = "text";
+  titleLabel.append(title);
+  const submit = el("button", "Create course");
+  submit.type = "submit";
+  const note = el("p", undefined, "course-note");
+  note.setAttribute("role", "alert");
+  form.append(titleLabel, submit, note);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = title.value.trim();
+    if (text === "") return;
+    title.value = "";
+    note.textContent = "";
+    submit.disabled = true;
+    try {
+      await handlers.onCreateCourse(text);
+    } catch (err) {
+      note.textContent = courseErrorText(err);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  return form;
+}
+
+/**
+ * Courses section: per course an "Open course" button and a Delete button, then the create-course form.
+ * Delete asks first: "Confirm delete" and "Cancel" replace it. A failed open or delete shows its error text in the note.
+ */
+function renderCourses(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  const courses = state.courses ?? [];
   const section = el("section", undefined, "courses");
   section.append(el("h2", "Courses"));
+  if ((state.courseLimit ?? 0) > 0) {
+    const total = state.courseTotal ?? courses.length;
+    section.append(el("p", `${total} of ${state.courseLimit}`, "course-limit"));
+  }
   const ul = el("ul");
   for (const course of courses) {
     const item = el("li", undefined, "course");
-    const button = el("button", "Open course");
-    button.type = "button";
+    const open = courseButton("Open course", `Open ${course.title}`);
+    const remove = courseButton("Delete", `Delete ${course.title}`);
+    const confirm = courseButton("Confirm delete", `Confirm delete of ${course.title}`, true);
+    const cancel = courseButton("Cancel", `Cancel delete of ${course.title}`, true);
     const note = el("span", undefined, "note");
-    button.addEventListener("click", async () => {
-      button.disabled = true;
+    const showDelete = (): void => {
+      remove.hidden = false;
+      confirm.hidden = true;
+      cancel.hidden = true;
+      confirm.disabled = false;
+      cancel.disabled = false;
+    };
+    open.addEventListener("click", async () => {
+      open.disabled = true;
       try {
         await handlers.onOpenCourse(course.id);
         note.textContent = "opened";
       } catch (err) {
         note.textContent = err instanceof Error ? err.message : String(err);
-        button.disabled = false;
+        open.disabled = false;
       }
     });
-    item.append(el("span", course.title, "course-title"), button, note);
+    remove.addEventListener("click", () => {
+      note.textContent = "";
+      remove.hidden = true;
+      confirm.hidden = false;
+      cancel.hidden = false;
+    });
+    cancel.addEventListener("click", showDelete);
+    confirm.addEventListener("click", async () => {
+      confirm.disabled = true;
+      cancel.disabled = true;
+      try {
+        await handlers.onDeleteCourse(course.id);
+      } catch (err) {
+        note.textContent = err instanceof Error ? err.message : String(err);
+        showDelete();
+      }
+    });
+    item.append(el("span", course.title, "course-title"), open, remove, confirm, cancel, note);
     ul.append(item);
   }
-  section.append(ul);
+  section.append(ul, renderCreateCourse(handlers));
   return section;
 }
 
@@ -272,7 +356,7 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
   review.addEventListener("click", () => void handlers.onReview());
   root.append(review);
   root.append(el("p", statusText(state.status), "status"));
-  if (state.courses && state.courses.length > 0) root.append(renderCourses(state.courses, handlers));
+  root.append(renderCourses(state, handlers));
   if (state.rows.length === 0 && state.status.kind === "idle") {
     root.append(el("p", "Nothing scanned yet", "empty"));
     return;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CoreHttpError } from "../src/coreClient";
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelState } from "../src/sidepanel";
 
 const session = { baseUrl: "http://localhost:8000", token: "t" };
@@ -14,6 +15,8 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
     onSetConcept: vi.fn(async () => {}),
     onCloseReview: vi.fn(),
     onOpenCourse: vi.fn(async () => {}),
+    onDeleteCourse: vi.fn(async () => {}),
+    onCreateCourse: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -291,22 +294,85 @@ describe("renderPanel", () => {
     renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, handlers());
     const section = root.querySelector("section.courses")!;
     expect(section.querySelector("h2")?.textContent).toBe("Courses");
-    const buttons = [...section.querySelectorAll<HTMLButtonElement>("button")];
-    expect(buttons.map((b) => b.textContent)).toEqual(["Open course", "Open course"]);
+    const buttons = [...section.querySelectorAll<HTMLButtonElement>("ul button")].filter((b) => !b.hidden);
+    expect(buttons.map((b) => b.textContent)).toEqual(["Open course", "Delete", "Open course", "Delete"]);
     expect([...section.querySelectorAll(".course-title")].map((s) => s.textContent)).toEqual(["Algebra", "Biology"]);
   });
 
-  it("shows no Courses section when there are no ready courses", () => {
+  it("keeps the Courses section with the create form when there are no ready courses", () => {
     renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses: [] }, handlers());
-    expect(root.querySelector("section.courses")).toBeNull();
-    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, handlers());
-    expect(root.querySelector("section.courses")).toBeNull();
+    expect(root.querySelector("section.courses form.create-course")).not.toBeNull();
+    expect(root.querySelector("section.courses ul")?.children.length).toBe(0);
+  });
+
+  describe("create course form", () => {
+    function submitTitle(value: string): void {
+      (root.querySelector('input[name="courseTitle"]') as HTMLInputElement).value = value;
+      root.querySelector("form.create-course")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    }
+    const courseNote = (): string | null | undefined => root.querySelector("form.create-course p.course-note")?.textContent;
+
+    it("labels the title input and names the button Create course", () => {
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, handlers());
+      const input = root.querySelector<HTMLInputElement>('form.create-course input[name="courseTitle"]')!;
+      expect(root.querySelector("form.create-course label")?.textContent).toBe("New course title");
+      expect(input.closest("label")).not.toBeNull();
+      expect(root.querySelector("form.create-course button")?.textContent).toBe("Create course");
+    });
+
+    it("calls onCreateCourse with the trimmed title and clears the input", async () => {
+      const h = handlers();
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+      submitTitle("  Chemistry  ");
+      expect(h.onCreateCourse).toHaveBeenCalledWith("Chemistry");
+      expect((root.querySelector('input[name="courseTitle"]') as HTMLInputElement).value).toBe("");
+      await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>("form.create-course button")?.disabled).toBe(false));
+      expect(courseNote()).toBe("");
+    });
+
+    it("does not call onCreateCourse for a blank title", () => {
+      const h = handlers();
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+      submitTitle("   ");
+      expect(h.onCreateCourse).not.toHaveBeenCalled();
+    });
+
+    it("disables the Create button while the create runs", async () => {
+      let finish = (): void => {};
+      const h = handlers({ onCreateCourse: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))) });
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+      submitTitle("Chemistry");
+      expect(root.querySelector<HTMLButtonElement>("form.create-course button")?.disabled).toBe(true);
+      finish();
+      await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>("form.create-course button")?.disabled).toBe(false));
+    });
+
+    it.each([
+      ["course_limit", "You have reached your course limit. Delete a course to add another."],
+      ["course_name_taken", "A course with this name already exists. Choose another title."],
+      ["course_title_empty", "Enter a course title."],
+    ])("shows the text for %s in the create note", async (code, text) => {
+      const h = handlers({ onCreateCourse: vi.fn(async () => Promise.reject(new CoreHttpError(409, code))) });
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+      submitTitle("Chemistry");
+      await vi.waitFor(() => expect(courseNote()).toBe(text));
+      expect(root.querySelector<HTMLButtonElement>("form.create-course button")?.disabled).toBe(false);
+    });
+
+    it("shows the generic text for any other create failure", async () => {
+      const h = handlers({ onCreateCourse: vi.fn(async () => Promise.reject(new Error("offline"))) });
+      renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+      submitTitle("Chemistry");
+      await vi.waitFor(() => expect(courseNote()).toBe("Could not save the course. Try again."));
+    });
   });
 
   it("calls onOpenCourse with the course id and disables the button on click", async () => {
     const h = handlers();
     renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
-    const second = root.querySelectorAll<HTMLButtonElement>("section.courses button")[1];
+    const second = [...root.querySelectorAll<HTMLButtonElement>("section.courses button")].find(
+      (b) => b.getAttribute("aria-label") === "Open Biology",
+    )!;
     second.click();
     expect(second.disabled).toBe(true);
     await vi.waitFor(() => expect(root.querySelectorAll("section.courses span.note")[1]?.textContent).toBe("opened"));
@@ -322,5 +388,69 @@ describe("renderPanel", () => {
     await vi.waitFor(() => expect(root.querySelector("section.courses span.note")?.textContent).toBe("course is not ready"));
     expect(first.disabled).toBe(false);
     expect(h.onOpenCourse).toHaveBeenCalledWith(4);
+  });
+
+  const deleteButton = (name: string) =>
+    root.querySelector<HTMLButtonElement>(`section.courses button[aria-label="Delete ${name}"]`)!;
+  const labelled = (label: string) => root.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+
+  it("first Delete click asks to confirm without calling onDeleteCourse", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    deleteButton("Biology").click();
+    expect(deleteButton("Biology").hidden).toBe(true);
+    expect(labelled("Confirm delete of Biology").hidden).toBe(false);
+    expect(labelled("Confirm delete of Biology").textContent).toBe("Confirm delete");
+    expect(labelled("Cancel delete of Biology").hidden).toBe(false);
+    expect(labelled("Cancel delete of Biology").textContent).toBe("Cancel");
+    expect(h.onDeleteCourse).not.toHaveBeenCalled();
+  });
+
+  it("Cancel restores the Delete button without calling onDeleteCourse", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    deleteButton("Biology").click();
+    labelled("Cancel delete of Biology").click();
+    expect(deleteButton("Biology").hidden).toBe(false);
+    expect(labelled("Confirm delete of Biology").hidden).toBe(true);
+    expect(labelled("Cancel delete of Biology").hidden).toBe(true);
+    expect(h.onDeleteCourse).not.toHaveBeenCalled();
+  });
+
+  it("Confirm delete calls onDeleteCourse with the course id", async () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    deleteButton("Algebra").click();
+    labelled("Confirm delete of Algebra").click();
+    await vi.waitFor(() => expect(h.onDeleteCourse).toHaveBeenCalledTimes(1));
+    expect(h.onDeleteCourse).toHaveBeenCalledWith(4);
+  });
+
+  it("shows the delete error in the course note and restores the Delete button", async () => {
+    const h = handlers({ onDeleteCourse: vi.fn(async () => Promise.reject(new Error("delete refused"))) });
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    deleteButton("Biology").click();
+    labelled("Confirm delete of Biology").click();
+    await vi.waitFor(() => expect(root.querySelectorAll("section.courses span.note")[1]?.textContent).toBe("delete refused"));
+    expect(deleteButton("Biology").hidden).toBe(false);
+    expect(labelled("Confirm delete of Biology").hidden).toBe(true);
+    expect(labelled("Confirm delete of Biology").disabled).toBe(false);
+  });
+
+  it("shows n of limit when the course limit is above 0", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses, courseLimit: 5, courseTotal: 2 }, handlers());
+    expect(root.querySelector("section.courses p.course-limit")?.textContent).toBe("2 of 5");
+  });
+
+  it("counts the listed courses when courseTotal is absent", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses, courseLimit: 5 }, handlers());
+    expect(root.querySelector("section.courses p.course-limit")?.textContent).toBe("2 of 5");
+  });
+
+  it("shows no limit text when the course limit is 0 or absent", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses, courseLimit: 0 }, handlers());
+    expect(root.querySelector("p.course-limit")).toBeNull();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, handlers());
+    expect(root.querySelector("p.course-limit")).toBeNull();
   });
 });

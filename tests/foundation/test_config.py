@@ -144,6 +144,46 @@ def test_load_reads_trainer_defaults(tmp_path: Path) -> None:
     assert cfg.get("model", "reasoning_effort") == ""
 
 
+def test_load_reads_course_limit_default(tmp_path: Path) -> None:
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert cfg.get("trainer", "max_courses_per_user") == 10
+
+
+@pytest.mark.parametrize("limit", [0, 10])
+def test_course_limit_zero_and_positive_load(tmp_path: Path, limit: int) -> None:
+    path = _copy_example(tmp_path)
+    cfg = load_config(path, env={"KATA_TRAINER_MAX_COURSES_PER_USER": str(limit)})
+    assert cfg.get("trainer", "max_courses_per_user") == limit
+
+
+def test_course_limit_negative_in_file_raises(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("max_courses_per_user = 10", "max_courses_per_user = -1"), encoding="utf-8"
+    )
+    with pytest.raises(ConfigError, match="max_courses_per_user"):
+        load_config(path, env={})
+
+
+def test_course_limit_negative_env_override_raises(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    with pytest.raises(ConfigError, match="max_courses_per_user"):
+        load_config(path, env={"KATA_TRAINER_MAX_COURSES_PER_USER": "-1"})
+
+
+@pytest.mark.parametrize("bad", ['"10"', "true", "1.5"])
+def test_course_limit_non_int_in_file_raises_config_error(tmp_path: Path, bad: str) -> None:
+    path = _copy_example(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("max_courses_per_user = 10", f"max_courses_per_user = {bad}"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="max_courses_per_user"):
+        load_config(path, env={})
+
+
 def test_load_reads_smoke_section(tmp_path: Path) -> None:
     cfg = load_config(_copy_example(tmp_path), env={})
     assert cfg.get("smoke", "allowed_models") == "claude-haiku-5-5"

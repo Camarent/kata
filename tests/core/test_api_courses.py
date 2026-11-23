@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
@@ -84,7 +85,7 @@ def test_known_concepts_are_not_gaps(client: TestClient, db: ScratchDatabase, cf
     resp = client.put(f"/concepts/{known}/mark", json={"state": "known"}, headers=headers)
     assert resp.status_code == 200
 
-    body = _create(client, headers, {})
+    body = _create(client, headers, {"title": "gaps"})
 
     assert body["concept_ids"] == [gap]
 
@@ -95,7 +96,7 @@ def test_named_concepts_are_used_as_given(client: TestClient, db: ScratchDatabas
     _concept(client, headers, topic, "lists")
     named = _concept(client, headers, topic, "dicts")
 
-    body = _create(client, headers, {"concept_ids": [named]})
+    body = _create(client, headers, {"title": "named", "concept_ids": [named]})
 
     assert body["concept_ids"] == [named]
 
@@ -128,8 +129,8 @@ def test_list_pages_newest_first(client: TestClient, db: ScratchDatabase, cfg: C
     headers = _token_for(client, db, cfg, "ana")
     topic = _shared_topic(client, headers, "Python")
     _concept(client, headers, topic, "lists")
-    older = _create(client, headers, {"concept_ids": [_concept(client, headers, topic, "dicts")]})
-    newer = _create(client, headers, {"concept_ids": [_concept(client, headers, topic, "sets")]})
+    older = _create(client, headers, {"title": "older", "concept_ids": [_concept(client, headers, topic, "dicts")]})
+    newer = _create(client, headers, {"title": "newer", "concept_ids": [_concept(client, headers, topic, "sets")]})
 
     first = client.get("/v1/courses?limit=1", headers=headers).json()
     assert [item["id"] for item in first["items"]] == [newer["id"]]
@@ -140,7 +141,101 @@ def test_list_pages_newest_first(client: TestClient, db: ScratchDatabase, cfg: C
     assert second["next_before_id"] == older["id"]
 
     last = client.get(f"/v1/courses?limit=5&before_id={older['id']}", headers=headers).json()
-    assert last == {"items": [], "next_before_id": None}
+    assert last == {
+        "items": [],
+        "next_before_id": None,
+        "limit": cfg.get("trainer", "max_courses_per_user"),
+        "total": 2,
+    }
+
+
+def _limit(client: TestClient, monkeypatch: pytest.MonkeyPatch, cfg: Config, limit: int) -> None:
+    """Set the course limit on this test's app only; monkeypatch restores the app config after the test."""
+    trainer = {**cfg.sections["trainer"], "max_courses_per_user": limit}
+    monkeypatch.setattr(client.app.state, "cfg", Config({**cfg.sections, "trainer": trainer}))
+
+
+def _job_count(db: ScratchDatabase) -> int:
+    with db.connect() as conn:
+        row = conn.execute("SELECT count(*) FROM jobs WHERE kind = 'course.generate'").fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def test_course_limit_is_409_and_queues_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 1)
+    _create(client, headers, {"title": "First", "concept_ids": [concept]})
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "Second", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "course_limit"
+    assert _job_count(db) == jobs_before
+    with db.connect() as conn:
+        row = conn.execute("SELECT count(*) FROM course").fetchone()
+    assert row is not None and row[0] == 1
+
+
+def test_zero_limit_is_unlimited(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 0)
+    for title in ("First", "Second", "Third"):
+        _create(client, headers, {"title": title, "concept_ids": [concept]})
+
+
+def test_taken_title_is_409_name_taken_and_queues_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _create(client, headers, {"title": "Basics", "concept_ids": [concept]})
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "  BASICS ", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "course_name_taken"
+    assert _job_count(db) == jobs_before
+
+
+def test_empty_title_is_422_and_queues_nothing(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "   ", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == "course_title_empty"
+    assert _job_count(db) == jobs_before
+
+
+def test_list_shows_limit_and_total_of_any_status(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 3)
+    _create(client, headers, {"title": "First", "concept_ids": [concept]})
+
+    page = client.get("/v1/courses", headers=headers).json()
+
+    assert page["limit"] == 3
+    assert page["total"] == 1
+    assert page["items"][0]["status"] == "queued"
 
 
 def test_list_before_id_out_of_range_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
@@ -159,9 +254,9 @@ def test_get_own_course_and_hide_others(client: TestClient, db: ScratchDatabase,
     ana = _token_for(client, db, cfg, "ana")
     ben = _token_for(client, db, cfg, "ben")
     topic = _shared_topic(client, ana, "Python")
-    course = _create(client, ana, {"concept_ids": [_concept(client, ana, topic, "lists")]})
+    course = _create(client, ana, {"title": "lists", "concept_ids": [_concept(client, ana, topic, "lists")]})
 
-    own = client.get(f"/v1/courses/{course['id']}", headers=ana)
+    own =client.get(f"/v1/courses/{course['id']}", headers=ana)
     assert own.status_code == 200
     assert own.json()["id"] == course["id"]
     assert own.json()["status"] == "queued"
@@ -174,7 +269,7 @@ def test_delete_own_course_and_refuse_others(client: TestClient, db: ScratchData
     ana = _token_for(client, db, cfg, "ana")
     ben = _token_for(client, db, cfg, "ben")
     topic = _shared_topic(client, ana, "Python")
-    course = _create(client, ana, {"concept_ids": [_concept(client, ana, topic, "lists")]})
+    course = _create(client, ana, {"title": "lists", "concept_ids": [_concept(client, ana, topic, "lists")]})
 
     assert client.delete(f"/v1/courses/{course['id']}", headers=ben).status_code == 404
     with db.connect() as conn:

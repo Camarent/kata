@@ -12,6 +12,21 @@ from datetime import datetime
 from typing import Any
 
 import psycopg
+from psycopg.errors import UniqueViolation
+
+
+class EmptyCourseTitle(ValueError):
+    """The title is empty or whitespace only."""
+
+
+class DuplicateCourseTitle(ValueError):
+    """The user already has a course whose normalised title is the same."""
+
+
+# Normal form of a course title, as migration 0014 indexes it. The migration file
+# carries this text copied verbatim; tests/core/test_course_title_unique.py checks that.
+NORMAL_TITLE_SQL = r"lower(btrim(regexp_replace(title, '\s+', ' ', 'g')))"
+COURSE_TITLE_INDEX = "course_user_id_title_norm_uidx"
 
 
 @dataclass(frozen=True)
@@ -50,18 +65,55 @@ def _owned(conn: psycopg.Connection[Any], user_id: int, course_id: int) -> bool:
     return row is not None
 
 
+def title_taken(conn: psycopg.Connection[Any], user_id: int, title: str) -> bool:
+    """True when `user_id` already has a course whose normal form equals that of `title`."""
+    row = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM course WHERE user_id = %s "
+        f"AND {NORMAL_TITLE_SQL} = (SELECT {NORMAL_TITLE_SQL} FROM (SELECT %s::text AS title) t))",
+        (user_id, title),
+    ).fetchone()
+    return row is not None and bool(row[0])
+
+
+def lock_user(conn: psycopg.Connection[Any], user_id: int) -> None:
+    """Lock the user row until the transaction ends, so two creates of one user run one at a time.
+
+    The count-then-insert of a course limit is only safe under this lock.
+    """
+    conn.execute("SELECT id FROM users WHERE id = %s FOR UPDATE", (user_id,)).fetchone()
+
+
+def count_courses(conn: psycopg.Connection[Any], user_id: int) -> int:
+    """Number of courses of `user_id`, whatever their status."""
+    row = conn.execute("SELECT count(*) FROM course WHERE user_id = %s", (user_id,)).fetchone()
+    return int(row[0]) if row is not None else 0
+
+
 def create_course(
     conn: psycopg.Connection[Any],
     user_id: int,
     title: str,
     concept_ids: list[int],
 ) -> Course:
-    """Insert a `queued` course for `user_id` and return it."""
-    row = conn.execute(
-        "INSERT INTO course (user_id, title, status, concept_ids) "
-        f"VALUES (%s, %s, 'queued', %s::bigint[]) RETURNING {_COLUMNS}",
-        (user_id, title, concept_ids),
-    ).fetchone()
+    """Insert a `queued` course for `user_id` and return it.
+
+    Raises EmptyCourseTitle for an empty or whitespace-only title, and
+    DuplicateCourseTitle when the user already has the same normalised title.
+    """
+    if not title.strip():
+        raise EmptyCourseTitle("course title is empty")
+    try:
+        # A savepoint (or transaction) keeps the connection usable after a violation.
+        with conn.transaction():
+            row = conn.execute(
+                "INSERT INTO course (user_id, title, status, concept_ids) "
+                f"VALUES (%s, %s, 'queued', %s::bigint[]) RETURNING {_COLUMNS}",
+                (user_id, title, concept_ids),
+            ).fetchone()
+    except UniqueViolation as exc:
+        if exc.diag.constraint_name != COURSE_TITLE_INDEX:
+            raise
+        raise DuplicateCourseTitle(f"user {user_id} already has course title {title!r}") from exc
     if row is None:
         raise RuntimeError("create_course: INSERT ... RETURNING returned no row")
     return _course(row)

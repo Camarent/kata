@@ -278,21 +278,81 @@ describe("background wiring", () => {
     return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/v1/courses")) {
-        return new Response(JSON.stringify({ items: [course(4, "ready"), course(5, "processing")] }), { status: 200 });
+        return new Response(
+          JSON.stringify({ items: [course(4, "ready"), course(5, "processing")], limit: 5, total: 2 }),
+          { status: 200 },
+        );
       }
       if (init?.method === "POST" && url.endsWith("/v1/courses/4/open")) {
         return new Response(JSON.stringify({ url: openUrl }), { status: 200 });
+      }
+      if (init?.method === "DELETE" && url.endsWith("/v1/courses/4")) {
+        return new Response(null, { status: 204 });
       }
       return new Response(JSON.stringify({ detail: "not found" }), { status: 404 });
     }) as unknown as typeof fetch;
   }
   const signedInArea = () => memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
 
-  it("courses lists only the ready courses, as id and title", async () => {
+  it("courses lists only the ready courses, as id and title, with the limit and total", async () => {
     const chrome = fakeChrome();
     wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/4/")));
     const reply = (await chrome.send({ type: "panel:courses" })) as PanelReply;
-    expect(reply).toEqual({ ok: true, data: [{ id: 4, title: "Course 4" }] });
+    expect(reply).toEqual({
+      ok: true,
+      data: { items: [{ id: 4, title: "Course 4" }], limit: 5, total: 2 },
+    });
+  });
+
+  it("deleteCourse deletes the course and replies ok on 204", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = courseFetch("http://127.0.0.1:8080/c/4/");
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl));
+    const reply = (await chrome.send({ type: "panel:deleteCourse", courseId: 4 })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    const deleteCall = vi.mocked(fetchImpl).mock.calls.find(([, init]) => init?.method === "DELETE");
+    expect(String(deleteCall?.[0])).toBe("http://127.0.0.1:8080/v1/courses/4");
+  });
+
+  it("deleteCourse replies ok when the course is already gone (404)", async () => {
+    const chrome = fakeChrome();
+    const gone = vi.fn(async () => new Response(JSON.stringify({ detail: "not found" }), { status: 404 }));
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), gone as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:deleteCourse", courseId: 4 })).toEqual({ ok: true });
+  });
+
+  /** Fake core that answers every call with one status and body; the request is kept for inspection. */
+  function createFetch(status: number, body: unknown) {
+    return vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  }
+
+  it("createCourse posts the title and replies ok on 202", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(202, { id: 6, title: "Rust basics", status: "processing" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "Rust basics" })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/courses");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ title: "Rust basics" });
+  });
+
+  it("createCourse replies with the core status and course_limit code on 409", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "X" })) as PanelReply;
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "course_limit" });
+    expect(reply).toEqual(expect.objectContaining({ error: expect.any(String) }));
+  });
+
+  it("createCourse replies with the course_name_taken code on 409", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(409, { detail: { code: "course_name_taken", message: "taken" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "X" })) as PanelReply;
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "course_name_taken" });
   });
 
   it("openCourse opens the core URL in a new tab", async () => {
@@ -324,6 +384,10 @@ describe("background wiring", () => {
     wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
     expect(await chrome.send({ type: "panel:courses" })).toEqual({ ok: false, error: "not signed in" });
     expect(await chrome.send({ type: "panel:openCourse", courseId: 4 })).toEqual({
+      ok: false,
+      error: "not signed in",
+    });
+    expect(await chrome.send({ type: "panel:deleteCourse", courseId: 4 })).toEqual({
       ok: false,
       error: "not signed in",
     });

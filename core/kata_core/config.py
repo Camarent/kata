@@ -22,6 +22,10 @@ EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "config" / "kata.example.to
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 
+# trainer.max_courses_per_user: this value means no limit; any value below it is rejected.
+MAX_COURSES_UNLIMITED = 0
+_COURSE_LIMIT_KEY = ("trainer", "max_courses_per_user")
+
 
 class ConfigError(Exception):
     """Config file missing, unreadable, incomplete, or holding a bad override."""
@@ -69,6 +73,13 @@ def _cast(raw: str, template: Any, name: str) -> Any:
         raise ConfigError(f"env override {name} is not a valid {type(template).__name__}") from exc
 
 
+def _is_course_limit(value: Any) -> bool:
+    # bool is an int subclass in Python; TOML true/false must not pass as a limit.
+    if isinstance(value, bool) or not isinstance(value, int):
+        return False
+    return value >= MAX_COURSES_UNLIMITED
+
+
 def load_config(
     path: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] = os.environ,
@@ -95,6 +106,11 @@ def load_config(
             env_name = f"{ENV_PREFIX}_{section}_{key}".upper()
             if env_name in env:
                 value = _cast(env[env_name], value, env_name)
+            if (section, key) == _COURSE_LIMIT_KEY and not _is_course_limit(value):
+                raise ConfigError(
+                    f"{section}.{key} must be an integer >= {MAX_COURSES_UNLIMITED} "
+                    f"(0 = unlimited), got {value!r}"
+                )
             values[key] = value
         sections[section] = MappingProxyType(values)
     return Config(sections=MappingProxyType(sections))

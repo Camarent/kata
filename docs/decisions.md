@@ -403,6 +403,8 @@ Decided 2026-11-21. Keys added to `config/kata.example.toml`: `[jobs] runner_pol
 
 Decided 2026-11-21. No existing contract shows courses or plans (extension side panel, editor, MCP tools). M5 adds no view. The backlog gets the entry "read-only plan/course view" (phase 02).
 
+Superseded in part by "Course limit and unique names (M16)" (2026-11-23): the side panel now lists, creates and deletes courses. The plan view is still in the backlog.
+
 ## D17 M6 phases in one stage
 
 Decided 2026-11-22. The seven M6 phases (images, stack, proxy, backup, provision, finish) run as one stage with one task per phase, not one stage each. Reason: the owner is away and the phases share files (compose, config template, scripts); splitting them adds merge steps without a gain. Each phase still lands as its own commit and task, and the success criteria of the roadmap cover all of them.
@@ -531,3 +533,29 @@ Health route: the first-run probe calls `GET /v1/health/deep` (`extension/src/co
 Release assets: a `v*` tag runs `.github/workflows/release-extension.yml`. It runs the extension tests, builds both browsers, writes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS`, and publishes them as a GitHub release. The actions are pinned by major tag (`@v7`), the same as `.github/workflows/ci.yml`. Reason: one unbranded build per browser serves every server, so the owner installs the zip and types the server URL.
 
 Limit: none of these flows is tested in a real browser. Not covered: the origin permission prompt, the `kata-bridge` registration and the course-page bridge. Vitest checks them with fake browser APIs (`extension/tests/`); the browser tests load the built extension but do not drive a real core through these steps.
+
+## Course limit default lives in the example config (M16)
+
+Decided 2026-11-23. `trainer.max_courses_per_user` defaults to 10 only in `config/kata.example.toml` (and its copy `deploy/kata.host.toml`). `core/kata_core/config.py` holds no default. `MAX_COURSES_UNLIMITED = 0` is the single named constant for the unlimited value; the negative check and the later API route use it. Deviation from the brief, which asked for a named constant for the default: the config file is the one default home, as the other `[trainer]` keys are. Values must be integers; a negative value, a string, a bool or a float raises `ConfigError` at startup, from file or env override.
+
+Reason: one default home keeps the example and the host config in sync (the host file copies the example by hand, its header says so). A second default in code would drift from both.
+
+Limit: the course limit is only validated here; no route enforces it yet (later task).
+
+Superseded in part by "Course limit and unique names (M16)" (2026-11-23): `POST /v1/courses` enforces the limit now.
+
+## Course limit and unique names (M16)
+
+Decided 2026-11-23. A user holds at most `[trainer] max_courses_per_user` courses. The default, 10, is set in `config/kata.example.toml` (and `deploy/kata.host.toml`); 0 means unlimited. Deviation from the brief, which asked for a named constant: the default lives in the config file, as recorded in "Course limit default lives in the example config (M16)". The only named constant is `MAX_COURSES_UNLIMITED = 0` (`core/kata_core/config.py:26`).
+- Limit: `POST /v1/courses` answers 409 `course_limit` when the user already holds the limit (`core/kata_core/api/routes/courses.py:149`). The count includes every status, so a failed course keeps its slot until it is deleted.
+- Unique names: a title is unique per user after normalisation (lower case, trimmed, runs of whitespace as one space). A duplicate answers 409 `course_name_taken`. The check is `title_taken` (`core/kata_core/trainer/store.py:68`); the unique index `course_user_id_title_norm_uidx` (`core/migrations/0014_course_unique_title.sql`) backs it, and a race that the check misses maps to the same 409 (`DuplicateCourseTitle`, `core/kata_core/trainer/store.py:22`).
+- Empty titles: an empty or whitespace-only title answers 422 `course_title_empty` (`_check_title` `core/kata_core/api/routes/courses.py:90`) before any write. The new 409 and 422 bodies are `{"code", "message"}` in `detail`; the 404 `course not found` keeps its plain text.
+- Migration 0014 renames existing duplicates: the oldest course of each normalised title keeps its name; each later duplicate gets the lowest ` (k)` suffix (k >= 2) that no course of the user uses. A rerun changes nothing.
+- Race: the count and the insert run under a row lock on the user (`lock_user` `core/kata_core/trainer/store.py:78`), so two creates of one user cannot both pass the limit.
+- Delete: `DELETE /v1/courses/{course_id}` (204) frees the slot and the title. The side panel asks for a second click ("Confirm delete") first; the server does not ask.
+- No rename route: a title is set at create and kept. A rename would need the same unique check; it is not built.
+- Panel: the side panel shows "n of limit" when the limit is above 0, and a create form. A failed create shows the text from `courseErrorText` (`extension/src/coreClient.ts:132`).
+
+Reason: each course runs a generate job and a build job, so the limit caps that work per user; unique titles let the list tell courses apart.
+
+Limit: the limit and the title rule are checked by the API tests and the Vitest panel tests with fake browser APIs; no real browser run drives them.
