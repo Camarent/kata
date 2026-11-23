@@ -113,7 +113,7 @@ Defaults are the values in `config/kata.example.toml`. The example values are pl
 
 The extension build has no server address in it. You type the server URL in the side panel the first time.
 
-Get the build: each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` on the GitHub release. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
+Get the build: download the zip for your browser from the Releases page. Each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` there. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
 
 Firefox (128.0 or later):
 1. Unzip the Firefox zip into a folder, or use `extension/dist/firefox/`.

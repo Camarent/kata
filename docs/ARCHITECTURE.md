@@ -53,5 +53,8 @@ Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whos
 Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
 E2e test: `cs-qrun -- python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests").
 
+## Releases
+How a tag becomes a GitHub release and how the VM takes it: `docs/release.md`.
+
 ## Known gaps
 - `pyproject.toml:5` comment says "stdlib only" but dependencies (`pyproject.toml:6`) are fastapi, psycopg, httpx, uvicorn.
