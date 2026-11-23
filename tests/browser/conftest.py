@@ -29,7 +29,7 @@ PAGES_DIR = TESTS_BROWSER / "pages"
 INSTALL_SCRIPT = REPO / "scripts" / "dev" / "install-browsers.sh"
 PRINT_DIR_TIMEOUT_SECONDS = 10
 CDP_TIMEOUT_SECONDS = 20
-FIREFOX_GECKO_ID = "kata@kata.local"
+FIREFOX_GECKO_ID = "kata@kata.invalid"
 # Fixed uuid for the Firefox extension origin: moz-extension://<uuid>/sidepanel.html is known.
 FIREFOX_EXTENSION_UUID = "6f1c3d2e-8a4b-4c5d-9e7f-0a1b2c3d4e5f"
 # Chrome creates its singleton socket under TMPDIR; unix socket paths are limited to 108 bytes, so a

@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Script } from "node:vm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 /** `npm --prefix extension test` runs with the extension folder as cwd. */
 const EXTENSION_DIR = process.cwd();
@@ -49,48 +49,44 @@ describe("built extension", () => {
     expect(manifest.sidebar_action).toBeDefined();
     expect(manifest.side_panel).toBeUndefined();
     expect(manifest.browser_specific_settings).toEqual({
-      gecko: { id: "kata@kata.local", strict_min_version: "128.0" },
+      gecko: { id: "kata@kata.invalid", strict_min_version: "128.0" },
     });
   });
+
+  it.each(BROWSERS)("dist/%s takes its version from extension/package.json when the env var is unset", (browser) => {
+    const packageVersion = JSON.parse(readFileSync(join(EXTENSION_DIR, "package.json"), "utf8")).version;
+    expect(readManifest(browser).version).toBe(packageVersion);
+  });
+
+  it.each(BROWSERS)("dist/%s takes its version from KATA_EXTENSION_VERSION when it is x.y.z", (browser) => {
+    execSync("npm run build", {
+      cwd: EXTENSION_DIR,
+      stdio: "pipe",
+      env: { ...process.env, KATA_EXTENSION_VERSION: "9.8.7" },
+    });
+    expect(readManifest(browser).version).toBe("9.8.7");
+  }, BUILD_TIMEOUT_MS);
+
+  it.each(["1.2", "v1.2.3", "1.2.3-beta", ""])("the build fails when KATA_EXTENSION_VERSION is %j", (bad) => {
+    expect(() =>
+      execSync("npm run build", {
+        cwd: EXTENSION_DIR,
+        stdio: "pipe",
+        env: { ...process.env, KATA_EXTENSION_VERSION: bad },
+      }),
+    ).toThrow();
+  }, BUILD_TIMEOUT_MS);
 
   it("chrome manifest uses side_panel, not sidebar_action", () => {
     const manifest = readManifest("chrome");
     expect(manifest.side_panel).toBeDefined();
     expect(manifest.sidebar_action).toBeUndefined();
   });
-});
 
-describe("built extension with KATA_EXTENSION_BASE_URL", () => {
-  const CUSTOM_URL = "http://127.0.0.1:9090";
-
-  /** Runs `node build/build.mjs firefox` with the base URL variable set, or unset when undefined. */
-  function buildFirefox(baseUrl: string | undefined): void {
-    const env: NodeJS.ProcessEnv = { ...process.env };
-    delete env.KATA_EXTENSION_BASE_URL;
-    if (baseUrl !== undefined) env.KATA_EXTENSION_BASE_URL = baseUrl;
-    execSync("node build/build.mjs firefox", { cwd: EXTENSION_DIR, env, stdio: "pipe" });
-  }
-
-  beforeAll(() => {
-    buildFirefox(CUSTOM_URL);
-  }, BUILD_TIMEOUT_MS);
-
-  afterAll(() => {
-    // Restore the default build that the other tests in this file read.
-    buildFirefox(undefined);
-  }, BUILD_TIMEOUT_MS);
-
-  it("manifest host_permissions is exactly the configured origin", () => {
-    expect(readManifest("firefox").host_permissions).toEqual(["http://127.0.0.1:9090/*"]);
-  });
-
-  it("the bundled background script carries the configured URL", () => {
-    const bundle = readFileSync(distPath("firefox", "background.js"), "utf8");
-    expect(bundle).toContain(JSON.stringify(CUSTOM_URL));
-  });
-
-  it("an unset variable gives the default host permission again", () => {
-    buildFirefox(undefined);
-    expect(readManifest("firefox").host_permissions).toEqual(["http://127.0.0.1:8080/*"]);
+  it.each(BROWSERS)("dist/%s manifest has no fixed host_permissions and asks for the origin at run time", (browser) => {
+    const manifest = readManifest(browser);
+    expect(manifest.host_permissions).toBeUndefined();
+    expect(manifest.optional_host_permissions).toEqual(["http://*/*", "https://*/*"]);
   });
 });
+

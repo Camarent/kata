@@ -6,6 +6,8 @@ import {
   CoreHttpError,
   CoreOfflineError,
   CoreTimeoutError,
+  CoreUnreachableError,
+  NotKataServerError,
 } from "../src/coreClient";
 
 const BASE = "http://127.0.0.1:8080";
@@ -267,5 +269,64 @@ describe("CoreClient course routes", () => {
     const client = new CoreClient({ baseUrl: BASE, token: "bad", timeoutMs: 500, fetchImpl: fn });
     await expect(client.getProgress(5)).rejects.toBeInstanceOf(CoreAuthError);
     await expect(client.putProgress(5, "{}", 1)).rejects.toBeInstanceOf(CoreAuthError);
+  });
+});
+
+describe("CoreClient health probe", () => {
+  const KATA_OK = { status: "ok", checks: { db: true, migrations: true } };
+
+  it("GETs /v1/health/deep without an Authorization header and resolves with the report", async () => {
+    const { fn, calls } = fakeFetch(200, KATA_OK);
+    const client = new CoreClient({ baseUrl: `${BASE}/`, token: "tok-1", timeoutMs: 500, fetchImpl: fn });
+    await expect(client.probe()).resolves.toEqual(KATA_OK);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/v1/health/deep`);
+    expect(calls[0].headers["Authorization"]).toBeUndefined();
+  });
+
+  it("resolves for a kata 503 'fail' report, so the caller can show the failed checks", async () => {
+    const failed = { status: "fail", failed: ["db"], checks: { db: false, migrations: false } };
+    const { fn } = fakeFetch(503, failed);
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: fn });
+    await expect(client.probe()).resolves.toMatchObject({ status: "fail", checks: { db: false } });
+  });
+
+  it("throws CoreUnreachableError when the network fails", async () => {
+    const failing = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: failing });
+    await expect(client.probe()).rejects.toBeInstanceOf(CoreUnreachableError);
+  });
+
+  it("throws CoreUnreachableError when the address never answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: hangingFetch() });
+      const pending = client.probe();
+      const assertion = expect(pending).rejects.toBeInstanceOf(CoreUnreachableError);
+      await vi.advanceTimersByTimeAsync(500);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("throws NotKataServerError on a 200 JSON reply that is not the health document", async () => {
+    const { fn } = fakeFetch(200, { hello: "world" });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: fn });
+    await expect(client.probe()).rejects.toBeInstanceOf(NotKataServerError);
+  });
+
+  it("throws NotKataServerError on a 200 reply with a non-JSON body", async () => {
+    const html = vi.fn(async () => new Response("<html>router</html>", { status: 200 })) as unknown as typeof fetch;
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: html });
+    await expect(client.probe()).rejects.toBeInstanceOf(NotKataServerError);
+  });
+
+  it("throws NotKataServerError when checks are not a map of booleans", async () => {
+    const { fn } = fakeFetch(200, { status: "ok", checks: { db: "yes" } });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 500, fetchImpl: fn });
+    await expect(client.probe()).rejects.toBeInstanceOf(NotKataServerError);
   });
 });

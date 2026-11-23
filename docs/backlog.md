@@ -42,8 +42,13 @@ Project items after Milestone 0.
       values (see `config/kata.example.toml`); the price table is pinned and unverified against
       live billing.
 - [x] Reproducible Postgres test setup: `scripts/dev/pg.sh`, see [`development.md`](development.md).
-- [ ] The extension manifest allows only `http://127.0.0.1:8080/*`, so a core reached over a VPN
+- [x] The extension manifest allows only `http://127.0.0.1:8080/*`, so a core reached over a VPN
       or another port needs a manifest change (request the host permission at sign-in).
+      Closed in M15: the build has no fixed host; the origin is requested at sign-in
+      (see [`decisions.md`](decisions.md), "Extension has no build-time server config (M15)").
+- [ ] Real-browser run of the extension's first run: the origin permission prompt, the
+      `kata-bridge` registration and the course-page bridge are checked only with fake browser
+      APIs (vitest). Run them in Firefox and Chrome against a real core.
 - [x] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have.
       Closed: `scripts/dev/check-all.sh` is the clean-clone gate with plain commands;
       `gates.json` now has plain commands too; `pipeline.json` runs `check-all` through `cs-qrun` (see

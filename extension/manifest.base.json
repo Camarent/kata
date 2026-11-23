@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "kata",
   "version": "0.0.0",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["http://127.0.0.1:8080/*"],
+  "permissions": ["storage", "activeTab", "scripting", "permissions"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],

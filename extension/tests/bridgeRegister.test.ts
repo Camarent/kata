@@ -3,11 +3,12 @@ import {
   BRIDGE_SCRIPT_ID,
   bridgeMatchPatterns,
   registerBridge,
+  syncBridge,
   wireBridgeRegistration,
   type RegisteredScript,
   type ScriptingLike,
 } from "../src/bridgeRegister";
-import { CORE_ORIGIN } from "../src/config";
+import { TokenStore, type StorageArea } from "../src/tokenStore";
 
 /** Fake `chrome.scripting` that records each call in order. */
 function fakeScripting(unregisterError?: Error) {
@@ -36,8 +37,113 @@ describe("bridgeMatchPatterns", () => {
     expect(bridgeMatchPatterns("https://core.example.test:9443")).toEqual(["https://*/c/*"]);
   });
 
-  it("defaults to the configured core origin", () => {
-    expect(bridgeMatchPatterns()).toEqual(bridgeMatchPatterns(CORE_ORIGIN));
+  it("follows the origin it is given, never a build-time default", () => {
+    expect(bridgeMatchPatterns("https://kata.example.test")).toEqual(["https://*/c/*"]);
+  });
+});
+
+/** In-memory storage area with the StorageArea shape. */
+function memoryArea(): StorageArea {
+  const items = new Map<string, unknown>();
+  return {
+    async get(key) {
+      return items.has(key) ? { [key]: items.get(key) } : {};
+    },
+    async set(values) {
+      for (const [key, value] of Object.entries(values)) items.set(key, value);
+    },
+    async remove(key) {
+      items.delete(key);
+    },
+  };
+}
+
+/** A token store holding the session, or no session when `baseUrl` is undefined. */
+async function storeWith(baseUrl: string | undefined): Promise<TokenStore> {
+  const tokens = new TokenStore(memoryArea());
+  if (baseUrl !== undefined) await tokens.saveSession({ baseUrl, token: "T" });
+  return tokens;
+}
+
+/** Fake `chrome.runtime` and `chrome.permissions` that keep the listeners and fire them on demand. */
+function fakeEvents() {
+  const lifecycle: Array<() => void> = [];
+  const removed: Array<(info: { origins?: string[] }) => void> = [];
+  const hook = { addListener: (listener: () => void) => lifecycle.push(listener) };
+  return {
+    runtime: { onInstalled: hook, onStartup: hook },
+    permissions: {
+      onRemoved: { addListener: (listener: (info: { origins?: string[] }) => void) => removed.push(listener) },
+    },
+    lifecycle,
+    removed,
+  };
+}
+
+describe("syncBridge", () => {
+  it("registers the bridge for the saved session's origin", async () => {
+    const { scripting, registered } = fakeScripting();
+    await syncBridge(scripting, await storeWith("http://127.0.0.1:8080/some/base"));
+    expect(registered).toEqual([
+      [expect.objectContaining({ id: BRIDGE_SCRIPT_ID, matches: ["http://*/c/*"] })],
+    ]);
+  });
+
+  it("removes the bridge when no session is saved", async () => {
+    const { scripting, calls, registered } = fakeScripting();
+    await syncBridge(scripting, await storeWith(undefined));
+    expect(calls).toEqual(["unregister"]);
+    expect(registered).toEqual([]);
+  });
+
+  it("removes the bridge when the saved base URL is invalid", async () => {
+    const { scripting, calls } = fakeScripting();
+    await syncBridge(scripting, await storeWith("not a url"));
+    expect(calls).toEqual(["unregister"]);
+  });
+});
+
+describe("wireBridgeRegistration with the session", () => {
+  it("syncs at wiring time, on install and on browser start, from the saved session", async () => {
+    const events = fakeEvents();
+    const { scripting, registered } = fakeScripting();
+    const tokens = await storeWith("https://kata.example.test");
+    wireBridgeRegistration(events.runtime, scripting, events.permissions, tokens);
+    await vi.waitFor(() => expect(registered).toHaveLength(1));
+    expect(events.lifecycle).toHaveLength(2);
+    for (const fire of events.lifecycle) fire();
+    await vi.waitFor(() => expect(registered).toHaveLength(3));
+    expect(registered[2][0].matches).toEqual(["https://*/c/*"]);
+  });
+
+  it("still syncs on wiring when chrome.permissions is absent", async () => {
+    const events = fakeEvents();
+    const { scripting, calls } = fakeScripting();
+    const tokens = await storeWith("http://127.0.0.1:8080");
+    expect(() => wireBridgeRegistration(events.runtime, scripting, undefined, tokens)).not.toThrow();
+    await vi.waitFor(() => expect(calls).toEqual(["unregister", "register"]));
+    expect(events.removed).toHaveLength(0);
+  });
+
+  it("removes the bridge when the permission for the session's origin is removed", async () => {
+    const events = fakeEvents();
+    const { scripting, calls } = fakeScripting();
+    const tokens = await storeWith("http://127.0.0.1:8080");
+    wireBridgeRegistration(events.runtime, scripting, events.permissions, tokens);
+    await vi.waitFor(() => expect(calls).toEqual(["unregister", "register"]));
+    for (const fire of events.removed) fire({ origins: ["http://127.0.0.1:8080/*"] });
+    await vi.waitFor(() => expect(calls).toEqual(["unregister", "register", "unregister"]));
+  });
+
+  it("keeps the bridge when the removed permission names another origin", async () => {
+    const events = fakeEvents();
+    const { scripting, calls } = fakeScripting();
+    const tokens = await storeWith("http://127.0.0.1:8080");
+    wireBridgeRegistration(events.runtime, scripting, events.permissions, tokens);
+    await vi.waitFor(() => expect(calls).toEqual(["unregister", "register"]));
+    for (const fire of events.removed) fire({ origins: ["https://other.test/*"] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toEqual(["unregister", "register"]);
   });
 });
 
@@ -76,20 +182,9 @@ describe("registerBridge", () => {
   });
 });
 
-describe("wireBridgeRegistration", () => {
-  it("registers on install and again on browser start", async () => {
-    const listeners: Array<() => void> = [];
-    const hook = { addListener: (listener: () => void) => listeners.push(listener) };
-    const { scripting, registered } = fakeScripting();
-    wireBridgeRegistration({ onInstalled: hook, onStartup: hook }, scripting, "http://127.0.0.1:8080");
-    expect(listeners).toHaveLength(2);
-    for (const fire of listeners) fire();
-    await vi.waitFor(() => expect(registered).toHaveLength(2));
-  });
-
+describe("wireBridgeRegistration failures", () => {
   it("logs a failed registration instead of throwing", async () => {
-    const listeners: Array<() => void> = [];
-    const hook = { addListener: (listener: () => void) => listeners.push(listener) };
+    const events = fakeEvents();
     const scripting: ScriptingLike = {
       registerContentScripts: async () => {
         throw new Error("boom");
@@ -97,8 +192,7 @@ describe("wireBridgeRegistration", () => {
       unregisterContentScripts: async () => undefined,
     };
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    wireBridgeRegistration({ onInstalled: hook, onStartup: hook }, scripting, "http://127.0.0.1:8080");
-    listeners[0]();
+    wireBridgeRegistration(events.runtime, scripting, events.permissions, await storeWith("http://127.0.0.1:8080"));
     await vi.waitFor(() => expect(log).toHaveBeenCalledTimes(1));
   });
 });

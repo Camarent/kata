@@ -3,13 +3,15 @@
  *
  * Pure function: no file system access. The caller reads the base file and writes the result.
  *
- * Firefox: `browser_specific_settings.gecko.id` is `kata@kata.local`; `strict_min_version`
- * is `128.0` (the chosen minimum, see docs/decisions.md). Change both only
- * together with the Firefox add-on listing.
+ * Firefox: `browser_specific_settings.gecko.id` is `kata@kata.invalid` (a reserved domain, so it
+ * never collides with a real add-on); `strict_min_version` is `128.0` (the chosen minimum, see
+ * docs/decisions.md). Change both only together with the Firefox add-on listing.
+ *
+ * `manifest.version` is stamped by the caller (see `build.mjs`), never read from `base`.
  */
 
 /** Gecko add-on id for the Firefox build. */
-const GECKO_ID = "kata@kata.local";
+const GECKO_ID = "kata@kata.invalid";
 
 /** Lowest Firefox version the extension runs on. */
 const GECKO_MIN_VERSION = "128.0";
@@ -21,37 +23,15 @@ const PANEL_PAGE = "sidepanel.html";
 const BACKGROUND_SCRIPT = "background.js";
 
 /**
- * Returns the origin of the core base URL, the only part a host permission can name.
- * @param {string} baseUrl Core base URL, for example `http://127.0.0.1:8080`.
- * @returns {string} The origin, for example `http://127.0.0.1:8080`.
- * @throws {Error} When the URL does not parse or is not http(s).
- */
-export function hostOrigin(baseUrl) {
-  let url;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    throw new Error(`invalid base URL: ${baseUrl}`);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(`base URL must be http or https: ${baseUrl}`);
-  }
-  return url.origin;
-}
-
-/**
  * Returns the manifest for one browser.
  * @param {object} base Parsed `manifest.base.json`; not modified.
  * @param {"chrome" | "firefox"} browser Target browser.
- * @param {string} [baseUrl] Core base URL; when given, `host_permissions` becomes exactly its origin plus `/*`.
- *   When omitted, `host_permissions` stays as in `manifest.base.json`.
+ * @param {string} version Extension version written to `manifest.version`.
  * @returns {object} A new manifest object.
  */
-export function composeManifest(base, browser, baseUrl) {
+export function composeManifest(base, browser, version) {
   const manifest = structuredClone(base);
-  if (baseUrl !== undefined) {
-    manifest.host_permissions = [`${hostOrigin(baseUrl)}/*`];
-  }
+  manifest.version = version;
   if (browser === "chrome") {
     manifest.permissions = [...base.permissions, "sidePanel"];
     manifest.side_panel = { default_path: PANEL_PAGE };

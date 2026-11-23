@@ -20,26 +20,40 @@ type PanelStatus =
   | { kind: "idle" }
   | { kind: "scanning" }
   | { kind: "partial"; done: number; total: number }
-  | { kind: "error"; reason: "timeout" | "auth" | "failed" };
+  | { kind: "error"; reason: "timeout" | "auth" | "failed" }
+  | { kind: "notice"; text: string };
 
-/** Everything the panel draws. `session` null means signed out. `review` non-null means the review screen. `courses` empty means no Courses section. */
+/**
+ * Everything the panel draws. `session` null means signed out. `changing` true shows the
+ * sign-in form over a live session (change server). `review` non-null means the review screen.
+ * `courses` empty means no Courses section.
+ */
 export interface PanelState {
   session: Session | null;
   rows: PanelRow[];
   status: PanelStatus;
+  changing?: boolean;
   review?: ReviewRow[] | null;
   courses?: CourseLink[];
 }
 
-/** Values typed into the sign-in form. */
+/** Values typed into the sign-in form: pairing code and device label. */
 export interface SignInInput {
   code: string;
   deviceLabel: string;
 }
 
+/** Sign-in form values with the typed server URL. */
+export interface ServerFormInput extends SignInInput {
+  baseUrl: string;
+}
+
 /** User actions the panel reports back to the caller. */
 export interface PanelHandlers {
-  onSignIn: (input: SignInInput) => void | Promise<void>;
+  onSignIn: (input: ServerFormInput) => void | Promise<void>;
+  onDisconnect: () => void | Promise<void>;
+  onChangeServer: () => void;
+  onCancelChange: () => void;
   onKnown: (topicId: number) => Promise<MarkOutcome>;
   onReview: () => Promise<void>;
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
@@ -59,9 +73,16 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** Sign-in form: pairing code and device label. */
-function renderSignIn(handlers: PanelHandlers): HTMLElement {
+/** Sign-in form: server URL, pairing code and device label. `prefill` fills the URL; `canCancel` adds Cancel. */
+function renderSignIn(handlers: PanelHandlers, prefill: string, canCancel: boolean): HTMLElement {
   const form = el("form", undefined, "signin");
+  const serverLabel = el("label", "Server URL");
+  const server = el("input");
+  server.name = "baseUrl";
+  server.type = "text";
+  server.placeholder = "https://kata.example.org";
+  server.value = prefill;
+  serverLabel.append(server);
   const codeLabel = el("label", "Code");
   const code = el("input");
   code.name = "code";
@@ -72,22 +93,47 @@ function renderSignIn(handlers: PanelHandlers): HTMLElement {
   device.name = "deviceLabel";
   device.type = "text";
   deviceLabel.append(device);
-  const submit = el("button", "Sign in");
+  const submit = el("button", "Connect");
   submit.type = "submit";
   const error = el("p", undefined, "error");
   error.setAttribute("role", "alert");
-  form.append(codeLabel, deviceLabel, submit, error);
+  form.append(serverLabel, codeLabel, deviceLabel, submit);
+  if (canCancel) {
+    const cancel = el("button", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", () => handlers.onCancelChange());
+    form.append(cancel);
+  }
+  form.append(error);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const input = { code: code.value.trim(), deviceLabel: device.value.trim() };
+    const input = { baseUrl: server.value.trim(), code: code.value.trim(), deviceLabel: device.value.trim() };
     if (input.code === "" || input.deviceLabel === "") {
       error.textContent = "Enter the code and a device label";
+      return;
+    }
+    if (input.baseUrl === "") {
+      error.textContent = "Enter the server URL";
       return;
     }
     error.textContent = "";
     void handlers.onSignIn(input);
   });
   return form;
+}
+
+/** Connected header: the session origin, with Change server and Disconnect. */
+function renderConnection(session: Session, handlers: PanelHandlers): HTMLElement {
+  const box = el("div", undefined, "connection");
+  box.append(el("p", session.baseUrl, "origin"));
+  const change = el("button", "Change server", "change-server");
+  change.type = "button";
+  change.addEventListener("click", () => handlers.onChangeServer());
+  const disconnect = el("button", "Disconnect", "disconnect");
+  disconnect.type = "button";
+  disconnect.addEventListener("click", () => void handlers.onDisconnect());
+  box.append(change, disconnect);
+  return box;
 }
 
 /** User-facing text for each error reason. */
@@ -108,6 +154,8 @@ function statusText(status: PanelStatus): string {
       return `partial: ${status.done} of ${status.total}`;
     case "error":
       return ERROR_TEXT[status.reason];
+    case "notice":
+      return status.text;
   }
 }
 
@@ -207,15 +255,18 @@ function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLEleme
 /** Draws the panel into root: sign-in form when signed out, else status and grouped results. */
 export function renderPanel(root: HTMLElement, state: PanelState, handlers: PanelHandlers): void {
   root.replaceChildren();
-  if (state.session === null) {
-    root.append(renderSignIn(handlers));
-    if (state.status.kind === "error") root.append(el("p", statusText(state.status), "status"));
+  if (state.session === null || state.changing) {
+    root.append(renderSignIn(handlers, state.session?.baseUrl ?? "", state.session !== null));
+    if (state.status.kind === "error" || state.status.kind === "notice") {
+      root.append(el("p", statusText(state.status), "status"));
+    }
     return;
   }
   if (state.review != null) {
     root.append(renderReviewView(state.review, handlers));
     return;
   }
+  root.append(renderConnection(state.session, handlers));
   const review = el("button", "Review concepts", "review-open");
   review.type = "button";
   review.addEventListener("click", () => void handlers.onReview());

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
-import { bootPanel, type PanelChromeLike } from "../src/sidepanelBoot";
+import { bootPanel, type OriginsRequest, type PanelChromeLike } from "../src/sidepanelBoot";
 import type { PanelMessage, PanelReply } from "../src/background";
 import type { StorageArea } from "../src/tokenStore";
 
@@ -34,14 +34,38 @@ function memoryArea(initial: Record<string, unknown> = {}): StorageArea {
   };
 }
 
-/** Fake chrome for the side panel page: storage with the given session, and a stubbed message reply. */
-function fakeChrome(reply: PanelReply = { ok: true }, session: unknown = null) {
+/** Fake origin permissions: request answers `granted`, remove records calls, `fire` runs onRemoved listeners. */
+function fakePermissions(granted = true) {
+  const request = vi.fn(async (_request: OriginsRequest) => granted);
+  const remove = vi.fn(async (_request: OriginsRequest) => true);
+  const listeners: Array<(removed: { origins?: string[] }) => void> = [];
+  const onRemoved = { addListener: (listener: (removed: { origins?: string[] }) => void) => void listeners.push(listener) };
+  const fire = (origins: string[]) => listeners.forEach((listener) => listener({ origins }));
+  return { request, remove, onRemoved, fire };
+}
+
+/** Fake chrome for the side panel page: storage with the given session, a stubbed message reply and fake permissions. */
+function fakeChrome(
+  reply: PanelReply = { ok: true },
+  session: unknown = null,
+  permissions = fakePermissions(),
+) {
   const sendMessage = vi.fn(async () => reply);
   const api: PanelChromeLike = {
     runtime: { sendMessage },
     storage: { local: memoryArea(session ? { "kata.session": session } : {}) },
+    permissions,
   };
-  return { api, sendMessage };
+  return { api, sendMessage, permissions };
+}
+
+/** Fills and submits the first-run form (or the change form) with the given values. */
+function submitSignIn(panel: HTMLElement, baseUrl: string, code: string, deviceLabel: string): void {
+  const form = panel.querySelector("form.signin") as HTMLFormElement;
+  (form.querySelector('input[name="baseUrl"]') as HTMLInputElement).value = baseUrl;
+  (form.querySelector('input[name="code"]') as HTMLInputElement).value = code;
+  (form.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = deviceLabel;
+  form.dispatchEvent(new Event("submit", { cancelable: true }));
 }
 
 describe("sidepanel.html", () => {
@@ -101,29 +125,104 @@ describe("bootPanel", () => {
     expect(root.querySelector(".empty")?.textContent).toBe("Nothing scanned yet");
   });
 
-  it("sends the typed sign-in values to the background as a panel message", async () => {
-    const { api, sendMessage } = fakeChrome({ ok: true });
+  it("requests the server origin, then sends the typed sign-in values to the background", async () => {
+    const { api, sendMessage, permissions } = fakeChrome({ ok: true });
     await bootPanel(mountPoint(), api);
-    const form = root.querySelector("form.signin") as HTMLFormElement;
-    (form.querySelector('input[name="code"]') as HTMLInputElement).value = " 123456 ";
-    (form.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = "laptop";
-    form.dispatchEvent(new Event("submit", { cancelable: true }));
-    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
-    expect(sendMessage).toHaveBeenCalledWith({
-      type: "panel:signIn",
-      input: { code: "123456", deviceLabel: "laptop" },
-    });
+    submitSignIn(root, "https://kata.example.org/", " 123456 ", "laptop");
+    await vi.waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith({
+        type: "panel:signIn",
+        input: { baseUrl: "https://kata.example.org", code: "123456", deviceLabel: "laptop" },
+      }),
+    );
+    expect(permissions.request).toHaveBeenCalledWith({ origins: ["https://kata.example.org/*"] });
+    expect(permissions.request.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0]);
   });
 
-  it("shows the background error when sign-in is refused", async () => {
-    const { api } = fakeChrome({ ok: false, error: "bad code" });
+  it("a refused permission shows the denied text, stores nothing and sends no sign-in", async () => {
+    const { api, sendMessage, permissions } = fakeChrome({ ok: true }, null, fakePermissions(false));
     await bootPanel(mountPoint(), api);
-    const form = root.querySelector("form.signin") as HTMLFormElement;
-    (form.querySelector('input[name="code"]') as HTMLInputElement).value = "000000";
-    (form.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = "laptop";
-    form.dispatchEvent(new Event("submit", { cancelable: true }));
-    await vi.waitFor(() => expect(root.querySelector(".status")).not.toBeNull());
+    submitSignIn(root, "https://kata.example.org", "123456", "laptop");
+    await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toMatch(/not granted/));
+    expect(permissions.request).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
     expect(root.querySelector("form.signin")).not.toBeNull();
+  });
+
+  it("an invalid URL shows its reason and asks for no permission", async () => {
+    const { api, sendMessage, permissions } = fakeChrome();
+    await bootPanel(mountPoint(), api);
+    submitSignIn(root, "not a url", "123456", "laptop");
+    await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("server URL is not a valid URL"));
+    expect(permissions.request).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows the background error text when sign-in is refused and releases the new origin", async () => {
+    const { api, permissions } = fakeChrome({ ok: false, error: "core rejected the credentials" });
+    await bootPanel(mountPoint(), api);
+    submitSignIn(root, "https://kata.example.org", "000000", "laptop");
+    await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("core rejected the credentials"));
+    expect(root.querySelector("form.signin")).not.toBeNull();
+    expect(permissions.remove).toHaveBeenCalledWith({ origins: ["https://kata.example.org/*"] });
+  });
+
+  it("shows each server error text the background sends (unreachable, not kata)", async () => {
+    for (const error of ["core is unreachable", "address does not answer as a kata core"]) {
+      const { api } = fakeChrome({ ok: false, error });
+      await bootPanel(mountPoint(), api);
+      submitSignIn(root, "https://kata.example.org", "123456", "laptop");
+      await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe(error));
+      root.remove();
+    }
+  });
+
+  it("Disconnect removes the session origin, sends panel:disconnect and draws first-run", async () => {
+    const { api, sendMessage, permissions } = fakeChrome({ ok: true }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.disconnect")!.click();
+    await vi.waitFor(() => expect(root.querySelector("form.signin")).not.toBeNull());
+    expect(permissions.remove).toHaveBeenCalledWith({ origins: ["http://localhost:8000/*"] });
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:disconnect" });
+    expect(root.querySelector<HTMLInputElement>('input[name="baseUrl"]')!.value).toBe("");
+  });
+
+  it("Change server asks for the new origin, signs in, then removes the old origin", async () => {
+    const { api, sendMessage, permissions } = fakeChrome({ ok: true }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.change-server")!.click();
+    expect(root.querySelector<HTMLInputElement>('input[name="baseUrl"]')!.value).toBe("http://localhost:8000");
+    submitSignIn(root, "https://kata.example.org", "123456", "laptop");
+    await vi.waitFor(() => expect(permissions.remove).toHaveBeenCalledTimes(1));
+    expect(permissions.request).toHaveBeenCalledWith({ origins: ["https://kata.example.org/*"] });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "panel:signIn",
+      input: { baseUrl: "https://kata.example.org", code: "123456", deviceLabel: "laptop" },
+    });
+    expect(permissions.remove).toHaveBeenCalledWith({ origins: ["http://localhost:8000/*"] });
+    expect(permissions.request.mock.invocationCallOrder[0]).toBeLessThan(permissions.remove.mock.invocationCallOrder[0]);
+  });
+
+  it("Cancel in change mode returns to the connected view without touching permissions", async () => {
+    const { api, permissions } = fakeChrome({ ok: true }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("button.change-server")!.click();
+    const cancel = [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Cancel")!;
+    cancel.click();
+    expect(root.querySelector("p.origin")?.textContent).toBe("http://localhost:8000");
+    expect(permissions.request).not.toHaveBeenCalled();
+    expect(permissions.remove).not.toHaveBeenCalled();
+  });
+
+  it("removing the session origin in the browser falls back to first-run", async () => {
+    const permissions = fakePermissions();
+    const { api } = fakeChrome({ ok: true }, signedIn, permissions);
+    await bootPanel(mountPoint(), api);
+    permissions.fire(["https://other.example.org/*"]);
+    expect(root.querySelector("form.signin")).toBeNull();
+    permissions.fire(["http://localhost:8000/*"]);
+    expect(root.querySelector("form.signin")).not.toBeNull();
+    expect(root.querySelector("p.origin")).toBeNull();
   });
 
   const reviewRows = [{ conceptId: 5, label: "ser", state: null, evidence: "" }];
@@ -202,7 +301,11 @@ describe("bootPanel", () => {
         ? { ok: true, data: courses }
         : { ok: false, error: "course link is outside the core" },
     );
-    const api: PanelChromeLike = { runtime: { sendMessage }, storage: { local: memoryArea({ "kata.session": signedIn }) } };
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
     await bootPanel(mountPoint(), api);
     root.querySelector<HTMLButtonElement>("section.courses button")!.click();
     await vi.waitFor(() =>

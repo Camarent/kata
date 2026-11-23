@@ -115,7 +115,7 @@ To load Firefox: open `about:debugging#/runtime/this-firefox`, choose "Load Temp
 
 To load Chrome: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick `extension/dist/chrome/`.
 
-Firefox loads the add-on under the id `kata@kata.local` and needs version 128.0 or later (see `docs/decisions.md`). The core must be running on `http://127.0.0.1:8080` for the panel to show marks.
+Firefox loads the add-on under the id `kata@kata.invalid` and needs version 128.0 or later (see `docs/decisions.md`). The build has no core URL: in the side panel, type the URL of your core (for a local core, `http://127.0.0.1:8080` with the default port) in the sign-in form and connect. The core must be running at that URL for the panel to show marks.
 
 ## Browser tests
 
