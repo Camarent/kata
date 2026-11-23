@@ -106,6 +106,9 @@ class DojoTrainerCli:
         for entry in raw:
             if not isinstance(entry, dict):
                 raise TrainerError("dojo validate: diagnostic is not an object")
+            # Warnings never fail a course: only severity=error diagnostics are returned.
+            if _text_field(entry, "severity", "validate") != "error":
+                continue
             message = _text_field(entry, "message", "validate")
             out.append(Diagnostic(item=_item_of(entry, message), message=message))
         return out

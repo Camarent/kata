@@ -25,6 +25,7 @@ from support.scratch_db import ScratchDatabase
 FAKE_TRAINER = [sys.executable, str(Path(fake_dojo.__file__))]
 MISSING_TRAINER = ["/nonexistent/dojo"]
 FAKE_MARK = fake_dojo.INVALID_MARK
+WARN_MARK = fake_dojo.WARN_MARK
 
 
 @pytest.fixture
@@ -193,6 +194,27 @@ def test_build_ready_drops_invalid_item(conn: psycopg.Connection[Any]) -> None:
     # The fake dojo writes data/content.json, manifest.json and index.html.
     assert _count(conn, "course_artifact", course.id) == 3
     assert _journal(conn, user, build.COURSE_READY_KIND) == 1
+
+
+def test_build_ready_keeps_warned_item(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "alice")
+    concepts = _concepts(conn)
+    _generate(
+        conn,
+        user,
+        concepts,
+        [_draft(concepts[0]), _draft(concepts[1]), _draft(concepts[0], prompt=f"{WARN_MARK} x")],
+    )
+    job = _build_job(conn, user)
+    build.run_build(conn, job, _cfg(), DojoTrainerCli(FAKE_TRAINER, 30))
+
+    course = get_course(conn, user, json.loads(job.payload)["course_id"])
+    assert course is not None
+    assert course.status == "ready"
+    assert course.error is None
+    # The warned item is not dropped: all three drafts end up in the course.
+    assert _count(conn, "course_item_map", course.id) == 3
+    assert _journal(conn, user, build.COURSE_FAILED_KIND) == 0
 
 
 def test_build_ready_with_long_title_and_control_chars(conn: psycopg.Connection[Any]) -> None:

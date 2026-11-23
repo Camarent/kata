@@ -135,8 +135,9 @@ def test_validate_falls_back_to_file_line(dojo: DojoTrainerCli, course: Path) ->
 
 
 def test_validate_warnings_only_exit_zero(dojo: DojoTrainerCli, course: Path) -> None:
-    warned = dojo.add(course, _item("answer in FAKE_WARN prompt"))
-    assert dojo.validate(course) == [Diagnostic(item=warned, message=f"{warned}: fake warning")]
+    dojo.add(course, _item("answer in FAKE_WARN prompt"))
+    # A warning is not an error: validate returns no diagnostics for it.
+    assert dojo.validate(course) == []
 
 
 def test_validate_exit_two_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
