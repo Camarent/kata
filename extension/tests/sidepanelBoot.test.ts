@@ -360,4 +360,55 @@ describe("bootPanel", () => {
     expect(root.querySelector("section.courses .course-title")?.textContent).toBe("Algebra");
     expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(1);
   });
+
+  /** Types a title into the create-course form and submits it. */
+  function submitCreate(title: string) {
+    const form = root.querySelector<HTMLFormElement>("section.courses form.create-course")!;
+    form.querySelector<HTMLInputElement>('input[name="courseTitle"]')!.value = title;
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+  }
+
+  it("a successful create sends panel:createCourse with the title and reloads the list", async () => {
+    let listed = courseList;
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> => {
+      if (message.type === "panel:courses") return { ok: true, data: listed };
+      if (message.type === "panel:createCourse") {
+        listed = { items: [...courseList.items, { id: 6, title: "Rust basics" }], limit: 5, total: 2 };
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    submitCreate("Rust basics");
+    await vi.waitFor(() => expect(root.querySelectorAll("section.courses .course-title")).toHaveLength(2));
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:createCourse", title: "Rust basics" });
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(2);
+    expect(root.querySelector("section.courses p.course-note")?.textContent).toBe("");
+  });
+
+  it("a refused create shows the course error text and does not reload the list", async () => {
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
+      message.type === "panel:courses"
+        ? { ok: true, data: courseList }
+        : { ok: false, error: "course limit of 3 reached", status: 409, code: "course_limit" },
+    );
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    submitCreate("Rust basics");
+    await vi.waitFor(() =>
+      expect(root.querySelector("section.courses p.course-note")?.textContent).toBe(
+        "You have reached your course limit. Delete a course to add another.",
+      ),
+    );
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(1);
+  });
 });

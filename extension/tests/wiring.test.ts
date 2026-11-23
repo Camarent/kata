@@ -321,6 +321,40 @@ describe("background wiring", () => {
     expect(await chrome.send({ type: "panel:deleteCourse", courseId: 4 })).toEqual({ ok: true });
   });
 
+  /** Fake core that answers every call with one status and body; the request is kept for inspection. */
+  function createFetch(status: number, body: unknown) {
+    return vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  }
+
+  it("createCourse posts the title and replies ok on 202", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(202, { id: 6, title: "Rust basics", status: "processing" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "Rust basics" })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/courses");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ title: "Rust basics" });
+  });
+
+  it("createCourse replies with the core status and course_limit code on 409", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "X" })) as PanelReply;
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "course_limit" });
+    expect(reply).toEqual(expect.objectContaining({ error: expect.any(String) }));
+  });
+
+  it("createCourse replies with the course_name_taken code on 409", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(409, { detail: { code: "course_name_taken", message: "taken" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:createCourse", title: "X" })) as PanelReply;
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "course_name_taken" });
+  });
+
   it("openCourse opens the core URL in a new tab", async () => {
     const chrome = fakeChrome();
     wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/4/")));
