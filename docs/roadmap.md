@@ -81,17 +81,17 @@ syllabus, time-boxed tracks sharing one time budget, decision points between tra
 **Success criteria.** Results from the trainer update the knowledge model. A syllabus import
 yields a per-module action plan that fits the time budget.
 
-## Milestone 6: deployment on the web VM (done)
+## Milestone 6: deployment on a VM (done)
 
-**Scope.** Run kata on the owner's Proxmox VM `web` (Ubuntu Server LTS, 2 cores, 3 GB memory,
-32 GB disk) with Docker, Tailscale and no public access. Images for core and migrate, a compose
-stack (core, migrate, Postgres, reverse proxy with TLS over the tailnet), a nightly encrypted
+**Scope.** Run kata on the owner's VM (Ubuntu Server LTS, 2 cores, 3 GB memory,
+32 GB disk) with Docker, the private network client and no public access. Images for core and migrate, a compose
+stack (core, migrate, Postgres, reverse proxy with TLS over the private network), a nightly encrypted
 dump, a tested restore drill, a provisioning script and a runbook. Nothing waits for the VM:
 everything is tested without it.
 
 **Success criteria.** One documented command sequence turns a fresh Ubuntu Server VM with
-Docker and Tailscale into a running kata (core, migrate, Postgres, reverse proxy with TLS over
-the tailnet). A deep health check passes. A nightly encrypted dump runs. The restore drill
+Docker and the private network client into a running kata (core, migrate, Postgres, reverse proxy with TLS over
+the private network). A deep health check passes. A nightly encrypted dump runs. The restore drill
 (design 4.3 steps 3 to 5) is scripted and tested against a temporary Postgres.
 
 **Shipped.** The runbook is in [`deployment.md`](deployment.md) (D17 to D25 in
@@ -112,7 +112,7 @@ No scope recorded: `decisions.md` and the git history have no entry under M9.
 
 ## Milestone 10: deploy images and ship script (done)
 
-**Scope.** Build the kata image on the dev machine and ship finished images to the web VM
+**Scope.** Build the kata image on the dev machine and ship finished images to a VM
 over SSH; the VM builds nothing.
 
 **Shipped.** `kata:<git short sha>` built from `deploy/compose.build.yaml`, checked, and shipped
@@ -136,7 +136,7 @@ Merged to master in `282cba3`. Opt-in Haiku and local-model smoke harnesses are 
 through the extension (`window.claude` stub, split parts reassembled in the bridge, no core
 migration).
 
-**Status.** Built on `stage/m12`, not on master yet: the open-link signer, course route,
+**Status.** Built on the m12 stage branch, not on master yet: the open-link signer, course route,
 open endpoint, progress round trip, side panel open action and the bridge content script are
 on the stage branch. Done once merged.
 

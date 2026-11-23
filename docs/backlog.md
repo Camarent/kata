@@ -5,8 +5,8 @@ Project items after Milestone 0.
 ## Open items
 
 - M5 leftovers blocking deployment: none. The open items below are not on the VM deploy path
-  (the core runs on the VM and is reached over the tailnet); the manifest host permission
-  item only matters when the extension talks to a tailnet name.
+  (the core runs on the VM and is reached over the private network); the manifest host permission
+  item only matters when the extension talks to a private network name.
 
 - [ ] Load the extension in a real browser (side panel, content script, background wiring,
       real sign-in and "I know this" against a running core). Milestone 0 only checked the
@@ -49,10 +49,9 @@ Project items after Milestone 0.
 - [ ] Real-browser run of the extension's first run: the origin permission prompt, the
       `kata-bridge` registration and the course-page bridge are checked only with fake browser
       APIs (vitest). Run them in Firefox and Chrome against a real core.
-- [x] `tools/gates.json` uses a pipeline wrapper (`cs-qrun`) that a clean clone does not have.
+- [x] `tools/gates.json` used a wrapper that a clean clone does not have.
       Closed: `scripts/dev/check-all.sh` is the clean-clone gate with plain commands;
-      `gates.json` now has plain commands too; `pipeline.json` runs `check-all` through `cs-qrun` (see
-      [`development.md`](development.md)).
+      `gates.json` now has plain commands too (see [`development.md`](development.md)).
 - [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
       token lifetime; fixed, but check new tests for fixed dates.
 - [ ] Cost cap check-then-record is not atomic: `CappedProvider.complete` in
@@ -90,15 +89,15 @@ Project items after Milestone 0.
 
 ## Deployment (M6) follow-ups
 
-- [ ] Real VM test: build VM 101 (`web`, Ubuntu Server LTS, 2 cores, 3072 MB, 32 GB), run
+- [ ] Real VM test: build the VM as in `docs/deployment.md` (Ubuntu Server LTS), run
       `deploy/provision-vm.sh` and the stack on it, and pass the deep health check. Owner steps in
       `.notes/run-on-vm.md` (git-excluded). Not proven until run on the real VM.
-- [ ] Real Tailscale test: `tailscale up` on the VM and the phone, reach the tailnet name over
+- [ ] Real private network test: join the VM and the phone to the network, reach the node name over
       TLS from a phone (secure context for the phone page), and check that nothing listens on a
       public interface.
 - [ ] Backup to a second location: the nightly encrypted dump stays on the VM only. Copy it off
       the host (a second machine or bucket) with its own retention; see `docs/deployment.md`.
-- [ ] TLS renewal: the tailnet certificate comes from `tailscale cert` on the host and needs a
+- [ ] TLS renewal: the node certificate comes from the network client on the host and needs a
       refresh timer or a manual step; confirm the renewal path on the real VM.
 - [ ] Monitoring: alert when `GET /v1/health/deep` fails or the backup timer does not run; no
       monitoring exists yet.
