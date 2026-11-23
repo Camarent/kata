@@ -31,6 +31,24 @@ chmod 0600 deploy/secrets/*
 Add `anthropic_api_key` the same way (paste the key, do not generate it) only if cloud providers
 are enabled. Check the mode with `stat -c '%a %n' deploy/secrets/*`: every line must show `600`.
 
+## Owner of the files on the VM
+
+Compose mounts each secret file as it is, with its owner and mode. The containers run as the user
+`kata` (uid 10001), so a `0600` file owned by your login user is unreadable there (`Permission
+denied` on `/run/secrets/...`). Give the files to uid 10001 and keep the mode:
+
+```sh
+sudo chown 10001:10001 deploy/secrets/*
+```
+
+Without sudo, a user who can run Docker can do the same with the shipped image (use the tag in the VM env file):
+
+```sh
+docker run --rm --user root --entrypoint chown -v "$PWD/deploy/secrets:/s" kata:<tag> 10001:10001 /s/postgres_password /s/worker_token /s/open_link_key
+```
+
+Do this once after creating or rotating a file. The directory stays `0700` and owned by your user.
+
 ## Rules
 
 - Mode 0600 on every file and 0700 on `deploy/secrets/`. Never widen them.

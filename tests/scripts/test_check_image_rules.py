@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -153,6 +154,17 @@ def test_dockerfile_has_worker_layout():
 @pytest.mark.parametrize("mutate", [_drop_worker_copy, _drop_worker_pythonpath])
 def test_worker_layout_missing_is_detected(mutate: Callable[[str], str]):
     assert not _worker_layout_ok(mutate(DOCKERFILE.read_text(encoding="utf-8")))
+
+
+def test_dockerfile_copies_the_config_defaults_where_core_looks():
+    """kata_core.config reads its defaults at <app>/config/kata.example.toml, with core/ under <app>.
+
+    The first real ship failed with `config file not found: /app/config/kata.example.toml`."""
+    from kata_core.config import EXAMPLE_PATH
+
+    assert EXAMPLE_PATH.relative_to(REPO_ROOT).as_posix() == "config/kata.example.toml"
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert re.search(r"^COPY config/ /app/config/\s*$", text, flags=re.MULTILINE)
 
 
 def test_dockerfile_trainer_tarball_unpacks_read_only_into_opt():
