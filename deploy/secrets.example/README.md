@@ -13,6 +13,7 @@ entrypoint exports each one into the env var named below (core reads no `*_FILE`
 | `postgres_password`        | `KATA_DATABASE_PASSWORD`   | core, postgres (`database.password_env`) |
 | `worker_token`             | `KATA_WORKER_TOKEN`        | worker (`worker.token_env`)              |
 | `anthropic_api_key`        | `KATA_ANTHROPIC_API_KEY`   | core, only when cloud providers are on (`provider_anthropic.api_key_env`) |
+| `open_link_key`            | none: mounted at `/run/secrets/open_link_key` | core, read from `trainer.open_link_key_file` (signs open links) |
 
 ## Create the files
 
@@ -23,6 +24,7 @@ umask 077
 mkdir -p deploy/secrets
 openssl rand -base64 32 > deploy/secrets/postgres_password
 openssl rand -base64 32 > deploy/secrets/worker_token
+openssl rand -hex 32 > deploy/secrets/open_link_key
 chmod 0600 deploy/secrets/*
 ```
 

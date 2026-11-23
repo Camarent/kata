@@ -14,9 +14,15 @@ describe("composeManifest", () => {
     expect(base.content_scripts[0].matches).toEqual(["http://*/*", "https://*/*"]);
   });
 
+  it("base static content scripts are content.js only; bridge.js is registered at runtime", () => {
+    expect(base.content_scripts).toHaveLength(1);
+    expect(base.content_scripts[0].js).toEqual(["content.js"]);
+    expect(JSON.stringify(base)).not.toContain("bridge.js");
+  });
+
   it("chrome adds sidePanel permission, side_panel and a module service worker", () => {
     const m = composeManifest(base, "chrome");
-    expect(m.permissions).toEqual(["storage", "activeTab", "sidePanel"]);
+    expect(m.permissions).toEqual(["storage", "activeTab", "scripting", "sidePanel"]);
     expect(m.side_panel).toEqual({ default_path: "sidepanel.html" });
     expect(m.background).toEqual({ service_worker: "background.js", type: "module" });
     expect(m.sidebar_action).toBeUndefined();
@@ -25,7 +31,7 @@ describe("composeManifest", () => {
 
   it("firefox adds sidebar_action, background scripts and gecko id without sidePanel", () => {
     const m = composeManifest(base, "firefox");
-    expect(m.permissions).toEqual(["storage", "activeTab"]);
+    expect(m.permissions).toEqual(["storage", "activeTab", "scripting"]);
     expect(m.permissions).not.toContain("sidePanel");
     expect(m.side_panel).toBeUndefined();
     expect(m.sidebar_action).toEqual({ default_panel: "sidepanel.html" });

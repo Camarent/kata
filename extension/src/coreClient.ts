@@ -32,6 +32,18 @@ export class CoreHttpError extends Error {
   }
 }
 
+/** A progress save lost the revision race (HTTP 412). Carries the stored revision and document. */
+export class CoreConflictError extends Error {
+  readonly status = 412;
+  constructor(
+    readonly revision: number,
+    readonly doc: ProgressDoc | null,
+  ) {
+    super("progress revision moved; reload before saving");
+    this.name = "CoreConflictError";
+  }
+}
+
 export interface CoreClientOptions {
   baseUrl: string;
   token?: string;
@@ -71,6 +83,38 @@ export interface LessonCheckResult {
   state: "known" | "learning" | "abstain";
   source: string;
   evidence: string;
+}
+
+/** A course progress document: item id to {ok, bad} counts (the core checks the shape). */
+export type ProgressDoc = Record<string, unknown>;
+
+/** One course of `GET /v1/courses`. */
+export interface CourseSummary {
+  id: number;
+  title: string;
+  status: string;
+  concept_ids: number[];
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Answer of `GET /v1/courses/{id}/progress`. `revision` is 0 and `doc` null when never saved. */
+export interface CourseProgress {
+  revision: number;
+  doc: ProgressDoc | null;
+}
+
+/** Answer of `PUT /v1/courses/{id}/progress`. */
+export interface ProgressSaved {
+  revision: number;
+  evidence_written: number;
+}
+
+/** Options of one request: a pre-serialised body (sent as is) and an `If-Match` revision. */
+interface RequestOptions {
+  rawBody?: string;
+  ifMatch?: number;
 }
 
 export class CoreClient {
@@ -132,9 +176,44 @@ export class CoreClient {
     return res.results;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  /** The caller's ready courses, newest first (first page of `GET /v1/courses`). */
+  async listCourses(): Promise<CourseSummary[]> {
+    const res = await this.request<{ items: CourseSummary[] }>("GET", "/v1/courses");
+    return res.items.filter((course) => course.status === "ready");
+  }
+
+  /** Open a ready course; returns the URL the panel should show it at. */
+  async openCourse(courseId: number): Promise<string> {
+    const res = await this.request<{ url: string }>("POST", `/v1/courses/${courseId}/open`);
+    return res.url;
+  }
+
+  /** The stored progress document of a course and its revision. */
+  getProgress(courseId: number): Promise<CourseProgress> {
+    return this.request<CourseProgress>("GET", `/v1/courses/${courseId}/progress`);
+  }
+
+  /**
+   * Save a progress document (already serialised as JSON) when `revision` is still the stored one.
+   * Throws CoreConflictError (412) when the revision moved.
+   */
+  putProgress(courseId: number, docJson: string, revision: number): Promise<ProgressSaved> {
+    return this.request<ProgressSaved>("PUT", `/v1/courses/${courseId}/progress`, undefined, {
+      rawBody: docJson,
+      ifMatch: revision,
+    });
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: RequestOptions = {},
+  ): Promise<T> {
     const headers: Record<string, string> = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const payload = options.rawBody ?? (body === undefined ? undefined : JSON.stringify(body));
+    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    if (options.ifMatch !== undefined) headers["If-Match"] = `"${options.ifMatch}"`;
     if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
 
     const controller = new AbortController();
@@ -145,7 +224,7 @@ export class CoreClient {
         res = await this.fetchImpl(`${this.baseUrl}${path}`, {
           method,
           headers,
-          body: body === undefined ? undefined : JSON.stringify(body),
+          body: payload,
           signal: controller.signal,
         });
       } catch {
@@ -153,6 +232,10 @@ export class CoreClient {
         throw new CoreOfflineError();
       }
       if (res.status === 401) throw new CoreAuthError();
+      if (res.status === 412) {
+        const conflict = (await res.json().catch(() => ({}))) as { revision?: number; doc?: ProgressDoc | null };
+        throw new CoreConflictError(conflict.revision ?? 0, conflict.doc ?? null);
+      }
       if (!res.ok) throw new CoreHttpError(res.status);
       if (res.status === 204) return undefined as T;
       return (await res.json()) as T;

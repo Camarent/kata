@@ -1,3 +1,4 @@
+import type { CourseLink } from "./background";
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
 import type { Session } from "./types";
@@ -21,12 +22,13 @@ type PanelStatus =
   | { kind: "partial"; done: number; total: number }
   | { kind: "error"; reason: "timeout" | "auth" | "failed" };
 
-/** Everything the panel draws. `session` null means signed out. `review` non-null means the review screen. */
+/** Everything the panel draws. `session` null means signed out. `review` non-null means the review screen. `courses` empty means no Courses section. */
 export interface PanelState {
   session: Session | null;
   rows: PanelRow[];
   status: PanelStatus;
   review?: ReviewRow[] | null;
+  courses?: CourseLink[];
 }
 
 /** Values typed into the sign-in form. */
@@ -42,6 +44,7 @@ export interface PanelHandlers {
   onReview: () => Promise<void>;
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
   onCloseReview: () => void;
+  onOpenCourse: (courseId: number) => Promise<void>;
 }
 
 /** Creates an element with text content; never parses markup. */
@@ -162,6 +165,33 @@ function renderGroups(rows: PanelRow[], handlers: PanelHandlers): HTMLElement {
   return root;
 }
 
+/** Courses section: one "Open course" button per ready course; a failed open shows its error text. */
+function renderCourses(courses: CourseLink[], handlers: PanelHandlers): HTMLElement {
+  const section = el("section", undefined, "courses");
+  section.append(el("h2", "Courses"));
+  const ul = el("ul");
+  for (const course of courses) {
+    const item = el("li", undefined, "course");
+    const button = el("button", "Open course");
+    button.type = "button";
+    const note = el("span", undefined, "note");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await handlers.onOpenCourse(course.id);
+        note.textContent = "opened";
+      } catch (err) {
+        note.textContent = err instanceof Error ? err.message : String(err);
+        button.disabled = false;
+      }
+    });
+    item.append(el("span", course.title, "course-title"), button, note);
+    ul.append(item);
+  }
+  section.append(ul);
+  return section;
+}
+
 /** Review screen: a Back button to the scan view, then one row per concept. */
 function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLElement {
   const view = el("div", undefined, "review-view");
@@ -191,6 +221,7 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
   review.addEventListener("click", () => void handlers.onReview());
   root.append(review);
   root.append(el("p", statusText(state.status), "status"));
+  if (state.courses && state.courses.length > 0) root.append(renderCourses(state.courses, handlers));
   if (state.rows.length === 0 && state.status.kind === "idle") {
     root.append(el("p", "Nothing scanned yet", "empty"));
     return;

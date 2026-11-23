@@ -1,8 +1,11 @@
 import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
+import type { BridgeMessage } from "./bridge";
+import { wireBridgeRegistration } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
-import { DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
-import { CoreAuthError, CoreClient, type ConceptMark } from "./coreClient";
+import { CORE_ORIGIN, DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
+import { CoreAuthError, CoreClient, type ConceptMark, type ProgressDoc } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
+import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
 import type { SignInInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
@@ -16,6 +19,7 @@ export interface ChromeLike extends PanelOpenApi {
   tabs: {
     query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number }[]>;
     sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
+    create(properties: { url: string }): Promise<unknown>;
   };
   runtime: RuntimeLike;
 }
@@ -26,10 +30,18 @@ export type PanelMessage =
   | { type: "panel:scan" }
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
-  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] };
+  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
+  | { type: "panel:courses" }
+  | { type: "panel:openCourse"; courseId: number };
 
 /** Reply to a panel message: the result, or the error text. */
 export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string };
+
+/** A ready course the panel can open: its id and title only. */
+export interface CourseLink {
+  id: number;
+  title: string;
+}
 
 /** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
 export interface ReviewRow {
@@ -47,6 +59,12 @@ export interface Backend {
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
   setConcept(conceptId: number, state: ConceptMark["state"]): Promise<void>;
+  /** The caller's ready courses, id and title only. */
+  courses(): Promise<CourseLink[]>;
+  /** Opens a ready course in a new tab; the URL must stay on the core origin. */
+  openCourse(courseId: number): Promise<void>;
+  /** Whole-document progress load and save for the course pages (see bridge.ts). */
+  progress: ProgressBridge;
 }
 
 /** Builds the backend over the chrome tabs API and the extension storage area. */
@@ -66,6 +84,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
   };
 
   return {
+    progress: createProgressBridge(clientFor, tokens),
+
     async signIn(input) {
       const client = clientFor(null);
       const token = await client.enrol(input.code, input.deviceLabel);
@@ -118,7 +138,44 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const session = await requireSession();
       await clientFor(session).setConceptMark(conceptId, state);
     },
+
+    async courses() {
+      const session = await requireSession();
+      const courses = await clientFor(session).listCourses();
+      return courses.map((course) => ({ id: course.id, title: course.title }));
+    },
+
+    async openCourse(courseId) {
+      const session = await requireSession();
+      const client = clientFor(session);
+      if (!(await client.listCourses()).some((course) => course.id === courseId)) {
+        throw new Error("course is not ready");
+      }
+      const url = await client.openCourse(courseId);
+      if (!isCoreUrl(url)) throw new Error("course link is outside the core");
+      await api.tabs.create({ url });
+    },
   };
+}
+
+/** True when `url` parses and has the core origin (scheme, host, port); anything else is refused. */
+function isCoreUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === CORE_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Routes one content-bridge message to the progress service. Its reply is the document or
+ * the short error text only; the session token never leaves this service.
+ */
+async function handleBridgeMessage(progress: ProgressBridge, message: BridgeMessage): Promise<PanelReply> {
+  if (!Number.isInteger(message.courseId) || message.courseId < 1) throw new Error("bad course id");
+  if (message.type === "bridge:load") return { ok: true, data: await progress.load(message.courseId) };
+  if (typeof message.doc !== "object" || message.doc === null) throw new Error("bad progress document");
+  return { ok: true, data: await progress.save(message.courseId, message.doc as ProgressDoc) };
 }
 
 /** Routes one panel message to the backend and returns its reply. */
@@ -136,6 +193,11 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
     case "panel:setConcept":
       await backend.setConcept(message.conceptId, message.state);
       return { ok: true };
+    case "panel:courses":
+      return { ok: true, data: await backend.courses() };
+    case "panel:openCourse":
+      await backend.openCourse(message.courseId);
+      return { ok: true };
   }
 }
 
@@ -148,13 +210,23 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:scan" ||
     type === "panel:known" ||
     type === "panel:review" ||
-    type === "panel:setConcept"
+    type === "panel:setConcept" ||
+    type === "panel:courses" ||
+    type === "panel:openCourse"
   );
+}
+
+/** True when `message` is one of the content-bridge message shapes. */
+function isBridgeMessage(message: unknown): message is BridgeMessage {
+  if (typeof message !== "object" || message === null) return false;
+  const type = (message as { type?: unknown }).type;
+  return type === "bridge:load" || type === "bridge:save";
 }
 
 /**
  * Registers the background listeners: the toolbar button opens the side panel and
- * flushes the offline mark queue; panel messages go to the backend.
+ * flushes the offline mark queue; panel messages go to the backend; bridge messages
+ * from the course pages go to the progress service.
  */
 export function wireBackground(api: ChromeLike, backend: Backend): void {
   api.action.onClicked.addListener((tab) => {
@@ -165,8 +237,13 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
   });
 
   api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!isPanelMessage(message)) return false;
-    handlePanelMessage(backend, message).then(
+    const route = isPanelMessage(message)
+      ? handlePanelMessage(backend, message)
+      : isBridgeMessage(message)
+        ? handleBridgeMessage(backend.progress, message)
+        : undefined;
+    if (route === undefined) return false;
+    route.then(
       (reply) => sendResponse(reply),
       (err: unknown) => sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) }),
     );
@@ -177,4 +254,5 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
 // Service worker entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.action) {
   wireBackground(chrome, createBackend(chrome, chrome.storage.local));
+  wireBridgeRegistration(chrome.runtime, chrome.scripting);
 }

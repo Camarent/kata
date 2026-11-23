@@ -19,6 +19,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/api/routes/courses.py:30` router `/v1/courses` (gated by `require_feature("trainer")`): `:100` `POST /v1/courses` (202; picks gaps or explicit concepts, enqueues `course.generate`), `:128` `GET /v1/courses` (paged, `before_id`), `:142` `GET /v1/courses/{course_id}`, `:151` `DELETE /v1/courses/{course_id}`.
 - `core/kata_core/api/routes/course_progress.py:35` router `/v1/courses` (gated by `require_feature("trainer")`): `:139` `GET /v1/courses/{course_id}/progress` (returns `ETag`), `:148` `PUT /v1/courses/{course_id}/progress` (needs `If-Match` revision), `:170` `PATCH /v1/courses/{course_id}/progress` (delta).
 - `core/kata_core/api/routes/lesson_check.py:54` `POST /lesson-check` (`lesson_check_route` `:55`); request `LessonCheckIn` `:26`, response `LessonCheckOut` `:44`.
+- `core/kata_core/api/routes/course_open.py:38` `POST /v1/courses/{course_id}/open` (`open_course_route`; router `/v1/courses`, gated by `require_feature("trainer")`): returns `{"url"}`, a signed link to `index.html` of a READY course.
+- `core/kata_core/api/routes/course_serve.py:55` `GET /c/{token}/{path}` (`serve_course_file`; no bearer token, the signed token is the credential; not in the OpenAPI schema).
+- `core/kata_core/trainer/open_link.py` - open-link tokens: `:33` `sign`, `:39` `verify` (constant-time MAC, expiry), `:64` `load_signing_key` (`[trainer] open_link_key_file`, at least 32 bytes).
 - `core/kata_core/lesson_check/checker.py:30` `ConceptCheck`, `:40` `check_lesson(conn, retriever, cfg, user_id, concept_ids)`, `:60` `_check_one` (the rule order below).
 - `core/kata_core/api/routes/marks.py:33` `GET /marks`, `:42` `PUT /marks/{topic_id}`, `:55` `DELETE /marks/{topic_id}`.
 - `core/kata_core/api/routes/topics.py:52` `GET /topics`, `:61` `POST /topics`, `:70` `POST /topics/{id}/aliases`.
@@ -169,7 +172,9 @@ Invariants and gotchas (trainer):
 ### Course artifact
 
 - `course.build` writes one folder `D/<course_id>/` (`D` is the build out dir; `_only_course_dir` `core/kata_core/trainer/dojo_cli.py:155`). Core keeps the files as artifact rows (`add_artifacts`, `core/kata_core/trainer/build.py`), capped by `[trainer] max_artifact_bytes`.
-- Serving contract: the files are static, with relative URLs, and need HTTP (no `file://`). This stage adds no route. How the files reach the browser is decided in the next stage (see `docs/decisions.md`, "Course artifact serving contract").
+- Open link: `POST /v1/courses/{id}/open` (`core/kata_core/api/routes/course_open.py:38`) answers 404 `course not found` for a missing or foreign course, 409 when the course is not `ready`, else `{"url": "<base>/c/<token>/index.html"}`. The base is `[core] public_url` when set, else the request base URL. The token is signed until `[trainer] open_link_ttl_seconds` from now (`trainer/open_link.py`).
+- Serving: `GET /c/{token}/{path}` (`core/kata_core/api/routes/course_serve.py:55`) serves one artifact of a READY course. An empty path serves `index.html`. Every failure (bad or expired token, bad path, foreign or non-ready course, missing artifact) answers the same 404 `not found` with the same headers. Success headers: `Cache-Control: private, max-age=0, must-revalidate`, `Content-Security-Policy` (`default-src 'none'`, scripts and styles from `'self'` plus `'unsafe-inline'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
+- The files are static with relative URLs and need HTTP (no `file://`). The proxy forwards `/c/*` to core unchanged (`deploy/Caddyfile`).
 
 ## Planning (M5)
 Syllabi, triage, study tracks, the weekly budget and decision points. Packages: `core/kata_core/planning/`, `core/kata_core/importer/syllabus.py`; migrations `0012_syllabus.sql` and `0013_tracks.sql` (`0011` is the trainer progress document).

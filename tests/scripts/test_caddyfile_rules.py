@@ -1,7 +1,9 @@
-"""deploy/Caddyfile: no buffering on stream routes, upstream timeouts above 60 s, one site. No network."""
+"""deploy/Caddyfile: no buffering on stream routes, upstream timeouts above 60 s, one site, and
+every path matcher covers /c/* (the open-link route). No network."""
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -16,6 +18,16 @@ TIMEOUT_DIRECTIVES = (
     "write_timeout",
     "keepalive",
 )
+# The open-link route: a path matcher in the proxy block must still let it through.
+OPEN_LINK_PATH = "/c/*"
+
+
+def _path_matchers(text: str) -> list[str]:
+    """Return the path patterns of handle, handle_path, path and named path matchers in TEXT."""
+    patterns = re.findall(r"^\s*handle(?:_path)?\s+(\S+)", text, re.MULTILINE)
+    patterns += re.findall(r"^\s*path\s+(\S+)", text, re.MULTILINE)
+    patterns += re.findall(r"^\s*@\w+\s+path\s+(\S+)", text, re.MULTILINE)
+    return patterns
 
 
 def _violations(text: str) -> list[str]:
@@ -33,6 +45,9 @@ def _violations(text: str) -> list[str]:
         for value in values:
             if int(value) < MIN_UPSTREAM_TIMEOUT_S:
                 found.append(f"{name} {value}s below {MIN_UPSTREAM_TIMEOUT_S}s")
+    for pattern in _path_matchers(text):
+        if not fnmatch.fnmatchcase(OPEN_LINK_PATH, pattern):
+            found.append(f"path matcher {pattern} does not cover {OPEN_LINK_PATH}")
     return found
 
 
@@ -49,3 +64,14 @@ def test_mutated_copy_fails(tmp_path: Path):
     short_read.write_text(text.replace("read_timeout 90s", "read_timeout 30s", 1), encoding="utf-8")
     assert _violations(no_flush.read_text(encoding="utf-8")) != []
     assert _violations(short_read.read_text(encoding="utf-8")) != []
+
+
+def test_path_matcher_must_cover_open_link_route():
+    text = CADDYFILE.read_text(encoding="utf-8")
+    assert _path_matchers(text) == []
+    # Decoy: a path matcher for /v1/* only leaves /c/* out of the proxy, so it must fail.
+    decoy = text.replace("\treverse_proxy core:8080 {", "\thandle /v1/* {\n\t\treverse_proxy core:8080 {", 1)
+    assert any("/v1/*" in problem for problem in _violations(decoy))
+    # A matcher that covers /c/* (catch-all) passes.
+    covering = text.replace("\treverse_proxy core:8080 {", "\thandle /c/* {\n\t\treverse_proxy core:8080 {", 1)
+    assert not any("does not cover" in problem for problem in _violations(covering))

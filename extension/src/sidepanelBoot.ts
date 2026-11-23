@@ -1,4 +1,4 @@
-import type { PanelMessage, PanelReply } from "./background";
+import type { CourseLink, PanelMessage, PanelReply } from "./background";
 import { renderPanel, type PanelHandlers, type PanelState, type SignInInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import type { MarkOutcome } from "./offlineQueue";
@@ -16,8 +16,21 @@ export interface PanelChromeLike {
  */
 export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promise<void> {
   const tokens = new TokenStore(api.storage.local);
-  const state: PanelState = { session: await tokens.loadSession(), rows: [], status: { kind: "idle" }, review: null };
+  const state: PanelState = {
+    session: await tokens.loadSession(),
+    rows: [],
+    status: { kind: "idle" },
+    review: null,
+    courses: [],
+  };
   const draw = (): void => renderPanel(root, state, handlers);
+
+  /** Ready courses for the Courses section; a refused list leaves the section out. */
+  const loadCourses = async (): Promise<CourseLink[]> => {
+    const reply = await api.runtime.sendMessage({ type: "panel:courses" });
+    return reply.ok && Array.isArray(reply.data) ? (reply.data as CourseLink[]) : [];
+  };
+  if (state.session !== null) state.courses = await loadCourses();
 
   const handlers: PanelHandlers = {
     async onSignIn(input: SignInInput) {
@@ -25,6 +38,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       if (reply.ok) {
         state.session = await tokens.loadSession();
         state.status = { kind: "idle" };
+        state.courses = await loadCourses();
       } else {
         state.status = { kind: "error", reason: "auth" };
       }
@@ -55,6 +69,11 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onCloseReview() {
       state.review = null;
       draw();
+    },
+
+    async onOpenCourse(courseId: number) {
+      const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
+      if (!reply.ok) throw new Error(reply.error);
     },
   };
 

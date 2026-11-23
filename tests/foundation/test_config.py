@@ -87,7 +87,7 @@ def test_example_has_required_sections() -> None:
         "generate_course",
         "extract_syllabus",
     }
-    assert set(data["core"]) == {"host", "port"}
+    assert set(data["core"]) == {"host", "port", "public_url"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
     assert set(data["worker"]) == {
@@ -139,6 +139,8 @@ def test_load_reads_trainer_defaults(tmp_path: Path) -> None:
     cfg = load_config(_copy_example(tmp_path), env={})
     assert cfg.get("trainer", "command") == ["/opt/trainer/dojo"]
     assert cfg.get("trainer", "max_progress_bytes") == 4194304
+    assert cfg.get("trainer", "open_link_ttl_seconds") == 43200
+    assert cfg.get("trainer", "open_link_key_file") == ""
     assert cfg.get("model", "reasoning_effort") == ""
 
 

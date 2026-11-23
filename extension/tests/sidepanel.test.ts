@@ -10,6 +10,7 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
     onReview: vi.fn(async () => {}),
     onSetConcept: vi.fn(async () => {}),
     onCloseReview: vi.fn(),
+    onOpenCourse: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -226,5 +227,47 @@ describe("renderPanel", () => {
     renderPanel(root, { session, rows: [], status: { kind: "idle" }, review: null }, h);
     expect(root.querySelector("button.review-open")).not.toBeNull();
     expect(root.querySelector("button.back")).toBeNull();
+  });
+
+  const courses = [
+    { id: 4, title: "Algebra" },
+    { id: 9, title: "Biology" },
+  ];
+
+  it("draws a Courses section with one Open course button per ready course", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, handlers());
+    const section = root.querySelector("section.courses")!;
+    expect(section.querySelector("h2")?.textContent).toBe("Courses");
+    const buttons = [...section.querySelectorAll<HTMLButtonElement>("button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Open course", "Open course"]);
+    expect([...section.querySelectorAll(".course-title")].map((s) => s.textContent)).toEqual(["Algebra", "Biology"]);
+  });
+
+  it("shows no Courses section when there are no ready courses", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses: [] }, handlers());
+    expect(root.querySelector("section.courses")).toBeNull();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, handlers());
+    expect(root.querySelector("section.courses")).toBeNull();
+  });
+
+  it("calls onOpenCourse with the course id and disables the button on click", async () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    const second = root.querySelectorAll<HTMLButtonElement>("section.courses button")[1];
+    second.click();
+    expect(second.disabled).toBe(true);
+    await vi.waitFor(() => expect(root.querySelectorAll("section.courses span.note")[1]?.textContent).toBe("opened"));
+    expect(h.onOpenCourse).toHaveBeenCalledTimes(1);
+    expect(h.onOpenCourse).toHaveBeenCalledWith(9);
+  });
+
+  it("shows the error text and re-enables the button when opening fails", async () => {
+    const h = handlers({ onOpenCourse: vi.fn(async () => Promise.reject(new Error("course is not ready"))) });
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+    const first = root.querySelector<HTMLButtonElement>("section.courses button")!;
+    first.click();
+    await vi.waitFor(() => expect(root.querySelector("section.courses span.note")?.textContent).toBe("course is not ready"));
+    expect(first.disabled).toBe(false);
+    expect(h.onOpenCourse).toHaveBeenCalledWith(4);
   });
 });

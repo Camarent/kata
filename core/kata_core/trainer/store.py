@@ -164,6 +164,27 @@ def read_files(
     return {str(path): str(content) for path, content in rows}
 
 
+def read_artifact(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    course_id: int,
+    path: str,
+) -> tuple[str, bytes] | None:
+    """Return `(media_type, bytes)` of the built artifact `path` of a course of `user_id`.
+
+    None when the course is missing or foreign, or when it has no artifact named `path`.
+    """
+    if not _owned(conn, user_id, course_id):
+        return None
+    row = conn.execute(
+        "SELECT media_type, content FROM course_artifact WHERE course_id = %s AND path = %s",
+        (course_id, path),
+    ).fetchone()
+    if row is None:
+        return None
+    return str(row[0]), bytes(row[1])
+
+
 def add_artifacts(
     conn: psycopg.Connection[Any],
     user_id: int,

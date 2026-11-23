@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { bootPanel, type PanelChromeLike } from "../src/sidepanelBoot";
-import type { PanelReply } from "../src/background";
+import type { PanelMessage, PanelReply } from "../src/background";
 import type { StorageArea } from "../src/tokenStore";
 
 /** `npm --prefix extension test` runs with the extension folder as cwd. */
@@ -170,5 +170,44 @@ describe("bootPanel", () => {
     root.querySelector<HTMLButtonElement>("button.back")!.click();
     expect(root.querySelector("li.review-row")).toBeNull();
     expect(root.querySelector("button.review-open")).not.toBeNull();
+  });
+
+  const courses = [{ id: 4, title: "Algebra" }];
+
+  it("loads the ready courses at boot and draws one Open course button each", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courses }, signedIn);
+    await bootPanel(mountPoint(), api);
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:courses" });
+    expect(root.querySelector("section.courses .course-title")?.textContent).toBe("Algebra");
+    expect(root.querySelector("section.courses button")?.textContent).toBe("Open course");
+  });
+
+  it("signed out at boot sends no courses request and draws no Courses section", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courses });
+    await bootPanel(mountPoint(), api);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(root.querySelector("section.courses")).toBeNull();
+  });
+
+  it("Open course sends panel:openCourse with the course id", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: courses }, signedIn);
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("section.courses button")!.click();
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: "panel:openCourse", courseId: 4 }));
+  });
+
+  it("a refused open shows the background error text next to the course", async () => {
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
+      message.type === "panel:courses"
+        ? { ok: true, data: courses }
+        : { ok: false, error: "course link is outside the core" },
+    );
+    const api: PanelChromeLike = { runtime: { sendMessage }, storage: { local: memoryArea({ "kata.session": signedIn }) } };
+    await bootPanel(mountPoint(), api);
+    root.querySelector<HTMLButtonElement>("section.courses button")!.click();
+    await vi.waitFor(() =>
+      expect(root.querySelector("section.courses span.note")?.textContent).toBe("course link is outside the core"),
+    );
+    expect(root.querySelector<HTMLButtonElement>("section.courses button")!.disabled).toBe(false);
   });
 });

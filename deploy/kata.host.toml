@@ -12,6 +12,8 @@
 [core]
 host = "0.0.0.0"
 port = 8080
+# Public base URL for open links. Empty derives it from the request base URL.
+public_url = ""
 
 [database]
 host = "postgres"
@@ -136,6 +138,11 @@ min_items = 5
 max_artifact_bytes = 1048576
 # Cap on a saved trainer progress document, in bytes (413 above it).
 max_progress_bytes = 4194304
+# Lifetime of a signed open link, in seconds.
+open_link_ttl_seconds = 43200
+# File holding the open-link signing key (at least 32 bytes). Required while trainer.enabled = true; startup exits 1 without it.
+# Compose mounts the secret open_link_key at this path (deploy/secrets.example/README.md).
+open_link_key_file = "/run/secrets/open_link_key"
 
 [knowledge]
 # Score change per trainer evidence step, and the largest change per save.

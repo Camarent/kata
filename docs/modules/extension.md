@@ -21,6 +21,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/offlineQueue.ts:31` `OfflineQueue`.
 - `extension/src/tokenStore.ts:21` `TokenStore`.
 - `extension/src/sidepanel.ts:178` `renderPanel`; `extension/src/sidepanelBoot.ts:17` `bootPanel`.
+- Side panel "Open course": `extension/src/sidepanel.ts:168` Courses section, one `Open course` button per ready course (`:175`); a failed open shows its error text. `extension/src/sidepanelBoot.ts:74` `onOpenCourse` sends `panel:openCourse`; `extension/src/background.ts:35` message type, `:148` `openCourse` checks the course is ready (`:151`), gets the link (`:154`), refuses a link outside the core (`:155` `isCoreUrl`) and opens it in a new tab (`:156`); `extension/src/coreClient.ts:186` `openCourse` calls `POST /v1/courses/{id}/open`.
+- Bridge stub and registration: `extension/src/bridge.ts:36` `injectStub` puts the page stub at document_start; `extension/src/bridgeRegister.ts:38` `bridgeMatchPatterns` builds `<core scheme>//*/c/*`, `:47` `registerBridge` re-registers `bridge.js` as `kata-bridge` on every install and startup (`:61` `wireBridgeRegistration`).
 - `extension/src/reviewScreen.ts:32` `renderReview` (one row per concept, three-state control); types `ReviewRow`, `ReviewState`.
 - `extension/src/background.ts:28` message `panel:review` (`:95` `review()` merges marks with lesson-check); `:29` message `panel:setConcept` (`:117` `setConcept`).
 - `extension/src/sidepanelBoot.ts:41` sends `panel:review`; `:50` `onSetConcept` sends `panel:setConcept`.
@@ -28,6 +30,10 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/config.ts:13` `DEFAULT_BASE_URL` (build-time `__KATA_BASE_URL__`, fallback `http://127.0.0.1:8080`); `:17` `REQUEST_TIMEOUT_MS`, `:20` `POLL_MS`, `:23` `MAX_WAIT_MS`.
 - `extension/build/build.mjs:24` `BASE_URL_ENV` = `KATA_EXTENSION_BASE_URL`; `:58` defines `__KATA_BASE_URL__` when it is set; `:75` reads it at build.
 - `extension/build/manifest.mjs:53` `host_permissions` becomes the base URL origin plus `/*` when a base URL is given (`:29` `hostOrigin`).
+- `extension/src/bridge.ts:27` `newChannel` (random channel id), `:36` `injectStub` (inline page stub at document_start), `:60` `startBridge`, `:93` `runBridge` (exact-origin check); message types `bridge:load` and `bridge:save`.
+- `extension/src/bridgeRegister.ts:38` `bridgeMatchPatterns`, `:47` `registerBridge` (id `kata-bridge`, `bridge.js`, document_start, persists across sessions), `:61` `wireBridgeRegistration` (install and startup).
+- `extension/src/background.ts:135` `handleBridgeMessage` (`bridge:load` / `bridge:save` to the progress service; replies `{ok,data}` or `{ok:false,error}`).
+- `extension/manifest.base.json` permission `scripting` (dynamic registration of `bridge.js`); `extension/build/build.mjs` builds `bridge.js` as an IIFE.
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
@@ -37,6 +43,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/tsconfig.json` - compiler settings.
 - `extension/src/background.ts` - service worker; message bridge to the core client.
 - `extension/src/content.ts` - content script: `scan` returns block ids and text, `highlight` and `clear` change the page.
+- `extension/src/bridge.ts` - content bridge for the course pages: a page stub posts whole-document progress load/save requests; only the core origin, the bridge channel and the `progress-<id>` path are accepted.
+- `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`http://*/c/*` on the core scheme; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
 - `extension/src/offlineQueue.ts` - queues mark presses while the core is unreachable.
@@ -49,7 +57,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - No `extension/manifest.json` in the repo: `extension/build/build.mjs:47` writes one into each `dist/<browser>/`; edit `manifest.base.json` or `build/manifest.mjs`.
 - Core base URL is fixed at build time: `KATA_EXTENSION_BASE_URL=https://<name> npm run build` in `extension/` (the VM build, `docs/deployment.md`). Unset, the build keeps the loopback URL and the `host_permissions` of `manifest.base.json`. The fallback in `config.ts` must match `manifest.base.json`.
 - Firefox first; Chrome later from the same code.
-- Adding a permission widens what users grant; keep the list minimal.
+- Adding a permission widens what users grant; keep the list minimal. `scripting` is there only for the bridge registration.
+- Match patterns cannot name a port: the bridge pattern uses `*` as host, so a core on a non-default port still gets `bridge.js`; `runBridge` returns early on any other origin.
 
 ## Depends on / used by
 - Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` or `.nvmrc` in repo); talks to `core` HTTP API (`docs/api.md`).
