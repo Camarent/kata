@@ -10,7 +10,7 @@ ARG PY_BASE_DIGEST
 # Base: the tag comes from versions.env and the digest pins the exact manifest.
 FROM ${PY_BASE_IMAGE}@${PY_BASE_DIGEST} AS base
 
-# Fetch: gitleaks and the trainer binary, each checked against a pinned sha256.
+# Fetch: gitleaks and the trainer tarball (dojo CLI), each checked against a pinned sha256.
 FROM base AS fetch
 ARG GITLEAKS_VERSION
 ARG GITLEAKS_SHA256
@@ -27,10 +27,14 @@ RUN curl -fsSL -o /tmp/gitleaks.tgz \
  && echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c - \
  && tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks \
  && rm /tmp/gitleaks.tgz
-RUN curl -fsSL -o /tmp/kata-trainer "${TRAINER_URL}" \
- && echo "${TRAINER_SHA256}  /tmp/kata-trainer" | sha256sum -c - \
- && install -m 0755 /tmp/kata-trainer /usr/local/bin/kata-trainer \
- && rm /tmp/kata-trainer
+# Trainer tarball: root layout dojo, dojo.wasm, web/. Unpacked read-only (no write bit) into /opt/trainer.
+RUN curl -fsSL -o /tmp/trainer.tgz "${TRAINER_URL}" \
+ && echo "${TRAINER_SHA256}  /tmp/trainer.tgz" | sha256sum -c - \
+ && mkdir -p /opt/trainer \
+ && tar -xzf /tmp/trainer.tgz -C /opt/trainer \
+ && chmod -R a=rX /opt/trainer \
+ && chmod 0755 /opt/trainer/dojo \
+ && rm /tmp/trainer.tgz
 
 # Deps: the runtime dependency list is read from pyproject.toml (pinned versions) into a venv.
 FROM base AS deps
@@ -45,16 +49,18 @@ ARG EMBED_MODEL_ID
 ARG EMBED_MODEL_REVISION
 LABEL kata.embed-model="${EMBED_MODEL_ID}@${EMBED_MODEL_REVISION}"
 ENV PATH=/opt/venv/bin:$PATH \
-    PYTHONPATH=/app/core \
+    PYTHONPATH=/app/core:/app/worker \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     KATA_CORE_PORT=8080
 RUN groupadd --system --gid 10001 kata \
  && useradd --system --uid 10001 --gid kata --home-dir /app --shell /usr/sbin/nologin kata
 COPY --from=deps /opt/venv /opt/venv
-COPY --from=fetch /usr/local/bin/gitleaks /usr/local/bin/kata-trainer /usr/local/bin/
+COPY --from=fetch /usr/local/bin/gitleaks /usr/local/bin/
+COPY --from=fetch /opt/trainer /opt/trainer
 WORKDIR /app
 COPY core/ /app/core/
+COPY worker/ /app/worker/
 USER kata
 EXPOSE 8080
 # Deep health: DB reachable and all migrations applied. Port follows KATA_CORE_PORT.

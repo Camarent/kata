@@ -75,7 +75,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
 | `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
 | `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
-| `trainer.command` | ["kata-trainer"] | `KATA_TRAINER_COMMAND` |
+| `trainer.command` | ["/opt/trainer/dojo"] | `KATA_TRAINER_COMMAND` |
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |

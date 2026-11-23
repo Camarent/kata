@@ -123,3 +123,46 @@ def test_unreadable_input_exits_two(tmp_path: Path):
     result = _run(tmp_path / "missing", DOCKERIGNORE)
     assert result.returncode == 2
     assert "cannot read input" in result.stderr
+
+
+WORKER_COPY = "COPY worker/ /app/worker/"
+WORKER_PYTHONPATH = "PYTHONPATH=/app/core:/app/worker \\"
+
+
+def _has_line(text: str, line: str) -> bool:
+    return any(current.strip() == line for current in text.splitlines())
+
+
+def _worker_layout_ok(text: str) -> bool:
+    """The runtime stage copies worker/ and puts it on PYTHONPATH next to core/."""
+    return _has_line(text, WORKER_COPY) and _has_line(text, WORKER_PYTHONPATH)
+
+
+def _drop_worker_copy(text: str) -> str:
+    return _drop_line(text, WORKER_COPY)
+
+
+def _drop_worker_pythonpath(text: str) -> str:
+    return _replace_once(text, WORKER_PYTHONPATH, "PYTHONPATH=/app/core \\")
+
+
+def test_dockerfile_has_worker_layout():
+    assert _worker_layout_ok(DOCKERFILE.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("mutate", [_drop_worker_copy, _drop_worker_pythonpath])
+def test_worker_layout_missing_is_detected(mutate: Callable[[str], str]):
+    assert not _worker_layout_ok(mutate(DOCKERFILE.read_text(encoding="utf-8")))
+
+
+def test_dockerfile_trainer_tarball_unpacks_read_only_into_opt():
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "tar -xzf /tmp/trainer.tgz -C /opt/trainer" in text
+    assert "chmod -R a=rX /opt/trainer" in text
+    assert "COPY --from=fetch /opt/trainer /opt/trainer" in text
+    assert "kata-trainer" not in text
+
+
+def test_trainer_checksum_precedes_unpack():
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert text.index('echo "${TRAINER_SHA256}') < text.index("tar -xzf /tmp/trainer.tgz")

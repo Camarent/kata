@@ -119,9 +119,9 @@ rate_limit_seconds = 300
 late_event_seconds = 120
 
 [trainer]
-# Trainer CLI run by the job runner. Config-supplied executable (TOML array); placeholder name.
+# Trainer CLI run by the job runner. Config-supplied executable (TOML array); default is the dojo CLI in the container image.
 enabled = true
-command = ["kata-trainer"]
+command = ["/opt/trainer/dojo"]
 # Seconds before a trainer run is killed.
 timeout_seconds = 120
 # Cap on concepts per generated course.
