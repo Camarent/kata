@@ -1,4 +1,4 @@
-"""Smoke build artifacts, stored and served through the course file route (M12) against the fake dojo."""
+"""Smoke build artifacts, stored and served through the course file route (M12), against the fake dojo and the real one."""
 
 from __future__ import annotations
 
@@ -26,6 +26,17 @@ SMOKE_PATH = REPO_ROOT / "scripts" / "smoke" / "dojo_real.py"
 EXAMPLE_CONFIG = REPO_ROOT / "config" / "kata.example.toml"
 MODULE_NAME = "dojo_real_serve_under_test"
 TOKEN_LIFETIME = 3600
+REAL_DOJO_ENV = "KATA_TEST_DOJO"
+REAL_WASM_ENV = "KATA_TEST_DOJO_WASM"
+REAL_WEB_ENV = "KATA_TEST_DOJO_WEB"
+
+
+def _real_dojo() -> str:
+    """Path of the real dojo binary named by KATA_TEST_DOJO; empty when unset or not executable."""
+    binary = os.environ.get(REAL_DOJO_ENV, "")
+    if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
+        return binary
+    return ""
 
 
 @pytest.fixture
@@ -47,10 +58,15 @@ def smoke(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     return module
 
 
-def _stored_smoke_course(db: ScratchDatabase, smoke: ModuleType) -> tuple[int, int]:
-    """Build the smoke course with the fake dojo, store it as a ready course; return (user_id, course_id)."""
-    fake_cli = DojoTrainerCli(argv_prefix=[sys.executable, str(fake_dojo.__file__)], timeout=60.0)
-    built = smoke.run_smoke(fake_cli, load_config(EXAMPLE_CONFIG, env={}))
+def _fake_cli() -> DojoTrainerCli:
+    return DojoTrainerCli(argv_prefix=[sys.executable, str(fake_dojo.__file__)], timeout=60.0)
+
+
+def _stored_smoke_course(
+    db: ScratchDatabase, smoke: ModuleType, cli: DojoTrainerCli
+) -> tuple[int, int]:
+    """Build the smoke course with `cli`, store it as a ready course; return (user_id, course_id)."""
+    built = smoke.run_smoke(cli, load_config(EXAMPLE_CONFIG, env={}))
     with db.connect() as conn:
         uid = create_user(conn, "ana")
         made = create_course(conn, uid, "Smoke course", [])
@@ -66,7 +82,7 @@ def _token(key: bytes, uid: int, course_id: int) -> str:
 def test_smoke_index_is_served_as_html(
     client: TestClient, db: ScratchDatabase, key: bytes, smoke: ModuleType
 ) -> None:
-    uid, cid = _stored_smoke_course(db, smoke)
+    uid, cid = _stored_smoke_course(db, smoke, _fake_cli())
     resp = client.get(f"/c/{_token(key, uid, cid)}/")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/html")
@@ -75,9 +91,31 @@ def test_smoke_index_is_served_as_html(
 def test_smoke_content_json_is_served_as_json(
     client: TestClient, db: ScratchDatabase, key: bytes, smoke: ModuleType
 ) -> None:
-    uid, cid = _stored_smoke_course(db, smoke)
+    uid, cid = _stored_smoke_course(db, smoke, _fake_cli())
     resp = client.get(f"/c/{_token(key, uid, cid)}/data/content.json")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/json")
-    items: list[dict[str, Any]] = json.loads(resp.content)
-    assert len(items) == smoke.EXPECTED_KEPT
+    content: dict[str, Any] = json.loads(resp.content)
+    assert len(content["items"]) == smoke.EXPECTED_KEPT
+
+
+@pytest.mark.real_dojo
+def test_real_dojo_artifacts_served(
+    client: TestClient, db: ScratchDatabase, key: bytes, smoke: ModuleType
+) -> None:
+    cli = DojoTrainerCli(
+        argv_prefix=[_real_dojo()],
+        timeout=smoke.TIMEOUT_SECONDS,
+        wasm=os.environ.get(REAL_WASM_ENV, ""),
+        web=os.environ.get(REAL_WEB_ENV, ""),
+    )
+    uid, cid = _stored_smoke_course(db, smoke, cli)
+    token = _token(key, uid, cid)
+    index = client.get(f"/c/{token}/index.html")
+    assert index.status_code == 200
+    assert index.headers["content-type"].startswith("text/html")
+    data = client.get(f"/c/{token}/data/content.json")
+    assert data.status_code == 200
+    assert data.headers["content-type"].startswith("application/json")
+    content: dict[str, Any] = json.loads(data.content)
+    assert len(content["items"]) == smoke.EXPECTED_KEPT

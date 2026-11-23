@@ -26,6 +26,7 @@ markers = [
     "smoke: quick end-to-end sanity check, selected by hand",
     "flaky: known intermittent test, kept out of the gate until fixed",
     "browser: real Firefox/Chrome through selenium (tests/browser), needs scripts/dev/install-browsers.sh",
+    "real_dojo: runs the real dojo binary named by KATA_TEST_DOJO, deselected when that is not an executable",
 ]
 
 [tool.vulture]

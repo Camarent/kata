@@ -361,7 +361,7 @@ Decided 2026-11-21. A gap is a visible concept whose mastery score (D9) is below
 
 Decided 2026-11-21. `core/kata_core/trainer/cli.py` defines the `TrainerCli` Protocol: `next_id(workdir) -> str`, `add(workdir, item) -> str`, `validate(workdir) -> list[Diagnostic]`, `lock(workdir)`, `build(workdir, outdir) -> list[str]`. `SubprocessTrainerCli(argv_prefix: list[str], timeout)` takes an argv list, never a shell; the prefix comes from config `[trainer] command` (a TOML array). Trust boundary: the executable is supplied by config; the sec-auditor must note this. A non-zero exit or bad JSON raises `TrainerError`. Machine output contract, also used by the fake: each call prints one JSON object on stdout. next-id `{"id": "i0001"}`; add `{"id": "..."}`; validate `{"ok": bool, "diagnostics": [{"item": id, "message": str}]}`; lock `{"ok": true}`; build `{"files": [paths]}`. The fake is `tests/fakes/fake_trainer_cli.py`, run as `[sys.executable, <path>]` so no exec bit is needed; item text containing `FAKE_INVALID` gets a diagnostic. The real binary format is unverified and goes to the backlog.
 
-Superseded by "Dojo CLI adapter replaces the D7 JSON contract" (2026-11-23): the real `dojo` CLI prints text, not JSON.
+Superseded by "Dojo CLI adapter replaces the D7 JSON contract" (2026-11-23): the real `dojo` CLI prints text, not JSON. Also superseded by "Real dojo contract corrections, part 2 (M14)" (2026-11-23): the id prefix and the `next-id` argument changed.
 
 ## D8 Progress documents (migration 0010_mastery.sql, with D9 tables)
 
@@ -453,6 +453,8 @@ Decided 2026-11-22. The worker ledger (`POST /usage`) records the cost of each c
 
 Decided 2026-11-23. `core/kata_core/trainer/dojo_cli.py` (`DojoTrainerCli`) runs the real `dojo` CLI (dojo-kit release) as `[trainer] command` plus `<subcommand> <dir> ...`, never through a shell. Output is text, not JSON: `next-id` takes the unit as a positional argument and prints the id; `add` prints `added N items to content/<unit>.jsonl: <first> .. <last>` and the ids (`ADDED_HEADER`); `validate` reports diagnostics on stdout. Exit codes: 0 ok; 1 content errors (diagnostics on stdout, or stderr for shape errors); 2 usage or I/O errors, which raise `TrainerError`. An exit 1 with no error count raises `TrainerError`. Ids come from the output, never computed: a dojo id is `<unit>-<n>`. The `TrainerCli` Protocol gains a `unit` argument to `next_id`. The draft to dojo item mapping lives in `core/kata_core/trainer/build.py` (`_dojo_item`): type `gap` (`DOJO_ITEM_TYPE`), unit `kata` (`DOJO_UNIT`), `answers=[answer]`, no `concept_id`. Reason: the D7 JSON contract was never measured; the binary is now measured. Limit: the text parser depends on the dojo-kit release pinned in the install; a new release may change the text.
 
+Superseded in part by "Real dojo contract corrections, part 2 (M14)" (2026-11-23): `next-id` takes the id prefix (the unit name without `-`), not the unit name, and ids are `<prefix>-<n>`.
+
 ## Progress documents are dojo-native
 
 Decided 2026-11-23. A progress document is the dojo-native shape: `items` maps each item id to `{"ok": int>=0, "bad": int>=0, "s": ...}`, `resetAt` is a number (epoch milliseconds, not a string), and any other key is kept verbatim on save and read. The core validates only `items` (`_doc_problem` in `core/kata_core/api/routes/course_progress.py:59`): a non-object document or a bad count gives 400. The size cap is `[trainer] max_progress_bytes = 4194304` (4 MiB; was 262144 in D8's shape) and gives 413 above it. Reason: the dojo CLI writes these keys, and the core must keep them unchanged. Limit: `s` is not checked by the core.
@@ -492,3 +494,14 @@ Decided 2026-11-23. A split document is a main path whose body has `parts: k` (1
 ## Real dojo contract corrections (M13)
 
 Decided 2026-11-23. The dojo adapter follows the real dojo CLI: a course starts with an `init` step (`dojo init <id> --title T --workspace <dir>`, the course folder is `<workspace>/<id>`, read from the printed line; `DojoTrainerCli.init` `core/kata_core/trainer/dojo_cli.py:62`). Every item goes into one unit, `unit-1` (`DOJO_UNIT` `core/kata_core/trainer/build.py:40`); dojo ids come back as `unit-1-<n>`. The course id is `kata-<id>`. Warnings never fail a build: `validate` returns only `severity=error` diagnostics (`core/kata_core/trainer/dojo_cli.py:110`). The artifact cap is 16 MiB (`[trainer] max_artifact_bytes = 16777216`). `wasm` and `web` are optional config assets, passed to `dojo build --wasm` and `--web` only when set (`core/kata_core/trainer/dojo_cli.py:122`, `:124`). Reason: the real dojo rejects the old argv and id shape, and a warning must not drop a whole course. Limit: the measured id rules (what dojo accepts in an id) are recorded by the next id-probe task, not here.
+
+Superseded in part by "Real dojo contract corrections, part 2 (M14)" (2026-11-23): dojo ids are `unit1-<n>` for unit `unit-1` (hyphen removed from the prefix), not `unit-1-<n>`.
+
+## Real dojo contract corrections, part 2 (M14)
+
+Decided 2026-11-23. The adapter, the fake (`tests/fakes/fake_dojo.py`) and the real-dojo smoke follow three more real dojo shapes.
+- Prefix rule: the id prefix is the unit name without `-` (`_id_prefix` `core/kata_core/trainer/dojo_cli.py:134`). The real dojo accepts only letters and digits in it. `next-id` takes the prefix; `next_id` and `add` check the ids against it. Unit `unit-1` gives ids `unit1-<n>`.
+- content.json shape: `data/content.json` is an object, not a list: `v`, `course` (`id`, `title`, `uiLanguage`, `contentLanguage`, `units`), `items` (the item list), `version`, `lock` (`v`, `ids`, `retired`). The smoke (`scripts/smoke/dojo_real.py:117-129`) checks `version` against the manifest, the course id, the items list and the lock ids.
+- manifest shape: `files` entries are objects `{"path", "bytes"}`; a plain string entry is still read (`_manifest_files` `core/kata_core/trainer/dojo_cli.py:225`). The manifest also has `version`, `totalBytes`, `wasmBytes` and `lang`. The build writes `manifest.json` and `THIRD_PARTY_NOTICES.md` but leaves both out of `files`; `_artifact_files` (`:200`) adds them to the artifact list when they exist.
+
+Reason: the real dojo writes these shapes, and the earlier list and string shapes did not match it. Limit: the fake copies the shapes from one measured build; fields the core does not read (`lang`, `wasmBytes`, `retired`) are not checked.
