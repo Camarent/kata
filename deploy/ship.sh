@@ -24,6 +24,9 @@ remote_dir="${KATA_SHIP_DIR:?KATA_SHIP_DIR is required}"
 env_file="${KATA_SHIP_ENV_FILE:-env/small.env}"
 health_tries="${KATA_SHIP_HEALTH_TRIES:-10}"
 health_wait="${KATA_SHIP_HEALTH_WAIT:-3}"
+# Compose needs a tailnet name to read the file even for a build; the image never contains it. The real
+# name lives in the VM env file.
+build_tailnet_name="build.invalid"
 # Files copied to the VM, relative to deploy/. Secrets and the Dockerfile are never listed.
 ship_files=(compose.yaml Caddyfile kata.host.toml env versions.env backup.sh restore.sh relocate.sh systemd)
 
@@ -87,7 +90,8 @@ check_image() {
 
 build_image() {
   (cd "$REPO_ROOT" && set -a && . deploy/versions.env && set +a \
-    && KATA_IMAGE_TAG="$tag" docker compose -f deploy/compose.yaml -f deploy/compose.build.yaml build)
+    && KATA_IMAGE_TAG="$tag" KATA_TAILNET_NAME="$build_tailnet_name" docker compose --env-file "deploy/$env_file" \
+      -f deploy/compose.yaml -f deploy/compose.build.yaml build)
 }
 
 check_stack() {
