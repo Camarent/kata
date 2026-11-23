@@ -5,7 +5,8 @@ script exits 2: PyYAML is not a project dependency (pyproject.toml), so there is
 to fall back on, and the check never passes silently.
 
 Rules, named at the start of each failure line:
-  no-host-port     a published port binds an address that is neither loopback nor tailscale
+  no-host-port     a service other than caddy publishes a port, or caddy binds an address that
+                   is neither loopback nor tailscale
   mem-limit        a service has no mem_limit
   secret-file      a top-level secret is not a file (it must have file:, not environment:)
   migrate-first    core does not wait for migrate to complete successfully
@@ -45,6 +46,7 @@ TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 # only satisfies compose's required-variable check (the no-latest rule checks that "@" is present).
 PLACEHOLDER_DIGEST = "sha256:" + "0" * 64
 HOST_VARS = {
+    "KATA_IMAGE_TAG": "validate",
     "KATA_TAILNET_NAME": "validate.example.ts.net",
     "POSTGRES_IMAGE": "postgres:17",
     "POSTGRES_DIGEST": PLACEHOLDER_DIGEST,
@@ -53,6 +55,8 @@ HOST_VARS = {
 }
 MIGRATE = "migrate"
 CORE = "core"
+# The only service that publishes a host port (deploy/compose.yaml header).
+PUBLISHER = "caddy"
 MIGRATE_DONE = "service_completed_successfully"
 
 Model = dict[str, Any]
@@ -107,7 +111,12 @@ def check_compose(model: Model) -> list[str]:
             if "published" not in port:
                 continue
             host_ip = str(port.get("host_ip", ""))
-            if not _loopback_or_tailscale(host_ip):
+            if name != PUBLISHER:
+                problems.append(
+                    f"no-host-port: {name} publishes port {port.get('published')}; "
+                    f"only {PUBLISHER} publishes"
+                )
+            elif not _loopback_or_tailscale(host_ip):
                 problems.append(
                     f"no-host-port: {name} publishes port {port.get('published')} on "
                     f"{host_ip or 'all interfaces'}"

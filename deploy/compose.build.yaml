@@ -1,0 +1,46 @@
+# Build override: the kata image, built on dev and shipped (deploy/ship.sh). The VM never runs this.
+#   Build: set -a; . deploy/versions.env; set +a; KATA_IMAGE_TAG=<tag> docker compose -f deploy/compose.yaml -f deploy/compose.build.yaml build
+# The three services share one image; versions.env supplies the pin build args.
+
+services:
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE}
+        PY_BASE_DIGEST: ${PY_BASE_DIGEST}
+        GITLEAKS_VERSION: ${GITLEAKS_VERSION}
+        GITLEAKS_SHA256: ${GITLEAKS_SHA256}
+        TRAINER_URL: ${TRAINER_URL}
+        TRAINER_SHA256: ${TRAINER_SHA256}
+        EMBED_MODEL_ID: ${EMBED_MODEL_ID}
+        EMBED_MODEL_REVISION: ${EMBED_MODEL_REVISION}
+
+  core:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE}
+        PY_BASE_DIGEST: ${PY_BASE_DIGEST}
+        GITLEAKS_VERSION: ${GITLEAKS_VERSION}
+        GITLEAKS_SHA256: ${GITLEAKS_SHA256}
+        TRAINER_URL: ${TRAINER_URL}
+        TRAINER_SHA256: ${TRAINER_SHA256}
+        EMBED_MODEL_ID: ${EMBED_MODEL_ID}
+        EMBED_MODEL_REVISION: ${EMBED_MODEL_REVISION}
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE}
+        PY_BASE_DIGEST: ${PY_BASE_DIGEST}
+        GITLEAKS_VERSION: ${GITLEAKS_VERSION}
+        GITLEAKS_SHA256: ${GITLEAKS_SHA256}
+        TRAINER_URL: ${TRAINER_URL}
+        TRAINER_SHA256: ${TRAINER_SHA256}
+        EMBED_MODEL_ID: ${EMBED_MODEL_ID}
+        EMBED_MODEL_REVISION: ${EMBED_MODEL_REVISION}

@@ -1,8 +1,10 @@
-# Compose stack for the VM: core, migrate (one-shot), postgres and caddy (reverse proxy).
+# Compose stack for the VM: core, worker, migrate (one-shot), postgres and caddy (reverse proxy).
+#   Images: kata:${KATA_IMAGE_TAG} is built elsewhere (dev, see deploy/compose.build.yaml) and shipped.
+#   The VM runs no builds: compose only pulls the tag it is given.
 #   Up:   set -a; . deploy/versions.env; set +a; docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d
-#   (versions.env supplies the image build args; the env file supplies the limits.)
-#   Ports: only caddy publishes a port, on KATA_BIND_ADDR (default loopback). Core and postgres
-#   publish nothing. Override any ${VAR} with the environment; the env file sets the limits.
+#   (KATA_IMAGE_TAG is required; the env file supplies the limits.)
+#   Ports: only caddy publishes a port, on KATA_BIND_ADDR (default loopback). Core, worker and
+#   postgres publish nothing. Override any ${VAR} with the environment; the env file sets the limits.
 # Secrets: files under deploy/secrets/ (layout in deploy/secrets.example/README.md), mounted at
 # /run/secrets/<name>. No password or token is written in this file.
 # Config: deploy/kata.host.toml is mounted read-only as /config/kata.toml (KATA_CONFIG).
@@ -36,19 +38,7 @@ services:
       start_period: 10s
 
   migrate:
-    image: kata:local
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        PY_BASE_IMAGE: ${PY_BASE_IMAGE}
-        PY_BASE_DIGEST: ${PY_BASE_DIGEST}
-        GITLEAKS_VERSION: ${GITLEAKS_VERSION}
-        GITLEAKS_SHA256: ${GITLEAKS_SHA256}
-        TRAINER_URL: ${TRAINER_URL}
-        TRAINER_SHA256: ${TRAINER_SHA256}
-        EMBED_MODEL_ID: ${EMBED_MODEL_ID}
-        EMBED_MODEL_REVISION: ${EMBED_MODEL_REVISION}
+    image: kata:${KATA_IMAGE_TAG:?set KATA_IMAGE_TAG, the image tag built on dev}
     restart: "no"
     environment: *core-env
     # Reads the password from the secret file into the env var core reads (core reads no *_FILE).
@@ -69,7 +59,7 @@ services:
     cpus: ${KATA_CPU_CORE:?set KATA_CPU_CORE, e.g. with --env-file deploy/env/small.env}
 
   core:
-    image: kata:local
+    image: kata:${KATA_IMAGE_TAG:?set KATA_IMAGE_TAG, the image tag built on dev}
     restart: unless-stopped
     environment: *core-env
     command:
@@ -99,6 +89,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  # Worker: no ports. Reaches core on the data network; egress is for its model providers.
+  worker:
+    image: kata:${KATA_IMAGE_TAG:?set KATA_IMAGE_TAG, the image tag built on dev}
+    restart: unless-stopped
+    environment: *core-env
+    command:
+      - sh
+      - -c
+      - export KATA_WORKER_TOKEN="$$(cat /run/secrets/worker_token)" && exec python -m kata_worker
+    secrets:
+      - worker_token
+    volumes:
+      - ./kata.host.toml:/config/kata.toml:ro
+    networks:
+      - data
+      - egress
+    depends_on:
+      core:
+        condition: service_healthy
+    mem_limit: ${KATA_MEM_WORKER:?set KATA_MEM_WORKER, e.g. with --env-file deploy/env/small.env}
+    cpus: ${KATA_CPU_WORKER:?set KATA_CPU_WORKER, e.g. with --env-file deploy/env/small.env}
 
   caddy:
     image: ${CADDY_IMAGE:?fill in deploy/versions.env}@${CADDY_DIGEST:?fill in deploy/versions.env}
@@ -130,6 +142,7 @@ networks:
   data:
     internal: true
   edge: {}
+  egress: {}
 
 volumes:
   pgdata: {}
