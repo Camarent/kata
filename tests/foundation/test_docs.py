@@ -56,9 +56,22 @@ def _missing_rows(data: dict, config_text: str) -> list[str]:
     return missing
 
 
-def test_readme_has_configuration_section():
+def test_readme_links_to_configuration_doc():
     text = README.read_text(encoding="utf-8")
-    assert "## Configuration" in text
+    assert "(docs/configuration.md)" in text
+    assert _table_rows(text) == {}
+
+
+# Words that belong in internal notes, not in the public README.
+README_BANNED = (
+    "Proxmox", "tailnet", "tailscale", "pipeline.json", "cs-qrun", "release_script",
+)
+
+
+def test_readme_has_no_internal_wording():
+    text = README.read_text(encoding="utf-8")
+    for word in README_BANNED:
+        assert word.lower() not in text.lower(), f"README.md contains {word!r}"
 
 
 def test_config_row_for_every_example_key():
