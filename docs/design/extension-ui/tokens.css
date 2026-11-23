@@ -1,0 +1,207 @@
+/*
+ * Design tokens for the kata side panel mockups (static, no build step).
+ * Light is the default; dark follows prefers-color-scheme, or data-theme on <html>.
+ * Motion is removed for users who ask for reduced motion.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces and text */
+  --color-bg: #ffffff;
+  --color-surface: #f5f6f8;
+  --color-text: #1b1f24;
+  --color-text-muted: #56606b;
+  --color-border: #c9ced6;
+
+  /* Accent and actions */
+  --color-accent: #1f5fbf;
+  --color-accent-text: #ffffff;
+  --color-focus: #0a5cd6;
+
+  /* Lesson marks: known and new words carry text labels, not colour alone */
+  --color-known: #1d7a3c;
+  --color-new: #b35c00;
+  --color-untagged: #56606b;
+
+  /* Status */
+  --color-error: #b3261e;
+  --color-error-bg: #fdecea;
+  --color-warning: #8a5a00;
+  --color-warning-bg: #fff4e0;
+
+  /* Spacing and shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --radius: 6px;
+
+  /* Touch target and type */
+  --touch-min: 44px;
+  --font-body: system-ui, sans-serif;
+  --font-size: 15px;
+  --font-size-small: 13px;
+
+  /* Motion */
+  --duration: 150ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #15181c;
+    --color-surface: #1f242b;
+    --color-text: #e6e9ee;
+    --color-text-muted: #a4adb8;
+    --color-border: #3a424d;
+
+    --color-accent: #7fb0ff;
+    --color-accent-text: #0b1220;
+    --color-focus: #9cc3ff;
+
+    --color-known: #6fd38f;
+    --color-new: #ffb866;
+    --color-untagged: #a4adb8;
+
+    --color-error: #ff8a80;
+    --color-error-bg: #3a1716;
+    --color-warning: #ffcc80;
+    --color-warning-bg: #3a2a10;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #15181c;
+  --color-surface: #1f242b;
+  --color-text: #e6e9ee;
+  --color-text-muted: #a4adb8;
+  --color-border: #3a424d;
+
+  --color-accent: #7fb0ff;
+  --color-accent-text: #0b1220;
+  --color-focus: #9cc3ff;
+
+  --color-known: #6fd38f;
+  --color-new: #ffb866;
+  --color-untagged: #a4adb8;
+
+  --color-error: #ff8a80;
+  --color-error-bg: #3a1716;
+  --color-warning: #ffcc80;
+  --color-warning-bg: #3a2a10;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Shared base for the mockup pages */
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+button,
+input {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+input {
+  width: 100%;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-family: ui-monospace, monospace;
+  font-size: var(--font-size-small);
+  text-align: center;
+}
+
+/* Lesson marks: colour plus a text label */
+.mark-known {
+  color: var(--color-known);
+  font-weight: 600;
+}
+
+.mark-new {
+  color: var(--color-new);
+  font-weight: 600;
+}
+
+.mark-untagged {
+  color: var(--color-untagged);
+}
+
+.state-error {
+  color: var(--color-error);
+  background: var(--color-error-bg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+}
+
+.state-warning {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
