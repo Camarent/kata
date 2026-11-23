@@ -60,6 +60,8 @@ COPY --from=fetch /usr/local/bin/gitleaks /usr/local/bin/
 COPY --from=fetch /opt/trainer /opt/trainer
 WORKDIR /app
 COPY core/ /app/core/
+# kata_core.config reads its defaults from /app/config/kata.example.toml (EXAMPLE_PATH).
+COPY config/ /app/config/
 COPY worker/ /app/worker/
 USER kata
 EXPOSE 8080
