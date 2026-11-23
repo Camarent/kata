@@ -122,7 +122,7 @@ start_stack() {
 
 deep_health() {
   local attempts=0
-  until ssh -- "$target" "cd $q_dir && docker compose --env-file $q_env -f compose.yaml exec -T core python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health/deep', timeout=4)\""; do
+  until ssh -- "$target" "cd $q_dir && set -a && . ./versions.env && set +a && docker compose --env-file $q_env -f compose.yaml exec -T core python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health/deep', timeout=4)\""; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge "$health_tries" ]; then
       echo "ship: deep health check failed after $attempts attempts" >&2
