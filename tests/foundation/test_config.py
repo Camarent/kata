@@ -98,7 +98,7 @@ def test_example_has_required_sections() -> None:
         "token_env",
     }
     assert set(data["jobs"]) == {"lease_seconds", "runner_poll_seconds", "max_output_bytes"}
-    assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds"}
+    assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds", "reasoning_effort"}
     assert set(data["client"]) == {"request_timeout_seconds"}
     assert set(data["retrieval"]) == {
         "embedder",
@@ -133,6 +133,13 @@ def test_load_returns_frozen_dataclass(tmp_path: Path) -> None:
     assert cfg.get("core", "port") == 8080
     with pytest.raises(dataclasses.FrozenInstanceError):
         cfg.sections = {}  # type: ignore[misc]  # frozen-check test needs a write
+
+
+def test_load_reads_trainer_defaults(tmp_path: Path) -> None:
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert cfg.get("trainer", "command") == ["/opt/trainer/dojo"]
+    assert cfg.get("trainer", "max_progress_bytes") == 4194304
+    assert cfg.get("model", "reasoning_effort") == ""
 
 
 def test_load_reads_smoke_section(tmp_path: Path) -> None:

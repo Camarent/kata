@@ -30,6 +30,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `model.base_url` | "http://127.0.0.1:11434/v1" | `KATA_MODEL_BASE_URL` |
 | `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
 | `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
+| `model.reasoning_effort` | "" | `KATA_MODEL_REASONING_EFFORT` |
 | `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
 | `retrieval.embedder` | "fake" | `KATA_RETRIEVAL_EMBEDDER` |
 | `retrieval.model_name` | "" | `KATA_RETRIEVAL_MODEL_NAME` |
@@ -81,7 +82,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
 | `trainer.max_artifact_bytes` | 1048576 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
-| `trainer.max_progress_bytes` | 262144 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
+| `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
 | `knowledge.trainer_step` | 0.1 | `KATA_KNOWLEDGE_TRAINER_STEP` |
 | `knowledge.trainer_max_step` | 0.3 | `KATA_KNOWLEDGE_TRAINER_MAX_STEP` |
 | `knowledge.known_threshold` | 0.8 | `KATA_KNOWLEDGE_KNOWN_THRESHOLD` |

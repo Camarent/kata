@@ -43,6 +43,8 @@ max_output_bytes = 262144
 base_url = "http://127.0.0.1:11434/v1"
 model_name = "local-model"
 timeout_seconds = 60
+# Reasoning effort sent with each request; empty omits the field.
+reasoning_effort = ""
 
 [client]
 request_timeout_seconds = 30
@@ -133,7 +135,7 @@ min_items = 5
 # Cap on the trainer artifact size, in bytes.
 max_artifact_bytes = 1048576
 # Cap on a saved trainer progress document, in bytes (413 above it).
-max_progress_bytes = 262144
+max_progress_bytes = 4194304
 
 [knowledge]
 # Score change per trainer evidence step, and the largest change per save.

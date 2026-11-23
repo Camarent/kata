@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -108,6 +109,39 @@ def test_put_saves_then_get_shows_revision_and_etag(client: TestClient, db: Scra
     got = client.get(url, headers=headers)
     assert got.json() == {"revision": 1, "doc": DOC}
     assert got.headers["ETag"] == '"1"'
+
+
+def _dojo_doc(items: int) -> dict[str, Any]:
+    """A synthetic progress document in the dojo CLI shape: s/due/ok/bad/last, numeric resetAt, extra keys."""
+    return {
+        "resetAt": 1767225600000,
+        "exported_by": "dojo-test",
+        "items": {
+            f"i{n:05d}": {
+                "s": 0.5 + (n % 5) / 10,
+                "due": "2026-11-30T00:00:00Z",
+                "ok": n % 7,
+                "bad": n % 3,
+                "last": "2026-11-20T10:00:00Z",
+            }
+            for n in range(items)
+        },
+    }
+
+
+def test_put_real_dojo_shape_pretty_printed_600kb_saves_verbatim(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers, url = _owner(client, db, cfg, "ana", "ready")
+    doc = _dojo_doc(4000)
+    raw = json.dumps(doc, indent=2).encode("utf-8")
+    assert 500_000 < len(raw) < int(cfg.get("trainer", "max_progress_bytes"))
+    resp = client.put(url, content=raw, headers={**headers, "If-Match": '"0"', "Content-Type": "application/json"})
+    assert resp.status_code == 200
+    got = client.get(url, headers=headers)
+    assert got.json() == {"revision": 1, "doc": doc}
+    assert got.json()["doc"]["resetAt"] == 1767225600000
+    assert got.json()["doc"]["exported_by"] == "dojo-test"
 
 
 def test_put_with_stale_if_match_is_412_with_current_doc(
