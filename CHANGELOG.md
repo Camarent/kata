@@ -14,3 +14,8 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - extension: browser extension client for Firefox and Chrome.
 - trainer: `dojo` trainer CLI runner, configured in the `[trainer]` section.
 - deploy: deployment scripts and a container image for the web VM.
+
+## [0.1.0] - 2026-11-23
+
+- docs(release): prepare first release notes and install docs
+
