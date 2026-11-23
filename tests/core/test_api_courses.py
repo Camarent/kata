@@ -84,7 +84,7 @@ def test_known_concepts_are_not_gaps(client: TestClient, db: ScratchDatabase, cf
     resp = client.put(f"/concepts/{known}/mark", json={"state": "known"}, headers=headers)
     assert resp.status_code == 200
 
-    body = _create(client, headers, {})
+    body = _create(client, headers, {"title": "gaps"})
 
     assert body["concept_ids"] == [gap]
 
@@ -95,7 +95,7 @@ def test_named_concepts_are_used_as_given(client: TestClient, db: ScratchDatabas
     _concept(client, headers, topic, "lists")
     named = _concept(client, headers, topic, "dicts")
 
-    body = _create(client, headers, {"concept_ids": [named]})
+    body = _create(client, headers, {"title": "named", "concept_ids": [named]})
 
     assert body["concept_ids"] == [named]
 
@@ -128,8 +128,8 @@ def test_list_pages_newest_first(client: TestClient, db: ScratchDatabase, cfg: C
     headers = _token_for(client, db, cfg, "ana")
     topic = _shared_topic(client, headers, "Python")
     _concept(client, headers, topic, "lists")
-    older = _create(client, headers, {"concept_ids": [_concept(client, headers, topic, "dicts")]})
-    newer = _create(client, headers, {"concept_ids": [_concept(client, headers, topic, "sets")]})
+    older = _create(client, headers, {"title": "older", "concept_ids": [_concept(client, headers, topic, "dicts")]})
+    newer = _create(client, headers, {"title": "newer", "concept_ids": [_concept(client, headers, topic, "sets")]})
 
     first = client.get("/v1/courses?limit=1", headers=headers).json()
     assert [item["id"] for item in first["items"]] == [newer["id"]]
@@ -159,9 +159,9 @@ def test_get_own_course_and_hide_others(client: TestClient, db: ScratchDatabase,
     ana = _token_for(client, db, cfg, "ana")
     ben = _token_for(client, db, cfg, "ben")
     topic = _shared_topic(client, ana, "Python")
-    course = _create(client, ana, {"concept_ids": [_concept(client, ana, topic, "lists")]})
+    course = _create(client, ana, {"title": "lists", "concept_ids": [_concept(client, ana, topic, "lists")]})
 
-    own = client.get(f"/v1/courses/{course['id']}", headers=ana)
+    own =client.get(f"/v1/courses/{course['id']}", headers=ana)
     assert own.status_code == 200
     assert own.json()["id"] == course["id"]
     assert own.json()["status"] == "queued"
@@ -174,7 +174,7 @@ def test_delete_own_course_and_refuse_others(client: TestClient, db: ScratchData
     ana = _token_for(client, db, cfg, "ana")
     ben = _token_for(client, db, cfg, "ben")
     topic = _shared_topic(client, ana, "Python")
-    course = _create(client, ana, {"concept_ids": [_concept(client, ana, topic, "lists")]})
+    course = _create(client, ana, {"title": "lists", "concept_ids": [_concept(client, ana, topic, "lists")]})
 
     assert client.delete(f"/v1/courses/{course['id']}", headers=ben).status_code == 404
     with db.connect() as conn:
