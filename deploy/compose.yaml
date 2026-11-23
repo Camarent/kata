@@ -106,6 +106,9 @@ services:
       - export KATA_WORKER_TOKEN="$$(cat /run/secrets/worker_token)" && exec python -m kata_worker
     secrets:
       - worker_token
+    # The image HEALTHCHECK probes the core HTTP port; the worker serves none, so it would stay "unhealthy".
+    healthcheck:
+      disable: true
     volumes:
       - ./kata.host.toml:/config/kata.toml:ro
     networks:
