@@ -1,0 +1,140 @@
+"""Fake `dojo` CLI: a python script run as `[sys.executable, <this file>, <subcommand>, <dir>, ...]`.
+
+Prints the text formats measured on the real dojo binary (see core/kata_core/trainer/dojo_cli.py).
+Items live in `<dir>/content/<unit>.jsonl`; ids are `<unit>-<n>`. Markers in a prompt:
+FAKE_INVALID gives an error diagnostic that names the item id; FAKE_NOID gives an error with
+no id in its message; FAKE_WARN gives a warning only (exit 0).
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+CONTENT_DIR = "content"
+INVALID_MARK = "FAKE_INVALID"
+NOID_MARK = "FAKE_NOID"
+WARN_MARK = "FAKE_WARN"
+PREFIX_RE = re.compile(r"[a-z][a-z0-9_]*")
+
+
+def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
+    """(id, item) pairs of every unit file, in file order."""
+    out: list[tuple[str, dict[str, Any]]] = []
+    for path in sorted((workdir / CONTENT_DIR).glob("*.jsonl")):
+        for line in path.read_text().splitlines():
+            if line:
+                item = json.loads(line)
+                out.append((item["id"], item))
+    return out
+
+
+def _next_number(workdir: Path, unit: str) -> int:
+    path = workdir / CONTENT_DIR / f"{unit}.jsonl"
+    if not path.exists():
+        return 1
+    return sum(1 for line in path.read_text().splitlines() if line) + 1
+
+
+def _next_id(workdir: Path, prefix: str) -> int:
+    if not PREFIX_RE.fullmatch(prefix):
+        sys.stderr.write(f"fake dojo: bad prefix {prefix!r}\n")
+        raise SystemExit(2)
+    print(f"{prefix}-{_next_number(workdir, prefix)}")
+    return 0
+
+
+def _add(workdir: Path, unit: str) -> int:
+    data = json.loads(sys.stdin.read())
+    items = data if isinstance(data, list) else [data]
+    for item in items:
+        if not isinstance(item, dict) or "type" not in item:
+            sys.stderr.write("fake dojo: shape error: item needs a type\n")
+            return 1
+    path = workdir / CONTENT_DIR / f"{unit}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ids: list[str] = []
+    number = _next_number(workdir, unit)
+    with path.open("a") as out:
+        for item in items:
+            item_id = f"{unit}-{number}"
+            number += 1
+            ids.append(item_id)
+            out.write(json.dumps({**item, "id": item_id}) + "\n")
+    print(f"added {len(ids)} items to content/{unit}.jsonl: {ids[0]} .. {ids[-1]}")
+    for item_id in ids:
+        print(item_id)
+    return 0
+
+
+def _validate(workdir: Path) -> int:
+    diagnostics: list[dict[str, Any]] = []
+    for item_id, item in _read_items(workdir):
+        prompt = str(item.get("prompt", ""))
+        base = {"file": f"content/{item['unit']}.jsonl", "line": 1}
+        if INVALID_MARK in prompt:
+            message = f"{item_id}: fake marked invalid"
+            diagnostics.append({"severity": "error", "code": "choice_few_options", **base, "message": message})
+        if NOID_MARK in prompt:
+            message = "answers list is empty"
+            diagnostics.append({"severity": "error", "code": "gap_empty_answer", **base, "message": message})
+        if WARN_MARK in prompt:
+            message = f"{item_id}: fake warning"
+            diagnostics.append({"severity": "warning", "code": "answer_in_prompt", **base, "message": message})
+    errors = sum(1 for d in diagnostics if d["severity"] == "error")
+    print(json.dumps({"ok": errors == 0, "errors": errors,
+                      "warnings": len(diagnostics) - errors, "diagnostics": diagnostics}))
+    return 1 if errors else 0
+
+
+def _lock(workdir: Path) -> int:
+    if any(INVALID_MARK in str(i.get("prompt", "")) for _, i in _read_items(workdir)):
+        print("content/geo.jsonl:1: error: fake marked invalid")
+        return 1
+    count = len(_read_items(workdir))
+    (workdir / "ids.lock").write_text(f"ids.lock: {count} ids, 0 retired\n")
+    print(f"ids.lock: {count} ids, 0 retired")
+    return 0
+
+
+def _build(workdir: Path, outdir: Path) -> int:
+    if any(INVALID_MARK in str(i.get("prompt", "")) for _, i in _read_items(workdir)):
+        sys.stderr.write("fake dojo: content errors, not built\n")
+        return 1
+    course = workdir.name
+    site = outdir / course
+    (site / "data").mkdir(parents=True, exist_ok=True)
+    (site / "index.html").write_text("<!doctype html>\n")
+    (site / "data" / "content.json").write_text(json.dumps([i for _, i in _read_items(workdir)]))
+    files = ["data/content.json", "manifest.json", "index.html"]
+    (site / "manifest.json").write_text(json.dumps({"course": course, "files": files}))
+    print(f"built {course} version 1 -> {site}")
+    for name in sorted(files):
+        print(f"  {course}/{name}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    subcommand, rest = argv[0], argv[1:]
+    if subcommand == "next-id":
+        return _next_id(Path(rest[0]), rest[1])
+    if subcommand == "add":
+        return _add(Path(rest[0]), rest[1])
+    if subcommand == "validate":
+        if not Path(rest[0]).is_dir():
+            sys.stderr.write("fake dojo: no such dir\n")
+            return 2
+        return _validate(Path(rest[0]))
+    if subcommand == "lock":
+        return _lock(Path(rest[0]))
+    if subcommand == "build":
+        return _build(Path(rest[0]), Path(rest[2]))
+    sys.stderr.write(f"fake dojo: unknown subcommand {subcommand}\n")
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

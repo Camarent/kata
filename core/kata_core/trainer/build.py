@@ -126,7 +126,7 @@ def _check_items(
 
 def _add(cli: TrainerCli, workdir: Path, draft: dict[str, Any]) -> str:
     """Add one draft as JSON text. The id must match the one `next-id` announced."""
-    expected = cli.next_id(workdir)
+    expected = cli.next_id(workdir, str(draft.get("unit", "")))
     added = cli.add(workdir, json.dumps(draft, sort_keys=True))
     if added != expected:
         raise TrainerError(f"trainer add gave id {added}, next-id said {expected}")

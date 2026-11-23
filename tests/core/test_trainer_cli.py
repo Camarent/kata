@@ -32,9 +32,9 @@ def _inline_cli(code: str, timeout: float = 30) -> SubprocessTrainerCli:
 
 
 def test_round_trip_against_fake(fake_cli: SubprocessTrainerCli, workdir: Path) -> None:
-    assert fake_cli.next_id(workdir) == "i0001"
+    assert fake_cli.next_id(workdir, "geo") == "i0001"
     assert fake_cli.add(workdir, "what is a noun") == "i0001"
-    assert fake_cli.next_id(workdir) == "i0002"
+    assert fake_cli.next_id(workdir, "geo") == "i0002"
     assert fake_cli.validate(workdir) == []
     fake_cli.lock(workdir)
     outdir = workdir / "out"
@@ -64,7 +64,7 @@ def test_item_text_is_passed_as_one_argument_not_a_shell(
 def test_non_zero_exit_raises(workdir: Path) -> None:
     cli = _inline_cli("import sys; sys.stderr.write('boom'); sys.exit(3)")
     with pytest.raises(TrainerError, match="exited 3: boom"):
-        cli.next_id(workdir)
+        cli.next_id(workdir, "geo")
 
 
 def test_timeout_raises(workdir: Path) -> None:
@@ -77,13 +77,13 @@ def test_timeout_raises(workdir: Path) -> None:
 def test_bad_json_raises(workdir: Path) -> None:
     cli = _inline_cli("print('not json')")
     with pytest.raises(TrainerError, match="invalid JSON"):
-        cli.next_id(workdir)
+        cli.next_id(workdir, "geo")
 
 
 def test_non_object_json_raises(workdir: Path) -> None:
     cli = _inline_cli("print('[1, 2]')")
     with pytest.raises(TrainerError, match="not an object"):
-        cli.next_id(workdir)
+        cli.next_id(workdir, "geo")
 
 
 def test_lock_not_ok_raises(workdir: Path) -> None:
@@ -95,4 +95,4 @@ def test_lock_not_ok_raises(workdir: Path) -> None:
 def test_missing_executable_raises(workdir: Path) -> None:
     cli = SubprocessTrainerCli(argv_prefix=[str(workdir / "no-such-trainer")], timeout=5)
     with pytest.raises(TrainerError, match="could not start"):
-        cli.next_id(workdir)
+        cli.next_id(workdir, "geo")

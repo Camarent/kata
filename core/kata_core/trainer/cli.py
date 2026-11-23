@@ -26,7 +26,7 @@ class Diagnostic:
 
 
 class TrainerCli(Protocol):
-    def next_id(self, workdir: Path) -> str: ...
+    def next_id(self, workdir: Path, unit: str) -> str: ...
 
     def add(self, workdir: Path, item: str) -> str: ...
 
@@ -66,7 +66,8 @@ class SubprocessTrainerCli:
             raise TrainerError(f"trainer {subcommand} JSON is not an object")
         return data
 
-    def next_id(self, workdir: Path) -> str:
+    def next_id(self, workdir: Path, unit: str) -> str:
+        """`unit` is accepted for the Protocol and ignored: the JSON trainer has no unit argument."""
         return _str_field(self._call("next-id", f"--workdir={workdir}"), "id", "next-id")
 
     def add(self, workdir: Path, item: str) -> str:
