@@ -24,9 +24,12 @@ export class CoreAuthError extends Error {
   }
 }
 
-/** Any other non-2xx answer from the core. */
+/** Any other non-2xx answer from the core. `code` is the stable `detail.code` of the body, when it has one. */
 export class CoreHttpError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly code?: string,
+  ) {
     super(`core answered HTTP ${status}`);
     this.name = "CoreHttpError";
   }
@@ -115,6 +118,31 @@ export interface CourseSummary {
   updated_at: string;
 }
 
+/** `GET /v1/courses` with the caller's limit and total course count. */
+export interface CourseListMeta {
+  items: CourseSummary[];
+  limit: number;
+  total: number;
+}
+
+/** Answer of `POST /v1/courses` (HTTP 202): the new course and the job building it. */
+export type CourseAccepted = CourseSummary & { job_id: number };
+
+/** Short, user-facing text for a failed course create or delete. */
+export function courseErrorText(err: unknown): string {
+  const code = err instanceof CoreHttpError ? err.code : undefined;
+  switch (code) {
+    case "course_limit":
+      return "You have reached your course limit. Delete a course to add another.";
+    case "course_name_taken":
+      return "A course with this name already exists. Choose another title.";
+    case "course_title_empty":
+      return "Enter a course title.";
+    default:
+      return "Could not save the course. Try again.";
+  }
+}
+
 /** Answer of `GET /v1/courses/{id}/progress`. `revision` is 0 and `doc` null when never saved. */
 export interface CourseProgress {
   revision: number;
@@ -143,6 +171,15 @@ export interface ProgressSaved {
 }
 
 /** Options of one request: a pre-serialised body (sent as is) and an `If-Match` revision. */
+/** The stable `detail.code` of an error body, or undefined when the body has none. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  const body = (await res.json().catch(() => undefined)) as { detail?: unknown } | undefined;
+  const detail = body?.detail;
+  if (typeof detail !== "object" || detail === null) return undefined;
+  const code = (detail as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 interface RequestOptions {
   rawBody?: string;
   ifMatch?: number;
@@ -245,6 +282,28 @@ export class CoreClient {
     return res.items.filter((course) => course.status === "ready");
   }
 
+  /** As listCourses, plus the course limit and total count (for "n of limit"). */
+  async listCoursesMeta(): Promise<CourseListMeta> {
+    const res = await this.request<CourseListMeta>("GET", "/v1/courses");
+    return { items: res.items.filter((course) => course.status === "ready"), limit: res.limit, total: res.total };
+  }
+
+  /** Queue a new course (`POST /v1/courses`). Throws CoreHttpError with `code` on 409/422. */
+  createCourse(title: string): Promise<CourseAccepted> {
+    return this.request<CourseAccepted>("POST", "/v1/courses", { title });
+  }
+
+  /** Delete a course. Resolves true when deleted, false when it was already gone (404). */
+  async deleteCourse(courseId: number): Promise<boolean> {
+    try {
+      await this.request<void>("DELETE", `/v1/courses/${courseId}`);
+      return true;
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return false;
+      throw err;
+    }
+  }
+
   /** Open a ready course; returns the URL the panel should show it at. */
   async openCourse(courseId: number): Promise<string> {
     const res = await this.request<{ url: string }>("POST", `/v1/courses/${courseId}/open`);
@@ -299,7 +358,7 @@ export class CoreClient {
         const conflict = (await res.json().catch(() => ({}))) as { revision?: number; doc?: ProgressDoc | null };
         throw new CoreConflictError(conflict.revision ?? 0, conflict.doc ?? null);
       }
-      if (!res.ok) throw new CoreHttpError(res.status);
+      if (!res.ok) throw new CoreHttpError(res.status, await errorCode(res));
       if (res.status === 204) return undefined as T;
       return (await res.json()) as T;
     } catch (err) {
