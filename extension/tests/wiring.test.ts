@@ -40,6 +40,7 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
     tabs: {
       query: vi.fn(async () => [{ id: 7 }]),
       sendMessage: vi.fn(async () => ({ blocks: [] })),
+      create: vi.fn(async () => ({})),
       ...overrides,
     },
     runtime: {
@@ -245,6 +246,71 @@ describe("background wiring", () => {
     wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
     expect(await chrome.send({ type: "panel:review" })).toEqual({ ok: false, error: "not signed in" });
     expect(await chrome.send({ type: "panel:setConcept", conceptId: 3, state: "known" })).toEqual({
+      ok: false,
+      error: "not signed in",
+    });
+  });
+
+  /** Fake core for the course calls: one ready course (4) and one still processing (5). */
+  function courseFetch(openUrl: string) {
+    const course = (id: number, status: string) => ({
+      id,
+      title: `Course ${id}`,
+      status,
+      concept_ids: [],
+      error: null,
+      created_at: "",
+      updated_at: "",
+    });
+    return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/courses")) {
+        return new Response(JSON.stringify({ items: [course(4, "ready"), course(5, "processing")] }), { status: 200 });
+      }
+      if (init?.method === "POST" && url.endsWith("/v1/courses/4/open")) {
+        return new Response(JSON.stringify({ url: openUrl }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: "not found" }), { status: 404 });
+    }) as unknown as typeof fetch;
+  }
+  const signedInArea = () => memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+
+  it("courses lists only the ready courses, as id and title", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/4/")));
+    const reply = (await chrome.send({ type: "panel:courses" })) as PanelReply;
+    expect(reply).toEqual({ ok: true, data: [{ id: 4, title: "Course 4" }] });
+  });
+
+  it("openCourse opens the core URL in a new tab", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/4/")));
+    const reply = (await chrome.send({ type: "panel:openCourse", courseId: 4 })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    expect(chrome.api.tabs.create).toHaveBeenCalledWith({ url: "http://127.0.0.1:8080/c/4/" });
+  });
+
+  it("openCourse refuses a URL on a foreign origin and opens no tab", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("https://evil.example/c/4/")));
+    const reply = (await chrome.send({ type: "panel:openCourse", courseId: 4 })) as PanelReply;
+    expect(reply).toEqual({ ok: false, error: "course link is outside the core" });
+    expect(chrome.api.tabs.create).not.toHaveBeenCalled();
+  });
+
+  it("openCourse refuses a course that is not ready and opens no tab", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/5/")));
+    const reply = (await chrome.send({ type: "panel:openCourse", courseId: 5 })) as PanelReply;
+    expect(reply).toEqual({ ok: false, error: "course is not ready" });
+    expect(chrome.api.tabs.create).not.toHaveBeenCalled();
+  });
+
+  it("courses and openCourse without a session reply with the auth error", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
+    expect(await chrome.send({ type: "panel:courses" })).toEqual({ ok: false, error: "not signed in" });
+    expect(await chrome.send({ type: "panel:openCourse", courseId: 4 })).toEqual({
       ok: false,
       error: "not signed in",
     });

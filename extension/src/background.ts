@@ -2,7 +2,7 @@ import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
 import type { BridgeMessage } from "./bridge";
 import { wireBridgeRegistration } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
-import { DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
+import { CORE_ORIGIN, DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark, type ProgressDoc } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
@@ -19,6 +19,7 @@ export interface ChromeLike extends PanelOpenApi {
   tabs: {
     query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number }[]>;
     sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
+    create(properties: { url: string }): Promise<unknown>;
   };
   runtime: RuntimeLike;
 }
@@ -29,10 +30,18 @@ export type PanelMessage =
   | { type: "panel:scan" }
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
-  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] };
+  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
+  | { type: "panel:courses" }
+  | { type: "panel:openCourse"; courseId: number };
 
 /** Reply to a panel message: the result, or the error text. */
 export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string };
+
+/** A ready course the panel can open: its id and title only. */
+export interface CourseLink {
+  id: number;
+  title: string;
+}
 
 /** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
 export interface ReviewRow {
@@ -50,6 +59,10 @@ export interface Backend {
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
   setConcept(conceptId: number, state: ConceptMark["state"]): Promise<void>;
+  /** The caller's ready courses, id and title only. */
+  courses(): Promise<CourseLink[]>;
+  /** Opens a ready course in a new tab; the URL must stay on the core origin. */
+  openCourse(courseId: number): Promise<void>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
   progress: ProgressBridge;
 }
@@ -125,7 +138,33 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const session = await requireSession();
       await clientFor(session).setConceptMark(conceptId, state);
     },
+
+    async courses() {
+      const session = await requireSession();
+      const courses = await clientFor(session).listCourses();
+      return courses.map((course) => ({ id: course.id, title: course.title }));
+    },
+
+    async openCourse(courseId) {
+      const session = await requireSession();
+      const client = clientFor(session);
+      if (!(await client.listCourses()).some((course) => course.id === courseId)) {
+        throw new Error("course is not ready");
+      }
+      const url = await client.openCourse(courseId);
+      if (!isCoreUrl(url)) throw new Error("course link is outside the core");
+      await api.tabs.create({ url });
+    },
   };
+}
+
+/** True when `url` parses and has the core origin (scheme, host, port); anything else is refused. */
+function isCoreUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === CORE_ORIGIN;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -154,6 +193,11 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
     case "panel:setConcept":
       await backend.setConcept(message.conceptId, message.state);
       return { ok: true };
+    case "panel:courses":
+      return { ok: true, data: await backend.courses() };
+    case "panel:openCourse":
+      await backend.openCourse(message.courseId);
+      return { ok: true };
   }
 }
 
@@ -166,7 +210,9 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:scan" ||
     type === "panel:known" ||
     type === "panel:review" ||
-    type === "panel:setConcept"
+    type === "panel:setConcept" ||
+    type === "panel:courses" ||
+    type === "panel:openCourse"
   );
 }
 
