@@ -80,6 +80,20 @@ def test_success_posts_item_drafts_as_output_and_sends_course_prompt() -> None:
 
 @pytest.mark.parametrize(
     "reply",
+    [_reply(ITEMS), f"```json\n{_reply(ITEMS)}\n```", f"```\n{_reply(ITEMS)}\n```"],
+)
+def test_fenced_or_plain_reply_posts_item_drafts(reply: str) -> None:
+    local = FakeProvider(name="local", script=[reply])
+    client = FakeClient()
+
+    course_handler.handle(_job(), _router({"local": local}), cast(CoreClient, client))
+
+    assert client.outputs == [(5, {"items": ITEMS})]
+    assert client.failed == []
+
+
+@pytest.mark.parametrize(
+    "reply",
     ["not json", json.dumps({"items": "nope"}), json.dumps(["a"]), json.dumps({"items": [1]})],
 )
 def test_unreadable_reply_fails_job(reply: str) -> None:

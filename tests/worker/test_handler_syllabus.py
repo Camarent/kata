@@ -77,6 +77,24 @@ def test_success_posts_modules_as_output_and_sends_syllabus_prompt() -> None:
 @pytest.mark.parametrize(
     "reply",
     [
+        _reply(MODULES),
+        f"```json\n{_reply(MODULES)}\n```",
+        f"```\n{_reply(MODULES)}\n```",
+    ],
+)
+def test_fenced_or_plain_reply_posts_modules(reply: str) -> None:
+    local = FakeProvider(name="local", script=[reply])
+    client = FakeClient()
+
+    syllabus_handler.handle(_job(), _router({"local": local}), cast(CoreClient, client))
+
+    assert client.outputs == [(9, {"modules": MODULES})]
+    assert client.failed == []
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
         "not json",
         json.dumps({"modules": "nope"}),
         json.dumps(["a"]),

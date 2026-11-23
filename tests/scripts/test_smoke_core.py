@@ -200,6 +200,9 @@ def test_run_case_json_shape_checks(smoke: ModuleType) -> None:
         ("extract_syllabus", '{"modules": [{"title": "a", "body": "b"}]}', True),
         ("extract_syllabus", '{"modules": [{"title": "a"}]}', False),
         ("extract_syllabus", "plain words", False),
+        ("generate_course", '```json\n{"items": []}\n```', True),
+        ("extract_syllabus", '```\n{"modules": [{"title": "a", "body": "b"}]}\n```', True),
+        ("extract_syllabus", '```json\n{"modules": [{"title": "a"}]}\n```', False),
     )
     for case_id, reply, expected in cases:
         provider, ledger, usage = _stack(smoke, Recorder(text=reply))

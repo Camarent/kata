@@ -35,7 +35,7 @@ TINY_BUDGET = 1
 EXAMPLE_BUDGET = int(load_config(EXAMPLE_PATH, env={}).get("smoke", "budget_micro_usd"))
 CONFIG_ARGS = ["--config", str(EXAMPLE_PATH)]
 GOOD_ENV = {SMOKE_ENV: "1", KEY_ENV: KEY}
-ESTIMATED_MICRO_USD = 448
+ESTIMATED_MICRO_USD = 467
 BILLED_MICRO_USD = 188
 COURSE_REPLY = '{"items": []}'
 SYLLABUS_REPLY = '{"modules": [{"title": "a", "body": "b"}]}'

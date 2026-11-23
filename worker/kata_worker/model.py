@@ -22,8 +22,8 @@ class ModelError(Exception):
     """The model call failed: bad status, timeout, unreadable reply or empty tag fields."""
 
 
-def _strip_fence(text: str) -> str:
-    """Drop a markdown code fence around the reply, if present."""
+def strip_fence(text: str) -> str:
+    """Drop a markdown code fence around the reply, if present. Shared by the handlers and smoke."""
     stripped = text.strip()
     if not stripped.startswith(FENCE):
         return stripped
@@ -46,7 +46,7 @@ def reply_content(response: httpx.Response) -> str:
 def parse_tag(reply: str) -> tuple[str, str]:
     """Return (category, topic) from a JSON tag reply; raise ModelError when the reply is unusable."""
     try:
-        fields = json.loads(_strip_fence(reply))
+        fields = json.loads(strip_fence(reply))
     except ValueError as exc:
         raise ModelError("model reply is not JSON") from exc
     if not isinstance(fields, dict):
