@@ -139,7 +139,7 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 
 ## 6. Accessibility rules
 
-- **Contrast.** Text and interactive parts meet WCAG 2.2 AA: at least 4.5:1 for normal text, 3:1 for large text and for focus outlines and mark icons against their background. Light and dark themes both meet this.
+- **Contrast.** Text and interactive parts meet WCAG 2.2 AA: at least 4.5 to 1 for normal text, 3 to 1 for large text and for focus outlines and mark icons against their background. Light and dark themes both meet this.
 - **Focus order.** Follows the visual order (section 5). No focus trap except inside the review screen and dialogs, which release focus on close.
 - **Keyboard use.** Every action is available without a pointer. No action needs a timed key press or a drag.
 - **Not colour alone.** Each mark has an icon and a text label (New, Known, Not tagged). Errors have a text message and an icon, not only a red border. Highlights on the page have a tag or dot, not only a tint.

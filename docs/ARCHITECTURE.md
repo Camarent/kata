@@ -13,7 +13,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 - [worker](modules/worker.md) - Python pull loop: takes jobs of the kinds it has handlers for (`tag`, `course.generate`, `syllabus.extract`; `worker/kata_worker/handlers/`), runs them through the provider router (`worker/kata_worker/providers/router.py`), which walks the `[routing]` chain per task class over the local and Anthropic providers; cloud calls pass the policy, the secret guard and the daily cost cap; reports result, output or fail.
 
-Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/INDEX.md` (generated file and symbol list).
+Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/design/extension-ui.md` (side panel and lesson page UI design, static mockups in `docs/design/extension-ui/`), `docs/INDEX.md` (generated file and symbol list).
 
 ## Data and control flow
 1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:72`).
