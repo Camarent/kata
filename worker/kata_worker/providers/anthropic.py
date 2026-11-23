@@ -24,12 +24,15 @@ TEXT_BLOCK = "text"
 CACHE_CREATION_FIELD = "cache_creation_input_tokens"
 CACHE_READ_FIELD = "cache_read_input_tokens"
 CACHE_CONTROL_TYPE = "ephemeral"
+STOP_MAX_TOKENS = "max_tokens"
+EMPTY_MAX_TOKENS_MESSAGE = "anthropic reply is empty and stop_reason is max_tokens: raise max_tokens"
 
 
 def _reply_text(response: httpx.Response) -> str:
-    """Join the text blocks of a Messages reply; raise ProviderError when the body is unreadable."""
+    """Join the text blocks of a Messages reply; raise ProviderError when unreadable or empty at max_tokens."""
     try:
-        blocks = response.json()["content"]
+        body = response.json()
+        blocks = body["content"]
     except (ValueError, KeyError, TypeError) as exc:
         raise ProviderError("anthropic reply has no content blocks") from exc
     if not isinstance(blocks, list):
@@ -41,9 +44,12 @@ def _reply_text(response: httpx.Response) -> str:
             if not isinstance(text, str):
                 raise ProviderError("anthropic reply text block is not a string")
             texts.append(text)
+    reply = "".join(texts)
+    if not reply.strip() and isinstance(body, dict) and body.get("stop_reason") == STOP_MAX_TOKENS:
+        raise ProviderError(EMPTY_MAX_TOKENS_MESSAGE)
     if not texts:
         raise ProviderError("anthropic reply has no text block")
-    return "".join(texts)
+    return reply
 
 
 def _count(usage: dict[str, object], key: str, *, optional: bool) -> int | None:

@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from kata_worker.core_client import CoreError
+from kata_worker.model import strip_fence
 
 if TYPE_CHECKING:
     from kata_worker.core_client import CoreClient, Job
@@ -17,7 +18,7 @@ COURSE_CLASS = "generate_course"
 COURSE_SYSTEM_PROMPT = (
     "You write practice items for a trainer. Reply with one JSON object only, shaped as "
     '{"items": [{"concept_id": <id>, "prompt": <text>, "answer": <text>}]}. '
-    "Use only the concept ids given in the request."
+    "Use only the concept ids given in the request. Do not wrap the JSON in a code fence."
 )
 
 log = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ def parse_drafts(reply: str) -> list[dict[str, Any]]:
     """Read the model reply: one JSON object whose `items` list holds item objects.
 
     Raise TypeError on another shape; `json.loads` raises ValueError on text that is not JSON.
+    A code fence around the reply is dropped first.
     """
-    data = json.loads(reply)
+    data = json.loads(strip_fence(reply))
     if not isinstance(data, dict) or not isinstance(data.get("items"), list):
         raise TypeError("reply is not an object with an items list")
     items: list[dict[str, Any]] = data["items"]

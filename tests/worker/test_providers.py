@@ -394,3 +394,61 @@ def test_anthropic_malformed_usage_is_none_and_keeps_text(usage: object) -> None
     completion = _anthropic(_usage_reply({"usage": usage})).complete_with_usage(SYSTEM, USER)
 
     assert completion == Completion(text="hi", usage=None)
+
+
+def _local_with_env(
+    handler: Callable[[httpx.Request], httpx.Response], env: dict[str, str]
+) -> LocalProvider:
+    config = load_config(EXAMPLE_PATH, env={"KATA_MODEL_BASE_URL": "http://model.test", **env})
+    return LocalProvider(config, transport=httpx.MockTransport(handler))
+
+
+def _local_choice_handler(
+    seen: list[httpx.Request], choice: dict[str, object]
+) -> Callable[[httpx.Request], httpx.Response]:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"choices": [choice]})
+
+    return handler
+
+
+def test_local_reasoning_effort_sent_when_set() -> None:
+    seen: list[httpx.Request] = []
+    handler = _local_choice_handler(seen, {"message": {"content": "ok"}})
+
+    _local_with_env(handler, {"KATA_MODEL_REASONING_EFFORT": "none"}).complete(SYSTEM, USER)
+
+    assert json.loads(seen[0].content)["reasoning_effort"] == "none"
+
+
+def test_local_reasoning_effort_omitted_when_empty() -> None:
+    seen: list[httpx.Request] = []
+    handler = _local_choice_handler(seen, {"message": {"content": "ok"}})
+
+    _local_with_env(handler, {"KATA_MODEL_REASONING_EFFORT": ""}).complete(SYSTEM, USER)
+
+    assert "reasoning_effort" not in json.loads(seen[0].content)
+
+
+def test_local_empty_reply_at_length_raises_provider_error() -> None:
+    handler = _local_choice_handler([], {"message": {"content": ""}, "finish_reason": "length"})
+
+    with pytest.raises(ProviderError, match="finish_reason is length"):
+        _local_with_env(handler, {}).complete(SYSTEM, USER)
+
+
+def test_local_empty_reply_at_stop_is_returned_as_is() -> None:
+    handler = _local_choice_handler([], {"message": {"content": ""}, "finish_reason": "stop"})
+
+    assert _local_with_env(handler, {}).complete(SYSTEM, USER) == ""
+
+
+def test_anthropic_empty_reply_at_max_tokens_raises_provider_error() -> None:
+    body = {"content": [{"type": "thinking", "text": "x"}], "stop_reason": "max_tokens"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=body)
+
+    with pytest.raises(ProviderError, match="stop_reason is max_tokens"):
+        _anthropic(handler).complete(SYSTEM, USER)

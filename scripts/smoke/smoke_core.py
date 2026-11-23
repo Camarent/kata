@@ -18,6 +18,7 @@ import httpx
 from kata_core.config import Config
 from kata_worker.handlers.course import COURSE_SYSTEM_PROMPT, parse_drafts
 from kata_worker.handlers.syllabus import SYLLABUS_SYSTEM_PROMPT, parse_modules
+from kata_worker.model import strip_fence
 from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
 from kata_worker.providers.anthropic import reply_usage
 from kata_worker.providers.base import Provider, ProviderError, TokenUsage
@@ -198,7 +199,7 @@ def excerpt(text: str, secret: str = "") -> str:
 
 
 def _json_ok(text: str) -> object:
-    return json.loads(text)
+    return json.loads(strip_fence(text))
 
 
 def shape_ok(case: Case, reply: str) -> bool:

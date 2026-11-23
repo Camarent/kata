@@ -403,6 +403,8 @@ No cost check applies: the assistant's provider bills its own user.
 
 #### 6.5 Trainer adapter contract
 
+> Superseded for the trainer CLI: the adapter is now the dojo CLI (`DojoTrainerCli`, `core/kata_core/trainer/dojo_cli.py`); see docs/decisions.md "Dojo CLI adapter replaces the D7 JSON contract". The JSON interface below is the planned design, kept as history.
+
 | Operation | Contract |
 |---|---|
 | Origin | trainer pages are served on their own name, separate from the API and app pages. The trainer name has its own narrower cookie, not sent to the app name. On loopback before the proxy exists, a second port gives the same separation |
@@ -417,7 +419,7 @@ No cost check applies: the assistant's provider bills its own user.
 | Page safety | generated item text is untrusted: the build accepts only the item schema's text fields, and both origins send a strict content security policy (own scripts only, no inline script, no foreign connections). Verify that the trainer's renderer escapes item text |
 | CLI import | `kata progress import <file>` posts an exported progress file to `POST /v1/courses/{id}/progress/import`; the core merges by running the pinned `trainer` binary, not by its own merge code |
 
-Changes needed in the trainer tool: machine-readable output for `build` and `next-id`; a current-format `import-progress` with machine-readable output and no hand-made id map; a merge command for two progress documents (proposed; until it exists, import replaces only when the stored document is empty); a round-trip test with an external storage adapter.
+(Superseded: the trainer CLI is now the dojo CLI; see docs/decisions.md "Dojo CLI adapter replaces the D7 JSON contract".) Changes needed in the trainer tool: machine-readable output for `build` and `next-id`; a current-format `import-progress` with machine-readable output and no hand-made id map; a merge command for two progress documents (proposed; until it exists, import replaces only when the stored document is empty); a round-trip test with an external storage adapter.
 
 #### 6.6 Provider adapter contract
 
@@ -690,7 +692,7 @@ Failure branches: `412`: merge in the page, retry. Core unreachable: local copy 
 1. The user picks categories and topics from `GET /v1/knowledge/gaps` and sends `POST /v1/courses` (a job).
 2. Step `select`: gap concepts and supporting chunks from the user's own links.
 3. Step `generate`: class `generate_course` requests in batches per concept; the item format comes from the pinned `trainer schema --brief`. Lesson text is passed as quoted reference material. Each batch is saved in the job's checkpoint.
-4. Step `add`: only the text fields of the item schema are accepted from the model. Course files are written from `course_file` into a temporary directory; `trainer next-id`, `trainer add`, `trainer validate --json --strict`. Diagnostics go back to the model; at most a configured number of rounds.
+4. Step `add`: only the text fields of the item schema are accepted from the model. Course files are written from `course_file` into a temporary directory; `trainer next-id`, `trainer add`, `trainer validate --json --strict` (superseded: now the dojo CLI, see docs/decisions.md "Dojo CLI adapter replaces the D7 JSON contract"). Diagnostics go back to the model; at most a configured number of rounds.
 5. Step `build`: add the storage adapter plugin and item tags, `trainer lock`, `trainer build`; store the output in `course_artifact` and the map in `course_item_map`; remove the temporary directory.
 6. A message announces the course; the page is served on the trainer origin.
 

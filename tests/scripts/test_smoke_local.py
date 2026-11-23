@@ -221,6 +221,28 @@ def test_warmup_tokens_are_not_counted(cli: ModuleType, capsys: pytest.CaptureFi
         assert f"prompt_tokens={PROMPT_TOKENS} " in line
 
 
+def test_summary_records_reasoning_effort_and_sends_it(
+    cli: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    recorder = Recorder(_replies_for_cases())
+    env = {**GOOD_ENV, "KATA_MODEL_REASONING_EFFORT": "none"}
+    code, lines = _run(cli, capsys, ["--base-url", FLAG_URL], env, recorder)
+    assert code == EXIT_OK
+    assert lines[-1].endswith(" reasoning_effort=none")
+    assert json.loads(recorder.requests[0].content)["reasoning_effort"] == "none"
+
+
+def test_summary_says_unset_and_omits_field_when_effort_empty(
+    cli: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    recorder = Recorder(_replies_for_cases())
+    env = {**GOOD_ENV, "KATA_MODEL_REASONING_EFFORT": ""}
+    code, lines = _run(cli, capsys, ["--base-url", FLAG_URL], env, recorder)
+    assert code == EXIT_OK
+    assert lines[-1].endswith(" reasoning_effort=unset")
+    assert "reasoning_effort" not in json.loads(recorder.requests[0].content)
+
+
 def test_excerpt_is_at_most_200_characters(
     cli: ModuleType, capsys: pytest.CaptureFixture[str]
 ) -> None:
