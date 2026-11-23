@@ -12,6 +12,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | --- | --- | --- |
 | `core.host` | "127.0.0.1" | `KATA_CORE_HOST` |
 | `core.port` | 8080 | `KATA_CORE_PORT` |
+| `core.public_url` | "" | `KATA_CORE_PUBLIC_URL` |
 | `database.host` | "127.0.0.1" | `KATA_DATABASE_HOST` |
 | `database.port` | 5432 | `KATA_DATABASE_PORT` |
 | `database.name` | "kata_dev" | `KATA_DATABASE_NAME` |
@@ -83,6 +84,8 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
 | `trainer.max_artifact_bytes` | 1048576 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
 | `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
+| `trainer.open_link_ttl_seconds` | 43200 | `KATA_TRAINER_OPEN_LINK_TTL_SECONDS` |
+| `trainer.open_link_key_file` | "" | `KATA_TRAINER_OPEN_LINK_KEY_FILE` |
 | `knowledge.trainer_step` | 0.1 | `KATA_KNOWLEDGE_TRAINER_STEP` |
 | `knowledge.trainer_max_step` | 0.3 | `KATA_KNOWLEDGE_TRAINER_MAX_STEP` |
 | `knowledge.known_threshold` | 0.8 | `KATA_KNOWLEDGE_KNOWN_THRESHOLD` |

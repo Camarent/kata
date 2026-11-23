@@ -12,6 +12,7 @@ import uvicorn
 
 from kata_core.api.app import create_app
 from kata_core.config import ConfigError, load_config
+from kata_core.trainer.open_link import load_signing_key
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,12 @@ def main() -> int:
     except ConfigError as exc:
         log.error("config: %s", exc)
         return 1
+    if cfg.get("trainer", "enabled"):
+        try:
+            load_signing_key(cfg)
+        except ConfigError as exc:
+            log.error("open link key: %s", exc)
+            return 1
     uvicorn.run(create_app(cfg), host=cfg.get("core", "host"), port=cfg.get("core", "port"))
     return 0
 

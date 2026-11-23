@@ -4,6 +4,8 @@
 [core]
 host = "127.0.0.1"
 port = 8080
+# Public base URL for open links. Empty derives it from the request base URL.
+public_url = ""
 
 [database]
 host = "127.0.0.1"
@@ -128,6 +130,10 @@ min_items = 5
 max_artifact_bytes = 1048576
 # Cap on a saved trainer progress document, in bytes (413 above it).
 max_progress_bytes = 4194304
+# Lifetime of a signed open link, in seconds.
+open_link_ttl_seconds = 43200
+# File holding the open-link signing key (at least 32 bytes). Required while trainer.enabled = true; startup exits 1 without it.
+open_link_key_file = ""
 
 [knowledge]
 # Score change per trainer evidence step, and the largest change per save.
