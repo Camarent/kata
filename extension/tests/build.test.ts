@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Script } from "node:vm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /** `npm --prefix extension test` runs with the extension folder as cwd. */
 const EXTENSION_DIR = process.cwd();
@@ -50,5 +50,40 @@ describe("built extension", () => {
     const manifest = readManifest("chrome");
     expect(manifest.side_panel).toBeDefined();
     expect(manifest.sidebar_action).toBeUndefined();
+  });
+});
+
+describe("built extension with KATA_EXTENSION_BASE_URL", () => {
+  const CUSTOM_URL = "http://127.0.0.1:9090";
+
+  /** Runs `node build/build.mjs firefox` with the base URL variable set, or unset when undefined. */
+  function buildFirefox(baseUrl: string | undefined): void {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    delete env.KATA_EXTENSION_BASE_URL;
+    if (baseUrl !== undefined) env.KATA_EXTENSION_BASE_URL = baseUrl;
+    execSync("node build/build.mjs firefox", { cwd: EXTENSION_DIR, env, stdio: "pipe" });
+  }
+
+  beforeAll(() => {
+    buildFirefox(CUSTOM_URL);
+  }, BUILD_TIMEOUT_MS);
+
+  afterAll(() => {
+    // Restore the default build that the other tests in this file read.
+    buildFirefox(undefined);
+  }, BUILD_TIMEOUT_MS);
+
+  it("manifest host_permissions is exactly the configured origin", () => {
+    expect(readManifest("firefox").host_permissions).toEqual(["http://127.0.0.1:9090/*"]);
+  });
+
+  it("the bundled background script carries the configured URL", () => {
+    const bundle = readFileSync(distPath("firefox", "background.js"), "utf8");
+    expect(bundle).toContain(JSON.stringify(CUSTOM_URL));
+  });
+
+  it("an unset variable gives the default host permission again", () => {
+    buildFirefox(undefined);
+    expect(readManifest("firefox").host_permissions).toEqual(["http://127.0.0.1:8080/*"]);
   });
 });

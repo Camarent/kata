@@ -55,4 +55,28 @@ describe("composeManifest", () => {
   it("throws on an unknown browser", () => {
     expect(() => composeManifest(base, "safari" as never)).toThrow("unknown browser: safari");
   });
+
+  it("with no base URL keeps host_permissions from the base manifest", () => {
+    for (const browser of ["chrome", "firefox"] as const) {
+      const m = composeManifest(base, browser);
+      expect(m.host_permissions).toEqual(base.host_permissions);
+      expect(m.content_scripts).toEqual(base.content_scripts);
+    }
+  });
+
+  it("sets host_permissions to exactly the origin of the configured base URL", () => {
+    for (const browser of ["chrome", "firefox"] as const) {
+      const m = composeManifest(base, browser, "https://core.example.test:9443/api/v1");
+      expect(m.host_permissions).toEqual(["https://core.example.test:9443/*"]);
+      expect(m.content_scripts).toEqual(base.content_scripts);
+    }
+  });
+
+  it("throws on a base URL that does not parse", () => {
+    expect(() => composeManifest(base, "chrome", "not a url")).toThrow("invalid base URL: not a url");
+  });
+
+  it("throws on a base URL that is not http or https", () => {
+    expect(() => composeManifest(base, "firefox", "ftp://127.0.0.1:8080")).toThrow("must be http or https");
+  });
 });

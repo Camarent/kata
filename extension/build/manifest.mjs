@@ -21,13 +21,37 @@ const PANEL_PAGE = "sidepanel.html";
 const BACKGROUND_SCRIPT = "background.js";
 
 /**
+ * Returns the origin of the core base URL, the only part a host permission can name.
+ * @param {string} baseUrl Core base URL, for example `http://127.0.0.1:8080`.
+ * @returns {string} The origin, for example `http://127.0.0.1:8080`.
+ * @throws {Error} When the URL does not parse or is not http(s).
+ */
+export function hostOrigin(baseUrl) {
+  let url;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`invalid base URL: ${baseUrl}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`base URL must be http or https: ${baseUrl}`);
+  }
+  return url.origin;
+}
+
+/**
  * Returns the manifest for one browser.
  * @param {object} base Parsed `manifest.base.json`; not modified.
  * @param {"chrome" | "firefox"} browser Target browser.
+ * @param {string} [baseUrl] Core base URL; when given, `host_permissions` becomes exactly its origin plus `/*`.
+ *   When omitted, `host_permissions` stays as in `manifest.base.json`.
  * @returns {object} A new manifest object.
  */
-export function composeManifest(base, browser) {
+export function composeManifest(base, browser, baseUrl) {
   const manifest = structuredClone(base);
+  if (baseUrl !== undefined) {
+    manifest.host_permissions = [`${hostOrigin(baseUrl)}/*`];
+  }
   if (browser === "chrome") {
     manifest.permissions = [...base.permissions, "sidePanel"];
     manifest.side_panel = { default_path: PANEL_PAGE };
