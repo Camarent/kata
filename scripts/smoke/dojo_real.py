@@ -19,8 +19,9 @@ from kata_core.trainer.dojo_cli import DojoTrainerCli
 
 GATE_ENV = "KATA_TEST_DOJO"
 COURSE_DIR = "course"
+COURSE_TITLE = "Smoke course"
 OUT_DIR = "out"
-UNIT = "geo"
+UNIT = "unit-1"
 SYNTHETIC_ITEM = {
     "type": "gap",
     "unit": UNIT,
@@ -41,9 +42,8 @@ def _refuse(message: str) -> int:
 def _smoke(cli: DojoTrainerCli) -> int:
     """Run the four steps in a temp dir; the dir is removed when the run ends."""
     with tempfile.TemporaryDirectory() as tmp:
-        workdir = Path(tmp) / COURSE_DIR
         outdir = Path(tmp) / OUT_DIR
-        workdir.mkdir()
+        workdir = cli.init(Path(tmp), COURSE_DIR, COURSE_TITLE)
         item_id = cli.add(workdir, json.dumps(SYNTHETIC_ITEM))
         print(f"added {item_id}")
         diagnostics = cli.validate(workdir)

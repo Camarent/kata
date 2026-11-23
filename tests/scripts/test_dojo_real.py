@@ -83,5 +83,5 @@ def test_fake_dojo_run_prints_file_list(
     wrapper = _fake_wrapper(tmp_path)
     assert cli.main({GATE_ENV: str(wrapper)}) == EXIT_OK
     out = capsys.readouterr().out
-    assert "added geo-1" in out
+    assert "added unit-1-1" in out
     assert FAKE_BUILT_FILE in out

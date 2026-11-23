@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 CONTENT_DIR = "content"
+TITLE_CHARS = 80
 INVALID_MARK = "FAKE_INVALID"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
@@ -34,6 +36,10 @@ def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
 
 
 def _init(course_id: str, title: str, workspace: Path) -> int:
+    # Strict like the real dojo: no control characters, at most TITLE_CHARS characters.
+    if len(title) > TITLE_CHARS or any(unicodedata.category(ch) == "Cc" for ch in title):
+        sys.stderr.write(f"fake dojo: bad course title {title!r}\n")
+        return 2
     course = workspace / course_id
     course.mkdir(parents=True, exist_ok=True)
     units = ["unit-1"]
@@ -49,18 +55,30 @@ def _next_number(workdir: Path, unit: str) -> int:
     return sum(1 for line in path.read_text().splitlines() if line) + 1
 
 
+def _units(workdir: Path) -> list[str] | None:
+    """Units of the course folder; None (after a message) when the folder has no course.json."""
+    course_file = workdir / COURSE_FILE
+    if not course_file.is_file():
+        sys.stderr.write(f"fake dojo: no course.json in {workdir}\n")
+        return None
+    return list(json.loads(course_file.read_text())["units"])
+
+
 def _next_id(workdir: Path, prefix: str) -> int:
     if not PREFIX_RE.fullmatch(prefix):
         sys.stderr.write(f"fake dojo: bad prefix {prefix!r}\n")
         raise SystemExit(2)
+    if _units(workdir) is None:
+        return 1
     print(f"{prefix}-{_next_number(workdir, prefix)}")
     return 0
 
 
 def _add(workdir: Path, unit: str) -> int:
-    course_file = workdir / COURSE_FILE
-    # A folder without course.json is still accepted; a later task makes the check strict.
-    if course_file.exists() and unit not in json.loads(course_file.read_text())["units"]:
+    units = _units(workdir)
+    if units is None:
+        return 1
+    if unit not in units:
         sys.stderr.write(f"fake dojo: unit {unit!r} does not exist in course.json\n")
         return 1
     data = json.loads(sys.stdin.read())
@@ -86,6 +104,8 @@ def _add(workdir: Path, unit: str) -> int:
 
 
 def _validate(workdir: Path) -> int:
+    if _units(workdir) is None:
+        return 2
     diagnostics: list[dict[str, Any]] = []
     for item_id, item in _read_items(workdir):
         prompt = str(item.get("prompt", ""))
