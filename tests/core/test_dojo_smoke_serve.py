@@ -79,5 +79,5 @@ def test_smoke_content_json_is_served_as_json(
     resp = client.get(f"/c/{_token(key, uid, cid)}/data/content.json")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/json")
-    items: list[dict[str, Any]] = json.loads(resp.content)
-    assert len(items) == smoke.EXPECTED_KEPT
+    content: dict[str, Any] = json.loads(resp.content)
+    assert len(content["items"]) == smoke.EXPECTED_KEPT

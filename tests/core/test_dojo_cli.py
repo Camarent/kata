@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -46,9 +47,19 @@ def _item(prompt: str) -> str:
 
 
 def test_next_id_reads_text_id(dojo: DojoTrainerCli, course: Path) -> None:
-    assert dojo.next_id(course, UNIT) == "unit-1-1"
+    # The id prefix is the unit name without `-`: dojo takes only letters and digits.
+    assert dojo.next_id(course, UNIT) == "unit1-1"
     dojo.add(course, GEO_ITEM)
-    assert dojo.next_id(course, UNIT) == "unit-1-2"
+    assert dojo.next_id(course, UNIT) == "unit1-2"
+
+
+def test_fake_next_id_rejects_hyphenated_prefix(course: Path) -> None:
+    proc = subprocess.run(
+        [sys.executable, str(Path(fake_dojo.__file__)), "next-id", str(course), UNIT],
+        capture_output=True, text=True, check=False,
+    )
+    assert proc.returncode == 2
+    assert "prefix 'unit-1' must contain only lowercase letters and digits" in proc.stderr
 
 
 def test_next_id_without_course_json_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
@@ -69,9 +80,9 @@ def test_unit_outside_name_charset_raises(dojo: DojoTrainerCli, workdir: Path, u
 
 
 def test_add_sends_json_on_stdin_and_parses_id(dojo: DojoTrainerCli, course: Path) -> None:
-    assert dojo.add(course, GEO_ITEM) == "unit-1-1"
+    assert dojo.add(course, GEO_ITEM) == "unit1-1"
     stored = (course / fake_dojo.CONTENT_DIR / f"{UNIT}.jsonl").read_text()
-    assert '"id": "unit-1-1"' in stored
+    assert '"id": "unit1-1"' in stored
     assert '"prompt": "The capital of Italy is ___."' in stored
 
 
@@ -102,7 +113,7 @@ def test_add_unit_missing_from_course_json_raises(dojo: DojoTrainerCli, workdir:
 def test_add_known_hyphenated_unit_accepted(dojo: DojoTrainerCli, workdir: Path) -> None:
     course = dojo.init(workdir, "geo-course", "Geography")
     known = '{"type": "gap", "unit": "unit-1", "prompt": "p", "answers": ["a"]}'
-    assert dojo.add(course, known) == "unit-1-1"
+    assert dojo.add(course, known) == "unit1-1"
 
 
 def test_add_shape_error_raises(dojo: DojoTrainerCli, course: Path) -> None:
@@ -177,11 +188,43 @@ def test_lock_failure_raises(dojo: DojoTrainerCli, course: Path) -> None:
 def test_build_lists_manifest_files_plus_index(dojo: DojoTrainerCli, course: Path) -> None:
     dojo.add(course, GEO_ITEM)
     outdir = course.parent / "out"
+    # The fake's manifest lists content and index; manifest.json and the notices are added on top.
     assert dojo.build(course, outdir) == [
+        f"{course.name}/THIRD_PARTY_NOTICES.md",
         f"{course.name}/data/content.json",
         f"{course.name}/index.html",
         f"{course.name}/manifest.json",
     ]
+
+
+def test_build_adds_notices_and_manifest_when_written(workdir: Path) -> None:
+    # The manifest lists files as `{path, bytes}` objects, as the real dojo writes them.
+    code = (
+        "import json, pathlib, sys; site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+        "(site / 'data').mkdir(parents=True); "
+        "(site / 'index.html').write_text('x'); "
+        "(site / 'data' / 'content.json').write_text('{}'); "
+        "(site / 'THIRD_PARTY_NOTICES.md').write_text('n'); "
+        "(site / 'manifest.json').write_text(json.dumps({'files': "
+        "[{'path': 'data/content.json', 'bytes': 2}, {'path': 'index.html', 'bytes': 1}]}))"
+    )
+    files = _inline(code).build(workdir, workdir / "out")
+    assert files == [
+        "geo-course/THIRD_PARTY_NOTICES.md",
+        "geo-course/data/content.json",
+        "geo-course/index.html",
+        "geo-course/manifest.json",
+    ]
+
+
+def test_build_notices_absent_is_not_listed(workdir: Path) -> None:
+    code = (
+        "import json, pathlib, sys; site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+        "site.mkdir(parents=True); (site / 'index.html').write_text('x'); "
+        "(site / 'manifest.json').write_text(json.dumps({'files': [{'path': 'index.html', 'bytes': 1}]}))"
+    )
+    files = _inline(code).build(workdir, workdir / "out")
+    assert files == ["geo-course/index.html", "geo-course/manifest.json"]
 
 
 def test_build_without_manifest_files_walks_course_dir(workdir: Path) -> None:
@@ -240,10 +283,10 @@ def test_unit_with_shell_characters_is_refused(workdir: Path) -> None:
 
 
 def test_unit_is_one_argument_not_a_shell(workdir: Path) -> None:
-    # The fake-free inline script echoes its last argument: a valid unit arrives unchanged.
+    # The fake-free inline script echoes its last argument: the unit arrives as one argument, with `-` dropped (the id prefix).
     unit = "geo_2-x"
     cli = _inline("import sys; print(sys.argv[-1] + '-1')")
-    assert cli.next_id(workdir, unit) == f"{unit}-1"
+    assert cli.next_id(workdir, unit) == "geo_2x-1"
 
 
 def test_build_symlink_to_file_outside_course_raises(workdir: Path) -> None:

@@ -113,8 +113,21 @@ def _check(built: BuiltCourse, max_bytes: int) -> None:
     if total > max_bytes:
         raise SmokeFailed(f"artifacts are {total} bytes, over the {max_bytes} byte cap")
     content = json.loads(built.artifacts["data/content.json"][1])
-    if sorted(item["prompt"] for item in content) != sorted(d["prompt"] for d in built.kept):
+    manifest = json.loads(built.artifacts["manifest.json"][1])
+    if content.get("version") != manifest.get("version"):
+        raise SmokeFailed("data/content.json and manifest.json disagree on version")
+    course = content.get("course")
+    if not isinstance(course, dict) or course.get("id") != COURSE_ID:
+        raise SmokeFailed(f"data/content.json course id is not {COURSE_ID!r}")
+    items = content.get("items")
+    if not isinstance(items, list):
+        raise SmokeFailed("data/content.json has no items list")
+    if sorted(item["prompt"] for item in items) != sorted(d["prompt"] for d in built.kept):
         raise SmokeFailed("data/content.json does not hold the kept prompts")
+    lock = content.get("lock")
+    lock_ids = lock.get("ids") if isinstance(lock, dict) else None
+    if not isinstance(lock_ids, list) or sorted(map(str, lock_ids)) != sorted(built.item_ids):
+        raise SmokeFailed("data/content.json lock ids are not the built item ids")
 
 
 def _report(built: BuiltCourse) -> None:

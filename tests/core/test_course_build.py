@@ -191,8 +191,8 @@ def test_build_ready_drops_invalid_item(conn: psycopg.Connection[Any]) -> None:
     assert course.status == "ready"
     assert course.error is None
     assert _count(conn, "course_item_map", course.id) == 2
-    # The fake dojo writes data/content.json, manifest.json and index.html.
-    assert _count(conn, "course_artifact", course.id) == 3
+    # The fake dojo writes data/content.json, index.html, manifest.json and THIRD_PARTY_NOTICES.md.
+    assert _count(conn, "course_artifact", course.id) == 4
     assert _journal(conn, user, build.COURSE_READY_KIND) == 1
 
 

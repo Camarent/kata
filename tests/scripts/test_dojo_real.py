@@ -6,18 +6,22 @@ script written into pytest's tmp_path; the wrapper execs the fake under sys.exec
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import json
 import shlex
 import subprocess
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 from fakes import fake_dojo
 from kata_core.config import load_config
+from kata_core.trainer.build import BuiltCourse
 from kata_core.trainer.dojo_cli import DojoTrainerCli
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -27,6 +31,7 @@ GATE_ENV = "KATA_TEST_DOJO"
 WASM_ENV = "KATA_TEST_DOJO_WASM"
 WEB_ENV = "KATA_TEST_DOJO_WEB"
 FAKE_KEPT = 7
+MAX_BYTES = 10_000_000
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_REFUSED = 2
@@ -92,7 +97,7 @@ def test_fake_dojo_run_prints_file_list(
     assert cli.main({GATE_ENV: str(wrapper)}) == EXIT_OK
     out = capsys.readouterr().out
     assert "init rejects 'Bad Id': " in out
-    assert "added unit-1-1" in out
+    assert "added unit1-1" in out
     assert FAKE_BUILT_FILE in out
 
 
@@ -145,6 +150,50 @@ def test_fake_run_keeps_seven_and_drops_empty_answer(cli: ModuleType) -> None:
     [(dropped_id, message)] = built.dropped.items()
     assert message == f"{dropped_id}: gap answer is empty"
     assert set(built.artifacts) >= set(cli.REQUIRED_FILES)
+
+
+@pytest.fixture
+def good_built(cli: ModuleType) -> BuiltCourse:
+    """A real run of the smoke build against the fake, which passes every check."""
+    fake_cli = DojoTrainerCli(argv_prefix=[sys.executable, str(fake_dojo.__file__)], timeout=60.0)
+    return cli.run_smoke(fake_cli, load_config(cli.EXAMPLE_CONFIG, env={}))
+
+
+def _with_content(built: BuiltCourse, mutate: Callable[[dict[str, Any]], None]) -> BuiltCourse:
+    """`built` with its data/content.json changed by `mutate`; everything else is kept."""
+    content = json.loads(built.artifacts["data/content.json"][1])
+    mutate(content)
+    artifacts = dict(built.artifacts)
+    artifacts["data/content.json"] = ("application/json", json.dumps(content).encode("utf-8"))
+    return dataclasses.replace(built, artifacts=artifacts)
+
+
+def test_check_passes_on_fake_build(cli: ModuleType, good_built: BuiltCourse) -> None:
+    cli._check(good_built, MAX_BYTES)
+
+
+def test_check_fails_when_version_differs_from_manifest(cli: ModuleType, good_built: BuiltCourse) -> None:
+    bad = _with_content(good_built, lambda content: content.update(version=content["version"] + 1))
+    with pytest.raises(cli.SmokeFailed, match="disagree on version"):
+        cli._check(bad, MAX_BYTES)
+
+
+def test_check_fails_on_wrong_course_id(cli: ModuleType, good_built: BuiltCourse) -> None:
+    bad = _with_content(good_built, lambda content: content["course"].update(id="other-course"))
+    with pytest.raises(cli.SmokeFailed, match="course id"):
+        cli._check(bad, MAX_BYTES)
+
+
+def test_check_fails_when_items_are_missing(cli: ModuleType, good_built: BuiltCourse) -> None:
+    bad = _with_content(good_built, lambda content: content.pop("items"))
+    with pytest.raises(cli.SmokeFailed, match="no items list"):
+        cli._check(bad, MAX_BYTES)
+
+
+def test_check_fails_when_lock_ids_differ_from_items(cli: ModuleType, good_built: BuiltCourse) -> None:
+    bad = _with_content(good_built, lambda content: content["lock"].update(ids=["unit1-999"]))
+    with pytest.raises(cli.SmokeFailed, match="lock ids"):
+        cli._check(bad, MAX_BYTES)
 
 
 def test_wasm_and_web_env_reach_the_build(

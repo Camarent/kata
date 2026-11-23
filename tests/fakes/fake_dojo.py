@@ -1,7 +1,8 @@
 """Fake `dojo` CLI: a python script run as `[sys.executable, <this file>, <subcommand>, <dir>, ...]`.
 
 Prints the text formats measured on the real dojo binary (see core/kata_core/trainer/dojo_cli.py).
-Items live in `<dir>/content/<unit>.jsonl`; ids are `<unit>-<n>`. Markers in a prompt:
+Items live in `<dir>/content/<unit>.jsonl`; ids are `<prefix>-<n>`, where the prefix is the unit name
+without `-` (as the real dojo: `next-id` accepts only letters and digits). Markers in a prompt:
 FAKE_INVALID gives an error diagnostic that names the item id; FAKE_NOID gives an error with
 no id in its message; FAKE_WARN gives a warning only (exit 0). A gap with a blank answer gives an
 error that names the item id.
@@ -24,7 +25,8 @@ INVALID_MARK = "FAKE_INVALID"
 ARGV_LOG_ENV = "FAKE_DOJO_ARGV_LOG"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
-PREFIX_RE = re.compile(r"[a-z][a-z0-9_-]*")
+PREFIX_RE = re.compile(r"[a-z][a-z0-9]*")
+NOTICES_FILE = "THIRD_PARTY_NOTICES.md"
 # Course ids for `init`: lowercase letters, digits and `-` only.
 COURSE_ID_RE = re.compile(r"[a-z0-9-]+")
 COURSE_FILE = "course.json"
@@ -57,11 +59,10 @@ def _init(course_id: str, title: str, workspace: Path) -> int:
     return 0
 
 
-def _next_number(workdir: Path, unit: str) -> int:
-    path = workdir / CONTENT_DIR / f"{unit}.jsonl"
-    if not path.exists():
-        return 1
-    return sum(1 for line in path.read_text().splitlines() if line) + 1
+def _next_number(workdir: Path, prefix: str) -> int:
+    """One more than the number of stored items whose id starts with `<prefix>-`."""
+    taken = [item_id for item_id, _ in _read_items(workdir) if item_id.startswith(f"{prefix}-")]
+    return len(taken) + 1
 
 
 def _units(workdir: Path) -> list[str] | None:
@@ -75,7 +76,7 @@ def _units(workdir: Path) -> list[str] | None:
 
 def _next_id(workdir: Path, prefix: str) -> int:
     if not PREFIX_RE.fullmatch(prefix):
-        sys.stderr.write(f"fake dojo: bad prefix {prefix!r}\n")
+        sys.stderr.write(f"fake dojo: prefix {prefix!r} must contain only lowercase letters and digits\n")
         raise SystemExit(2)
     if _units(workdir) is None:
         return 1
@@ -99,10 +100,11 @@ def _add(workdir: Path, unit: str) -> int:
     path = workdir / CONTENT_DIR / f"{unit}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     ids: list[str] = []
-    number = _next_number(workdir, unit)
+    prefix = unit.replace("-", "")
+    number = _next_number(workdir, prefix)
     with path.open("a") as out:
         for item in items:
-            item_id = f"{unit}-{number}"
+            item_id = f"{prefix}-{number}"
             number += 1
             ids.append(item_id)
             out.write(json.dumps({**item, "id": item_id}) + "\n")
@@ -151,15 +153,36 @@ def _build(workdir: Path, outdir: Path) -> int:
     if any(INVALID_MARK in str(i.get("prompt", "")) for _, i in _read_items(workdir)):
         sys.stderr.write("fake dojo: content errors, not built\n")
         return 1
-    course = workdir.name
+    meta = json.loads((workdir / COURSE_FILE).read_text())
+    course = meta["id"]
     site = outdir / course
     (site / "data").mkdir(parents=True, exist_ok=True)
-    (site / "index.html").write_text("<!doctype html>\n")
-    (site / "data" / "content.json").write_text(json.dumps([i for _, i in _read_items(workdir)]))
-    files = ["data/content.json", "manifest.json", "index.html"]
-    (site / "manifest.json").write_text(json.dumps({"course": course, "files": files}))
+    pairs = _read_items(workdir)
+    # content.json as the real dojo writes it: an object with the course, the items and the lock.
+    content = {
+        "v": 1,
+        "course": {"id": course, "title": meta["title"], "uiLanguage": "en",
+                   "contentLanguage": "en", "units": meta["units"]},
+        "items": [i for _, i in pairs],
+        "version": 1,
+        "lock": {"v": 1, "ids": [item_id for item_id, _ in pairs], "retired": []},
+    }
+    content_text = json.dumps(content)
+    html = "<!doctype html>\n"
+    notices = "Third-party notices (fake).\n"
+    (site / "data" / "content.json").write_text(content_text)
+    (site / "index.html").write_text(html)
+    (site / NOTICES_FILE).write_text(notices)
+    # The manifest lists content and index only, as the real dojo does; it and the notices are left out.
+    files = [
+        {"path": "data/content.json", "bytes": len(content_text.encode())},
+        {"path": "index.html", "bytes": len(html.encode())},
+    ]
+    manifest = {"course": course, "version": 1, "files": files,
+                "totalBytes": sum(f["bytes"] for f in files), "wasmBytes": 0, "lang": "en"}
+    (site / "manifest.json").write_text(json.dumps(manifest))
     print(f"built {course} version 1 -> {site}")
-    for name in sorted(files):
+    for name in sorted({*(f["path"] for f in files), "manifest.json", NOTICES_FILE}):
         print(f"  {course}/{name}")
     return 0
 

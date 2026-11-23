@@ -27,6 +27,9 @@ CREATED_LINE = re.compile(r"^Created course \S+ in (.+)$", re.MULTILINE)
 ADDED_HEADER = re.compile(r"^added \d+ items? to .*?: (\S+) \.\. (\S+)$", re.MULTILINE)
 INDEX_FILE = "index.html"
 MANIFEST_FILE = "manifest.json"
+NOTICES_FILE = "THIRD_PARTY_NOTICES.md"
+# Files the real dojo writes into a course folder but leaves out of the manifest's `files` list.
+UNLISTED_FILES = (MANIFEST_FILE, NOTICES_FILE)
 
 
 @dataclass(frozen=True)
@@ -72,10 +75,11 @@ class DojoTrainerCli:
 
     def next_id(self, workdir: Path, unit: str) -> str:
         _check_unit(unit)
-        proc = self._run("next-id", [str(workdir), unit])
+        prefix = _id_prefix(unit)
+        proc = self._run("next-id", [str(workdir), prefix])
         _require_zero("next-id", proc)
         lines = proc.stdout.strip().splitlines()
-        if len(lines) != 1 or not lines[0].startswith(f"{unit}-"):
+        if len(lines) != 1 or not lines[0].startswith(f"{prefix}-"):
             raise TrainerError(f"dojo next-id printed no id for unit {unit!r}")
         return lines[0]
 
@@ -87,7 +91,7 @@ class DojoTrainerCli:
         if match is None or match.group(1) != match.group(2):
             raise TrainerError("dojo add printed no single id")
         added = match.group(1)
-        if not added.startswith(f"{unit}-"):
+        if not added.startswith(f"{_id_prefix(unit)}-"):
             raise TrainerError(f"dojo add gave id {added!r} for unit {unit!r}")
         return added
 
@@ -125,6 +129,11 @@ class DojoTrainerCli:
         _require_zero("build", self._run("build", args))
         course_dir = _only_course_dir(outdir)
         return _artifact_files(course_dir)
+
+
+def _id_prefix(unit: str) -> str:
+    """The id prefix dojo derives from a unit: its name without `-` (dojo accepts only letters and digits)."""
+    return unit.replace("-", "")
 
 
 def _check_unit(unit: str) -> None:
@@ -197,6 +206,8 @@ def _artifact_files(course_dir: Path) -> list[str]:
             if path.is_symlink():
                 raise TrainerError(f"dojo build: {path.relative_to(course_dir).as_posix()!r} is a symlink")
         names = sorted(p.relative_to(course_dir).as_posix() for p in walked if p.is_file())
+    # The manifest leaves these out; add the ones the build wrote.
+    names = sorted({*names, *(n for n in UNLISTED_FILES if (course_dir / n).is_file())})
     for name in names:
         _check_artifact(course_dir, name)
     return [f"{course_dir.name}/{name}" for name in names]
@@ -220,6 +231,11 @@ def _manifest_files(course_dir: Path) -> list[str] | None:
     except (OSError, json.JSONDecodeError) as exc:
         raise TrainerError("dojo build: manifest.json is unreadable") from exc
     files = data.get("files") if isinstance(data, dict) else None
-    if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
+    if not isinstance(files, list):
         return None
-    return sorted({*files, INDEX_FILE})
+    # Each entry is a path string, or an object `{"path": ..., "bytes": ...}` as the real dojo writes.
+    raw = [f.get("path") if isinstance(f, dict) else f for f in files]
+    paths = [p for p in raw if isinstance(p, str)]
+    if len(paths) != len(raw):
+        return None
+    return sorted({*paths, INDEX_FILE})
