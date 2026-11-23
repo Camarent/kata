@@ -81,7 +81,7 @@ To change the Caddy or Postgres tag, edit `image:` in `deploy/compose.yaml` on d
 2. On dev, check out the new code (`git pull`, or the new tag) with a clean tree.
 3. On dev, bump the pins in `deploy/versions.env` if the release changes them. The build fails on empty values.
 4. Ship: `KATA_SHIP_TARGET=<user>@<host> KATA_SHIP_DIR=/opt/kata/deploy KATA_SHIP_ENV_FILE=env/vm.env deploy/ship.sh`. The ship rebuilds, reloads the image, restarts the stack and runs the deep health check. Compose runs the `migrate` one-shot before `core` starts; `core` does not start if migrate fails.
-5. Clients: the extension and the phone page talk to the core API. Build the extension against the new core and check it loads before you leave (see Extension below).
+5. Clients: the extension and the phone page talk to the core API. Reload the extension and check it connects to the new core before you leave (see Extension below).
 
 Rollback: an image that was built on dev and is still there can be shipped again without a build:
 
@@ -92,13 +92,7 @@ To stop the stack on the VM: `cd /opt/kata/deploy && docker compose --env-file e
 
 ## Extension for the VM
 
-The extension reads its core base URL at build time (D25). Build it on dev with the node name, origin only:
-
-```
-cd extension && KATA_EXTENSION_BASE_URL=https://<name> npm run build
-```
-
-The build writes `dist/firefox/` and `dist/chrome/`. Each manifest gets `host_permissions` for `https://<name>/*`, and the bundled default base URL is `https://<name>`. Load `dist/firefox/manifest.json` as a temporary add-on in Firefox. The browser must be on the tailnet to reach the core.
+The extension has no core URL in its build (M15). One build serves the laptop and the VM, so nothing about the VM goes into the extension. Install the extension from the release zips or from a local build (README, "Install the extension"). In the side panel, type the server URL `https://<name>` (origin only) in the sign-in form and click Connect. The browser asks for permission to reach that origin; accept it. The browser must be on the tailnet to reach the core. Real-browser checks of this step are not automated (see `docs/decisions.md`, "Extension has no build-time server config (M15)").
 
 ## Postgres major upgrade
 

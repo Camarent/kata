@@ -8,8 +8,8 @@ summary: Browser extension (WebExtension MV3, TypeScript) - manifest, npm packag
 Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the open lesson page, shows topic marks in a side panel, and (Milestone 2) offers a review screen to set the user's concept marks. Sources in `extension/src/`; the build (`extension/build/build.mjs`) bundles `background.ts` (ESM), `content.ts` (IIFE) and `sidepanelBoot.ts` (ESM) into `dist/<browser>/` for `chrome` and `firefox`. The e2e test bundles the same modules through `tests/e2e/driver.ts`.
 
 ## Public surface
-- `extension/manifest.base.json:3` name `kata`; `:5` shared permissions `storage`, `activeTab`; `:6` host permission `http://127.0.0.1:8080/*`; `:9` content script match `http://*/*`, `https://*/*`; `:10` content script `content.js`.
-- `extension/build/manifest.mjs:32` Chrome adds permission `sidePanel` and `:33` `side_panel`, `:34` service worker `background.js`; `:38` Firefox `sidebar_action`, `:39` background scripts, `:41` `gecko` id `kata@kata.local`, min version `128.0`.
+- `extension/manifest.base.json:3` name `kata`; `:5` shared permissions `storage`, `activeTab`, `scripting`, `permissions`; `:6` optional host permissions `http://*/*`, `https://*/*` (the saved server's origin is granted at sign-in, never at build time); `:9` content script match `http://*/*`, `https://*/*`; `:10` content script `content.js`.
+- `extension/build/manifest.mjs:32` Chrome adds permission `sidePanel` and `:33` `side_panel`, `:34` service worker `background.js`; `:38` Firefox `sidebar_action`, `:39` background scripts, `:41` `gecko` id `kata@kata.invalid`, min version `128.0`.
 - `extension/build/build.mjs` `composeManifest` output and bundles written per browser to `dist/<browser>/`.
 - `extension/src/browser.ts:15` `openPanel` (`sidePanel` on Chrome, `sidebarAction` on Firefox).
 - `extension/package.json:6` `build` = `tsc --noEmit && node build/build.mjs`; `:7` `test` = `vitest run`; devDependencies `esbuild`, `jsdom`, `typescript`, `vitest`.
@@ -27,11 +27,13 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/background.ts:28` message `panel:review` (`:95` `review()` merges marks with lesson-check); `:29` message `panel:setConcept` (`:117` `setConcept`).
 - `extension/src/sidepanelBoot.ts:41` sends `panel:review`; `:50` `onSetConcept` sends `panel:setConcept`.
 - `extension/src/highlight.ts:47` `applyHighlights`, `:60` `clearHighlights`; CSS classes `CLASS_KNOWN` = `kata-known` (`:12`), `CLASS_NEW` = `kata-new` (`:14`).
-- `extension/src/config.ts:13` `DEFAULT_BASE_URL` (build-time `__KATA_BASE_URL__`, fallback `http://127.0.0.1:8080`); `:17` `REQUEST_TIMEOUT_MS`, `:20` `POLL_MS`, `:23` `MAX_WAIT_MS`.
-- `extension/build/build.mjs:24` `BASE_URL_ENV` = `KATA_EXTENSION_BASE_URL`; `:58` defines `__KATA_BASE_URL__` when it is set; `:75` reads it at build.
-- `extension/build/manifest.mjs:53` `host_permissions` becomes the base URL origin plus `/*` when a base URL is given (`:29` `hostOrigin`).
+- `extension/src/config.ts` `REQUEST_TIMEOUT_MS`, `POLL_MS`, `MAX_WAIT_MS`. No default server: the URL is typed at sign-in.
+- `extension/src/serverUrl.ts:11` `validateServerUrl` (http or https only; no credentials, query or fragment; returns `baseUrl`, `origin`, and the grant pattern `<origin>/*`).
+- `extension/build/build.mjs` `resolveVersion`: `KATA_EXTENSION_VERSION` (`x.y.z`) when set, else the `version` of `extension/package.json`. No server URL is read at build.
+- `extension/build/manifest.mjs` `composeManifest` adds no host permission; the server origin is granted at runtime.
 - `extension/src/bridge.ts:27` `newChannel` (random channel id), `:36` `injectStub` (inline page stub at document_start), `:60` `startBridge`, `:93` `runBridge` (exact-origin check); message types `bridge:load` and `bridge:save`.
-- `extension/src/bridgeRegister.ts:38` `bridgeMatchPatterns`, `:47` `registerBridge` (id `kata-bridge`, `bridge.js`, document_start, persists across sessions), `:61` `wireBridgeRegistration` (install and startup).
+- `extension/src/bridgeRegister.ts` `bridgeMatchPatterns` (`<scheme>://*/c/*` of the saved origin), `registerBridge` (id `kata-bridge`, `bridge.js`, document_start, persists across sessions), `syncBridge` (after sign-in, disconnect, install and startup), `wireBridgeRegistration` (install, startup, origin permission removed).
+- `extension/src/sidepanelBoot.ts` `onSignIn` (origin grant, then `panel:signIn`), `onDisconnect`; `extension/src/background.ts` `signIn` (probe `GET /v1/health/deep`, enrol, save session, sync bridge), `disconnect`.
 - `extension/src/background.ts:135` `handleBridgeMessage` (`bridge:load` / `bridge:save` to the progress service; replies `{ok,data}` or `{ok:false,error}`).
 - `extension/manifest.base.json` permission `scripting` (dynamic registration of `bridge.js`); `extension/build/build.mjs` builds `bridge.js` as an IIFE.
 
@@ -44,7 +46,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/background.ts` - service worker; message bridge to the core client.
 - `extension/src/content.ts` - content script: `scan` returns block ids and text, `highlight` and `clear` change the page.
 - `extension/src/bridge.ts` - content bridge for the course pages: a page stub posts whole-document progress load/save requests; only the core origin, the bridge channel and the `progress-<id>` path are accepted.
-- `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`http://*/c/*` on the core scheme; the bridge checks the exact origin).
+- `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`<scheme>://*/c/*` of the saved origin; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
 - `extension/src/offlineQueue.ts` - queues mark presses while the core is unreachable.
@@ -55,10 +57,12 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Review screen: a stored concept mark wins over the lesson-check result; with no mark, an abstaining check shows the row unset (state null).
 - Review keyboard: Tab moves focus through the rows and buttons; ArrowUp/ArrowDown move between rows; keys 1, 2, 3 set known, learning, new.
 - No `extension/manifest.json` in the repo: `extension/build/build.mjs:47` writes one into each `dist/<browser>/`; edit `manifest.base.json` or `build/manifest.mjs`.
-- Core base URL is fixed at build time: `KATA_EXTENSION_BASE_URL=https://<name> npm run build` in `extension/` (the VM build, `docs/deployment.md`). Unset, the build keeps the loopback URL and the `host_permissions` of `manifest.base.json`. The fallback in `config.ts` must match `manifest.base.json`.
+- The core URL is not in the build. One build serves every core; the user types the URL at first run, and the origin is granted by the browser at that moment (`docs/decisions.md`, "Extension has no build-time server config (M15)"). Do not add a build-time URL or a fixed host permission.
+- Not tested in a real browser: the origin permission prompt, the `kata-bridge` registration and the course-page bridge. Vitest checks them with fake browser APIs only.
 - Firefox first; Chrome later from the same code.
 - Adding a permission widens what users grant; keep the list minimal. `scripting` is there only for the bridge registration.
 - Match patterns cannot name a port: the bridge pattern uses `*` as host, so a core on a non-default port still gets `bridge.js`; `runBridge` returns early on any other origin.
+- Release: a `v*` tag runs `.github/workflows/release-extension.yml`, which builds both browsers and publishes the zips and `SHA256SUMS`. Actions are pinned by major tag, like `ci.yml`.
 
 ## Depends on / used by
 - Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` or `.nvmrc` in repo); talks to `core` HTTP API (`docs/api.md`).

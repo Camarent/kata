@@ -109,6 +109,29 @@ The file path is read from `KATA_CONFIG` when not passed in.
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 
+## Install the extension
+
+The extension build has no server address in it. You type the server URL in the side panel the first time.
+
+Get the build: each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` on the GitHub release. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
+
+Firefox (128.0 or later):
+1. Unzip the Firefox zip into a folder, or use `extension/dist/firefox/`.
+2. Open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on", and pick `manifest.json` in that folder.
+
+A temporary add-on lasts until Firefox restarts. A permanent install needs an add-on signed by Mozilla (AMO); signing is not automated in this repo.
+
+Chrome:
+1. Unzip the Chrome zip into a folder, or use `extension/dist/chrome/`.
+2. Open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick that folder.
+
+First run:
+1. On the core machine, create the user and print an enrolment code once: `PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME`, then `PYTHONPATH=core python3 -m kata_core.auth.admin enrol NAME`.
+2. Open the kata side panel from the toolbar button.
+3. Type the server URL (origin only, for example `http://127.0.0.1:8080`), the enrolment code and a device label, then click Connect. Accept the browser's permission prompt for that address.
+
+Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see `docs/decisions.md`, "Extension has no build-time server config (M15)").
+
 ## Development workflow
 
 `master` is the only long-lived branch. Work happens on a short-lived branch, goes through a
