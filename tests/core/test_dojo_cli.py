@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -281,3 +282,44 @@ def test_missing_executable_raises(workdir: Path) -> None:
     cli = DojoTrainerCli(argv_prefix=[str(workdir / "no-such-dojo")], timeout=5)
     with pytest.raises(TrainerError, match="could not start"):
         cli.next_id(workdir, "geo")
+
+
+# Records the build argv (JSON, in the workdir) and writes the course folder the adapter expects.
+_RECORD_BUILD = (
+    "import json, pathlib, sys; "
+    "pathlib.Path(sys.argv[2], 'argv.json').write_text(json.dumps(sys.argv[1:])); "
+    "site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+    "(site / 'data').mkdir(parents=True); "
+    "(site / 'index.html').write_text('x'); "
+    "(site / 'data' / 'content.json').write_text('[]'); "
+    "(site / 'manifest.json').write_text('{}')"
+)
+
+
+def _build_argv(cli: DojoTrainerCli, workdir: Path) -> list[str]:
+    cli.build(workdir, workdir / "out")
+    return json.loads((workdir / "argv.json").read_text())
+
+
+def test_build_omits_asset_flags_when_empty(workdir: Path) -> None:
+    cli = _inline(_RECORD_BUILD)
+    assert _build_argv(cli, workdir) == ["build", str(workdir), "--out", str(workdir / "out")]
+
+
+def test_build_passes_asset_flags_when_set(workdir: Path) -> None:
+    cli = DojoTrainerCli(
+        argv_prefix=[sys.executable, "-c", _RECORD_BUILD],
+        timeout=30,
+        wasm="assets/wasm",
+        web="assets/web",
+    )
+    assert _build_argv(cli, workdir) == [
+        "build",
+        str(workdir),
+        "--out",
+        str(workdir / "out"),
+        "--wasm",
+        "assets/wasm",
+        "--web",
+        "assets/web",
+    ]

@@ -58,6 +58,8 @@ def handle(conn: psycopg.Connection[Any], job: Job) -> None:
     cli = DojoTrainerCli(
         argv_prefix=list(cfg.get("trainer", "command")),
         timeout=float(cfg.get("trainer", "timeout_seconds")),
+        wasm=str(cfg.get("trainer", "wasm")),
+        web=str(cfg.get("trainer", "web")),
     )
     run_build(conn, job, cfg, cli)
 

@@ -78,6 +78,8 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
 | `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
 | `trainer.command` | ["/opt/trainer/dojo"] | `KATA_TRAINER_COMMAND` |
+| `trainer.wasm` | "" | `KATA_TRAINER_WASM` |
+| `trainer.web` | "" | `KATA_TRAINER_WEB` |
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |

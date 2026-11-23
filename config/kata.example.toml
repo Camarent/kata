@@ -118,6 +118,10 @@ late_event_seconds = 120
 # Trainer CLI run by the job runner. Config-supplied executable (TOML array); default is the dojo CLI in the container image.
 enabled = true
 command = ["/opt/trainer/dojo"]
+# Optional wasm asset path passed to `dojo build --wasm`; empty leaves the flag out.
+wasm = ""
+# Optional web asset path passed to `dojo build --web`; empty leaves the flag out.
+web = ""
 # Seconds before a trainer run is killed.
 timeout_seconds = 120
 # Cap on concepts per generated course.

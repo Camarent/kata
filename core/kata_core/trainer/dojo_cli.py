@@ -31,10 +31,15 @@ MANIFEST_FILE = "manifest.json"
 
 @dataclass(frozen=True)
 class DojoTrainerCli:
-    """Runs the `dojo` binary named by `argv_prefix`; `timeout` is in seconds per call."""
+    """Runs the `dojo` binary named by `argv_prefix`; `timeout` is in seconds per call.
+
+    `wasm` and `web` are optional asset paths passed to `build` only when non-empty.
+    """
 
     argv_prefix: list[str]
     timeout: float
+    wasm: str = ""
+    web: str = ""
 
     def _run(
         self, subcommand: str, args: list[str], stdin: str | None = None
@@ -109,7 +114,12 @@ class DojoTrainerCli:
         _require_zero("lock", self._run("lock", [str(workdir)]))
 
     def build(self, workdir: Path, outdir: Path) -> list[str]:
-        _require_zero("build", self._run("build", [str(workdir), "--out", str(outdir)]))
+        args = [str(workdir), "--out", str(outdir)]
+        if self.wasm:
+            args += ["--wasm", self.wasm]
+        if self.web:
+            args += ["--web", self.web]
+        _require_zero("build", self._run("build", args))
         course_dir = _only_course_dir(outdir)
         return _artifact_files(course_dir)
 
