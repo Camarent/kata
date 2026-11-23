@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -92,6 +93,34 @@ def test_put_above_cap_is_413(client: TestClient, db: ScratchDatabase, cfg: Conf
     resp = client.put(url, content=b"x" * (cap + 1), headers={**headers, "If-Match": '"0"'})
     assert resp.status_code == 413
     assert client.get(url, headers=headers).json()["revision"] == 0
+
+
+def _chunks(total: int) -> Iterator[bytes]:
+    """Yield `total` bytes in 64 KiB chunks, so the request goes out chunked with no Content-Length."""
+    sent = 0
+    while sent < total:
+        size = min(65536, total - sent)
+        yield b"x" * size
+        sent += size
+
+
+def test_put_chunked_stream_above_cap_is_413(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers, url = _owner(client, db, cfg, "ana", "ready")
+    cap = int(cfg.get("trainer", "max_progress_bytes"))
+    resp = client.put(url, content=_chunks(cap + 1), headers={**headers, "If-Match": '"0"'})
+    assert resp.status_code == 413
+    assert client.get(url, headers=headers).json()["revision"] == 0
+
+
+def test_put_chunked_body_exactly_at_cap_is_accepted(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers, url = _owner(client, db, cfg, "ana", "ready")
+    cap = int(cfg.get("trainer", "max_progress_bytes"))
+    prefix = b'{"items": {}, "pad": "'
+    raw = prefix + b"x" * (cap - len(prefix) - len(b'"}')) + b'"}'
+    assert len(raw) == cap
+    resp = client.put(url, content=iter([raw]), headers={**headers, "If-Match": '"0"'})
+    assert resp.status_code == 200
+    assert resp.json()["revision"] == 1
 
 
 def test_put_on_course_not_ready_is_409(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:

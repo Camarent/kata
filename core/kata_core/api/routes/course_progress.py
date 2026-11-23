@@ -97,11 +97,26 @@ def _rules(cfg: Config) -> dict[str, Any]:
 
 
 async def _read_doc(request: Request, cfg: Config) -> dict[str, Any]:
-    """Read the body as a progress document or delta. 413 above the cap, 400 when malformed."""
-    raw = await request.body()
-    if len(raw) > int(cfg.get("trainer", "max_progress_bytes")):
-        raise HTTPException(status_code=413, detail="progress document too large")
-    return _parse(raw)
+    """Read the body as a progress document or delta. 413 above the cap, 400 when malformed.
+
+    A declared `Content-Length` above the cap is refused before reading. Otherwise (absent or
+    lying) the stream is read chunk by chunk and refused as soon as the running total passes the cap.
+    """
+    cap = int(cfg.get("trainer", "max_progress_bytes"))
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            length = int(declared)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Content-Length must be an integer") from exc
+        if length > cap:
+            raise HTTPException(status_code=413, detail="progress document too large")
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > cap:
+            raise HTTPException(status_code=413, detail="progress document too large")
+    return _parse(bytes(raw))
 
 
 def _save(
