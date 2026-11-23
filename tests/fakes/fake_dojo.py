@@ -18,7 +18,8 @@ CONTENT_DIR = "content"
 INVALID_MARK = "FAKE_INVALID"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
-PREFIX_RE = re.compile(r"[a-z][a-z0-9_]*")
+PREFIX_RE = re.compile(r"[a-z][a-z0-9_-]*")
+COURSE_FILE = "course.json"
 
 
 def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
@@ -30,6 +31,15 @@ def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
                 item = json.loads(line)
                 out.append((item["id"], item))
     return out
+
+
+def _init(course_id: str, title: str, workspace: Path) -> int:
+    course = workspace / course_id
+    course.mkdir(parents=True, exist_ok=True)
+    units = ["unit-1"]
+    (course / COURSE_FILE).write_text(json.dumps({"id": course_id, "title": title, "units": units}))
+    print(f"Created course {course_id} in {course}")
+    return 0
 
 
 def _next_number(workdir: Path, unit: str) -> int:
@@ -48,6 +58,11 @@ def _next_id(workdir: Path, prefix: str) -> int:
 
 
 def _add(workdir: Path, unit: str) -> int:
+    course_file = workdir / COURSE_FILE
+    # A folder without course.json is still accepted; a later task makes the check strict.
+    if course_file.exists() and unit not in json.loads(course_file.read_text())["units"]:
+        sys.stderr.write(f"fake dojo: unit {unit!r} does not exist in course.json\n")
+        return 1
     data = json.loads(sys.stdin.read())
     items = data if isinstance(data, list) else [data]
     for item in items:
@@ -119,6 +134,9 @@ def _build(workdir: Path, outdir: Path) -> int:
 
 def main(argv: list[str]) -> int:
     subcommand, rest = argv[0], argv[1:]
+    if subcommand == "init":
+        # init <course_id> --title <T> --workspace <dir>
+        return _init(rest[0], rest[2], Path(rest[4]))
     if subcommand == "next-id":
         return _next_id(Path(rest[0]), rest[1])
     if subcommand == "add":

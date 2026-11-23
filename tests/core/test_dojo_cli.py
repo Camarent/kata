@@ -61,6 +61,36 @@ def test_add_sends_json_on_stdin_and_parses_id(dojo: DojoTrainerCli, workdir: Pa
     assert '"prompt": "The capital of Italy is ___."' in stored
 
 
+def test_init_returns_course_folder_from_created_line(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    assert course == workdir / "geo-course"
+    assert (course / fake_dojo.COURSE_FILE).is_file()
+
+
+def test_init_without_created_line_raises(workdir: Path) -> None:
+    with pytest.raises(TrainerError, match="no course folder"):
+        _inline("pass").init(workdir, "geo", "Geography")
+
+
+@pytest.mark.parametrize("course_id", ["--workspace", "a/b", "", "geo x"])
+def test_init_course_id_outside_name_charset_raises(dojo: DojoTrainerCli, workdir: Path, course_id: str) -> None:
+    with pytest.raises(TrainerError, match="invalid course id"):
+        dojo.init(workdir, course_id, "Geography")
+
+
+def test_add_unit_missing_from_course_json_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    unknown = '{"type": "gap", "unit": "unit-2", "prompt": "p", "answers": ["a"]}'
+    with pytest.raises(TrainerError, match="does not exist in course.json"):
+        dojo.add(course, unknown)
+
+
+def test_add_known_hyphenated_unit_accepted(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    known = '{"type": "gap", "unit": "unit-1", "prompt": "p", "answers": ["a"]}'
+    assert dojo.add(course, known) == "unit-1-1"
+
+
 def test_add_shape_error_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
     with pytest.raises(TrainerError, match="shape error"):
         dojo.add(workdir, '{"unit": "geo"}')

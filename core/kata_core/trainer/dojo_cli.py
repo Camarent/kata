@@ -22,6 +22,8 @@ ID_IN_MESSAGE = re.compile(r"(?<![\w-])([A-Za-z][\w-]*-\d+)(?![\w-])")
 # A unit name: letters, digits, `_` and `-`. Anything else (`/`, `..`, whitespace, shell characters) is refused.
 UNIT_NAME = re.compile(r"[A-Za-z0-9_-]+")
 # `dojo add` prints: `added N items to content/<unit>.jsonl: <first> .. <last>`, then the ids.
+# `dojo init <id> --title T --workspace <dir>` prints: `Created course <id> in <DIR>`.
+CREATED_LINE = re.compile(r"^Created course \S+ in (.+)$", re.MULTILINE)
 ADDED_HEADER = re.compile(r"^added \d+ items? to .*?: (\S+) \.\. (\S+)$", re.MULTILINE)
 INDEX_FILE = "index.html"
 MANIFEST_FILE = "manifest.json"
@@ -51,6 +53,17 @@ class DojoTrainerCli:
             raise TrainerError(f"dojo {subcommand} timed out after {self.timeout}s") from exc
         except OSError as exc:
             raise TrainerError(f"dojo {subcommand} could not start: {exc}") from exc
+
+    def init(self, workspace: Path, course_id: str, title: str) -> Path:
+        """Creates the course folder under `workspace`; returns that folder (from dojo's `Created course` line)."""
+        if not UNIT_NAME.fullmatch(course_id) or course_id.startswith("-"):
+            raise TrainerError(f"invalid course id {course_id!r}")
+        proc = self._run("init", [course_id, "--title", title, "--workspace", str(workspace)])
+        _require_zero("init", proc)
+        match = CREATED_LINE.search(proc.stdout)
+        if match is None:
+            raise TrainerError("dojo init printed no course folder")
+        return Path(match.group(1).strip())
 
     def next_id(self, workdir: Path, unit: str) -> str:
         _check_unit(unit)
