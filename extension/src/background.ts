@@ -3,7 +3,7 @@ import type { BridgeMessage } from "./bridge";
 import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
-import { CoreAuthError, CoreClient, type ConceptMark, type ProgressDoc } from "./coreClient";
+import { CoreAuthError, CoreClient, CoreHttpError, type ConceptMark, type ProgressDoc } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
@@ -44,10 +44,12 @@ export type PanelMessage =
   | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
   | { type: "panel:courses" }
   | { type: "panel:openCourse"; courseId: number }
-  | { type: "panel:deleteCourse"; courseId: number };
+  | { type: "panel:deleteCourse"; courseId: number }
+  | { type: "panel:createCourse"; title: string };
 
 /** Reply to a panel message: the result, or the error text. */
-export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string };
+/** A refused panel message; `status` and `code` are set when the core refused it (CoreHttpError). */
+export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string; status?: number; code?: string };
 
 /** A ready course the panel can open: its id and title only. */
 export interface CourseLink {
@@ -87,6 +89,8 @@ export interface Backend {
   openCourse(courseId: number): Promise<void>;
   /** Deletes a course; a course already gone (404) counts as deleted. */
   deleteCourse(courseId: number): Promise<void>;
+  /** Queues a new course with the given title; a refusal from the core rejects with CoreHttpError. */
+  createCourse(title: string): Promise<void>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
   progress: ProgressBridge;
 }
@@ -196,6 +200,11 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       // deleteCourse resolves false on 404: the course is already gone, which is the state asked for.
       await clientFor(session).deleteCourse(courseId);
     },
+
+    async createCourse(title) {
+      const session = await requireSession();
+      await clientFor(session).createCourse(title);
+    },
   };
 }
 
@@ -245,6 +254,14 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
     case "panel:deleteCourse":
       await backend.deleteCourse(message.courseId);
       return { ok: true };
+    case "panel:createCourse":
+      try {
+        await backend.createCourse(message.title);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
+        throw err;
+      }
   }
 }
 
@@ -261,7 +278,8 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:setConcept" ||
     type === "panel:courses" ||
     type === "panel:openCourse" ||
-    type === "panel:deleteCourse"
+    type === "panel:deleteCourse" ||
+    type === "panel:createCourse"
   );
 }
 

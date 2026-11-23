@@ -1,6 +1,7 @@
 import type { CourseList, PanelMessage, PanelReply } from "./background";
 import { renderPanel, type PanelHandlers, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
+import { CoreHttpError } from "./coreClient";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
@@ -154,6 +155,16 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onOpenCourse(courseId: number) {
       const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);
+    },
+    async onCreateCourse(title: string) {
+      const reply = await api.runtime.sendMessage({ type: "panel:createCourse", title });
+      // A core refusal keeps its status and code so the panel can show the matching text.
+      if (!reply.ok) {
+        if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
+        throw new Error(reply.error);
+      }
+      await loadCourses();
+      draw();
     },
     async onDeleteCourse(courseId: number) {
       const reply = await api.runtime.sendMessage({ type: "panel:deleteCourse", courseId });
