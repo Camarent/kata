@@ -6,6 +6,9 @@ const session = { baseUrl: "http://localhost:8000", token: "t" };
 function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
   return {
     onSignIn: vi.fn(),
+    onDisconnect: vi.fn(),
+    onChangeServer: vi.fn(),
+    onCancelChange: vi.fn(),
     onKnown: vi.fn(async () => "saved" as const),
     onReview: vi.fn(async () => {}),
     onSetConcept: vi.fn(async () => {}),
@@ -40,13 +43,62 @@ describe("renderPanel", () => {
     expect(root.querySelector("ul")).toBeNull();
   });
 
+  it("first-run form has an empty server URL with the example placeholder and no default server", () => {
+    renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, handlers());
+    const server = root.querySelector<HTMLInputElement>('input[name="baseUrl"]')!;
+    expect(server.value).toBe("");
+    expect(server.placeholder).toBe("https://kata.example.org");
+    expect(root.querySelector("button[type='submit']")?.textContent).toBe("Connect");
+    expect(root.querySelector("button")?.textContent).not.toBe("Cancel");
+  });
+
   it("sends the sign-in values to onSignIn", () => {
     const h = handlers();
     renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, h);
+    (root.querySelector('input[name="baseUrl"]') as HTMLInputElement).value = " https://kata.example.org/ ";
     (root.querySelector('input[name="code"]') as HTMLInputElement).value = " 1234 ";
     (root.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = "laptop";
     root.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
-    expect(h.onSignIn).toHaveBeenCalledWith({ code: "1234", deviceLabel: "laptop" });
+    expect(h.onSignIn).toHaveBeenCalledWith({
+      baseUrl: "https://kata.example.org/",
+      code: "1234",
+      deviceLabel: "laptop",
+    });
+  });
+
+  it("does not sign in with an empty server URL and shows a message", () => {
+    const h = handlers();
+    renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, h);
+    (root.querySelector('input[name="code"]') as HTMLInputElement).value = "1234";
+    (root.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = "laptop";
+    root.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    expect(h.onSignIn).not.toHaveBeenCalled();
+    expect(root.querySelector("p.error")?.textContent).toBe("Enter the server URL");
+  });
+
+  it("connected view shows the session origin with Change server and Disconnect", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, h);
+    expect(root.querySelector("form.signin")).toBeNull();
+    expect(root.querySelector("p.origin")?.textContent).toBe("http://localhost:8000");
+    root.querySelector<HTMLButtonElement>("button.change-server")!.click();
+    expect(h.onChangeServer).toHaveBeenCalledTimes(1);
+    root.querySelector<HTMLButtonElement>("button.disconnect")!.click();
+    expect(h.onDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("changing server shows the form prefilled with the session URL and a Cancel button", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" }, changing: true }, h);
+    expect(root.querySelector<HTMLInputElement>('input[name="baseUrl"]')!.value).toBe("http://localhost:8000");
+    const cancel = [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Cancel")!;
+    cancel.click();
+    expect(h.onCancelChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a notice on the status line", () => {
+    renderPanel(root, { session: null, rows: [], status: { kind: "notice", text: "core is unreachable" } }, handlers());
+    expect(root.querySelector("p.status")?.textContent).toBe("core is unreachable");
   });
 
   it("groups results by category", () => {
@@ -112,11 +164,12 @@ describe("renderPanel", () => {
     renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, h);
     const form = root.querySelector("form")!;
     form.dispatchEvent(new Event("submit", { cancelable: true }));
+    (root.querySelector('input[name="baseUrl"]') as HTMLInputElement).value = "https://kata.example.org";
     (root.querySelector('input[name="code"]') as HTMLInputElement).value = " 42 ";
     (root.querySelector('input[name="deviceLabel"]') as HTMLInputElement).value = " tab ";
     form.dispatchEvent(new Event("submit", { cancelable: true }));
     expect(h.onSignIn).toHaveBeenCalledTimes(1);
-    expect(h.onSignIn).toHaveBeenCalledWith({ code: "42", deviceLabel: "tab" });
+    expect(h.onSignIn).toHaveBeenCalledWith({ baseUrl: "https://kata.example.org", code: "42", deviceLabel: "tab" });
     expect(root.querySelector("p.error")?.textContent).toBe("");
   });
 
