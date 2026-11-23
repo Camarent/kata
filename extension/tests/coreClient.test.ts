@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CoreAuthError,
   CoreClient,
+  CoreConflictError,
   CoreHttpError,
   CoreOfflineError,
   CoreTimeoutError,
@@ -195,5 +196,76 @@ describe("CoreClient errors", () => {
     const { fn } = fakeFetch(204);
     const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
     await expect(client.setKnown(7)).resolves.toBeUndefined();
+  });
+});
+
+describe("CoreClient course routes", () => {
+  it("listCourses gets /v1/courses and keeps only ready courses", async () => {
+    const items = [
+      { id: 2, title: "B", status: "ready", concept_ids: [1], error: null, created_at: "t", updated_at: "t" },
+      { id: 1, title: "A", status: "building", concept_ids: [], error: null, created_at: "t", updated_at: "t" },
+    ];
+    const { fn, calls } = fakeFetch(200, { items, next_before_id: null });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const courses = await client.listCourses();
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses`);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+    expect(courses.map((c) => c.id)).toEqual([2]);
+  });
+
+  it("openCourse posts to /v1/courses/{id}/open and returns the url", async () => {
+    const { fn, calls } = fakeFetch(200, { url: "http://127.0.0.1:8080/c/5?sig=x" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.openCourse(5)).toBe("http://127.0.0.1:8080/c/5?sig=x");
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/5/open`);
+  });
+
+  it("getProgress gets the progress document and revision", async () => {
+    const { fn, calls } = fakeFetch(200, { revision: 3, doc: { items: { "7": { ok: 1, bad: 0 } } } });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const progress = await client.getProgress(5);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/5/progress`);
+    expect(progress).toEqual({ revision: 3, doc: { items: { "7": { ok: 1, bad: 0 } } } });
+  });
+
+  it("putProgress sends the doc as the raw body with If-Match set to the revision", async () => {
+    const { fn, calls } = fakeFetch(200, { revision: 4, evidence_written: 2 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const doc = '{"items":{"7":{"ok":1,"bad":0}}}';
+    expect(await client.putProgress(5, doc, 3)).toEqual({ revision: 4, evidence_written: 2 });
+    expect(calls[0].method).toBe("PUT");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/5/progress`);
+    expect(calls[0].headers["If-Match"]).toBe('"3"');
+    expect(calls[0].headers["Content-Type"]).toBe("application/json");
+    expect(calls[0].body).toEqual({ items: { "7": { ok: 1, bad: 0 } } });
+  });
+
+  it("putProgress throws CoreConflictError with the stored revision and doc on 412", async () => {
+    const stored = { items: { "7": { ok: 2, bad: 1 } } };
+    const { fn } = fakeFetch(412, { revision: 6, doc: stored });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.putProgress(5, "{}", 3).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreConflictError);
+    expect((err as CoreConflictError).status).toBe(412);
+    expect((err as CoreConflictError).revision).toBe(6);
+    expect((err as CoreConflictError).doc).toEqual(stored);
+  });
+
+  it("putProgress keeps CoreHttpError with status 413 for an oversized doc", async () => {
+    const { fn } = fakeFetch(413, { detail: "progress document too large" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.putProgress(5, "{}", 3).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(413);
+  });
+
+  it("course calls throw CoreAuthError on 401", async () => {
+    const { fn } = fakeFetch(401, { detail: "nope" });
+    const client = new CoreClient({ baseUrl: BASE, token: "bad", timeoutMs: 500, fetchImpl: fn });
+    await expect(client.getProgress(5)).rejects.toBeInstanceOf(CoreAuthError);
+    await expect(client.putProgress(5, "{}", 1)).rejects.toBeInstanceOf(CoreAuthError);
   });
 });
