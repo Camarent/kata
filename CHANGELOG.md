@@ -7,8 +7,6 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 
 ## [Unreleased]
 
-This is the first release, v0.1.0, not yet tagged.
-
 ### Added
 
 - core: knowledge model and API for the pipeline.
