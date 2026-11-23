@@ -49,9 +49,33 @@ describe("built extension", () => {
     expect(manifest.sidebar_action).toBeDefined();
     expect(manifest.side_panel).toBeUndefined();
     expect(manifest.browser_specific_settings).toEqual({
-      gecko: { id: "kata@kata.local", strict_min_version: "128.0" },
+      gecko: { id: "kata@kata.invalid", strict_min_version: "128.0" },
     });
   });
+
+  it.each(BROWSERS)("dist/%s takes its version from extension/package.json when the env var is unset", (browser) => {
+    const packageVersion = JSON.parse(readFileSync(join(EXTENSION_DIR, "package.json"), "utf8")).version;
+    expect(readManifest(browser).version).toBe(packageVersion);
+  });
+
+  it.each(BROWSERS)("dist/%s takes its version from KATA_EXTENSION_VERSION when it is x.y.z", (browser) => {
+    execSync("npm run build", {
+      cwd: EXTENSION_DIR,
+      stdio: "pipe",
+      env: { ...process.env, KATA_EXTENSION_VERSION: "9.8.7" },
+    });
+    expect(readManifest(browser).version).toBe("9.8.7");
+  }, BUILD_TIMEOUT_MS);
+
+  it.each(["1.2", "v1.2.3", "1.2.3-beta", ""])("the build fails when KATA_EXTENSION_VERSION is %j", (bad) => {
+    expect(() =>
+      execSync("npm run build", {
+        cwd: EXTENSION_DIR,
+        stdio: "pipe",
+        env: { ...process.env, KATA_EXTENSION_VERSION: bad },
+      }),
+    ).toThrow();
+  }, BUILD_TIMEOUT_MS);
 
   it("chrome manifest uses side_panel, not sidebar_action", () => {
     const manifest = readManifest("chrome");
