@@ -18,6 +18,7 @@ Dev-side variables read by `deploy/ship.sh`:
 | `KATA_SHIP_TARGET` | SSH target of the VM, `user@host` (required). Set it to the tailnet address of the VM. |
 | `KATA_SHIP_DIR` | Deploy directory on the VM: `/opt/kata/deploy` (required). |
 | `KATA_SHIP_ENV_FILE` | VM env file, relative to `KATA_SHIP_DIR` (default `env/small.env`). Use `env/vm.env`, see step 6. |
+| `KATA_SHIP_BUILD_ENV_FILE` | Profile for the build on dev, relative to `deploy/` (default `env/small.env`). The build never reads the VM env file, which exists only on the VM. |
 | `KATA_SHIP_HEALTH_TRIES` | Deep health attempts (default 10). |
 | `KATA_SHIP_HEALTH_WAIT` | Seconds between health attempts (default 3). |
 

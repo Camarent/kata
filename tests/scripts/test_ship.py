@@ -193,6 +193,16 @@ def test_build_gets_the_env_profile_and_a_build_only_tailnet_name(work: Path):
     assert "build-env KATA_TAILNET_NAME=build.invalid" in log
 
 
+def test_build_uses_the_repo_profile_not_the_vm_env_file(work: Path):
+    """The VM env file exists only on the VM: a ship with env/vm.env must still build from a repo profile."""
+    result = _ship(work, overrides={"KATA_SHIP_ENV_FILE": "env/vm.env"})
+    assert result.returncode == 0, result.stderr
+    log = _log(work)
+    assert "compose --env-file deploy/env/small.env -f deploy/compose.yaml" in log
+    assert "deploy/env/vm.env" not in log
+    assert "KATA_IMAGE_TAG=" in log and "env/vm.env" in log
+
+
 def test_rollback_ships_the_given_tag_without_building(work: Path):
     result = _ship(work, "--rollback", "v1.2")
     assert result.returncode == 0, result.stderr

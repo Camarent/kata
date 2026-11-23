@@ -14,6 +14,8 @@
 #   KATA_SHIP_TARGET        ssh target of the VM, e.g. user@host (required)
 #   KATA_SHIP_DIR           deploy directory on the VM (required; letters, digits and ._/- only)
 #   KATA_SHIP_ENV_FILE      VM env file, relative to KATA_SHIP_DIR (default env/small.env)
+#   KATA_SHIP_BUILD_ENV_FILE  profile for the build on dev, relative to deploy/ (default env/small.env);
+#                           the VM env file may exist only on the VM, so the build never reads it
 #   KATA_SHIP_HEALTH_TRIES  deep health attempts (default 10)
 #   KATA_SHIP_HEALTH_WAIT   seconds between health attempts (default 3)
 set -euo pipefail
@@ -22,6 +24,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 target="${KATA_SHIP_TARGET:?KATA_SHIP_TARGET is required}"
 remote_dir="${KATA_SHIP_DIR:?KATA_SHIP_DIR is required}"
 env_file="${KATA_SHIP_ENV_FILE:-env/small.env}"
+build_env_file="${KATA_SHIP_BUILD_ENV_FILE:-env/small.env}"
 health_tries="${KATA_SHIP_HEALTH_TRIES:-10}"
 health_wait="${KATA_SHIP_HEALTH_WAIT:-3}"
 # Compose needs a tailnet name to read the file even for a build; the image never contains it. The real
@@ -90,7 +93,7 @@ check_image() {
 
 build_image() {
   (cd "$REPO_ROOT" && set -a && . deploy/versions.env && set +a \
-    && KATA_IMAGE_TAG="$tag" KATA_TAILNET_NAME="$build_tailnet_name" docker compose --env-file "deploy/$env_file" \
+    && KATA_IMAGE_TAG="$tag" KATA_TAILNET_NAME="$build_tailnet_name" docker compose --env-file "deploy/$build_env_file" \
       -f deploy/compose.yaml -f deploy/compose.build.yaml build)
 }
 
