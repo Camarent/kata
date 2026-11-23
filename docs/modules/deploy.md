@@ -21,7 +21,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - `deploy/Caddyfile:22` site `{$KATA_TAILNET_NAME}`; `:23` `tls` with host-written cert files under `/var/run/tailscale/certs/`.
 - `deploy/ship.sh:28` `ship_files` (the only files copied to the VM; never `secrets/` or the Dockerfile); `:35` `--rollback <tag>`; `:34` `--dry-run`; `:88` `build_image`; `:100` `docker save | ssh docker load`; `:108` `write_tag` (`KATA_IMAGE_TAG` into the VM env file); `:116` `deep_health`.
 - `deploy/systemd/kata-cert.timer:6` `OnUnitActiveSec=30d`; `deploy/systemd/kata-cert.service:10` `EnvironmentFile=/etc/kata/cert.env`; `:13` `tailscale cert` into `KATA_CERT_DIR`; `:14` caddy reload.
-- `deploy/versions.env:10` `PY_BASE_IMAGE`; `:11` `PY_BASE_DIGEST`; `:21` `GITLEAKS_VERSION`; `:25` `TRAINER_URL`; `:30` `EMBED_MODEL_ID`. Empty values are filled by hand. The trainer is pinned to the dojo-kit v0.5.0 tarball; repin it after each dojo-kit release.
+- `deploy/versions.env:10` `PY_BASE_IMAGE`; `:11` `PY_BASE_DIGEST`; `:21` `GITLEAKS_VERSION`; `:25` `TRAINER_URL`; `:30` `EMBED_MODEL_ID`. Empty values are filled by hand. The trainer is pinned to the dojo-kit v0.5.1 tarball; repin it after each dojo-kit release.
 - `deploy/env/small.env:4` (`KATA_MEM_CORE=768m`, default for the 3 GB VM); `deploy/env/large.env:3`.
 - `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`.
 - `deploy/backup.sh:25` needs `KATA_BACKUP_DIR`; `:68` `pg_dump -Fc`; `:73` `openssl enc -aes-256-cbc -pbkdf2`; `:80` writes the `.dump.enc.hmac` sidecar.
