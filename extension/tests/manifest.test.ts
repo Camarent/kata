@@ -27,7 +27,8 @@ describe("composeManifest", () => {
     for (const browser of ["chrome", "firefox"] as const) {
       expect(composeManifest(base, browser, VERSION).version).toBe(VERSION);
     }
-    expect(base.version).toBe("0.0.0");
+    expect(base.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(base.version).not.toBe(VERSION);
   });
 
   it("base static content scripts are content.js only; bridge.js is registered at runtime", () => {
