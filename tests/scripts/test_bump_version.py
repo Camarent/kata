@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import difflib
+import re
 import subprocess
 from pathlib import Path
 
@@ -94,4 +96,73 @@ def test_set_restores_all_when_old_version_does_not_match(tmp_path: Path):
     before = _snapshot(tmp_path)
     result = _run(tmp_path, "set", "9.9.9", "0.0.1", "entry")
     assert result.returncode == 1
+    assert _snapshot(tmp_path) == before
+
+
+def _commit_all(root: Path) -> None:
+    git = ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"]
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "base"]):
+        subprocess.run([*git, *args], cwd=root, capture_output=True, text=True, timeout=30, check=True)
+
+
+def _added(before: str, after: str) -> list[str]:
+    """Contents of the lines that the edit added (without the diff prefix)."""
+    return [line[2:] for line in difflib.ndiff(before.splitlines(), after.splitlines()) if line.startswith("+ ")]
+
+
+def test_current_reads_git_ref_not_working_tree(tmp_path: Path):
+    _project(tmp_path)
+    _commit_all(tmp_path)
+    (tmp_path / "pyproject.toml").write_text(PYPROJECT.replace('"0.0.0"', '"0.0.9"'))
+    assert _run(tmp_path, "current", "HEAD").stdout == "0.0.0\n"
+    assert _run(tmp_path, "current").stdout == "0.0.9\n"
+
+
+def test_set_edits_exactly_the_anchored_lines(tmp_path: Path):
+    _project(tmp_path)
+    before = _snapshot(tmp_path)
+    result = _run(tmp_path, "set", "0.0.0", "0.0.1", "first release")
+    assert result.returncode == 0, result.stderr
+    after = _snapshot(tmp_path)
+    assert after.keys() == before.keys()
+    changed = sorted(name for name in before if before[name] != after[name])
+    assert changed == sorted(
+        [
+            "pyproject.toml",
+            "extension/package.json",
+            "extension/package-lock.json",
+            "extension/manifest.base.json",
+            "CHANGELOG.md",
+        ]
+    )
+    assert _added(PYPROJECT, after["pyproject.toml"]) == ['version = "0.0.1"']
+    assert _added(PACKAGE_JSON, after["extension/package.json"]) == ['  "version": "0.0.1",']
+    assert _added(MANIFEST, after["extension/manifest.base.json"]) == ['  "version": "0.0.1"']
+    assert _added(PACKAGE_LOCK, after["extension/package-lock.json"]) == [
+        '  "version": "0.0.1",',
+        '      "version": "0.0.1"',
+    ]
+
+
+def test_set_writes_changelog_entry_in_keep_a_changelog_format(tmp_path: Path):
+    _project(tmp_path)
+    assert _run(tmp_path, "set", "0.0.0", "0.0.1", "first release").returncode == 0
+    changelog = (tmp_path / "CHANGELOG.md").read_text()
+    match = re.search(r"^## \[0\.0\.1\] - (\d{4}-\d{2}-\d{2})$", changelog, re.MULTILINE)
+    assert match is not None, changelog
+    expected = (
+        "# Changelog\n\n## [Unreleased]\n\n"
+        f"## [0.0.1] - {match.group(1)}\n\n- first release\n\n"
+        "## [0.0.0] - 2026-01-01\n\n- first\n"
+    )
+    assert changelog == expected
+
+
+def test_set_restores_all_when_package_json_missing(tmp_path: Path):
+    _project(tmp_path)
+    (tmp_path / "extension" / "package.json").unlink()
+    before = _snapshot(tmp_path)
+    result = _run(tmp_path, "set", "0.0.0", "0.0.1", "entry")
+    assert result.returncode == 1
+    assert "extension/package.json (missing)" in result.stderr
     assert _snapshot(tmp_path) == before
