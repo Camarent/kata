@@ -1,8 +1,27 @@
 # Deployment on the web VM
 
-This runbook takes a fresh Ubuntu Server VM to a running kata: core, migrate, Postgres and a Caddy reverse proxy with a Tailscale certificate. Nothing here has run on a real VM yet; the first real run waits for the owner to build it (see `docs/backlog.md`; the VM requirements are in the owner's notes). Decisions behind the stack: D17 to D24 in `docs/decisions.md`.
+This runbook takes a fresh Ubuntu Server VM to a running kata: core, worker, migrate, Postgres and a Caddy reverse proxy with a Tailscale certificate. The owner built the VM; the first ship follows this runbook. Decisions behind the stack: D17 to D25 in `docs/decisions.md`.
 
-Run every command from the repository checkout on the VM (below: `/opt/kata`), as a user with sudo.
+The VM builds nothing (D25). The image is built on the dev machine, shipped over SSH, and started on the VM. The VM holds only finished images and the small deploy files.
+
+## Where things run
+
+| Where | What |
+|---|---|
+| Dev machine | Builds `kata:<git short sha>` (`deploy/compose.build.yaml`), runs the checks, ships with `deploy/ship.sh`, builds the extension. |
+| VM, `/opt/kata/deploy` | The deploy files (`compose.yaml`, `Caddyfile`, `kata.host.toml`, `env/`, `versions.env`, scripts, `systemd/`), the secrets under `secrets/`, and the loaded images. No git checkout and no compiler on the VM. |
+
+Dev-side variables read by `deploy/ship.sh`:
+
+| Variable | Meaning |
+|---|---|
+| `KATA_SHIP_TARGET` | SSH target of the VM, `user@host` (required). Set it to the tailnet address of the VM. |
+| `KATA_SHIP_DIR` | Deploy directory on the VM: `/opt/kata/deploy` (required). |
+| `KATA_SHIP_ENV_FILE` | VM env file, relative to `KATA_SHIP_DIR` (default `env/small.env`). Use `env/vm.env`, see step 6. |
+| `KATA_SHIP_HEALTH_TRIES` | Deep health attempts (default 10). |
+| `KATA_SHIP_HEALTH_WAIT` | Seconds between health attempts (default 3). |
+
+`deploy/ship.sh` refuses a dirty git tree, so commit or stash first.
 
 ## VM spec
 
@@ -11,7 +30,7 @@ Run every command from the repository checkout on the VM (below: `/opt/kata`), a
 | Host | Proxmox (KVM, QEMU guest agent) |
 | VM id | 101 |
 | Name | `web` |
-| OS | Ubuntu Server 24.04 LTS, OpenSSH server on |
+| OS | Ubuntu Server 26.04 LTS, OpenSSH server on |
 | CPU | 2 cores, type `host` |
 | Memory | 3072 MB (4096 MB is better); ballooning off |
 | Disk | 32 GB, VirtIO SCSI |
@@ -21,80 +40,91 @@ Run every command from the repository checkout on the VM (below: `/opt/kata`), a
 
 ## Fresh VM to deep health check
 
-1. Create the VM with the table above and install Ubuntu Server. Clone this repository to `/opt/kata`.
-2. Check the provisioning plan without changing anything: `deploy/provision-vm.sh --dry-run`.
-3. Provision: `sudo deploy/provision-vm.sh`. It installs Docker and the compose plugin, the QEMU guest agent, unattended upgrades, a 2 GB swapfile and `ufw` (SSH only from the tailnet). It does not join the tailnet. Join before you log out of a public-IP SSH session, or new logins fail.
-4. Join the tailnet by hand: `sudo tailscale up`. The script holds no auth key. Note the node name (`tailscale status`) and the tailnet IP (`tailscale ip -4`).
-5. Create the secret files (layout and modes in `deploy/secrets.example/README.md`): `umask 077; mkdir -p deploy/secrets; openssl rand -base64 32 > deploy/secrets/postgres_password; openssl rand -base64 32 > deploy/secrets/worker_token`.
-6. Review `deploy/kata.host.toml` (the config the core container reads; same keys as `config/kata.example.toml`).
-7. Get the TLS certificate for the node name (Caddy cannot use the tailscaled socket, so the host writes the files):
-   `sudo mkdir -p /var/run/tailscale/certs && sudo tailscale cert --cert-file /var/run/tailscale/certs/<name>.crt --key-file /var/run/tailscale/certs/<name>.key <name>`.
-   Renew about every 60 days (cron), then run `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` (with the same `-f` and `--env-file` flags as step 10).
-8. Fill the pins in `deploy/versions.env`: `PY_BASE_DIGEST`, `GITLEAKS_SHA256`, `TRAINER_URL`, `TRAINER_SHA256`. The Dockerfile stops with an error when a `GITLEAKS_*` or `TRAINER_*` value is empty (the `RUN test -n` guard in `deploy/Dockerfile`). `PY_BASE_DIGEST` and the `EMBED_MODEL_*` values are not guarded by that check: fill the digest, and fill `EMBED_MODEL_*` only when `retrieval.embedder = "model"`.
-9. Validate the stack files (needs docker): `python3 scripts/deploy/validate_stack.py`. Check the image rules: `python3 scripts/deploy/check_image_rules.py`.
-10. Start the stack (builds the image, runs migrate, then core, then Caddy):
-    ```
-    export KATA_TAILNET_NAME=<name> KATA_BIND_ADDR=<tailnet IP>
-    set -a; . deploy/versions.env; set +a
-    docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d --build
-    ```
-    `KATA_BIND_ADDR` defaults to loopback. Set it to the tailnet IP so Caddy listens there only; only port 443 is published.
-11. Deep health check: `curl -fsS https://<name>/v1/health/deep`. It checks the database and the migration state (D22). The core container runs the same check as its healthcheck: `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml ps` must show `core` as `healthy`.
-12. Install the nightly dump (see Backup below).
+Run the VM steps on the VM as a user with sudo. Run the dev steps on the dev machine.
+
+1. Create the VM with the table above and install Ubuntu Server. Create the deploy directory and give the SSH user write access to it: `sudo mkdir -p /opt/kata/deploy && sudo chown <user> /opt/kata/deploy`. `deploy/ship.sh` copies the files in there over SSH.
+2. Provision the host. `deploy/provision-vm.sh` is not part of the shipped set: copy it from the dev checkout (`scp deploy/provision-vm.sh <user>@<host>:`), then on the VM run `./provision-vm.sh --dry-run` and `sudo ./provision-vm.sh`. It installs Docker and the compose plugin, the QEMU guest agent, unattended upgrades, a 2 GB swapfile and `ufw` (SSH only from the tailnet). It does not join the tailnet. Join before you log out of a public-IP SSH session, or new logins fail. The SSH user needs Docker access to load images.
+3. Join the tailnet by hand on the VM: `sudo tailscale up`. The script holds no auth key. Note the node name (`tailscale status`) and the tailnet IP (`tailscale ip -4`).
+4. Create the secret files on the VM (layout and modes in `deploy/secrets.example/README.md`). The ship never copies `secrets/`: `umask 077; mkdir -p /opt/kata/deploy/secrets; openssl rand -base64 32 > /opt/kata/deploy/secrets/postgres_password; openssl rand -base64 32 > /opt/kata/deploy/secrets/worker_token`.
+5. Get the TLS certificate for the node name. Caddy cannot use the tailscaled socket, so the host writes the files into `KATA_CERT_DIR` (default `/var/lib/kata/certs`), which compose mounts read-only into Caddy:
+   `sudo mkdir -p /var/lib/kata/certs && sudo tailscale cert --cert-file /var/lib/kata/certs/<name>.crt --key-file /var/lib/kata/certs/<name>.key <name>`.
+   Then install the renewal timer. Write `/etc/kata/cert.env` with `KATA_TAILNET_NAME=<name>` and `KATA_CERT_DIR=/var/lib/kata/certs`, copy `deploy/systemd/kata-cert.service` and `deploy/systemd/kata-cert.timer` to `/etc/systemd/system/` (from `/opt/kata/deploy/systemd/` after the first ship, or from the dev checkout), then `sudo systemctl daemon-reload && sudo systemctl enable --now kata-cert.timer`. The timer renews every 30 days and reloads Caddy.
+6. Create the VM env file `/opt/kata/deploy/env/vm.env`: the limits from `deploy/env/small.env` plus `KATA_TAILNET_NAME=<name>` and `KATA_BIND_ADDR=<tailnet IP>`. Compose needs both names: `KATA_TAILNET_NAME` is required by the Caddy service, and `KATA_BIND_ADDR` (default loopback) makes Caddy listen on the tailnet IP only. The ship does not export them. The file is not in the repo, so a ship never overwrites it. `KATA_IMAGE_TAG` is written into it by the ship.
+7. On dev, fill the pins in `deploy/versions.env`: `PY_BASE_DIGEST`, `GITLEAKS_SHA256`, `TRAINER_URL`, `TRAINER_SHA256`. The Dockerfile stops with an error when a `GITLEAKS_*` or `TRAINER_*` value is empty (the `RUN test -n` guard in `deploy/Dockerfile`). `PY_BASE_DIGEST` and the `EMBED_MODEL_*` values are not guarded by that check: fill the digest, and fill `EMBED_MODEL_*` only when `retrieval.embedder = "model"`.
+8. On dev, review `deploy/kata.host.toml` (the config the core and worker containers read; same keys as `config/kata.example.toml`). `core_hosts = ["core"]` lets the worker reach the in-network core.
+9. On dev, ship. Dry run first, then the real run:
+   ```
+   export KATA_SHIP_TARGET=<user>@<tailnet IP or name> KATA_SHIP_DIR=/opt/kata/deploy KATA_SHIP_ENV_FILE=env/vm.env
+   deploy/ship.sh --dry-run
+   deploy/ship.sh
+   ```
+   The ship builds `kata:<sha>`, runs `scripts/deploy/validate_stack.py` and `scripts/deploy/check_image_rules.py`, streams the image with `docker save | ssh docker load`, copies the deploy files, writes `KATA_IMAGE_TAG` into the VM env file, runs `docker compose up -d` (migrate, then core, worker and Caddy) and ends with the deep health check.
+10. Deep health check from a tailnet device: `curl -fsS https://<name>/v1/health/deep`. It checks the database and the migration state (D22). The core container runs the same check as its healthcheck: on the VM, in `/opt/kata/deploy`, `docker compose --env-file env/vm.env -f compose.yaml ps` must show `core` as `healthy`.
+11. Install the nightly dump (see Backup below).
 
 ## Profiles
 
 Two env files set the container limits, read by compose as `${KATA_MEM_*}` and `${KATA_CPU_*}` (D21):
 
-| Profile | File | Memory (core + Postgres + proxy) | Use |
+| Profile | File | Memory (core + worker + Postgres + proxy) | Use |
 |---|---|---|---|
-| small | `deploy/env/small.env` | 768m + 1024m + 128m | the 3 GB VM (default) |
-| large | `deploy/env/large.env` | 2048m + 4096m + 256m | a real server |
+| small | `deploy/env/small.env` | 768m + 256m + 1024m + 128m | the 3 GB VM (default) |
+| large | `deploy/env/large.env` | 2048m + 512m + 4096m + 256m | a real server |
 
-Pick one with `--env-file deploy/env/<profile>.env`. Any variable in the file can also be overridden from the environment.
+On the VM, copy the chosen profile into `env/vm.env` (step 6) and keep the two names `KATA_TAILNET_NAME` and `KATA_BIND_ADDR` in it. Any variable in the file can also be overridden from the environment.
 
 ## Update
 
-To change the Caddy or Postgres tag, edit `image:` in `deploy/compose.yaml`, then do step 4 below.
+To change the Caddy or Postgres tag, edit `image:` in `deploy/compose.yaml` on dev, then ship (step 4 below).
 
 1. Take a dump first (see Backup, "run now").
-2. Fetch the new code: `git pull`, or check out the new tag.
-3. Export the names and pins again, as in step 10: `export KATA_TAILNET_NAME=<name> KATA_BIND_ADDR=<tailnet IP>` and `set -a; . deploy/versions.env; set +a`. Bump the pins in `deploy/versions.env` if the release changes them. Without them the build fails on the empty values.
-4. Rebuild and restart: `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d --build`. Compose runs the `migrate` one-shot before `core` starts; `core` does not start if migrate fails.
-5. Run the deep health check (step 11).
-6. Clients: the extension and the phone page talk to the core API. Check the extension still loads against the new core before you leave.
+2. On dev, check out the new code (`git pull`, or the new tag) with a clean tree.
+3. On dev, bump the pins in `deploy/versions.env` if the release changes them. The build fails on empty values.
+4. Ship: `KATA_SHIP_TARGET=<user>@<host> KATA_SHIP_DIR=/opt/kata/deploy KATA_SHIP_ENV_FILE=env/vm.env deploy/ship.sh`. The ship rebuilds, reloads the image, restarts the stack and runs the deep health check. Compose runs the `migrate` one-shot before `core` starts; `core` does not start if migrate fails.
+5. Clients: the extension and the phone page talk to the core API. Build the extension against the new core and check it loads before you leave (see Extension below).
 
-Rollback:
+Rollback: an image that was built on dev and is still there can be shipped again without a build:
 
-1. Stop the stack: `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml down` (keeps the volumes).
-2. Check out the previous code and rebuild as in Update steps 3 and 4.
-3. If the new migration changed the schema, the old code may not run on it: restore the pre-update dump into an empty database instead (Restore drill below), or restore the Proxmox backup of the VM.
+1. On dev: `KATA_SHIP_TARGET=<user>@<host> KATA_SHIP_DIR=/opt/kata/deploy KATA_SHIP_ENV_FILE=env/vm.env deploy/ship.sh --rollback <previous short sha>`. The ship checks that `kata:<previous sha>` exists locally, then runs the same steps as an update.
+2. If the new migration changed the schema, the old code may not run on it: restore the pre-update dump into an empty database instead (Restore drill below), or restore the Proxmox backup of the VM.
+
+To stop the stack on the VM: `cd /opt/kata/deploy && docker compose --env-file env/vm.env -f compose.yaml down` (keeps the volumes).
+
+## Extension for the VM
+
+The extension reads its core base URL at build time (D25). Build it on dev with the node name, origin only:
+
+```
+cd extension && KATA_EXTENSION_BASE_URL=https://<name> npm run build
+```
+
+The build writes `dist/firefox/` and `dist/chrome/`. Each manifest gets `host_permissions` for `https://<name>/*`, and the bundled default base URL is `https://<name>`. Load `dist/firefox/manifest.json` as a temporary add-on in Firefox. The browser must be on the tailnet to reach the core.
 
 ## Postgres major upgrade
 
 The `postgres` image tag in `deploy/compose.yaml` pins the major version (17). A data directory from one major version does not start under another.
 
-1. Dump: run `deploy/backup.sh` (Backup below). Keep the dump and its `.tombstone` copy.
-2. Stop the stack: `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml down`.
+1. Dump: run the backup (Backup below). Keep the dump and its `.tombstone` copy.
+2. Stop the stack: `docker compose --env-file env/vm.env -f compose.yaml down` in `/opt/kata/deploy`.
 3. Remove the old data volume: `docker volume rm kata_pgdata`. Only do this after you check the dump decrypts and lists (`openssl enc -d ... | pg_restore -l`).
-4. Change the image tag in `deploy/compose.yaml`, start only Postgres (`docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d postgres`), and wait until it is healthy.
-5. Restore into the empty database with `deploy/restore.sh` (Restore drill), then start the whole stack and run the deep health check.
+4. On dev, change the image tag in `deploy/compose.yaml` and ship the new file set. Start only Postgres on the VM (`docker compose --env-file env/vm.env -f compose.yaml up -d postgres`), and wait until it is healthy.
+5. Restore into the empty database with `restore.sh` (Restore drill), then start the whole stack and run the deep health check.
 
 ## VM full (disk)
 
 1. Find the cause: `df -h`, `docker system df`, `du -sh /var/lib/docker/* /var/backups/kata 2>/dev/null`.
-2. Remove unused Docker data: `docker image prune -f` and `docker builder prune -f`. Do not prune volumes: `pgdata` holds the database.
+2. Remove unused Docker data: `docker image prune -f`. Do not prune volumes: `pgdata` holds the database. Keep the images you may roll back to.
 3. Lower `KATA_BACKUP_RETENTION_DAYS` in `/etc/kata/backup.env` (default 14) and delete the oldest dumps, each `.dump.enc` with its `.dump.enc.hmac` and `.tombstone`.
-4. If Postgres stopped on a full disk, free space first, then `docker compose --env-file deploy/env/small.env -f deploy/compose.yaml up -d`.
+4. If Postgres stopped on a full disk, free space first, then `docker compose --env-file env/vm.env -f compose.yaml up -d` in `/opt/kata/deploy`.
 5. Still full: grow the disk in Proxmox, then extend the partition and filesystem inside the VM.
 
 ## Backup
 
-Nightly dump: a host systemd timer runs `deploy/backup.sh` (D20). It writes `kata-<UTC stamp>.dump.enc` (pg_dump, encrypted with openssl and a passphrase file), a `kata-<UTC stamp>.dump.enc.hmac` sidecar (HMAC-SHA256 of the dump, keyed from the passphrase file), and a `.tombstone` copy beside it, and deletes dumps older than the retention with their sidecar and tombstone.
+Nightly dump: a host systemd timer runs `backup.sh` (D20; `/opt/kata/deploy/backup.sh` on the VM). It writes `kata-<UTC stamp>.dump.enc` (pg_dump, encrypted with openssl and a passphrase file), a `kata-<UTC stamp>.dump.enc.hmac` sidecar (HMAC-SHA256 of the dump, keyed from the passphrase file), and a `.tombstone` copy beside it, and deletes dumps older than the retention with their sidecar and tombstone.
 
 1. Write `/etc/kata/backup.env` with `KATA_BACKUP_DIR`, `KATA_BACKUP_PASSPHRASE_FILE`, `KATA_DATABASE_HOST`, `KATA_DATABASE_PORT`, `KATA_DATABASE_USER`, `KATA_DATABASE_NAME`, and optionally `KATA_BACKUP_TOMBSTONE_FILE` and `KATA_BACKUP_RETENTION_DAYS`. The Postgres container publishes no port: point the host at it by its address on the compose `data` network, or run the script inside a container that reaches it. `pg_dump` reads the password from `PGPASSWORD`: add `PGPASSWORD=<postgres password>` to `/etc/kata/backup.env` and make the file root-only (mode 0600), because the unit loads only that file.
-2. Create the passphrase file with mode 0600 outside the repo. Keep a copy elsewhere: a dump is useless without it.
-3. Install the units: `sudo cp deploy/systemd/kata-backup.service deploy/systemd/kata-backup.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now kata-backup.timer`.
+2. Create the passphrase file with mode 0600 outside the deploy directory. Keep a copy elsewhere: a dump is useless without it.
+3. Install the units: `sudo cp /opt/kata/deploy/systemd/kata-backup.service /opt/kata/deploy/systemd/kata-backup.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now kata-backup.timer`.
 4. Run now: `sudo systemctl start kata-backup.service`; check with `journalctl -u kata-backup.service`.
 
 A backup to a second location stays on the backlog.
@@ -104,8 +134,8 @@ A backup to a second location stays on the backlog.
 Restore (design 4.3 steps 3 to 5) into an empty database:
 
 ```
-deploy/restore.sh --dry-run
-deploy/restore.sh <dump.enc> <target-database> [counts.json]
+restore.sh --dry-run
+restore.sh <dump.enc> <target-database> [counts.json]
 ```
 
 It refuses a dump whose `<dump.enc>.hmac` sidecar is missing or does not match (an unauthenticated dump is never decrypted), refuses a non-empty target, decrypts and runs `pg_restore`, replays the tombstone file kept beside the dump (design 12.2), runs `python -m kata_core.migrate --check`, and with `counts.json` (from `scripts/deploy/verify_counts.py --write`) compares row counts. Run the drill on a scratch database, never on the live one.
@@ -113,18 +143,18 @@ It refuses a dump whose `<dump.enc>.hmac` sidecar is missing or does not match (
 Relocation (design 4.3) to a new host:
 
 ```
-deploy/relocate.sh --dry-run
-deploy/relocate.sh --confirm-maintenance <source-database> <target-database>
+relocate.sh --dry-run
+relocate.sh --confirm-maintenance <source-database> <target-database>
 ```
 
-The script copies config and secret files by path, takes row counts, dumps through `deploy/backup.sh`, and restores through `deploy/restore.sh`. It needs `KATA_RELOCATE_TOMBSTONE`; without the tombstone, revoked tokens and deleted data would come back. You do these steps by hand, and the script prints them as reminders: switch the old core to maintenance mode (the core has no maintenance command yet), start the new core and run the deep health check, switch the address, and keep the stopped old database for the set days before you wipe it.
+The script copies config and secret files by path, takes row counts, dumps through `backup.sh`, and restores through `restore.sh`. It needs `KATA_RELOCATE_TOMBSTONE`; without the tombstone, revoked tokens and deleted data would come back. You do these steps by hand, and the script prints them as reminders: switch the old core to maintenance mode (the core has no maintenance command yet), start the new core and run the deep health check, switch the address, and keep the stopped old database for the set days before you wipe it.
 
 ## Manual lint (D23)
 
 shellcheck and hadolint are not in the gate image. Run them by hand where installed:
 
 ```
-shellcheck deploy/provision-vm.sh deploy/backup.sh deploy/restore.sh deploy/relocate.sh scripts/dev/*.sh
+shellcheck deploy/provision-vm.sh deploy/backup.sh deploy/restore.sh deploy/relocate.sh deploy/ship.sh scripts/dev/*.sh
 hadolint deploy/Dockerfile
 ```
 

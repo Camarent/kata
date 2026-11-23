@@ -55,7 +55,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
-- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`) or at a whole host name listed in `[worker] core_hosts` (the compose core service in the container deployment); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:41` and `:44`).
+- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`) or at a whole host name listed in `[worker] core_hosts` (the compose core service in the container deployment; `deploy/kata.host.toml:32` sets `core_hosts = ["core"]` and `core_url = "http://core:8080"`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:41` and `:44`).
 - The token comes from an env var, never from the config file; a missing variable raises `ValueError` (`worker/kata_worker/core_client.py:53`).
 - A tagging or generation exception fails only that job (`worker/kata_worker/handlers/tag.py:30`, `worker/kata_worker/handlers/course.py:49` `client.fail`); the worker keeps running.
 - A job kind has one handler: the loop asks the core only for kinds in `load_handlers()` (`worker/kata_worker/loop.py:29`), so a new kind needs a new module in `handlers/`, not an edit to the loop.

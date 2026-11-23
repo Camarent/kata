@@ -407,7 +407,7 @@ Decided 2026-11-22. Postgres runs as the plain `postgres` image without the pgve
 
 ## D19 Reverse proxy: Caddy bound to the tailnet IP, one name with paths
 
-Decided 2026-11-22. Caddy runs as a compose container and listens on the Tailscale IP of the VM only. Its TLS certificate is a Tailscale certificate for the node name. Caddy in a container cannot use the tailscaled socket, so the host runs `tailscale cert` and writes the files that compose mounts read-only (renewal about every 60 days). Reason: Tailscale gives one name per node, so the two names of design 4.2 become one name with paths. The phone page needs a secure context, and a Tailscale certificate provides it. Tailscale serve was rejected because the proxy settings the design needs (no buffering on stream routes, idle timeout above 15 s and 60 s) are set in one config file in Caddy.
+Decided 2026-11-22. Caddy runs as a compose container and listens on the Tailscale IP of the VM only. Its TLS certificate is a Tailscale certificate for the node name. Caddy in a container cannot use the tailscaled socket, so the host runs `tailscale cert` and writes the files that compose mounts read-only (renewed every 30 days by `kata-cert.timer`, see D25). Reason: Tailscale gives one name per node, so the two names of design 4.2 become one name with paths. The phone page needs a secure context, and a Tailscale certificate provides it. Tailscale serve was rejected because the proxy settings the design needs (no buffering on stream routes, idle timeout above 15 s and 60 s) are set in one config file in Caddy.
 
 ## D20 Nightly backup by a host systemd timer, encrypted with openssl
 
@@ -428,6 +428,10 @@ Decided 2026-11-22. shellcheck and hadolint are not in the gate image. Reason: t
 ## D24 Notes are git-excluded and updated by the lead
 
 Decided 2026-11-22. Files under `.notes/` are git-excluded. Reason: they hold owner-local steps (for example `.notes/run-on-vm.md`) that must not reach the repo. Agents do not edit them; the lead updates them when the stage finishes.
+
+## D25 Build on dev, ship images to the VM; the VM runs no builds
+
+Decided 2026-11-23. The kata image is built on the dev machine as `kata:<git short sha>` (`deploy/compose.build.yaml`), checked, and shipped over SSH with `deploy/ship.sh` (`docker save | ssh docker load`). The VM gets the deploy files (`compose.yaml`, `Caddyfile`, `kata.host.toml`, `env/`, `versions.env`, scripts, `systemd/`) and runs `docker compose up -d` on the loaded tag. Compose never builds on the VM. The Tailscale certificate timer (`deploy/systemd/kata-cert.timer`) renews every 30 days. The extension gets its core base URL at build time from `KATA_EXTENSION_BASE_URL`. Reasons: a small attack surface on the VM (no toolchain, no compilers, no package builds on a host that serves the owner's data); the 3 GB VM does not have the memory for a build next to Postgres and the core; pins (base digest, gitleaks and trainer checksums) are checked where the image is built, so the VM only receives the result; and one image tag per commit makes rollback a re-ship of an image already built. Limit: the image is only as fresh as the last ship, and secrets and the Dockerfile never leave dev or the VM's `secrets/` directory.
 
 ## Cloud smoke is opt-in, Haiku only, capped by budget, run by the lead
 

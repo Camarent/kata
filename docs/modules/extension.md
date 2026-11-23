@@ -25,7 +25,9 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/background.ts:28` message `panel:review` (`:95` `review()` merges marks with lesson-check); `:29` message `panel:setConcept` (`:117` `setConcept`).
 - `extension/src/sidepanelBoot.ts:41` sends `panel:review`; `:50` `onSetConcept` sends `panel:setConcept`.
 - `extension/src/highlight.ts:47` `applyHighlights`, `:60` `clearHighlights`; CSS classes `CLASS_KNOWN` = `kata-known` (`:12`), `CLASS_NEW` = `kata-new` (`:14`).
-- `extension/src/config.ts:4` `DEFAULT_BASE_URL`, `:7` `REQUEST_TIMEOUT_MS`, `:10` `POLL_MS`, `:13` `MAX_WAIT_MS`.
+- `extension/src/config.ts:13` `DEFAULT_BASE_URL` (build-time `__KATA_BASE_URL__`, fallback `http://127.0.0.1:8080`); `:17` `REQUEST_TIMEOUT_MS`, `:20` `POLL_MS`, `:23` `MAX_WAIT_MS`.
+- `extension/build/build.mjs:24` `BASE_URL_ENV` = `KATA_EXTENSION_BASE_URL`; `:58` defines `__KATA_BASE_URL__` when it is set; `:75` reads it at build.
+- `extension/build/manifest.mjs:53` `host_permissions` becomes the base URL origin plus `/*` when a base URL is given (`:29` `hostOrigin`).
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
@@ -45,6 +47,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Review screen: a stored concept mark wins over the lesson-check result; with no mark, an abstaining check shows the row unset (state null).
 - Review keyboard: Tab moves focus through the rows and buttons; ArrowUp/ArrowDown move between rows; keys 1, 2, 3 set known, learning, new.
 - No `extension/manifest.json` in the repo: `extension/build/build.mjs:47` writes one into each `dist/<browser>/`; edit `manifest.base.json` or `build/manifest.mjs`.
+- Core base URL is fixed at build time: `KATA_EXTENSION_BASE_URL=https://<name> npm run build` in `extension/` (the VM build, `docs/deployment.md`). Unset, the build keeps the loopback URL and the `host_permissions` of `manifest.base.json`. The fallback in `config.ts` must match `manifest.base.json`.
 - Firefox first; Chrome later from the same code.
 - Adding a permission widens what users grant; keep the list minimal.
 
