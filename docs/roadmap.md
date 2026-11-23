@@ -81,7 +81,7 @@ syllabus, time-boxed tracks sharing one time budget, decision points between tra
 **Success criteria.** Results from the trainer update the knowledge model. A syllabus import
 yields a per-module action plan that fits the time budget.
 
-## Milestone 6: deployment on the web VM
+## Milestone 6: deployment on the web VM (done)
 
 **Scope.** Run kata on the owner's Proxmox VM `web` (Ubuntu Server LTS, 2 cores, 3 GB memory,
 32 GB disk) with Docker, Tailscale and no public access. Images for core and migrate, a compose
@@ -93,6 +93,52 @@ everything is tested without it.
 Docker and Tailscale into a running kata (core, migrate, Postgres, reverse proxy with TLS over
 the tailnet). A deep health check passes. A nightly encrypted dump runs. The restore drill
 (design 4.3 steps 3 to 5) is scripted and tested against a temporary Postgres.
+
+**Shipped.** The runbook is in [`deployment.md`](deployment.md) (D17 to D25 in
+`decisions.md`). The real VM run is still open in [`backlog.md`](backlog.md).
+
+## Milestone 7
+
+No scope recorded: `decisions.md` and the git history have no entry under M7. The numbering goes
+from M6 to M10.
+
+## Milestone 8
+
+No scope recorded: `decisions.md` and the git history have no entry under M8.
+
+## Milestone 9
+
+No scope recorded: `decisions.md` and the git history have no entry under M9.
+
+## Milestone 10: deploy images and ship script (done)
+
+**Scope.** Build the kata image on the dev machine and ship finished images to the web VM
+over SSH; the VM builds nothing.
+
+**Shipped.** `kata:<git short sha>` built from `deploy/compose.build.yaml`, checked, and shipped
+over SSH (D25). Merged to master in `b3bf49d`, with pinned base, Postgres and Caddy digests in
+`9faa97d`.
+
+## Milestone 11: real trainer contract and local-model fixes (done)
+
+**Scope.** Replace the assumed trainer JSON contract with the real `dojo` CLI, and fix what the
+local model run showed.
+
+**Shipped.** `DojoTrainerCli` runs the real `dojo` CLI without a shell; progress documents are
+dojo-native, with a PATCH delta save and an import that writes no evidence; local-model fixes.
+Merged to master in `282cba3`. Opt-in Haiku and local-model smoke harnesses are on master in
+`4e3da45` and `5fbf115`. The real dojo and real model runs are open in
+[`backlog.md`](backlog.md).
+
+## Milestone 12: serve courses and bridge progress through the extension (not merged yet)
+
+**Scope.** Serve built courses over HTTP by signed open links, and bridge dojo progress saves
+through the extension (`window.claude` stub, split parts reassembled in the bridge, no core
+migration).
+
+**Status.** Built on `stage/m12`, not on master yet: the open-link signer, course route,
+open endpoint, progress round trip, side panel open action and the bridge content script are
+on the stage branch. Done once merged.
 
 ## Later
 

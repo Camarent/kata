@@ -20,6 +20,9 @@ Project items after Milestone 0.
 - [ ] Narrow the `<all_urls>` content-script permission in `extension/manifest.base.json` before
       any publish. Note: the match is now `http://*/*` and `https://*/*` in
       `extension/manifest.base.json` (see [`decisions.md`](decisions.md)); still host-wide.
+      The bridge content script is registered for `<core scheme>://*/c/*` only
+      (`extension/src/bridgeRegister.ts`); the exact configured origin is checked at runtime in
+      `runBridge`; the scan content script stays host-wide.
 - [x] Python dependencies are pinned with `==` and there is no lock file. Decided: keep the
       `==` pins, no `uv lock` (see [`decisions.md`](decisions.md)).
 - [ ] Style nits: three `nosec` lines longer than 100 columns; `MarkSink` vs
