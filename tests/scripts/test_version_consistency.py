@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -17,12 +18,20 @@ VERSION_FILES = (
     "extension/package.json",
     "extension/package-lock.json",
     "extension/manifest.base.json",
+    "core/kata_core/__init__.py",
 )
 VERSION_ENV = "KATA_EXTENSION_VERSION"
 
 
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _init_version(root: Path) -> str:
+    text = (root / "core" / "kata_core" / "__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    assert match, "no __version__ line"
+    return match.group(1)
 
 
 def _read_versions(root: Path) -> dict[str, str]:
@@ -35,6 +44,7 @@ def _read_versions(root: Path) -> dict[str, str]:
         "extension/package-lock.json": lock["version"],
         'extension/package-lock.json packages[""]': lock["packages"][""]["version"],
         "extension/manifest.base.json": _read_json(root / "extension" / "manifest.base.json")["version"],
+        "core/kata_core/__init__.py": _init_version(root),
     }
 
 

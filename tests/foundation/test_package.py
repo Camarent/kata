@@ -1,9 +1,11 @@
+import re
 import tomllib
 from pathlib import Path
 
 import kata_core
 
 ROOT = Path(__file__).resolve().parents[2]
+SEMVER = r"\d+\.\d+\.\d+"  # the version moves with every release; tests/scripts checks that the files agree
 
 
 def _pyproject() -> dict:
@@ -14,7 +16,7 @@ def _pyproject() -> dict:
 def test_project_metadata() -> None:
     project = _pyproject()["project"]
     assert project["name"] == "kata"
-    assert project["version"] == "0.0.0"
+    assert re.fullmatch(SEMVER, project["version"])
     assert project["requires-python"] == ">=3.11"
     assert project["dependencies"] == [
         "fastapi==0.165.0",
@@ -34,4 +36,4 @@ def test_tool_sections_present() -> None:
 
 
 def test_version_exposed() -> None:
-    assert kata_core.__version__ == "0.0.0"
+    assert re.fullmatch(SEMVER, kata_core.__version__)

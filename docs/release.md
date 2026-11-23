@@ -4,7 +4,7 @@ Every change after the first release ships as a release made by the pipeline. Th
 
 ## Version
 
-The version lives in four files: `pyproject.toml`, `extension/package.json`, the root entry of `extension/package-lock.json`, and `extension/manifest.base.json`. The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, made by the pipeline with `release: minor`. Audits and fix tasks must not change the version.
+The version lives in five files: `pyproject.toml`, `extension/package.json`, the root entry of `extension/package-lock.json`, `extension/manifest.base.json`, and the `__version__` line of `core/kata_core/__init__.py`. The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, made by the pipeline with `release: minor`. Audits and fix tasks must not change the version.
 
 ## Pipeline step order
 
@@ -56,4 +56,4 @@ The full steps, rollback and the variables are in `docs/deployment.md`.
 
 - `scripts/dev/check-all.sh` is green on `master`.
 - `CHANGELOG.md` has the entry for the version under `## [X.Y.Z]`, with `## [Unreleased]` above it.
-- The four version fields agree (`tests/scripts/test_version_consistency.py` checks this).
+- The five version fields agree (`tests/scripts/test_version_consistency.py` checks this).

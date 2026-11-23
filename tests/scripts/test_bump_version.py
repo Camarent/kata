@@ -1,4 +1,4 @@
-"""scripts/release/bump_version.sh: current reads the project version, set moves our five files or none."""
+"""scripts/release/bump_version.sh: current reads the project version, set moves our six files or none."""
 
 from __future__ import annotations
 
@@ -18,11 +18,14 @@ PACKAGE_LOCK = (
     '  "packages": {\n    "": {\n      "name": "kata-extension",\n      "version": "0.0.0"\n    },\n'
     '    "node_modules/dep": {\n      "version": "0.0.0"\n    }\n  }\n}\n'
 )
+INIT = '"""kata core package."""\n\n__version__ = "0.0.0"\n'
 CHANGELOG = "# Changelog\n\n## [Unreleased]\n\n## [0.0.0] - 2026-01-01\n\n- first\n"
 
 
 def _project(root: Path, changelog: bool = True) -> None:
     (root / "extension").mkdir()
+    (root / "core" / "kata_core").mkdir(parents=True)
+    (root / "core" / "kata_core" / "__init__.py").write_text(INIT)
     (root / "pyproject.toml").write_text(PYPROJECT)
     (root / "extension" / "package.json").write_text(PACKAGE_JSON)
     (root / "extension" / "manifest.base.json").write_text(MANIFEST)
@@ -57,7 +60,7 @@ def test_current_reads_pyproject_version(tmp_path: Path):
     assert result.stdout == "0.0.0\n"
 
 
-def test_set_bumps_five_files_and_leaves_dependencies(tmp_path: Path):
+def test_set_bumps_six_files_and_leaves_dependencies(tmp_path: Path):
     _project(tmp_path)
     result = _run(tmp_path, "set", "0.0.0", "0.0.1", "first release")
     assert result.returncode == 0, result.stderr
@@ -67,6 +70,7 @@ def test_set_bumps_five_files_and_leaves_dependencies(tmp_path: Path):
             "extension/package.json",
             "extension/package-lock.json",
             "extension/manifest.base.json",
+            "core/kata_core/__init__.py",
             "CHANGELOG.md",
         ]
     )
@@ -132,12 +136,14 @@ def test_set_edits_exactly_the_anchored_lines(tmp_path: Path):
             "extension/package.json",
             "extension/package-lock.json",
             "extension/manifest.base.json",
+            "core/kata_core/__init__.py",
             "CHANGELOG.md",
         ]
     )
     assert _added(PYPROJECT, after["pyproject.toml"]) == ['version = "0.0.1"']
     assert _added(PACKAGE_JSON, after["extension/package.json"]) == ['  "version": "0.0.1",']
     assert _added(MANIFEST, after["extension/manifest.base.json"]) == ['  "version": "0.0.1"']
+    assert _added(INIT, after["core/kata_core/__init__.py"]) == ['__version__ = "0.0.1"']
     assert _added(PACKAGE_LOCK, after["extension/package-lock.json"]) == [
         '  "version": "0.0.1",',
         '      "version": "0.0.1"',
