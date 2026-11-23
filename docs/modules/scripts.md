@@ -21,7 +21,7 @@ Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper
 - `scripts/deploy/validate_stack.py:153` `main(argv)` - checks `deploy/compose.yaml` (`:97` `check_compose`: published ports bound to loopback or the tailnet, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:140` `check_config_keys`). The model comes from `docker compose config` (`:52` `load_compose`); without docker it fails, it does not fall back to a parser.
 - `scripts/deploy/replay_tombstone.py:71` `main(argv)` - replays the tombstone file kept beside a dump (`:38` `parse`, `:55` `replay`).
 - `scripts/deploy/verify_counts.py:54` `main(argv)` - content-free row counts per table (`:34` `table_counts`, `:47` `differing_tables`) for the restore drill; prints counts and names only.
-- `scripts/smoke/dojo_real.py:60` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:20`); returns 0, 1 or 2 (`:31-33`).
+- `scripts/smoke/dojo_real.py:60` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:20`); returns 0, 1 or 2 (`:31-33`). It runs `build_course_dir` (probe, init, add, validate, lock, build) on 8 synthetic drafts, expects 7 kept and 1 dropped, checks the required keys `index.html`, `data/content.json`, `manifest.json`, the `max_artifact_bytes` cap and the prompts in `data/content.json`; optional `KATA_TEST_DOJO_WASM` and `KATA_TEST_DOJO_WEB` are passed to `build`.
 - `scripts/bench/scoring.py:108` `score(expected, got)` -> `Score` (accuracy, abstain_rate, abstain_precision, per_state).
 - `scripts/bench/scoring.py:94` `load_cases(path)` -> `Cases`; validates every field, raises on malformed input.
 - `scripts/bench/scoring.py:16` `STATES` (`known`, `learning`, `new`, `abstain`), `:17` `MARKS`.
@@ -36,7 +36,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
 - `scripts/smoke/real_model.py` - opt-in real-model smoke CLI; `scripts/smoke/smoke_core.py` - case loader, checks, masking; tested by `tests/scripts/test_smoke_cli.py` and `tests/scripts/test_smoke_core.py`.
 - `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
-- `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (add, validate, lock, build); tested by `tests/scripts/test_dojo_real.py`.
+- `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
 - `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
