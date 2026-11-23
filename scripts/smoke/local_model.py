@@ -57,6 +57,8 @@ MODEL_SECTION = "model"
 BASE_URL_KEY = "base_url"
 MODEL_NAME_KEY = "model_name"
 TIMEOUT_KEY = "timeout_seconds"
+REASONING_KEY = "reasoning_effort"
+REASONING_UNSET_LABEL = "unset"
 LIST_SEPARATOR = ","
 # A prompt estimated above this share of num_ctx gets a WARN line before it is sent.
 CONTEXT_WARN_PERCENT = 75
@@ -216,11 +218,12 @@ def _run_model(
     return results
 
 
-def _summary_line(summary: ModelSummary) -> str:
+def _summary_line(summary: ModelSummary, reasoning_effort: str) -> str:
     return (
         f"summary model={summary.model} passes={summary.passes}/{summary.cases} "
         f"mean_seconds={summary.mean_seconds:.2f} "
-        f"mean_tokens_per_s={summary.mean_tokens_per_second:.1f}"
+        f"mean_tokens_per_s={summary.mean_tokens_per_second:.1f} "
+        f"reasoning_effort={reasoning_effort or REASONING_UNSET_LABEL}"
     )
 
 
@@ -256,8 +259,9 @@ def main(
         ]
     finally:
         base.close()
+    reasoning_effort = str(config.get(MODEL_SECTION, REASONING_KEY))
     for summary in summaries:
-        print(_summary_line(summary))
+        print(_summary_line(summary, reasoning_effort))
     all_passed = bool(summaries) and all(
         summary.cases > 0 and summary.passes == summary.cases for summary in summaries
     )
