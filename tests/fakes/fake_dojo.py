@@ -3,12 +3,14 @@
 Prints the text formats measured on the real dojo binary (see core/kata_core/trainer/dojo_cli.py).
 Items live in `<dir>/content/<unit>.jsonl`; ids are `<unit>-<n>`. Markers in a prompt:
 FAKE_INVALID gives an error diagnostic that names the item id; FAKE_NOID gives an error with
-no id in its message; FAKE_WARN gives a warning only (exit 0).
+no id in its message; FAKE_WARN gives a warning only (exit 0). A gap with a blank answer gives an
+error that names the item id.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -18,6 +20,8 @@ from typing import Any
 CONTENT_DIR = "content"
 TITLE_CHARS = 80
 INVALID_MARK = "FAKE_INVALID"
+# When set, every `build` call appends its argv as one JSON list per line to this file.
+ARGV_LOG_ENV = "FAKE_DOJO_ARGV_LOG"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
 PREFIX_RE = re.compile(r"[a-z][a-z0-9_-]*")
@@ -116,6 +120,9 @@ def _validate(workdir: Path) -> int:
         if NOID_MARK in prompt:
             message = "answers list is empty"
             diagnostics.append({"severity": "error", "code": "gap_empty_answer", **base, "message": message})
+        if any(not str(answer).strip() for answer in item.get("answers", [])):
+            message = f"{item_id}: gap answer is empty"
+            diagnostics.append({"severity": "error", "code": "gap_empty_answer", **base, "message": message})
         if WARN_MARK in prompt:
             message = f"{item_id}: fake warning"
             diagnostics.append({"severity": "warning", "code": "answer_in_prompt", **base, "message": message})
@@ -152,6 +159,13 @@ def _build(workdir: Path, outdir: Path) -> int:
     return 0
 
 
+def _log_argv(argv: list[str]) -> None:
+    log = os.environ.get(ARGV_LOG_ENV, "")
+    if log:
+        with open(log, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(argv) + "\n")
+
+
 def main(argv: list[str]) -> int:
     subcommand, rest = argv[0], argv[1:]
     if subcommand == "init":
@@ -169,6 +183,7 @@ def main(argv: list[str]) -> int:
     if subcommand == "lock":
         return _lock(Path(rest[0]))
     if subcommand == "build":
+        _log_argv(argv)
         return _build(Path(rest[0]), Path(rest[2]))
     sys.stderr.write(f"fake dojo: unknown subcommand {subcommand}\n")
     return 2

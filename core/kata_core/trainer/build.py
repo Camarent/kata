@@ -146,6 +146,7 @@ def build_course_dir(
         artifacts = _artifacts(
             cli.build(workdir, outdir),
             outdir,
+            course_id,
             int(cfg.get("trainer", "max_artifact_bytes")),
         )
     return BuiltCourse(artifacts, item_ids, kept, dropped)
@@ -200,10 +201,14 @@ def _add(cli: TrainerCli, workdir: Path, draft: dict[str, Any]) -> str:
 def _artifacts(
     files: list[str],
     outdir: Path,
+    course_id: str,
     max_bytes: int,
 ) -> dict[str, tuple[str, bytes]]:
-    """Read the built `files` under `outdir` into artifacts (path -> (media type, bytes)), capped in total."""
-    root = outdir.resolve()
+    """Read the built `files` under `outdir` into artifacts (path -> (media type, bytes)), capped in total.
+
+    Names are relative to the course folder `<outdir>/<course_id>`, so `index.html` is served at the root.
+    """
+    root = (outdir / course_id).resolve()
     out: dict[str, tuple[str, bytes]] = {}
     total = 0
     for name in files:
@@ -213,7 +218,7 @@ def _artifacts(
         try:
             rel = path.resolve().relative_to(root)
         except ValueError as exc:
-            raise TrainerError(f"trainer build: file outside outdir: {name}") from exc
+            raise TrainerError(f"trainer build: file outside course dir: {name}") from exc
         data = path.read_bytes()
         total += len(data)
         if total > max_bytes:

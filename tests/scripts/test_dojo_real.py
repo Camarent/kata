@@ -7,6 +7,7 @@ script written into pytest's tmp_path; the wrapper execs the fake under sys.exec
 from __future__ import annotations
 
 import importlib.util
+import json
 import shlex
 import sys
 from pathlib import Path
@@ -14,11 +15,16 @@ from types import ModuleType
 
 import pytest
 from fakes import fake_dojo
+from kata_core.config import load_config
+from kata_core.trainer.dojo_cli import DojoTrainerCli
 
 REPO_ROOT = Path(__file__).parents[2]
 CLI_PATH = REPO_ROOT / "scripts" / "smoke" / "dojo_real.py"
 MODULE_NAME = "dojo_real_under_test"
 GATE_ENV = "KATA_TEST_DOJO"
+WASM_ENV = "KATA_TEST_DOJO_WASM"
+WEB_ENV = "KATA_TEST_DOJO_WEB"
+FAKE_KEPT = 7
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_REFUSED = 2
@@ -85,3 +91,31 @@ def test_fake_dojo_run_prints_file_list(
     out = capsys.readouterr().out
     assert "added unit-1-1" in out
     assert FAKE_BUILT_FILE in out
+
+
+def test_fake_run_keeps_seven_and_drops_empty_answer(cli: ModuleType) -> None:
+    fake_cli = DojoTrainerCli(argv_prefix=[sys.executable, str(fake_dojo.__file__)], timeout=60.0)
+    built = cli.run_smoke(fake_cli, load_config(cli.EXAMPLE_CONFIG, env={}))
+    assert len(built.item_ids) == FAKE_KEPT
+    [(dropped_id, message)] = built.dropped.items()
+    assert message == f"{dropped_id}: gap answer is empty"
+    assert set(built.artifacts) >= set(cli.REQUIRED_FILES)
+
+
+def test_wasm_and_web_env_reach_the_build(
+    cli: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    log = tmp_path / "argv.log"
+    monkeypatch.setenv(fake_dojo.ARGV_LOG_ENV, str(log))
+    wrapper = _fake_wrapper(tmp_path)
+    wasm = tmp_path / "app.wasm"
+    web = tmp_path / "web"
+    env = {GATE_ENV: str(wrapper), WASM_ENV: str(wasm), WEB_ENV: str(web)}
+    assert cli.main(env) == EXIT_OK
+    assert FAKE_BUILT_FILE in capsys.readouterr().out
+    [build_argv] = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert build_argv[build_argv.index("--wasm") + 1] == str(wasm)
+    assert build_argv[build_argv.index("--web") + 1] == str(web)

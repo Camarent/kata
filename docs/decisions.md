@@ -471,6 +471,8 @@ Decided 2026-11-23. The build writes one course folder `D/<course_id>/`, where `
 
 Superseded by "Serving CSP and headers are fixed in code" (2026-11-23): `GET /c/{token}/{path}` serves the files now, so a built course can be opened in a browser.
 
+Artifact keys changed (M13 task-6): they are relative to the course folder (`index.html`, `data/content.json`), not `<course_id>/index.html`, so the root page is served. Rows stored under the old keys are not served at the root. No course built before this change is stored: the first deploy (M6) has not run. If one exists, rebuild it; there is no migration.
+
 ## Open-link tokens are HMAC-SHA256 signed
 
 Decided 2026-11-23. An open link is `base64url(payload).base64url(mac)`, payload `[user_id, course_id, expires_at]`, mac = HMAC-SHA256 over the payload (`sign` and `verify` in `core/kata_core/trainer/open_link.py`; `verify` compares with `hmac.compare_digest`). The key is read from the file named by `[trainer] open_link_key_file`; it must be at least 32 bytes (`MIN_KEY_BYTES`). `main` exits 1 at startup, logging `open link key: ...`, when `[trainer] enabled` is true and the key file is missing, empty or short (`core/kata_core/__main__.py:27`). The link lifetime is `[trainer] open_link_ttl_seconds` (43200 in the example config). The link base is `[core] public_url` when set, else the URL the request came in on (`core/kata_core/api/routes/course_open.py:33`). Tests inject the key as `app.state.open_link_key`; when it is unset the routes load the key file. Reason: the link carries its own credential, so the course page needs no bearer token. Limit: one key signs and checks every link; rotating it invalidates all open links at once.
