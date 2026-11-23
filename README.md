@@ -84,7 +84,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
-| `trainer.max_artifact_bytes` | 1048576 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
+| `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
 | `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
 | `trainer.open_link_ttl_seconds` | 43200 | `KATA_TRAINER_OPEN_LINK_TTL_SECONDS` |
 | `trainer.open_link_key_file` | "" | `KATA_TRAINER_OPEN_LINK_KEY_FILE` |

@@ -131,7 +131,7 @@ items_per_concept = 3
 # Minimum items a course must keep, else the job fails.
 min_items = 5
 # Cap on the trainer artifact size, in bytes.
-max_artifact_bytes = 1048576
+max_artifact_bytes = 16777216
 # Cap on a saved trainer progress document, in bytes (413 above it).
 max_progress_bytes = 4194304
 # Lifetime of a signed open link, in seconds.

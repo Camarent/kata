@@ -71,6 +71,20 @@ def test_valid_token_serves_named_file_with_stored_media_type(
     assert data.content == JSON
 
 
+def test_large_artifact_is_served_whole(client: TestClient, db: ScratchDatabase, key: bytes) -> None:
+    # 3 MB, under the 16 MiB max_artifact_bytes default: the route must return every byte
+    big = b"<!doctype html>" + b"x" * (3 * 1024 * 1024)
+    with db.connect() as conn:
+        uid = create_user(conn, "ana")
+        made = create_course(conn, uid, "Course", [])
+        set_status(conn, uid, made.id, "ready")
+        add_artifacts(conn, uid, made.id, {"index.html": ("text/html; charset=utf-8", big)})
+    resp = client.get(f"/c/{_token(key, uid, made.id)}/index.html")
+    assert resp.status_code == 200
+    assert len(resp.content) == len(big)
+    assert resp.content == big
+
+
 def test_success_carries_security_headers(client: TestClient, db: ScratchDatabase, key: bytes) -> None:
     uid, cid = _course(db, "ana")
     resp = client.get(f"/c/{_token(key, uid, cid)}/index.html")

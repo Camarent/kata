@@ -33,7 +33,7 @@ def conn(db: ScratchDatabase) -> Iterator[psycopg.Connection[Any]]:
         yield connection
 
 
-def _cfg(argv: list[str] = FAKE_TRAINER, min_items: int = 2, max_bytes: int = 1048576) -> Config:
+def _cfg(argv: list[str] = FAKE_TRAINER, min_items: int = 2, max_bytes: int = 16777216) -> Config:
     return Config(
         sections={
             "trainer": {
