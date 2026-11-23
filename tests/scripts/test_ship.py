@@ -22,6 +22,7 @@ SHIP = REPO_ROOT / "deploy" / "ship.sh"
 
 FAKE_DOCKER = """#!/usr/bin/env bash
 echo "docker $*" >> "$FAKE_LOG"
+case " $* " in *" build "*) echo "build-env KATA_TAILNET_NAME=${KATA_TAILNET_NAME:-unset}" >> "$FAKE_LOG" ;; esac
 for arg in "$@"; do
   if [ "$arg" = config ]; then cat "$FAKE_MODEL"; exit 0; fi
 done
@@ -180,6 +181,16 @@ def test_tag_is_written_to_vm_env_and_stack_started(work: Path):
     assert "env/small.env" in log
     assert "up -d" in log
     assert "exec -T core" in log
+
+
+def test_build_gets_the_env_profile_and_a_build_only_tailnet_name(work: Path):
+    """Compose refuses to build without the resource limits and the tailnet name (found on the first real ship)."""
+    result = _ship(work)
+    assert result.returncode == 0, result.stderr
+    log = _log(work)
+    assert "compose --env-file deploy/env/small.env -f deploy/compose.yaml -f deploy/compose.build.yaml build" in log
+    assert "build-env KATA_TAILNET_NAME=unset" not in log
+    assert "build-env KATA_TAILNET_NAME=build.invalid" in log
 
 
 def test_rollback_ships_the_given_tag_without_building(work: Path):
