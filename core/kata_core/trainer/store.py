@@ -75,6 +75,20 @@ def title_taken(conn: psycopg.Connection[Any], user_id: int, title: str) -> bool
     return row is not None and bool(row[0])
 
 
+def lock_user(conn: psycopg.Connection[Any], user_id: int) -> None:
+    """Lock the user row until the transaction ends, so two creates of one user run one at a time.
+
+    The count-then-insert of a course limit is only safe under this lock.
+    """
+    conn.execute("SELECT id FROM users WHERE id = %s FOR UPDATE", (user_id,)).fetchone()
+
+
+def count_courses(conn: psycopg.Connection[Any], user_id: int) -> int:
+    """Number of courses of `user_id`, whatever their status."""
+    row = conn.execute("SELECT count(*) FROM course WHERE user_id = %s", (user_id,)).fetchone()
+    return int(row[0]) if row is not None else 0
+
+
 def create_course(
     conn: psycopg.Connection[Any],
     user_id: int,

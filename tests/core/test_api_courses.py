@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
@@ -140,7 +141,101 @@ def test_list_pages_newest_first(client: TestClient, db: ScratchDatabase, cfg: C
     assert second["next_before_id"] == older["id"]
 
     last = client.get(f"/v1/courses?limit=5&before_id={older['id']}", headers=headers).json()
-    assert last == {"items": [], "next_before_id": None}
+    assert last == {
+        "items": [],
+        "next_before_id": None,
+        "limit": cfg.get("trainer", "max_courses_per_user"),
+        "total": 2,
+    }
+
+
+def _limit(client: TestClient, monkeypatch: pytest.MonkeyPatch, cfg: Config, limit: int) -> None:
+    """Set the course limit on this test's app only; monkeypatch restores the app config after the test."""
+    trainer = {**cfg.sections["trainer"], "max_courses_per_user": limit}
+    monkeypatch.setattr(client.app.state, "cfg", Config({**cfg.sections, "trainer": trainer}))
+
+
+def _job_count(db: ScratchDatabase) -> int:
+    with db.connect() as conn:
+        row = conn.execute("SELECT count(*) FROM jobs WHERE kind = 'course.generate'").fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def test_course_limit_is_409_and_queues_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 1)
+    _create(client, headers, {"title": "First", "concept_ids": [concept]})
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "Second", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "course_limit"
+    assert _job_count(db) == jobs_before
+    with db.connect() as conn:
+        row = conn.execute("SELECT count(*) FROM course").fetchone()
+    assert row is not None and row[0] == 1
+
+
+def test_zero_limit_is_unlimited(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 0)
+    for title in ("First", "Second", "Third"):
+        _create(client, headers, {"title": title, "concept_ids": [concept]})
+
+
+def test_taken_title_is_409_name_taken_and_queues_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _create(client, headers, {"title": "Basics", "concept_ids": [concept]})
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "  BASICS ", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "course_name_taken"
+    assert _job_count(db) == jobs_before
+
+
+def test_empty_title_is_422_and_queues_nothing(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    jobs_before = _job_count(db)
+
+    resp = client.post("/v1/courses", json={"title": "   ", "concept_ids": [concept]}, headers=headers)
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == "course_title_empty"
+    assert _job_count(db) == jobs_before
+
+
+def test_list_shows_limit_and_total_of_any_status(
+    client: TestClient, db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+    _limit(client, monkeypatch, cfg, 3)
+    _create(client, headers, {"title": "First", "concept_ids": [concept]})
+
+    page = client.get("/v1/courses", headers=headers).json()
+
+    assert page["limit"] == 3
+    assert page["total"] == 1
+    assert page["items"][0]["status"] == "queued"
 
 
 def test_list_before_id_out_of_range_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
