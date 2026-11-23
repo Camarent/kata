@@ -120,7 +120,7 @@ Firefox (128.0 or later):
 1. Unzip the Firefox zip into a folder, or use `extension/dist/firefox/`.
 2. Open `about:debugging#/runtime/this-firefox`, choose "Load Temporary Add-on", and pick `manifest.json` in that folder.
 
-A temporary add-on lasts until Firefox restarts. A permanent install needs an add-on signed by Mozilla (AMO); signing is not automated in this repo.
+A temporary add-on lasts until Firefox restarts. After each Firefox restart, load it again with "Load Temporary Add-on". A permanent install needs an add-on signed by Mozilla (AMO); signing is not automated in this repo.
 
 Chrome:
 1. Unzip the Chrome zip into a folder, or use `extension/dist/chrome/`.
@@ -132,6 +132,23 @@ First run:
 3. Type the server URL (origin only, for example `http://127.0.0.1:8080`), the enrolment code and a device label, then click Connect. Accept the browser's permission prompt for that address.
 
 Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see `docs/decisions.md`, "Extension has no build-time server config (M15)").
+
+### Scan a lesson page
+
+1. Open a lesson page in the browser.
+2. Open the kata side panel from the toolbar button.
+3. Click "Scan this page". The panel reads the open page and shows the topic marks for it.
+
+The page is read only when you click the button; kata never crawls pages.
+
+## Worker (GPU machine, not yet verified end to end)
+
+The worker runs the model jobs next to Ollama. Not yet verified end to end: the steps below follow the config keys, but no full run on a real machine is recorded yet.
+
+1. Run Ollama on the worker machine with the model from `[model]` in `config/kata.example.toml`. `[model] base_url` (`config/kata.example.toml:37`, default `http://127.0.0.1:11434/v1`) must point at that Ollama.
+2. Set `[worker] core_url` (`config/kata.example.toml:24`, env `KATA_WORKER_CORE_URL`) to the core's address. Loopback is allowed by default; any other host goes in `worker.core_hosts`.
+3. Give the worker its own token, not a user's token. The worker reads it from the environment variable named by `worker.token_env` (default `KATA_WORKER_TOKEN`). How the core issues a worker token is not documented yet.
+4. Start the worker with `python -m kata_worker`. It reads the config file named by the env variable `KATA_CONFIG`.
 
 ## Development workflow
 
