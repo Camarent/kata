@@ -22,6 +22,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `worker.poll_interval_seconds` | 5 | `KATA_WORKER_POLL_INTERVAL_SECONDS` |
 | `worker.request_timeout_seconds` | 30 | `KATA_WORKER_REQUEST_TIMEOUT_SECONDS` |
 | `worker.core_url` | "http://127.0.0.1:8080" | `KATA_WORKER_CORE_URL` |
+| `worker.core_hosts` | [] | `KATA_WORKER_CORE_HOSTS` |
 | `worker.token_env` | "KATA_WORKER_TOKEN" | `KATA_WORKER_TOKEN_ENV` |
 | `jobs.lease_seconds` | 300 | `KATA_JOBS_LEASE_SECONDS` |
 | `jobs.runner_poll_seconds` | 5 | `KATA_JOBS_RUNNER_POLL_SECONDS` |
@@ -74,7 +75,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
 | `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
 | `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
-| `trainer.command` | ["kata-trainer"] | `KATA_TRAINER_COMMAND` |
+| `trainer.command` | ["/opt/trainer/dojo"] | `KATA_TRAINER_COMMAND` |
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |

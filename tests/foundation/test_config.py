@@ -94,6 +94,7 @@ def test_example_has_required_sections() -> None:
         "poll_interval_seconds",
         "request_timeout_seconds",
         "core_url",
+        "core_hosts",
         "token_env",
     }
     assert set(data["jobs"]) == {"lease_seconds", "runner_poll_seconds", "max_output_bytes"}

@@ -65,11 +65,16 @@ def _model() -> dict:
     return {
         "services": {
             "postgres": {"image": "postgres:17", "mem_limit": 1073741824},
-            "migrate": {"image": "kata:local", "mem_limit": 805306368},
+            "migrate": {"image": "kata:validate", "mem_limit": 805306368},
             "core": {
-                "image": "kata:local",
+                "image": "kata:validate",
                 "mem_limit": 805306368,
                 "depends_on": {"migrate": {"condition": "service_completed_successfully"}},
+            },
+            "worker": {
+                "image": "kata:validate",
+                "mem_limit": 268435456,
+                "depends_on": {"core": {"condition": "service_healthy"}},
             },
             "caddy": {
                 "image": "caddy:2.8-alpine",
@@ -118,6 +123,10 @@ def _public_port(model: dict) -> None:
     model["services"]["caddy"]["ports"][0]["host_ip"] = ""
 
 
+def _worker_port(model: dict) -> None:
+    model["services"]["worker"]["ports"] = [{"target": 8080, "published": "8080", "host_ip": "127.0.0.1"}]
+
+
 def _secret_from_env(model: dict) -> None:
     model["secrets"]["worker_token"] = {"environment": "KATA_WORKER_TOKEN"}
 
@@ -134,6 +143,7 @@ def _latest_image(model: dict) -> None:
     ("rule", "mutate"),
     [
         ("no-host-port", _public_port),
+        ("no-host-port", _worker_port),
         ("mem-limit", _drop_mem_limit),
         ("secret-file", _secret_from_env),
         ("migrate-first", _core_not_waiting),
@@ -173,6 +183,10 @@ def _mutate_public_port(text: str) -> str:
     return _replace_once(text, '"${KATA_BIND_ADDR:-127.0.0.1}:443:443"', '"0.0.0.0:443:443"')
 
 
+def _mutate_worker_port(text: str) -> str:
+    return _replace_once(text, "  worker:\n    image: ", '  worker:\n    ports:\n      - "8080:8080"\n    image: ')
+
+
 def _mutate_no_mem_limit(text: str) -> str:
     return _drop_line(text, "mem_limit: ${KATA_MEM_PROXY:?set KATA_MEM_PROXY, e.g. with --env-file deploy/env/small.env}")
 
@@ -208,6 +222,14 @@ def test_mutated_copy_fails_with_rule_name(tmp_path: Path, rule: str):
     assert result.returncode == 1, result.stdout + result.stderr
     failed = [line.split(":", 1)[0] for line in result.stdout.splitlines() if ":" in line]
     assert failed.count(rule) == 1, result.stdout
+
+
+def test_worker_port_mutated_copy_fails_with_no_host_port(tmp_path: Path):
+    compose = tmp_path / "compose.yaml"
+    compose.write_text(_mutate_worker_port(COMPOSE.read_text(encoding="utf-8")), encoding="utf-8")
+    result = _run(["--compose", str(compose), "--env-file", str(ENV_FILE)])
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "no-host-port: worker publishes port 8080" in result.stdout
 
 
 def test_mutated_template_fails_with_config_keys(tmp_path: Path):

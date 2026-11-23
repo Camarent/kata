@@ -55,7 +55,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/__main__.py` - process entry and signal handling.
 
 ## Invariants and gotchas
-- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:41` and `:44`).
+- `core_url` must be `http` or `https` and point at loopback (`127.0.0.1`, `::1`, `localhost`) or at a whole host name listed in `[worker] core_hosts` (the compose core service in the container deployment; `deploy/kata.host.toml:32` sets `core_hosts = ["core"]` and `core_url = "http://core:8080"`); other hosts raise `ValueError` (`worker/kata_worker/core_client.py:41` and `:44`).
 - The token comes from an env var, never from the config file; a missing variable raises `ValueError` (`worker/kata_worker/core_client.py:53`).
 - A tagging or generation exception fails only that job (`worker/kata_worker/handlers/tag.py:30`, `worker/kata_worker/handlers/course.py:49` `client.fail`); the worker keeps running.
 - A job kind has one handler: the loop asks the core only for kinds in `load_handlers()` (`worker/kata_worker/loop.py:29`), so a new kind needs a new module in `handlers/`, not an edit to the loop.
@@ -103,5 +103,5 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Cost config: `[cost]` `cap_micro_usd` and `warn_micro_usd` (`config/kata.example.toml:53-54`), `estimate_safety_percent` (`:57`, pre-call guard only); spend goes to the core `POST /usage` and is read from `GET /usage` (`docs/api.md`).
 - Prompt caching config: `[provider_anthropic]` `cache_system` (`config/kata.example.toml:89`, default false; see the cost invariants above).
 - The smoke run prints the ledger cost from usage, the input and output token counts, and one line with the estimated versus billed cost per run (`scripts/smoke/real_model.py`).
-- Config keys: `[worker]` `poll_interval_seconds`, `request_timeout_seconds`, `core_url`, `token_env`; `[model]` `base_url`, `model_name`, `timeout_seconds` (`config/kata.example.toml:19`, `:28`). Env overrides follow the config module (`KATA_*`).
+- Config keys: `[worker]` `poll_interval_seconds`, `request_timeout_seconds`, `core_url`, `core_hosts`, `token_env`; `[model]` `base_url`, `model_name`, `timeout_seconds` (`config/kata.example.toml:19`, `:28`). Env overrides follow the config module (`KATA_*`).
 - Used by: `tests/worker/`, and `tests/e2e/conftest.py:143` `running_worker` (`kata_worker.loop.run_forever` in a thread).

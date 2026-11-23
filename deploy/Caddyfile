@@ -2,10 +2,9 @@
 #
 # One site: the tailnet name of this node, from env KATA_TAILNET_NAME (e.g. vm.tailnet-name.ts.net).
 # TLS: a Tailscale certificate for the node name (D19). Caddy cannot use the tailscaled socket, so
-# the host writes the files and compose mounts that directory read-only at /var/run/tailscale. Run on
-# the host, and again before expiry (about every 60 days, e.g. from cron):
-#   tailscale cert --cert-file /var/run/tailscale/certs/<name>.crt --key-file /var/run/tailscale/certs/<name>.key <name>
-# then `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+# the host writes the files into KATA_CERT_DIR and compose mounts that directory read-only at
+# /var/run/tailscale/certs. deploy/systemd/kata-cert.timer runs kata-cert.service every 30 days: it
+# runs `tailscale cert` into that directory, then `docker compose exec caddy caddy reload`.
 # Redirects: the HTTP to HTTPS redirect is off; only port 443 is published (compose).
 #
 # Sources: docs/design/detailed-architecture.md section 4.2 (proxy settings the design relies on): worker route

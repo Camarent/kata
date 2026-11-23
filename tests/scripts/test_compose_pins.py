@@ -1,7 +1,9 @@
 """deploy/compose.yaml: every third-party image is pinned by digest through deploy/versions.env.
 
-Reads the files as text (no docker): each image line that is not the local kata build must be
+Reads the files as text (no docker): each image line that is not the shipped kata image must be
 `${<NAME>_IMAGE:?...}@${<NAME>_DIGEST:?...}`, and deploy/versions.env must define both variables.
+The shipped kata image is `kata:${KATA_IMAGE_TAG:?...}`; compose.yaml has no build: key (the build
+lives in deploy/compose.build.yaml, which the VM never runs).
 """
 
 from __future__ import annotations
@@ -11,8 +13,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
 COMPOSE = REPO_ROOT / "deploy" / "compose.yaml"
+COMPOSE_BUILD = REPO_ROOT / "deploy" / "compose.build.yaml"
 VERSIONS = REPO_ROOT / "deploy" / "versions.env"
-LOCAL_IMAGE = "kata:local"
+LOCAL_IMAGE = re.compile(r"kata:\$\{KATA_IMAGE_TAG:\?[^}]*\}")
+BUILT_SERVICES = ("migrate", "core", "worker")
 PINNED_IMAGE = re.compile(
     r"\$\{(?P<image>[A-Z_]+)_IMAGE:\?[^}]*\}@\$\{(?P<digest>[A-Z_]+)_DIGEST:\?[^}]*\}"
 )
@@ -31,7 +35,7 @@ def _unpinned_images(compose_text: str) -> list[str]:
     """Image values that are neither the local kata build nor a versions.env digest reference."""
     bad = []
     for value in _image_values(compose_text):
-        if value == LOCAL_IMAGE:
+        if LOCAL_IMAGE.fullmatch(value):
             continue
         match = PINNED_IMAGE.fullmatch(value)
         if match is None or match.group("image") != match.group("digest"):
@@ -70,6 +74,18 @@ def test_versions_env_defines_every_compose_image_variable():
     defined = _defined_variables(VERSIONS.read_text())
     missing = _referenced_variables(COMPOSE.read_text()) - defined
     assert missing == set()
+
+
+def test_compose_has_no_build_key():
+    build_lines = [line for line in COMPOSE.read_text().splitlines() if line.strip().startswith("build:")]
+    assert build_lines == []
+
+
+def test_build_override_builds_every_stack_image():
+    text = COMPOSE_BUILD.read_text()
+    for service in BUILT_SERVICES:
+        assert f"  {service}:\n    build:\n" in text, f"{service} has no build in compose.build.yaml"
+    assert "PY_BASE_DIGEST: ${PY_BASE_DIGEST}" in text
 
 
 def test_bare_tag_mutation_is_reported():

@@ -16,6 +16,14 @@ const EXTENSION_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST_DIR = join(EXTENSION_DIR, "dist");
 const BROWSERS = ["chrome", "firefox"];
 const PANEL_PAGE = "sidepanel.html";
+/**
+ * Optional build-time core base URL. When set, it becomes the manifest host permission and the
+ * default `DEFAULT_BASE_URL` in `src/config.ts`; when unset, the values in `src/config.ts` and
+ * `manifest.base.json` apply.
+ */
+const BASE_URL_ENV = "KATA_EXTENSION_BASE_URL";
+/** Identifier in `src/config.ts` that esbuild replaces with the build-time base URL. */
+const BASE_URL_DEFINE = "__KATA_BASE_URL__";
 
 /** Scripts bundled for every browser; `out` is relative to `dist/<browser>/`. */
 const SCRIPTS = [
@@ -39,13 +47,15 @@ function selectedBrowsers(requested) {
  * Writes the full output for one browser.
  * @param {string} browser Target browser.
  * @param {object} base Parsed `manifest.base.json`.
+ * @param {string | undefined} baseUrl Core base URL from `BASE_URL_ENV`, or undefined when unset.
  */
-async function buildBrowser(browser, base) {
+async function buildBrowser(browser, base, baseUrl) {
   const outDir = join(DIST_DIR, browser);
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, "manifest.json"), `${JSON.stringify(composeManifest(base, browser), null, 2)}\n`);
+  await writeFile(join(outDir, "manifest.json"), `${JSON.stringify(composeManifest(base, browser, baseUrl), null, 2)}\n`);
   await copyFile(join(EXTENSION_DIR, PANEL_PAGE), join(outDir, PANEL_PAGE));
+  const define = baseUrl === undefined ? {} : { [BASE_URL_DEFINE]: JSON.stringify(baseUrl) };
   for (const script of SCRIPTS) {
     await build({
       entryPoints: [join(EXTENSION_DIR, script.entry)],
@@ -55,12 +65,14 @@ async function buildBrowser(browser, base) {
       platform: "browser",
       target: "es2022",
       logLevel: "warning",
+      define,
     });
   }
   console.log(`built ${browser}: ${outDir}`);
 }
 
 const base = JSON.parse(await readFile(join(EXTENSION_DIR, "manifest.base.json"), "utf8"));
+const baseUrl = process.env[BASE_URL_ENV] || undefined;
 for (const browser of selectedBrowsers(process.argv[2])) {
-  await buildBrowser(browser, base);
+  await buildBrowser(browser, base, baseUrl);
 }

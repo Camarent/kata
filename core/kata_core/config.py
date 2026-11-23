@@ -61,6 +61,9 @@ def _cast(raw: str, template: Any, name: str) -> Any:
             return int(raw)
         if isinstance(template, float):
             return float(raw)
+        if isinstance(template, list):
+            # Comma-separated list; an unsplit string would make list membership a substring test.
+            return [item.strip() for item in raw.split(",") if item.strip()]
         return raw
     except ValueError as exc:
         raise ConfigError(f"env override {name} is not a valid {type(template).__name__}") from exc
