@@ -61,7 +61,8 @@ Run the VM steps on the VM as a user with sudo. Run the dev steps on the dev mac
    ```
    The ship builds `kata:<sha>`, runs `scripts/deploy/validate_stack.py` and `scripts/deploy/check_image_rules.py`, streams the image with `docker save | ssh docker load`, copies the deploy files, writes `KATA_IMAGE_TAG` into the VM env file, runs `docker compose up -d` (migrate, then core, worker and Caddy) and ends with the deep health check.
 10. Deep health check from a tailnet device: `curl -fsS https://<name>/v1/health/deep`. It checks the database and the migration state (D22). The core container runs the same check as its healthcheck: on the VM, in `/opt/kata/deploy`, `docker compose --env-file env/vm.env -f compose.yaml ps` must show `core` as `healthy`.
-11. Install the nightly dump (see Backup below).
+11. Create the kata user and give the worker a real token. Core accepts only device tokens it issued, so the random `worker_token` from step 4 only lets the stack start; the worker gets 401 until you replace it. In `/opt/kata/deploy`, with `versions.env` sourced (`set -a; . ./versions.env; set +a`) and `dc="docker compose --env-file env/vm.env -f compose.yaml"`: `$dc exec -T core sh -c 'export KATA_DATABASE_PASSWORD="$(cat /run/secrets/postgres_password)"; exec python -m kata_core.auth.admin create-user NAME'`, then the same with `enrol NAME`, which prints a one-time code. Redeem it for the worker: `POST http://127.0.0.1:8080/auth/enrol` with `{"code": ..., "label": "vm-worker"}` from inside the core container; the reply holds the token. Write only the token into `secrets/worker_token` (uid 10001, mode 0600, no echo to the terminal), then `$dc restart worker`. The worker serves that one user's jobs (`/jobs/next` is per user). Issue a second `enrol NAME` code for each extension device. The worker has no health check: the image check probes the core port, so compose disables it.
+12. Install the nightly dump (see Backup below).
 
 ## Profiles
 

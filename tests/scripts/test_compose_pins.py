@@ -94,3 +94,10 @@ def test_bare_tag_mutation_is_reported():
     assert text.count(old) == 1, "expected exactly one postgres digest line"
     mutated = text.replace(old, "    image: postgres:17\n")
     assert _unpinned_images(mutated) == ["postgres:17"]
+
+
+def test_worker_disables_the_image_healthcheck():
+    """The image HEALTHCHECK probes the core HTTP port; the worker serves none, so it must opt out."""
+    text = COMPOSE.read_text()
+    block = text.split("\n  worker:\n", 1)[1].split("\n  caddy:\n", 1)[0]
+    assert "healthcheck:\n      disable: true" in block
