@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -110,3 +111,40 @@ def test_dispatch_runs_no_release_step():
         run = str(step.get("run", ""))
         if "make_zip.py" in run or "gh release" in run:
             assert "github.event_name == 'push'" in str(step.get("if", "")), step.get("name")
+
+
+# The publish step branches on `gh release view`: upload with --clobber when the release
+# exists, create it otherwise. The two branches are checked as one unit.
+PUBLISH_BRANCHES = re.compile(
+    r'if gh release view "\$TAG" >/dev/null 2>&1; then\n\s*(?P<then>.*?)\n\s*else\n\s*(?P<els>.*?)\n\s*fi',
+    re.DOTALL,
+)
+
+
+def _publish_run(doc: dict[str, Any]) -> str:
+    runs = [str(s.get("run", "")) for s in _steps(doc) if "gh release view" in str(s.get("run", ""))]
+    assert len(runs) == 1, "exactly one publish step must branch on gh release view"
+    return runs[0]
+
+
+def _assert_publish_branches(run: str) -> None:
+    match = PUBLISH_BRANCHES.search(run)
+    assert match, "publish step must branch on gh release view"
+    then, els = match.group("then"), match.group("els")
+    assert "gh release upload" in then and "--clobber" in then
+    assert "gh release create" in els
+    assert "gh release create" not in then and "gh release upload" not in els
+
+
+def test_publish_uploads_with_clobber_when_release_exists_else_creates():
+    _, doc = _workflow()
+    _assert_publish_branches(_publish_run(doc))
+
+
+def test_publish_check_rejects_upload_without_clobber():
+    # Mutation: drop --clobber from the upload branch; the same check must go red.
+    _, doc = _workflow()
+    mutated = _publish_run(doc).replace(" --clobber", "")
+    assert mutated != _publish_run(doc)
+    with pytest.raises(AssertionError):
+        _assert_publish_branches(mutated)
