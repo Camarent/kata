@@ -27,7 +27,7 @@ env_file="${KATA_SHIP_ENV_FILE:-env/small.env}"
 build_env_file="${KATA_SHIP_BUILD_ENV_FILE:-env/small.env}"
 health_tries="${KATA_SHIP_HEALTH_TRIES:-10}"
 health_wait="${KATA_SHIP_HEALTH_WAIT:-3}"
-# Compose needs a tailnet name to read the file even for a build; the image never contains it. The real
+# Compose needs a node name to read the file even for a build; the image never contains it. The real
 # name lives in the VM env file.
 build_tailnet_name="build.invalid"
 # Files copied to the VM, relative to deploy/. Secrets and the Dockerfile are never listed.

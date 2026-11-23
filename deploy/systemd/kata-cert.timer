@@ -1,5 +1,5 @@
 [Unit]
-Description=Renew the kata Tailscale certificate every 30 days
+Description=Renew the kata node certificate every 30 days
 
 [Timer]
 OnBootSec=5min

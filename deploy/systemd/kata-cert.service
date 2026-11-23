@@ -1,12 +1,12 @@
 [Unit]
-Description=Renew the kata Tailscale certificate and reload caddy
+Description=Renew the kata node certificate and reload caddy
 Wants=network-online.target
 After=network-online.target docker.service
 
 [Service]
 Type=oneshot
-# Environment: KATA_TAILNET_NAME (the node name) and KATA_CERT_DIR (the host directory compose mounts
-# read-only at /var/run/tailscale/certs in the caddy service; default /var/lib/kata/certs).
+# Environment: the node name (set in /etc/kata/cert.env) and KATA_CERT_DIR (the host directory
+# compose mounts read-only into the caddy service; default /var/lib/kata/certs).
 EnvironmentFile=/etc/kata/cert.env
 WorkingDirectory=/opt/kata/deploy
 ExecStartPre=/bin/mkdir -p ${KATA_CERT_DIR}
