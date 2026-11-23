@@ -44,6 +44,22 @@ export class CoreConflictError extends Error {
   }
 }
 
+/** The health probe got no answer from the address (network failure or timeout). */
+export class CoreUnreachableError extends Error {
+  constructor(message = "core is unreachable") {
+    super(message);
+    this.name = "CoreUnreachableError";
+  }
+}
+
+/** The health probe got an answer that is not the kata health document. */
+export class NotKataServerError extends Error {
+  constructor(message = "address does not answer as a kata core") {
+    super(message);
+    this.name = "NotKataServerError";
+  }
+}
+
 export interface CoreClientOptions {
   baseUrl: string;
   token?: string;
@@ -105,6 +121,21 @@ export interface CourseProgress {
   doc: ProgressDoc | null;
 }
 
+/** Answer of `GET /v1/health/deep`: `status` is "fail" (HTTP 503) when a check failed. */
+export interface HealthReport {
+  status: "ok" | "fail";
+  checks: Record<string, boolean>;
+}
+
+/** True when `value` has the shape of the kata health document. */
+function isHealthReport(value: unknown): value is HealthReport {
+  if (typeof value !== "object" || value === null) return false;
+  const { status, checks } = value as { status?: unknown; checks?: unknown };
+  if (status !== "ok" && status !== "fail") return false;
+  if (typeof checks !== "object" || checks === null) return false;
+  return Object.values(checks).every((passed) => typeof passed === "boolean");
+}
+
 /** Answer of `PUT /v1/courses/{id}/progress`. */
 export interface ProgressSaved {
   revision: number;
@@ -128,6 +159,38 @@ export class CoreClient {
     this.token = opts.token;
     this.timeoutMs = opts.timeoutMs;
     this.fetchImpl = opts.fetchImpl ?? ((input, init) => fetch(input, init));
+  }
+
+  /**
+   * Checks that `baseUrl` is a kata core: unauthenticated `GET /v1/health/deep`. Resolves for a
+   * kata health document (also a 503 "fail" one). Throws CoreUnreachableError when there is no
+   * answer in time, NotKataServerError when the answer is not that document.
+   */
+  async probe(): Promise<HealthReport> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      let res: Response;
+      try {
+        res = await this.fetchImpl(`${this.baseUrl}/v1/health/deep`, {
+          method: "GET",
+          signal: controller.signal,
+        });
+      } catch {
+        throw new CoreUnreachableError();
+      }
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        if (controller.signal.aborted) throw new CoreUnreachableError();
+        throw new NotKataServerError();
+      }
+      if (!isHealthReport(body)) throw new NotKataServerError();
+      return body;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Redeem an enrolment code; returns the device token and keeps it for later calls. */
