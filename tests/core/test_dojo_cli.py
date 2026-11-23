@@ -43,8 +43,15 @@ def test_next_id_reads_text_id(dojo: DojoTrainerCli, workdir: Path) -> None:
 
 
 def test_next_id_bad_prefix_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
-    with pytest.raises(TrainerError, match="exited 2"):
+    # The unit is refused before dojo runs, so no dojo exit code is involved.
+    with pytest.raises(TrainerError, match="invalid unit"):
         dojo.next_id(workdir, "Bad Prefix")
+
+
+@pytest.mark.parametrize("unit", ["a/b", "..", "geo x", "geo\tx", "-geo", ""])
+def test_unit_outside_name_charset_raises(dojo: DojoTrainerCli, workdir: Path, unit: str) -> None:
+    with pytest.raises(TrainerError, match="invalid unit"):
+        dojo.next_id(workdir, unit)
 
 
 def test_add_sends_json_on_stdin_and_parses_id(dojo: DojoTrainerCli, workdir: Path) -> None:
@@ -181,11 +188,56 @@ def test_build_content_error_raises(dojo: DojoTrainerCli, workdir: Path) -> None
         dojo.build(workdir, workdir / "out")
 
 
+def test_unit_with_shell_characters_is_refused(workdir: Path) -> None:
+    # Shell metacharacters never reach argv: the unit is refused before any process starts.
+    cli = _inline("raise SystemExit('dojo must not run')")
+    with pytest.raises(TrainerError, match="invalid unit"):
+        cli.next_id(workdir, "geo;$(echo no)")
+
+
 def test_unit_is_one_argument_not_a_shell(workdir: Path) -> None:
-    # The fake-free inline script echoes its last argument: the unit arrives unchanged.
-    unit = "geo;$(echo no)"
+    # The fake-free inline script echoes its last argument: a valid unit arrives unchanged.
+    unit = "geo_2-x"
     cli = _inline("import sys; print(sys.argv[-1] + '-1')")
     assert cli.next_id(workdir, unit) == f"{unit}-1"
+
+
+def test_build_symlink_to_file_outside_course_raises(workdir: Path) -> None:
+    secret = workdir / "secret.txt"
+    secret.write_text("outside")
+    code = (
+        "import json, os, pathlib, sys; site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+        "site.mkdir(parents=True); (site / 'index.html').write_text('x'); "
+        "os.symlink(" + repr(str(secret)) + ", site / 'linked.txt'); "
+        "(site / 'manifest.json').write_text(json.dumps({'files': ['linked.txt']}))"
+    )
+    with pytest.raises(TrainerError, match="symlink or outside"):
+        _inline(code).build(workdir, workdir / "out")
+
+
+def test_build_symlink_to_file_inside_course_raises(workdir: Path) -> None:
+    # Inside the course dir the resolve() check passes: only the symlink check refuses it.
+    code = (
+        "import json, os, pathlib, sys; site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+        "site.mkdir(parents=True); (site / 'index.html').write_text('x'); "
+        "(site / 'real.txt').write_text('inside'); "
+        "os.symlink(site / 'real.txt', site / 'alias.txt'); "
+        "(site / 'manifest.json').write_text(json.dumps({'files': ['alias.txt']}))"
+    )
+    with pytest.raises(TrainerError, match="is a symlink"):
+        _inline(code).build(workdir, workdir / "out")
+
+
+def test_build_symlink_found_by_walk_raises(workdir: Path) -> None:
+    secret = workdir / "secret.txt"
+    secret.write_text("outside")
+    code = (
+        "import os, pathlib, sys; site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+        "site.mkdir(parents=True); (site / 'index.html').write_text('x'); "
+        "os.symlink(" + repr(str(secret)) + ", site / 'linked.txt')"
+    )
+    with pytest.raises(TrainerError, match="is a symlink"):
+        _inline(code).build(workdir, workdir / "out")
 
 
 def test_timeout_raises(workdir: Path) -> None:

@@ -19,6 +19,8 @@ from kata_core.trainer.cli import Diagnostic, TrainerError
 
 # An item id as `dojo` prints it: `<unit>-<n>`. Only used to find the id inside a diagnostic message.
 ID_IN_MESSAGE = re.compile(r"(?<![\w-])([A-Za-z][\w-]*-\d+)(?![\w-])")
+# A unit name: letters, digits, `_` and `-`. Anything else (`/`, `..`, whitespace, shell characters) is refused.
+UNIT_NAME = re.compile(r"[A-Za-z0-9_-]+")
 # `dojo add` prints: `added N items to content/<unit>.jsonl: <first> .. <last>`, then the ids.
 ADDED_HEADER = re.compile(r"^added \d+ items? to .*?: (\S+) \.\. (\S+)$", re.MULTILINE)
 INDEX_FILE = "index.html"
@@ -100,7 +102,7 @@ class DojoTrainerCli:
 
 
 def _check_unit(unit: str) -> None:
-    if not unit or unit.startswith("-"):
+    if not UNIT_NAME.fullmatch(unit) or unit.startswith("-"):
         raise TrainerError(f"invalid unit {unit!r}")
 
 
@@ -164,11 +166,23 @@ def _artifact_files(course_dir: Path) -> list[str]:
     """Course files as paths relative to the out dir: the manifest's `files` list when present, else a walk."""
     names = _manifest_files(course_dir)
     if names is None:
-        names = sorted(p.relative_to(course_dir).as_posix() for p in course_dir.rglob("*") if p.is_file())
+        walked = list(course_dir.rglob("*"))
+        for path in walked:
+            if path.is_symlink():
+                raise TrainerError(f"dojo build: {path.relative_to(course_dir).as_posix()!r} is a symlink")
+        names = sorted(p.relative_to(course_dir).as_posix() for p in walked if p.is_file())
     for name in names:
-        if Path(name).is_absolute() or ".." in Path(name).parts or not (course_dir / name).is_file():
-            raise TrainerError(f"dojo build: file {name!r} is missing or outside the course dir")
+        _check_artifact(course_dir, name)
     return [f"{course_dir.name}/{name}" for name in names]
+
+
+def _check_artifact(course_dir: Path, name: str) -> None:
+    """A listed file must be a real file inside the course dir: no absolute path, no `..`, no symlink."""
+    path = course_dir / name
+    if Path(name).is_absolute() or ".." in Path(name).parts or not path.is_file():
+        raise TrainerError(f"dojo build: file {name!r} is missing or outside the course dir")
+    if path.is_symlink() or not path.resolve().is_relative_to(course_dir.resolve()):
+        raise TrainerError(f"dojo build: file {name!r} is a symlink or outside the course dir")
 
 
 def _manifest_files(course_dir: Path) -> list[str] | None:
