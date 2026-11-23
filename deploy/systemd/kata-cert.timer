@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew the kata Tailscale certificate every 30 days
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30d
+# A renewal missed while the host was off runs at the next start.
+Persistent=true
+Unit=kata-cert.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,1 @@
+{"syllabus_id": 4, "text": "Week 1: TCP basics, the three-way handshake. Week 2: UDP and when to pick it. Week 3: congestion control and retransmission timers."}

@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "explain",
+      "task_class": "explain",
+      "system": "You explain a topic to a trainer in two short sentences.",
+      "input": "scripts/smoke/data/explain.txt",
+      "json": false
+    },
+    {
+      "id": "summary",
+      "task_class": "summary",
+      "system": "You summarize a text for a trainer in three short sentences.",
+      "input": "scripts/smoke/data/summary.txt",
+      "json": false
+    },
+    {
+      "id": "generate_course",
+      "task_class": "generate_course",
+      "system": "COURSE_SYSTEM_PROMPT",
+      "system_source": "worker/kata_worker/handlers/course.py:17",
+      "input": "scripts/smoke/data/course_concepts.json",
+      "json": true
+    },
+    {
+      "id": "extract_syllabus",
+      "task_class": "extract_syllabus",
+      "system": "SYLLABUS_SYSTEM_PROMPT",
+      "system_source": "worker/kata_worker/handlers/syllabus.py:17",
+      "input": "scripts/smoke/data/syllabus.txt",
+      "json": true
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+---
+paths: [scripts/]
+summary: Operator DB CLI (create, migrate, drop) and the lesson-check benchmark harness with pure scoring in scripts/bench/
+---
+# scripts
+
+## Purpose
+Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests). `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. `scripts/smoke/` runs the opt-in smokes: real model, local model and real dojo (see the smoke sections below). The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
+
+## Public surface
+- `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
+- `scripts/dev/check-all.sh:47` mode flags (`--py`, `--ext`, `--editor`, `--browser`, ...), `:152` `run_browser` (`--browser`: prints a skip line and exits 0 when the install status fails, else runs `tests/browser -m browser`); every other mode excludes `browser` (`:134`, `:138`, `:174-180`).
+- `scripts/db/kata_db.py:35` `main(argv)` - subcommands `create NAME`, `migrate [--name NAME]`, `drop NAME`.
+- `scripts/db/kata_db.py:20` `_parser()` - argparse setup; `--config` at `:24`.
+- `scripts/db/kata_db.py:55` `if __name__ == "__main__"` - run as script.
+- `scripts/bench/lesson_check_bench.py:177` `main(argv)` - exit 0 with report on stdout; exit 2 with message on stderr when config is invalid or the embedder is not `fake`.
+- `scripts/bench/lesson_check_bench.py:169` `_parser()` - flags `--config`, `--cases` (default `cases.json` beside the script), `--format text|markdown`.
+- `scripts/bench/lesson_check_bench.py:92` `run_bench(cfg, cases)` -> `BenchResult`; creates scratch DB, seeds, runs `check_lesson`, drops DB in `finally`.
+- `scripts/bench/lesson_check_bench.py:133` `render_markdown(result)`, `:155` `render_text(result)` - report shapes; labels and numbers only.
+- `scripts/deploy/check_image_rules.py:135` `main(argv)` - checks `deploy/Dockerfile` and `.dockerignore` (pinned base image, non-root user, healthcheck, no secret paths copied); `:91` `check(dockerfile, dockerignore)` -> list of problems.
+- `scripts/deploy/validate_stack.py:153` `main(argv)` - checks `deploy/compose.yaml` (`:97` `check_compose`: published ports bound to loopback or the tailnet, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:140` `check_config_keys`). The model comes from `docker compose config` (`:52` `load_compose`); without docker it fails, it does not fall back to a parser.
+- `scripts/deploy/replay_tombstone.py:71` `main(argv)` - replays the tombstone file kept beside a dump (`:38` `parse`, `:55` `replay`).
+- `scripts/deploy/verify_counts.py:54` `main(argv)` - content-free row counts per table (`:34` `table_counts`, `:47` `differing_tables`) for the restore drill; prints counts and names only.
+- `scripts/smoke/dojo_real.py:142` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:30`); returns 0, 1 or 2 (`:54-56`). It runs `build_course_dir` (probe, init, add, validate, lock, build) on 8 synthetic drafts, expects 7 kept and 1 dropped, checks the required keys `index.html`, `data/content.json`, `manifest.json`, the `max_artifact_bytes` cap, and the prompts in `data/content.json` `items`. `data/content.json` is an object (`version`, `course`, `items`, `lock`): `run_smoke` (`:97`) checks its version against the manifest, its course id, its items list and its lock ids (`:117-129`). Optional `KATA_TEST_DOJO_WASM` and `KATA_TEST_DOJO_WEB` are passed to `build`.
+- `scripts/bench/scoring.py:108` `score(expected, got)` -> `Score` (accuracy, abstain_rate, abstain_precision, per_state).
+- `scripts/bench/scoring.py:94` `load_cases(path)` -> `Cases`; validates every field, raises on malformed input.
+- `scripts/bench/scoring.py:16` `STATES` (`known`, `learning`, `new`, `abstain`), `:17` `MARKS`.
+
+Run `scripts/db/kata_db.py` from repo root: `PYTHONPATH=core python3 scripts/db/kata_db.py <subcommand>` (see `docs/api.md`, Database CLI).
+Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown`, with `KATA_CONFIG` and the dev Postgres env set (`docs/research/benchmarks/RESULTS.md:29`). Whether `kata_core` must be on `PYTHONPATH` for the bench: TODO(verify).
+
+## Key files
+- `scripts/db/kata_db.py` - DB CLI.
+- `scripts/bench/lesson_check_bench.py` - bench runner: seed, check, score, render.
+- `scripts/bench/scoring.py` - stdlib-only case loader and scorer; no DB, no `kata_core` import.
+- `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
+- `scripts/smoke/real_model.py` - opt-in real-model smoke CLI; `scripts/smoke/smoke_core.py` - case loader, checks, masking; tested by `tests/scripts/test_smoke_cli.py` and `tests/scripts/test_smoke_core.py`.
+- `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
+- `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
+- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
+- `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
+- `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
+- `scripts/deploy/validate_stack.py` - compose and config template rules; tested by `tests/scripts/test_validate_stack.py`.
+- `scripts/deploy/replay_tombstone.py`, `scripts/deploy/verify_counts.py` - restore drill helpers; tested by `tests/scripts/test_restore.py` and `tests/scripts/test_relocate.py`.
+
+## scripts/smoke: real dojo
+`scripts/smoke/dojo_real.py` adds, validates, locks and builds one synthetic gap item (unit `geo`) with the `dojo` binary in a temp dir, then prints the built file names. It is opt-in and run by hand; check-all and CI never run it. Run line: `KATA_TEST_DOJO=<path to dojo> python scripts/smoke/dojo_real.py`.
+
+- Refused (exit 2, no run) unless `KATA_TEST_DOJO` names an executable file (`scripts/smoke/dojo_real.py:133-135`). The temp dir is removed when the run ends.
+- Exit codes (`scripts/smoke/dojo_real.py:54-56`): 0 when every step succeeds with no diagnostics; 1 on a diagnostic or a `TrainerError`; 2 when refused.
+- Uses `DojoTrainerCli` (`core/kata_core/trainer/dojo_cli.py:29`) with a 60 s timeout per call. Tested by `tests/scripts/test_dojo_real.py`.
+- Init id probe runs first (`probe_init_ids` in `scripts/smoke/dojo_real.py`): `dojo init "Bad Id"` must exit non-zero, and the smoke prints that id-rule error text (`init rejects 'Bad Id': <text>`). `dojo init kata-<uuid>` must exit 0.
+- The id rules the real `dojo` enforces are not yet measured here. After the first real run, the lead records the measured rules in `docs/decisions.md` (lead step, not the dev).
+
+## scripts/smoke
+`scripts/smoke/real_model.py` runs the 4 prepared cases (`scripts/smoke/data/cases.json`) against the Anthropic API. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (env file holds `KATA_CONFIG` and the key in `KATA_ANTHROPIC_API_KEY`):
+
+`set -a; . <env file>; set +a; KATA_SMOKE_REAL=1 python scripts/smoke/real_model.py`
+
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_REAL=1`, the key env var is set, and the model is on `[smoke] allowed_models` (`scripts/smoke/real_model.py:115-119`). `--model` picks a model; the default is the first id in the list.
+- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:67`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`scripts/smoke/real_model.py:78-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
+- Checks per case (`scripts/smoke/smoke_core.py:205`): the reply is non-empty; a JSON case must parse, and `generate_course` and `extract_syllabus` must also pass `parse_drafts` and `parse_modules` (`scripts/smoke/smoke_core.py:46-48`).
+- Exit codes (`scripts/smoke/real_model.py:55-57`, `:151`): 0 when every case passes; 1 when a case fails or the cost cap stops the run; 2 when refused.
+- The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`scripts/smoke/smoke_core.py:195-198`, `:255`).
+
+## scripts/smoke: local model
+`scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
+
+`KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_model.py`
+
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_LOCAL=1` and a base URL is given: `--base-url` wins over `KATA_SMOKE_LOCAL_BASE_URL` (`scripts/smoke/local_model.py:240-241`). Also refused when the config does not load, the cases do not load, or no model is named (`scripts/smoke/local_model.py:236-252`).
+- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`scripts/smoke/local_model.py:251`, `:106`). The example is `models = "kata-l"` (`config/kata.example.toml:72`).
+- Config keys in `[smoke_local]` (`config/kata.example.toml:71-75`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
+- Warm-up: each model gets one request first (`scripts/smoke/local_model.py:138`, `:205`). Its result is neither printed nor counted, so a slow cold load does not fail a case.
+- Context warning: a case whose prompt estimate is over 75 percent of `num_ctx` prints `WARN model=... case=... prompt_estimate_tokens=... num_ctx=... over 75 percent` before it is sent (`scripts/smoke/local_model.py:64`, `:146-153`). It does not stop the case.
+- Output, one line per case (`scripts/smoke/smoke_core.py:312-320`): `<case> PASS|FAIL class=... prompt_tokens=... completion_tokens=... seconds=... tokens_per_s=... reason=<JSON> excerpt=<JSON>`. The excerpt is cut to 200 characters. Then one summary line per model: `summary model=... passes=N/M mean_seconds=... mean_tokens_per_s=... reasoning_effort=...` (`unset` when empty; `scripts/smoke/local_model.py:221-227`).
+- Failure reasons (`scripts/smoke/local_model.py:68-71`): `timeout`, `connection refused`, `missing usage`, `shape check failed`, or the provider's own short reason (cut to 120 characters, `:73`, `:124-137`). A case passes only when the call succeeds, the usage is present, and the shape check passes.
+- Exit codes (`scripts/smoke/local_model.py:74-76`, `:268`): 0 only when every case of every model passes; 1 when any case fails or a model has no cases; 2 when refused.
+- The base URL never reaches stdout or stderr. A reply reaches stdout only as the masked excerpt above (`scripts/smoke/local_model.py:7`).
+
+## Invariants and gotchas
+- `kata_db.py` needs the `core` package on `PYTHONPATH`; it imports `kata_core` directly.
+- `drop NAME` is destructive; it drops the database if it exists.
+- `migrate` applies only pending migrations; running it twice is a no-op (tested).
+- Bench refuses any embedder other than `fake` before any DB work (`scripts/bench/lesson_check_bench.py:67`, `:94`); no model loads.
+- Bench DB name is `<database.name>_b<uuid8>` (`scripts/bench/lesson_check_bench.py:62`); dropped in a `finally`, so Ctrl-C also drops it.
+- A concept with a mark has expected = mark (`scripts/bench/scoring.py:83`); expected `new` needs mark `new` (`scripts/bench/scoring.py:81`), because retrieval never gives `new`.
+- `abstain_rate` is over all cases; `abstain_precision` is `None` when nothing was predicted abstain (`scripts/bench/scoring.py:121`).
+- Report never prints entry text (tested by `test_rendered_report_has_no_entry_text`).
+- `install-browsers.sh` fails closed: an empty sha256 pin refuses the install. Chromedriver is not pinned; Chrome is found on `PATH`.
+- `docs/research/benchmarks/RESULTS.md` holds a pasted block between `bench:lesson-check` markers; `tests/scripts/test_bench_results_note.py` fails when it differs from the bench output.
+
+## Depends on / used by
+- Depends on: `core/kata_core/config.py` (`load_config`, `ConfigError`), `core/kata_core/storage/provision.py` (`connect`, `create_database`, `drop_database`, `migrate`), psycopg.
+- `scripts/smoke/dojo_real.py` depends on `kata_core.trainer.cli` (`TrainerError`) and `kata_core.trainer.dojo_cli` (`DojoTrainerCli`).
+- Bench also depends on `kata_core` lesson_check, retrieval, storage (`check_lesson`, `Retriever`, `add_entry`, `load_embedder`, concepts, taxonomy, users).
+- Used by: operators by hand; `tests/browser/conftest.py` calls `install-browsers.sh --print-dir`; `check-all.sh` runs every mode; `tests/core/test_provision.py` covers the CLI parser; `tests/scripts/test_bench_*.py` cover the bench; `docs/research/benchmarks/SUITE.md` line 3 points to `scripts/bench/`.

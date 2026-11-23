@@ -1,0 +1,26 @@
+pipeline.json
+AUDIT.md
+.pipeline/
+.work/
+.wt/
+.audits/
+.code-index/
+.notes/
+node_modules/
+dist/
+.vite/
+extension/coverage/
+editor/coverage/
+reports/jscpd/
+__pycache__/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.coverage
+# Real secret files for the container deployment (layout in deploy/secrets.example/README.md).
+deploy/secrets/
+
+# Extension release zips built by scripts/release/make_zip.py
+/release/

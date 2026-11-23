@@ -1,0 +1,13 @@
+# Build context exclusions: VCS, work and notes, local envs, and anything that holds secrets.
+.git
+.work
+.wt
+.notes
+.pipeline
+node_modules
+.venv
+AUDIT.md
+**/*.env
+**/secrets
+**/__pycache__
+**/.pytest_cache

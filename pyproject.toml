@@ -1,0 +1,34 @@
+[project]
+name = "kata"
+version = "0.0.0"
+requires-python = ">=3.11"
+# stdlib only: tomllib ships with Python 3.11+, so no tomli dependency.
+dependencies = ["fastapi==0.165.0", "psycopg[binary]==3.3.9", "httpx==0.28.1", "uvicorn==0.54.0"]
+
+[dependency-groups]
+dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "coverage==7.17.4", "ruff==0.17.6", "mypy==2.4.1", "pyyaml==6.0.3"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
+files = ["core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["core"]
+# strict_markers: an unregistered marker is an error, so a typo cannot silently skip a tier.
+strict_markers = true
+markers = [
+    "integration: needs the database (tests/core), set by tests/conftest.py",
+    "e2e: runs a live core, worker and fake model (tests/e2e), set by tests/conftest.py",
+    "smoke: quick end-to-end sanity check, selected by hand",
+    "flaky: known intermittent test, kept out of the gate until fixed",
+    "browser: real Firefox/Chrome through selenium (tests/browser), needs scripts/dev/install-browsers.sh",
+    "real_dojo: runs the real dojo binary named by KATA_TEST_DOJO, deselected when that is not an executable",
+]
+
+[tool.vulture]
+# FastAPI calls route handlers by decorator, so nothing in code calls them.
+ignore_decorators = ["@router.*"]

@@ -1,0 +1,6 @@
+#!/bin/sh
+PATTERNS=$(git config --get-all privacy.blocklist)
+if [ -z "$PATTERNS" ]; then
+  echo "privacy hook: no privacy.blocklist configured, check skipped" >&2; exit 0
+fi
+if grep -qiE "$PATTERNS" "$1"; then echo "commit-msg: message contains the personal address" >&2; exit 1; fi

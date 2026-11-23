@@ -1,0 +1,173 @@
+# Example kata configuration. Every key here is required in a real config file.
+# Values are synthetic placeholders. Override any key with KATA_<SECTION>_<KEY>.
+
+[core]
+host = "127.0.0.1"
+port = 8080
+# Public base URL for open links. Empty derives it from the request base URL.
+public_url = ""
+
+[database]
+host = "127.0.0.1"
+port = 5432
+name = "kata_dev"
+user = "kata_dev"
+password_env = "KATA_DATABASE_PASSWORD"
+
+[auth]
+token_ttl_seconds = 3600
+enrolment_ttl_seconds = 86400
+
+[worker]
+poll_interval_seconds = 5
+request_timeout_seconds = 30
+core_url = "http://127.0.0.1:8080"
+token_env = "KATA_WORKER_TOKEN"
+# Extra core hosts the worker may use besides loopback (whole names; empty = loopback only).
+core_hosts = []
+
+[jobs]
+lease_seconds = 300
+# Seconds between polls of the job runner (python -m kata_core.jobs).
+runner_poll_seconds = 5
+# Cap on the output a job may store, in bytes.
+max_output_bytes = 262144
+
+[model]
+base_url = "http://127.0.0.1:11434/v1"
+model_name = "local-model"
+timeout_seconds = 60
+# Reasoning effort sent with each request; empty omits the field.
+reasoning_effort = ""
+
+[client]
+request_timeout_seconds = 30
+
+[retrieval]
+embedder = "fake"
+model_name = ""
+rrf_k = 60
+candidate_limit = 50
+dimensions = 64
+
+[lesson_check]
+min_score = 0.02
+known_hits = 3
+search_limit = 5
+
+[cost]
+cap_micro_usd = 2000000
+warn_micro_usd = 1500000
+# Pre-call guard: a cloud call is refused when spent + its estimated input cost * this percent / 100
+# reaches the cap. Must be at least 100.
+estimate_safety_percent = 150
+
+# Opt-in smoke run, started by the lead by hand (never by CI). allowed_models lists the
+# only models it may call; budget_micro_usd caps its spend. No secrets here: keys stay in env.
+[smoke]
+allowed_models = "claude-haiku-5-5"
+budget_micro_usd = 500000
+
+# Opt-in local smoke run, started by the lead by hand (never by CI). The base URL comes from env
+# KATA_SMOKE_LOCAL_BASE_URL or the --base-url flag; it is never written here.
+[smoke_local]
+models = "kata-l"
+case_timeout_seconds = 180
+warmup_timeout_seconds = 600
+num_ctx = 8192
+
+[routing]
+# Per task class: comma list of provider names, tried in order.
+tag = "local"
+explain = "anthropic,local"
+summary = "anthropic"
+batch = "anthropic"
+generate_course = "local,anthropic"
+extract_syllabus = "local,anthropic"
+
+[providers]
+cloud_enabled = false
+
+[provider_local]
+task_classes = "tag,explain,generate_course,extract_syllabus"
+
+[provider_anthropic]
+allow_cloud = false
+task_classes = "explain,summary,batch,generate_course,extract_syllabus"
+base_url = "https://api.anthropic.com"
+model_name = "claude-model"
+api_key_env = "KATA_ANTHROPIC_API_KEY"
+timeout_seconds = 60
+max_tokens = 1024
+api_version = "2023-06-01"
+cache_system = false
+
+[policy]
+quiet_mark_enabled = true
+quiet_mark_idle_seconds = 600
+nudge_enabled = true
+nudge_error_threshold = 3
+nudge_window_seconds = 900
+stop_enabled = true
+stop_error_threshold = 8
+# Same limit for each type; state is kept per type.
+rate_limit_seconds = 300
+late_event_seconds = 120
+
+[trainer]
+# Trainer CLI run by the job runner. Config-supplied executable (TOML array); default is the dojo CLI in the container image.
+enabled = true
+command = ["/opt/trainer/dojo"]
+# Optional wasm asset path passed to `dojo build --wasm`; empty leaves the flag out.
+wasm = ""
+# Optional web asset path passed to `dojo build --web`; empty leaves the flag out.
+web = ""
+# Seconds before a trainer run is killed.
+timeout_seconds = 120
+# Cap on concepts per generated course.
+max_concepts = 10
+# Items generated per concept.
+items_per_concept = 3
+# Minimum items a course must keep, else the job fails.
+min_items = 5
+# Cap on the trainer artifact size, in bytes.
+max_artifact_bytes = 16777216
+# Cap on a saved trainer progress document, in bytes (413 above it).
+max_progress_bytes = 4194304
+# Lifetime of a signed open link, in seconds.
+open_link_ttl_seconds = 43200
+# File holding the open-link signing key (at least 32 bytes). Required while trainer.enabled = true; startup exits 1 without it.
+open_link_key_file = ""
+
+[knowledge]
+# Score change per trainer evidence step, and the largest change per save.
+trainer_step = 0.1
+trainer_max_step = 0.3
+# Score at or above known_threshold is known; at or above learning_threshold is learning.
+known_threshold = 0.8
+learning_threshold = 0.4
+# Contrary trainer evidence rows needed before a user mark is overwritten.
+assertion_hold = 3
+# Base score for a concept with no evidence, by mark state.
+base_known = 0.9
+base_learning = 0.5
+base_new = 0.1
+
+[syllabus]
+enabled = true
+# Ask the model for help when no syllabus structure is found.
+model_extract = false
+# Cap on the syllabus input size, in bytes.
+max_bytes = 524288
+
+[planning]
+enabled = true
+# Known share of a partly known unit at or above which it is skimmed, not studied.
+skim_share = 0.5
+# Words per unit of reading effort (units = ceil(words / words_per_unit), at least 1).
+words_per_unit = 400
+# Minutes per unit for each action.
+minutes_skip = 1
+minutes_skim = 5
+minutes_practice = 15
+minutes_learn = 30

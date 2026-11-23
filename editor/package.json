@@ -1,0 +1,62 @@
+{
+  "name": "kata-editor",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:kata.installHooks",
+    "onView:kata.infoView"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kata.installHooks",
+        "title": "Kata: Install git hooks"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "kata.infoView",
+          "name": "Kata"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kata",
+      "properties": {
+        "kata.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the kata server, e.g. http://127.0.0.1:8000."
+        },
+        "kata.token": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer token sent with editor events."
+        },
+        "kata.stopPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Regular expressions; a document whose text matches one posts nothing."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.1.0",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  }
+}

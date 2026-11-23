@@ -1,0 +1,1 @@
+"""kata HTTP API (FastAPI)."""

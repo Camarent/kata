@@ -1,0 +1,10 @@
+{
+  "gates": [
+    {"name": "ruff", "cmd": ".venv/bin/ruff check ."},
+    {"name": "mypy", "cmd": ".venv/bin/mypy core"},
+    {"name": "smoke", "cmd": ".venv/bin/python -m pytest tests -m smoke"},
+    {"name": "pytest", "cmd": ".venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term -m 'not flaky'"},
+    {"name": "extension-build", "cmd": "npm --prefix extension run build"},
+    {"name": "extension-test", "cmd": "npm --prefix extension run test:cov"}
+  ]
+}

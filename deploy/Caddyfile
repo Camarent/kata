@@ -1,0 +1,36 @@
+# Caddy reverse proxy for kata (D19, docs/decisions.md). Loaded by the caddy service in deploy/compose.yaml.
+#
+# One site: the tailnet name of this node, from env KATA_TAILNET_NAME (e.g. vm.tailnet-name.ts.net).
+# TLS: a Tailscale certificate for the node name (D19). Caddy cannot use the tailscaled socket, so
+# the host writes the files into KATA_CERT_DIR and compose mounts that directory read-only at
+# /var/run/tailscale/certs. deploy/systemd/kata-cert.timer runs kata-cert.service every 30 days: it
+# runs `tailscale cert` into that directory, then `docker compose exec caddy caddy reload`.
+# Redirects: the HTTP to HTTPS redirect is off; only port 443 is published (compose).
+# Paths: one catch-all reverse_proxy with no path matcher, so every path reaches core, /c/* included
+# (the open-link route). A path matcher here must cover /c/* (test_caddyfile_rules.py checks it).
+#
+# Sources: docs/design/detailed-architecture.md section 4.2 (proxy settings the design relies on): worker route
+# timeout 60 s (proposed there), stream keep-alive comment line every 15 s, idle timeout above both.
+# Timeouts: the worker route timeout is 60 s, so the upstream response and idle timeouts are 90 s
+# (above 60 s). The keep-alive ping on stream routes is 15 s, so an idle upstream stream must
+# survive more than 15 s between pings; 90 s covers it.
+# Buffering: flush_interval -1 flushes each chunk at once on stream routes (no buffering).
+# Stream routes: core/kata_core/api has no text/event-stream or StreamingResponse route yet
+# (grep at task-9); the rule applies to the one proxied upstream, so it covers any stream route added later.
+{
+	auto_https disable_redirects
+}
+
+{$KATA_TAILNET_NAME} {
+	tls /var/run/tailscale/certs/{$KATA_TAILNET_NAME}.crt /var/run/tailscale/certs/{$KATA_TAILNET_NAME}.key
+
+	reverse_proxy core:8080 {
+		flush_interval -1
+		transport http {
+			response_header_timeout 90s
+			read_timeout 90s
+			write_timeout 90s
+			keepalive 90s
+		}
+	}
+}

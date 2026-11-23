@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the kata database dump every night
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# A run missed while the host was off runs at the next start.
+Persistent=true
+Unit=kata-backup.service
+
+[Install]
+WantedBy=timers.target
