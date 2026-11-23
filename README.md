@@ -113,7 +113,7 @@ Defaults are the values in `config/kata.example.toml`. The example values are pl
 
 The extension build has no server address in it. You type the server URL in the side panel the first time.
 
-Get the build: download the zip for your browser from the Releases page. Each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` there. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
+Get the build: download the zip for your browser from the [Releases page](https://github.com/Camarent/kata/releases). Each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` there. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
 
 Firefox (128.0 or later):
 1. Unzip the Firefox zip into a folder, or use `extension/dist/firefox/`.
@@ -126,7 +126,7 @@ Chrome:
 2. Open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick that folder.
 
 First run:
-1. On the core machine, create the user and print an enrolment code once: `PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME`, then `PYTHONPATH=core python3 -m kata_core.auth.admin enrol NAME`.
+1. On the core machine, with `KATA_CONFIG` set to your config file, create the user with `PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME`. Then print an enrolment code with `PYTHONPATH=core python3 -m kata_core.auth.admin enrol NAME`. The code is shown once and is not stored.
 2. Open the kata side panel from the toolbar button.
 3. Type the server URL (origin only, for example `http://127.0.0.1:8080`), the enrolment code and a device label, then click Connect. Accept the browser's permission prompt for that address.
 
