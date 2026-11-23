@@ -6,12 +6,12 @@
 # Only this project's own version is ever touched. Each edit is anchored to a place that can only be ours:
 # the version key of the [project] table in pyproject.toml, the top-level "version" of the extension's
 # package.json, manifest.base.json and package-lock.json, the root package entry of package-lock.json,
-# and a new "## [NEW]" section in CHANGELOG.md. A dependency that shares the number is never matched.
+# the `__version__` line of core/kata_core/__init__.py, and a new "## [NEW]" section in CHANGELOG.md. A dependency that shares the number is never matched.
 # A guard then counts the changed lines per file; any other count restores every file and exits 1.
 set -euo pipefail
 
 # Every file below MUST hold the new version after `set`; a missing file or an unmatched pattern is an error, never a skip.
-REQUIRED=(pyproject.toml extension/package.json extension/package-lock.json extension/manifest.base.json CHANGELOG.md)
+REQUIRED=(pyproject.toml extension/package.json extension/package-lock.json extension/manifest.base.json core/kata_core/__init__.py CHANGELOG.md)
 
 current() {
   local ref="${1:-}" text
@@ -43,7 +43,7 @@ verify() {
 # Lines each file may change: exactly this many (0 when already done). CHANGELOG.md gets a section, so it is not counted.
 expected() {
   case "$1" in
-    pyproject.toml | extension/package.json | extension/manifest.base.json) echo 1 ;;
+    pyproject.toml | extension/package.json | extension/manifest.base.json | core/kata_core/__init__.py) echo 1 ;;
     extension/package-lock.json) echo 2 ;;
   esac
 }
@@ -65,6 +65,7 @@ set_version() {
   edit pyproject.toml 's/(^\[project\]\n(?:(?!\[)[^\n]*\n)*?version\s*=\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/m'
   edit extension/package.json 's/^(  "version"\s*:\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/m'
   edit extension/manifest.base.json 's/^(  "version"\s*:\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/m'
+  edit core/kata_core/__init__.py 's/^(__version__\s*=\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/m'
   edit extension/package-lock.json 's/^(  "version"\s*:\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/m; s/("packages"\s*:\s*\{\s*""\s*:\s*\{[^}]*?"version"\s*:\s*")\Q$ENV{OLD}\E"/$1$ENV{NEW}"/s'
   if [ -f CHANGELOG.md ] && ! grep -q "^## \[$NEW\]" CHANGELOG.md; then
     edit CHANGELOG.md 'my $h = "## [$ENV{NEW}] - $ENV{DATE}\n\n- $ENV{ENTRY}\n\n"; s/^(?=## \[(?!Unreleased))/$h/m or $_ .= "\n$h"'

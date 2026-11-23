@@ -9,12 +9,13 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 
 ### Added
 
-- core: knowledge model and API for the first pipeline release.
+- core: knowledge model and API for the pipeline.
 - worker: local worker that runs the pipeline tasks and reports status.
-- extension: browser extension client for the kata workflow.
-- trainer: integration with the `dojo` trainer CLI (`trainer.command`, `trainer.timeout_seconds`).
+- extension: browser extension client for Firefox and Chrome.
+- trainer: `dojo` trainer CLI runner, configured in the `[trainer]` section.
 - deploy: deployment scripts and a container image for the web VM.
 
-### Known gaps
+## [0.1.0] - 2026-11-23
 
-- No tagged release yet; the version stays `0.0.0`.
+- docs(release): prepare first release notes and install docs
+

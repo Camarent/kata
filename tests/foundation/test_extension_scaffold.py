@@ -1,9 +1,11 @@
 """Checks the MV3 extension scaffold: manifest, package.json and tsconfig."""
 
 import json
+import re
 from pathlib import Path
 
 EXTENSION = Path(__file__).resolve().parents[2] / "extension"
+SEMVER = r"\d+\.\d+\.\d+"  # the version moves with every release; tests/scripts checks that the files agree
 
 
 def _load(name):
@@ -14,7 +16,7 @@ def test_manifest_base_is_mv3_with_expected_fields():
     manifest = _load("manifest.base.json")
     assert manifest["manifest_version"] == 3
     assert manifest["name"] == "kata"
-    assert manifest["version"] == "0.0.0"
+    assert re.fullmatch(SEMVER, manifest["version"])
     assert manifest["permissions"] == ["storage", "activeTab", "scripting", "permissions"]
     assert "host_permissions" not in manifest
     assert manifest["optional_host_permissions"] == ["http://*/*", "https://*/*"]
@@ -31,7 +33,7 @@ def test_manifest_base_content_script_is_narrowed():
 def test_package_json_scripts_and_dev_dependencies():
     package = _load("package.json")
     assert package["private"] is True
-    assert package["version"] == "0.0.0"
+    assert re.fullmatch(SEMVER, package["version"])
     assert package["scripts"]["build"] == "tsc --noEmit && node build/build.mjs"
     assert "build:content" not in package["scripts"]
     assert "build:sidepanel" not in package["scripts"]
