@@ -15,6 +15,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - trainer: `dojo` trainer CLI runner, configured in the `[trainer]` section.
 - deploy: deployment scripts and a container image for the web VM.
 
+## [0.1.3] - 2026-11-23
+
+- docs(extension): UI design and static mockups
+
 ## [0.1.2] - 2026-11-23
 
 - feat(extension): scan button in side panel and Firefox permission fix

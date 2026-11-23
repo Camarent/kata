@@ -52,6 +52,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`<scheme>://*/c/*` of the saved origin; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
+- `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page; static mockups in `docs/design/extension-ui/` (`panel-states.html`, `lesson-page.html`, `tokens.css`). Not shipped in the extension build; checked by `tests/scripts/test_extension_ui_design.py` and `tests/scripts/test_lesson_page_mockup.py`.
 - `extension/src/offlineQueue.ts` - queues mark presses while the core is unreachable.
 
 ## Invariants and gotchas
