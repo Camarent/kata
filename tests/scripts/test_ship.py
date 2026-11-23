@@ -183,6 +183,14 @@ def test_tag_is_written_to_vm_env_and_stack_started(work: Path):
     assert "exec -T core" in log
 
 
+def test_deep_health_loads_versions_env_like_start(work: Path):
+    """compose interpolates image pins on every call; exec without versions.env failed on the first real ship."""
+    result = _ship(work)
+    assert result.returncode == 0, result.stderr
+    line = next(ln for ln in _log(work).splitlines() if "exec -T core" in ln)
+    assert ". ./versions.env" in line
+
+
 def test_build_gets_the_env_profile_and_a_build_only_tailnet_name(work: Path):
     """Compose refuses to build without the resource limits and the tailnet name (found on the first real ship)."""
     result = _ship(work)
