@@ -28,6 +28,8 @@ enrolment_ttl_seconds = 86400
 poll_interval_seconds = 5
 request_timeout_seconds = 30
 core_url = "http://core:8080"
+# Compose service name of the core: the in-network host the worker may reach.
+core_hosts = ["core"]
 token_env = "KATA_WORKER_TOKEN"
 
 [jobs]

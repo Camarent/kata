@@ -21,6 +21,8 @@ poll_interval_seconds = 5
 request_timeout_seconds = 30
 core_url = "http://127.0.0.1:8080"
 token_env = "KATA_WORKER_TOKEN"
+# Extra core hosts the worker may use besides loopback (whole names; empty = loopback only).
+core_hosts = []
 
 [jobs]
 lease_seconds = 300

@@ -1,6 +1,7 @@
 """Worker client for the core job API: pull a job, report its topic or fail it.
 
-Loopback only: the worker talks to the core on this machine. The bearer token comes from the
+Loopback by default: the worker talks to the core on this machine, or to a host listed in
+`[worker] core_hosts` (the in-network core in the container deployment). The bearer token comes from the
 environment variable named by `[worker] token_env`.
 """
 
@@ -35,13 +36,17 @@ class Job:
     kind: str = DEFAULT_KIND
 
 
-def _loopback_base(core_url: str) -> SplitResult:
+def _loopback_base(core_url: str, core_hosts: Sequence[str]) -> SplitResult:
     parts = urlsplit(core_url)
     if parts.scheme not in ALLOWED_SCHEMES:
         raise ValueError(f"core_url scheme must be http or https: {core_url!r}")
     # hostname is the parsed host (no userinfo, no port); compare whole names, never prefixes.
-    if parts.hostname not in LOOPBACK_HOSTS:
-        raise ValueError(f"core_url must point at loopback (127.0.0.1, ::1 or localhost): {core_url!r}")
+    # core_hosts lists the in-network core names the deployment allows (e.g. the compose service).
+    if parts.hostname not in LOOPBACK_HOSTS and parts.hostname not in core_hosts:
+        raise ValueError(
+            "core_url must point at loopback (127.0.0.1, ::1 or localhost) "
+            f"or a host in [worker] core_hosts: {core_url!r}"
+        )
     return parts
 
 
@@ -58,7 +63,8 @@ class CoreClient:
     """Calls the core job routes with one bearer token over a loopback connection per request."""
 
     def __init__(self, cfg: Config, token: str | None = None) -> None:
-        self._parts = _loopback_base(str(cfg.get("worker", "core_url")))
+        core_hosts = [str(host) for host in cfg.get("worker", "core_hosts")]
+        self._parts = _loopback_base(str(cfg.get("worker", "core_url")), core_hosts)
         self._timeout = float(cfg.get("worker", "request_timeout_seconds"))
         self._token = token if token is not None else resolve_token(cfg)
 

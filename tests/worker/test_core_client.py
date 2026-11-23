@@ -13,9 +13,10 @@ from kata_worker.providers.cost import Ledger
 TOKEN_ENV = "KATA_WORKER_TOKEN"
 
 
-def _cfg(core_url: str) -> Config:
+def _cfg(core_url: str, core_hosts: list[str] | None = None) -> Config:
     worker = {
         "core_url": core_url,
+        "core_hosts": core_hosts or [],
         "token_env": TOKEN_ENV,
         "request_timeout_seconds": 5,
         "poll_interval_seconds": 1,
@@ -125,6 +126,24 @@ def test_non_loopback_url_is_rejected(core_url: str) -> None:
 )
 def test_loopback_url_is_accepted(core_url: str) -> None:
     CoreClient(_cfg(core_url), token="t")
+
+
+def test_in_network_core_host_is_accepted_when_listed() -> None:
+    CoreClient(_cfg("http://core:8080", ["core"]), token="t")
+
+
+def test_in_network_core_host_is_rejected_when_not_listed() -> None:
+    with pytest.raises(ValueError, match="core_url"):
+        CoreClient(_cfg("http://core:8080"), token="t")
+
+
+@pytest.mark.parametrize(
+    "core_url",
+    ["http://core.evil.example:8080", "http://cor:8080", "http://core@evil.example:8080"],
+)
+def test_listed_core_host_must_match_whole_name(core_url: str) -> None:
+    with pytest.raises(ValueError, match="core_url"):
+        CoreClient(_cfg(core_url, ["core"]), token="t")
 
 
 def test_token_read_from_named_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
