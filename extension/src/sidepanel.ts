@@ -60,6 +60,7 @@ export interface PanelHandlers {
   onChangeServer: () => void;
   onCancelChange: () => void;
   onKnown: (topicId: number) => Promise<MarkOutcome>;
+  onScan: () => Promise<void>;
   onReview: () => Promise<void>;
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
   onCloseReview: () => void;
@@ -355,6 +356,12 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
   review.type = "button";
   review.addEventListener("click", () => void handlers.onReview());
   root.append(review);
+  const scan = el("button", "Scan this page", "scan");
+  scan.type = "button";
+  // A scan in flight disables the button; the boot script also ignores a second call.
+  scan.disabled = state.status.kind === "scanning";
+  scan.addEventListener("click", () => void handlers.onScan());
+  root.append(scan);
   root.append(el("p", statusText(state.status), "status"));
   root.append(renderCourses(state, handlers));
   if (state.rows.length === 0 && state.status.kind === "idle") {

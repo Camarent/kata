@@ -50,7 +50,7 @@ function fakeChrome(
   session: unknown = null,
   permissions = fakePermissions(),
 ) {
-  const sendMessage = vi.fn(async () => reply);
+  const sendMessage = vi.fn(async (_message: PanelMessage) => reply);
   const api: PanelChromeLike = {
     runtime: { sendMessage },
     storage: { local: memoryArea(session ? { "kata.session": session } : {}) },
@@ -227,6 +227,75 @@ describe("bootPanel", () => {
 
   const reviewRows = [{ conceptId: 5, label: "ser", state: null, evidence: "" }];
   const signedIn = { baseUrl: "http://localhost:8000", token: "t" };
+
+  describe("Scan this page", () => {
+    const connected = { baseUrl: "http://localhost:8000", token: "t" };
+    const scanRows = [
+      { blockId: "b1", topic: { id: 1, category: "ser", label: "serial" }, known: true },
+      { blockId: "b2", topic: { id: 2, category: "ser", label: "queue" }, known: false },
+    ];
+
+    it("shows the Scan this page button when connected and no button on the sign-in form", async () => {
+      const { api } = fakeChrome({ ok: true }, connected);
+      await bootPanel(mountPoint(), api);
+      expect(root.querySelector("button.scan")?.textContent).toBe("Scan this page");
+      root.remove();
+      const signedOut = fakeChrome();
+      await bootPanel(mountPoint(), signedOut.api);
+      expect(root.querySelector("form.signin")).not.toBeNull();
+      expect(root.querySelector("button.scan")).toBeNull();
+    });
+
+    it("sends no panel:scan at boot", async () => {
+      const { api, sendMessage } = fakeChrome({ ok: true }, connected);
+      await bootPanel(mountPoint(), api);
+      expect(sendMessage.mock.calls.some(([message]) => message.type === "panel:scan")).toBe(false);
+    });
+
+    it("click sends panel:scan once and draws the rows with their known badge and button", async () => {
+      const { api, sendMessage } = fakeChrome({ ok: true, data: scanRows }, connected);
+      await bootPanel(mountPoint(), api);
+      root.querySelector<HTMLButtonElement>("button.scan")!.click();
+      await vi.waitFor(() => expect(root.querySelector("li.row")).not.toBeNull());
+      expect(sendMessage).toHaveBeenCalledWith({ type: "panel:scan" });
+      expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:scan")).toHaveLength(1);
+      expect(Array.from(root.querySelectorAll("span.badge"), (badge) => badge.textContent)).toEqual(["known", "new"]);
+      expect(Array.from(root.querySelectorAll<HTMLButtonElement>("li.row button"), (button) => button.hidden)).toEqual([
+        true,
+        false,
+      ]);
+      expect(root.querySelector("p.status")?.textContent).toBe("");
+    });
+
+    it("a refused scan shows the failed text", async () => {
+      const { api } = fakeChrome({ ok: false, error: "core down" }, connected);
+      await bootPanel(mountPoint(), api);
+      root.querySelector<HTMLButtonElement>("button.scan")!.click();
+      await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("Something went wrong"));
+      expect(root.querySelector("li.row")).toBeNull();
+    });
+
+    it("a refused scan with HTTP 401 shows the sign-in text", async () => {
+      const { api } = fakeChrome({ ok: false, error: "expired", status: 401 }, connected);
+      await bootPanel(mountPoint(), api);
+      root.querySelector<HTMLButtonElement>("button.scan")!.click();
+      await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("Sign-in failed or expired"));
+    });
+
+    it("a second click while the scan is in flight sends one message", async () => {
+      const { api, sendMessage } = fakeChrome({ ok: true }, connected);
+      sendMessage.mockImplementation(async (message: PanelMessage): Promise<PanelReply> => {
+        if (message.type === "panel:scan") return new Promise<PanelReply>(() => {});
+        return { ok: true };
+      });
+      await bootPanel(mountPoint(), api);
+      const scan = root.querySelector<HTMLButtonElement>("button.scan")!;
+      scan.dispatchEvent(new MouseEvent("click"));
+      scan.dispatchEvent(new MouseEvent("click"));
+      await vi.waitFor(() => expect(root.querySelector("p.status")?.textContent).toBe("scanning"));
+      expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:scan")).toHaveLength(1);
+    });
+  });
 
   it("Review concepts sends panel:review and draws the returned rows", async () => {
     const { api, sendMessage } = fakeChrome({ ok: true, data: reviewRows }, signedIn);
