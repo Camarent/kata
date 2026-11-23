@@ -85,6 +85,7 @@ def _model() -> dict:
         "secrets": {
             "postgres_password": {"file": "/stack/secrets/postgres_password"},
             "worker_token": {"file": "/stack/secrets/worker_token"},
+            "open_link_key": {"file": "/stack/secrets/open_link_key"},
         },
     }
 

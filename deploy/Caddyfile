@@ -6,6 +6,8 @@
 # /var/run/tailscale/certs. deploy/systemd/kata-cert.timer runs kata-cert.service every 30 days: it
 # runs `tailscale cert` into that directory, then `docker compose exec caddy caddy reload`.
 # Redirects: the HTTP to HTTPS redirect is off; only port 443 is published (compose).
+# Paths: one catch-all reverse_proxy with no path matcher, so every path reaches core, /c/* included
+# (the open-link route). A path matcher here must cover /c/* (test_caddyfile_rules.py checks it).
 #
 # Sources: docs/design/detailed-architecture.md section 4.2 (proxy settings the design relies on): worker route
 # timeout 60 s (proposed there), stream keep-alive comment line every 15 s, idle timeout above both.

@@ -141,7 +141,8 @@ max_progress_bytes = 4194304
 # Lifetime of a signed open link, in seconds.
 open_link_ttl_seconds = 43200
 # File holding the open-link signing key (at least 32 bytes). Required while trainer.enabled = true; startup exits 1 without it.
-open_link_key_file = ""
+# Compose mounts the secret open_link_key at this path (deploy/secrets.example/README.md).
+open_link_key_file = "/run/secrets/open_link_key"
 
 [knowledge]
 # Score change per trainer evidence step, and the largest change per save.

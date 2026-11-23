@@ -61,14 +61,19 @@ services:
   core:
     image: kata:${KATA_IMAGE_TAG:?set KATA_IMAGE_TAG, the image tag built on dev}
     restart: unless-stopped
-    environment: *core-env
+    # KATA_CORE_PUBLIC_URL: the public base URL for open links, from the host env (never in a tracked file).
+    environment:
+      <<: *core-env
+      KATA_CORE_PUBLIC_URL: ${KATA_CORE_PUBLIC_URL:-}
     command:
       - sh
       - -c
       - export KATA_DATABASE_PASSWORD="$$(cat /run/secrets/postgres_password)" KATA_WORKER_TOKEN="$$(cat /run/secrets/worker_token)" && exec python -m kata_core
+    # open_link_key is read by core from trainer.open_link_key_file (a file path, not an env var).
     secrets:
       - postgres_password
       - worker_token
+      - open_link_key
     volumes:
       - ./kata.host.toml:/config/kata.toml:ro
     networks:
@@ -137,6 +142,8 @@ secrets:
     file: ./secrets/postgres_password
   worker_token:
     file: ./secrets/worker_token
+  open_link_key:
+    file: ./secrets/open_link_key
 
 networks:
   data:
