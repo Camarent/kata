@@ -123,10 +123,10 @@ services:
     ports:
       - "${KATA_BIND_ADDR:-127.0.0.1}:443:443"
     volumes:
-      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from `tailscale cert` run on the host (D19, see Caddyfile).
+      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from `tailscale cert` run by deploy/systemd/kata-cert.service (D19, see Caddyfile).
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
-      - ${KATA_TAILSCALE_SOCKET_DIR:-/var/run/tailscale}:/var/run/tailscale:ro
+      - ${KATA_CERT_DIR:-/var/lib/kata/certs}:/var/run/tailscale/certs:ro
     networks:
       - edge
     mem_limit: ${KATA_MEM_PROXY:?set KATA_MEM_PROXY, e.g. with --env-file deploy/env/small.env}
