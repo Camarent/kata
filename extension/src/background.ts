@@ -1,13 +1,14 @@
 import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
 import type { BridgeMessage } from "./bridge";
-import { wireBridgeRegistration } from "./bridgeRegister";
+import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
-import { CORE_ORIGIN, DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
+import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark, type ProgressDoc } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
 import type { SignInInput } from "./sidepanel";
+import { validateServerUrl } from "./serverUrl";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import type { Session } from "./types";
 
@@ -22,11 +23,21 @@ export interface ChromeLike extends PanelOpenApi {
     create(properties: { url: string }): Promise<unknown>;
   };
   runtime: RuntimeLike;
+  scripting: ScriptingLike;
+}
+
+/**
+ * Sign-in values from the panel: the enrolment code, the device label and the typed server URL.
+ * The URL is optional in the type until the side panel sends it; an absent URL is refused as empty.
+ */
+export interface ServerSignIn extends SignInInput {
+  baseUrl?: string;
 }
 
 /** Messages the side panel page sends to the background script. */
 export type PanelMessage =
-  | { type: "panel:signIn"; input: SignInInput }
+  | { type: "panel:signIn"; input: ServerSignIn }
+  | { type: "panel:disconnect" }
   | { type: "panel:scan" }
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
@@ -53,7 +64,10 @@ export interface ReviewRow {
 
 /** Business logic behind the side panel; each call talks to the core. */
 export interface Backend {
-  signIn(input: SignInInput): Promise<void>;
+  /** Checks the server, redeems the code and saves the session; the bridge follows the new origin. */
+  signIn(input: ServerSignIn): Promise<void>;
+  /** Clears the session and the bridge; the offline mark queue is kept. */
+  disconnect(): Promise<void>;
   scan(): Promise<ScanResult[]>;
   markKnown(topicId: number): Promise<MarkOutcome>;
   flush(): Promise<FlushResult | null>;
@@ -70,13 +84,9 @@ export interface Backend {
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
   const tokens = new TokenStore(area);
-  const clientFor = (session: Session | null): CoreClient =>
-    new CoreClient({
-      baseUrl: session?.baseUrl ?? DEFAULT_BASE_URL,
-      token: session?.token,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      fetchImpl,
-    });
+  const clientAt = (baseUrl: string, token?: string): CoreClient =>
+    new CoreClient({ baseUrl, token, timeoutMs: REQUEST_TIMEOUT_MS, fetchImpl });
+  const clientFor = (session: Session): CoreClient => clientAt(session.baseUrl, session.token);
   const requireSession = async (): Promise<Session> => {
     const session = await tokens.loadSession();
     if (!session) throw new CoreAuthError("not signed in");
@@ -87,9 +97,20 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     progress: createProgressBridge(clientFor, tokens),
 
     async signIn(input) {
-      const client = clientFor(null);
+      const server = validateServerUrl(input.baseUrl ?? "");
+      if (!server.ok) throw new Error(server.reason);
+      // Probe first: an unreachable address or a non-kata server fails with its own error text.
+      const client = clientAt(server.baseUrl);
+      await client.probe();
+      // The code is redeemed here and never stored; only the resulting token is saved.
       const token = await client.enrol(input.code, input.deviceLabel);
-      await tokens.saveSession({ baseUrl: DEFAULT_BASE_URL, token });
+      await tokens.saveSession({ baseUrl: server.baseUrl, token });
+      await syncBridge(api.scripting, tokens);
+    },
+
+    async disconnect() {
+      await tokens.clearSession();
+      await syncBridge(api.scripting, tokens);
     },
 
     async scan() {
@@ -152,16 +173,16 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
         throw new Error("course is not ready");
       }
       const url = await client.openCourse(courseId);
-      if (!isCoreUrl(url)) throw new Error("course link is outside the core");
+      if (!isCoreUrl(url, session.baseUrl)) throw new Error("course link is outside the core");
       await api.tabs.create({ url });
     },
   };
 }
 
-/** True when `url` parses and has the core origin (scheme, host, port); anything else is refused. */
-function isCoreUrl(url: string): boolean {
+/** True when `url` parses and has the origin (scheme, host, port) of the session's base URL; else refused. */
+function isCoreUrl(url: string, baseUrl: string): boolean {
   try {
-    return new URL(url).origin === CORE_ORIGIN;
+    return new URL(url).origin === originOf(baseUrl);
   } catch {
     return false;
   }
@@ -183,6 +204,9 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
   switch (message.type) {
     case "panel:signIn":
       await backend.signIn(message.input);
+      return { ok: true };
+    case "panel:disconnect":
+      await backend.disconnect();
       return { ok: true };
     case "panel:scan":
       return { ok: true, data: await backend.scan() };
@@ -207,6 +231,7 @@ function isPanelMessage(message: unknown): message is PanelMessage {
   const type = (message as { type?: unknown }).type;
   return (
     type === "panel:signIn" ||
+    type === "panel:disconnect" ||
     type === "panel:scan" ||
     type === "panel:known" ||
     type === "panel:review" ||

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBackend, wireBackground, type ChromeLike, type PanelReply } from "../src/background";
 import { handleContentMessage, registerContentScript, type RuntimeLike } from "../src/content";
+import type { ScriptingLike } from "../src/bridgeRegister";
 import type { StorageArea } from "../src/tokenStore";
 
 const LONG = "This paragraph is long enough to count as a readable block of page text.";
@@ -28,6 +29,16 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
     | ((message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | void)
     | undefined;
   const open = vi.fn(async () => undefined);
+  /** Bridge registration calls in order: "register:<id>:<matches>" and "unregister:<id>". */
+  const calls: string[] = [];
+  const scripting: ScriptingLike = {
+    async registerContentScripts(scripts) {
+      for (const script of scripts) calls.push(`register:${script.id}:${script.matches.join(",")}`);
+    },
+    async unregisterContentScripts({ ids }) {
+      for (const id of ids) calls.push(`unregister:${id}`);
+    },
+  };
   const api: ChromeLike = {
     action: {
       onClicked: {
@@ -50,10 +61,12 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
         },
       },
     },
+    scripting,
   };
   return {
     api,
     open,
+    calls,
     click: (tab: { windowId?: number }) => clickListener?.(tab),
     /** Sends a runtime message and resolves with what `sendResponse` got. */
     send: (message: unknown) =>
@@ -314,5 +327,141 @@ describe("background wiring", () => {
       ok: false,
       error: "not signed in",
     });
+  });
+});
+
+/** Fake core for sign-in: the health probe and the enrol call; each answer can be replaced. */
+function signInFetch(
+  health: () => Response = () => new Response(JSON.stringify({ status: "ok", checks: {} }), { status: 200 }),
+  enrol: () => Response = () => new Response(JSON.stringify({ token: "tok-new" }), { status: 200 }),
+) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    return url.endsWith("/v1/health/deep") ? health() : enrol();
+  }) as unknown as typeof fetch;
+}
+
+describe("sign-in, server change and disconnect", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("probes the typed server, enrols the code and saves the normalised origin", async () => {
+    const area = memoryArea();
+    const fetchImpl = signInFetch();
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const input = { baseUrl: "http://kata.lan:9000/base/", code: "ABC123", deviceLabel: "laptop" };
+    expect(await chrome.send({ type: "panel:signIn", input })).toEqual({ ok: true });
+    expect(await area.get("kata.session")).toEqual({
+      "kata.session": { baseUrl: "http://kata.lan:9000/base", token: "tok-new" },
+    });
+    const urls = vi.mocked(fetchImpl).mock.calls.map(([url]) => String(url));
+    expect(urls).toEqual(["http://kata.lan:9000/base/v1/health/deep", "http://kata.lan:9000/base/auth/enrol"]);
+    const enrolBody = vi.mocked(fetchImpl).mock.calls[1]?.[1]?.body;
+    expect(JSON.parse(String(enrolBody))).toEqual({ code: "ABC123", label: "laptop" });
+    expect(chrome.calls).toEqual(["unregister:kata-bridge", "register:kata-bridge:http://*/c/*"]);
+  });
+
+  it("refuses an invalid server URL before any request", async () => {
+    const area = memoryArea();
+    const fetchImpl = signInFetch();
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = await chrome.send({ type: "panel:signIn", input: { baseUrl: "ftp://kata.lan", code: "x", deviceLabel: "d" } });
+    expect(reply).toEqual({ ok: false, error: "server URL must use http or https" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(await area.get("kata.session")).toEqual({});
+  });
+
+  it("reports an unreachable server and saves nothing", async () => {
+    const area = memoryArea();
+    const fetchImpl = signInFetch(() => {
+      throw new TypeError("fetch failed");
+    });
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const input = { baseUrl: "http://kata.lan:9000", code: "ABC123", deviceLabel: "laptop" };
+    expect(await chrome.send({ type: "panel:signIn", input })).toEqual({ ok: false, error: "core is unreachable" });
+    expect(vi.mocked(fetchImpl)).toHaveBeenCalledTimes(1);
+    expect(await area.get("kata.session")).toEqual({});
+  });
+
+  it("reports an address that does not answer as a kata core", async () => {
+    const area = memoryArea();
+    const fetchImpl = signInFetch(() => new Response("<html>not kata</html>", { status: 200 }));
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const input = { baseUrl: "http://example.org", code: "ABC123", deviceLabel: "laptop" };
+    expect(await chrome.send({ type: "panel:signIn", input })).toEqual({
+      ok: false,
+      error: "address does not answer as a kata core",
+    });
+    expect(vi.mocked(fetchImpl)).toHaveBeenCalledTimes(1);
+    expect(await area.get("kata.session")).toEqual({});
+  });
+
+  it("reports a bad code (HTTP 401) and saves nothing", async () => {
+    const area = memoryArea();
+    const fetchImpl = signInFetch(undefined, () => new Response(JSON.stringify({ detail: "bad code" }), { status: 401 }));
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const input = { baseUrl: "http://kata.lan:9000", code: "WRONG", deviceLabel: "laptop" };
+    expect(await chrome.send({ type: "panel:signIn", input })).toEqual({
+      ok: false,
+      error: "core rejected the credentials",
+    });
+    expect(await area.get("kata.session")).toEqual({});
+    expect(chrome.calls).toEqual([]);
+  });
+
+  it("changing the server replaces the session and moves the bridge to the new origin", async () => {
+    const area = memoryArea();
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, signInFetch()));
+    await chrome.send({ type: "panel:signIn", input: { baseUrl: "http://127.0.0.1:8080", code: "A", deviceLabel: "d" } });
+    await chrome.send({ type: "panel:signIn", input: { baseUrl: "https://kata.example:9443", code: "B", deviceLabel: "d" } });
+    expect(await area.get("kata.session")).toEqual({
+      "kata.session": { baseUrl: "https://kata.example:9443", token: "tok-new" },
+    });
+    expect(chrome.calls).toEqual([
+      "unregister:kata-bridge",
+      "register:kata-bridge:http://*/c/*",
+      "unregister:kata-bridge",
+      "register:kata-bridge:https://*/c/*",
+    ]);
+  });
+
+  it("openCourse accepts only the origin of the saved session", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "https://kata.example:9443", token: "t" } });
+    const chrome = fakeChrome();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/courses")) {
+        return new Response(JSON.stringify({ items: [{ id: 4, title: "C", status: "ready", concept_ids: [], error: null, created_at: "", updated_at: "" }] }), { status: 200 });
+      }
+      if (init?.method === "POST" && url.endsWith("/v1/courses/4/open")) {
+        return new Response(JSON.stringify({ url: "http://127.0.0.1:8080/c/4/" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: "not found" }), { status: 404 });
+    }) as unknown as typeof fetch;
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = (await chrome.send({ type: "panel:openCourse", courseId: 4 })) as PanelReply;
+    expect(reply).toEqual({ ok: false, error: "course link is outside the core" });
+    expect(chrome.api.tabs.create).not.toHaveBeenCalled();
+  });
+
+  it("disconnect clears the session and the bridge but keeps the offline queue", async () => {
+    const area = memoryArea({
+      "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" },
+      "kata.pending": [3],
+    });
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, signInFetch()));
+    expect(await chrome.send({ type: "panel:disconnect" })).toEqual({ ok: true });
+    expect(await area.get("kata.session")).toEqual({});
+    expect(await area.get("kata.pending")).toEqual({ "kata.pending": [3] });
+    expect(chrome.calls).toEqual(["unregister:kata-bridge"]);
+    expect(await chrome.send({ type: "panel:scan" })).toEqual({ ok: false, error: "not signed in" });
   });
 });
