@@ -39,6 +39,8 @@ export function composeManifest(base, browser, version) {
     return manifest;
   }
   if (browser === "firefox") {
+    // Firefox rejects "permissions" as a manifest permission; its permissions API needs no entry.
+    manifest.permissions = base.permissions.filter((name) => name !== "permissions");
     manifest.sidebar_action = { default_panel: PANEL_PAGE };
     manifest.background = { scripts: [BACKGROUND_SCRIPT], type: "module" };
     manifest.browser_specific_settings = {

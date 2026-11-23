@@ -11,6 +11,7 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
     onChangeServer: vi.fn(),
     onCancelChange: vi.fn(),
     onKnown: vi.fn(async () => "saved" as const),
+    onScan: vi.fn(async () => {}),
     onReview: vi.fn(async () => {}),
     onSetConcept: vi.fn(async () => {}),
     onCloseReview: vi.fn(),
@@ -221,6 +222,28 @@ describe("renderPanel", () => {
     const label = root.querySelector("span.label")!;
     expect(label.textContent).toBe(hostile);
     expect(root.querySelector("img")).toBeNull();
+  });
+
+  it("shows the Scan this page button only in the connected view", () => {
+    renderPanel(root, { session: null, rows: [], status: { kind: "idle" } }, handlers());
+    expect(root.querySelector("button.scan")).toBeNull();
+    renderPanel(root, { session: session, rows: [], status: { kind: "idle" } }, handlers());
+    expect(root.querySelector("button.scan")?.textContent).toBe("Scan this page");
+    renderPanel(root, { session: session, rows: [], status: { kind: "idle" }, review: [] }, handlers());
+    expect(root.querySelector("button.scan")).toBeNull();
+  });
+
+  it("calls onScan when Scan this page is clicked", () => {
+    const h = handlers();
+    renderPanel(root, { session, rows: [], status: { kind: "idle" } }, h);
+    root.querySelector<HTMLButtonElement>("button.scan")!.click();
+    expect(h.onScan).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Scan this page while a scan is in flight", () => {
+    renderPanel(root, { session, rows: [], status: { kind: "scanning" } }, handlers());
+    expect(root.querySelector<HTMLButtonElement>("button.scan")?.disabled).toBe(true);
+    expect(root.querySelector("p.status")?.textContent).toBe("scanning");
   });
 
   it("shows the Review concepts button only when signed in", () => {

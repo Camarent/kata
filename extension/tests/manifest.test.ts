@@ -16,11 +16,10 @@ describe("composeManifest", () => {
     expect(base.content_scripts[0].matches).toEqual(["http://*/*", "https://*/*"]);
   });
 
-  it("base declares the permissions API, so chrome.permissions exists in both browsers", () => {
+  it("base declares the permissions API; chrome keeps it, firefox drops it (invalid there)", () => {
     expect(base.permissions).toContain("permissions");
-    for (const browser of ["chrome", "firefox"] as const) {
-      expect(composeManifest(base, browser, VERSION).permissions).toContain("permissions");
-    }
+    expect(composeManifest(base, "chrome", VERSION).permissions).toContain("permissions");
+    expect(composeManifest(base, "firefox", VERSION).permissions).not.toContain("permissions");
   });
 
   it("stamps the given version into both browsers and leaves the base version alone", () => {
@@ -48,8 +47,9 @@ describe("composeManifest", () => {
 
   it("firefox adds sidebar_action, background scripts and gecko id without sidePanel", () => {
     const m = composeManifest(base, "firefox", VERSION);
-    expect(m.permissions).toEqual(["storage", "activeTab", "scripting", "permissions"]);
+    expect(m.permissions).toEqual(["storage", "activeTab", "scripting"]);
     expect(m.permissions).not.toContain("sidePanel");
+    expect(m.permissions).not.toContain("permissions");
     expect(m.side_panel).toBeUndefined();
     expect(m.sidebar_action).toEqual({ default_panel: "sidepanel.html" });
     expect(m.background).toEqual({ scripts: ["background.js"], type: "module" });

@@ -2,14 +2,36 @@
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 EXTENSION = Path(__file__).resolve().parents[2] / "extension"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SEMVER = r"\d+\.\d+\.\d+"  # the version moves with every release; tests/scripts checks that the files agree
 
 
 def _load(name):
     return json.loads((EXTENSION / name).read_text(encoding="utf-8"))
+
+
+def test_firefox_build_manifest_has_no_permissions_entry():
+    # Runs the real composeManifest in node (no dist build, no temp files).
+    script = (
+        "import { readFileSync } from 'node:fs';"
+        "import { composeManifest } from './extension/build/manifest.mjs';"
+        "const base = JSON.parse(readFileSync('extension/manifest.base.json', 'utf-8'));"
+        "process.stdout.write(JSON.stringify(composeManifest(base, 'firefox', '0.0.0').permissions));"
+    )
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    permissions = json.loads(result.stdout)
+    assert "permissions" not in permissions
+    assert permissions == ["storage", "activeTab", "scripting"]
 
 
 def test_manifest_base_is_mv3_with_expected_fields():

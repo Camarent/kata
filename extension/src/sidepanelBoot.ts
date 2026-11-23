@@ -1,5 +1,5 @@
 import type { CourseList, PanelMessage, PanelReply } from "./background";
-import { renderPanel, type PanelHandlers, type PanelState, type ServerFormInput } from "./sidepanel";
+import { renderPanel, type PanelHandlers, type PanelRow, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
 import type { MarkOutcome } from "./offlineQueue";
@@ -126,6 +126,25 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       draw();
     },
 
+    async onScan() {
+      // A scan already in flight: the second click sends nothing.
+      if (state.status.kind === "scanning") return;
+      state.status = { kind: "scanning" };
+      draw();
+      try {
+        const reply = await api.runtime.sendMessage({ type: "panel:scan" });
+        if (reply.ok) {
+          state.rows = reply.data as PanelRow[];
+          state.status = { kind: "idle" };
+        } else {
+          state.status = { kind: "error", reason: scanErrorReason(reply) };
+        }
+      } catch {
+        state.status = { kind: "error", reason: "failed" };
+      }
+      draw();
+    },
+
     async onKnown(topicId: number): Promise<MarkOutcome> {
       const reply = await api.runtime.sendMessage({ type: "panel:known", topicId });
       if (!reply.ok) throw new Error(reply.error);
@@ -184,6 +203,16 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   });
 
   draw();
+}
+
+/** HTTP statuses the core answers when the stored sign-in is missing or expired. */
+const AUTH_STATUSES = [401, 403];
+
+/** Error reason of a refused scan: timeout or auth when the reply says so, else failed. */
+function scanErrorReason(reply: { status?: number; code?: string }): "timeout" | "auth" | "failed" {
+  if (reply.code === "timeout") return "timeout";
+  if (reply.status !== undefined && AUTH_STATUSES.includes(reply.status)) return "auth";
+  return "failed";
 }
 
 /** Host pattern of a stored session's server, or null when there is no usable session. */

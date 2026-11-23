@@ -9,7 +9,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 
 ## Public surface
 - `extension/manifest.base.json:3` name `kata`; `:5` shared permissions `storage`, `activeTab`, `scripting`, `permissions`; `:6` optional host permissions `http://*/*`, `https://*/*` (the saved server's origin is granted at sign-in, never at build time); `:9` content script match `http://*/*`, `https://*/*`; `:10` content script `content.js`.
-- `extension/build/manifest.mjs:32` Chrome adds permission `sidePanel` and `:33` `side_panel`, `:34` service worker `background.js`; `:38` Firefox `sidebar_action`, `:39` background scripts, `:41` `gecko` id `kata@kata.invalid`, min version `128.0`.
+- `extension/build/manifest.mjs` Chrome adds permission `sidePanel` and `side_panel`, service worker `background.js`; Firefox `sidebar_action`, background `scripts`, `gecko` id `kata@kata.invalid`, min version `128.0`.
 - `extension/build/build.mjs` `composeManifest` output and bundles written per browser to `dist/<browser>/`.
 - `extension/src/browser.ts:15` `openPanel` (`sidePanel` on Chrome, `sidebarAction` on Firefox).
 - `extension/package.json:6` `build` = `tsc --noEmit && node build/build.mjs`; `:7` `test` = `vitest run`; devDependencies `esbuild`, `jsdom`, `typescript`, `vitest`.
@@ -32,6 +32,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/serverUrl.ts:11` `validateServerUrl` (http or https only; no credentials, query or fragment; returns `baseUrl`, `origin`, and the grant pattern `<origin>/*`).
 - `extension/build/build.mjs` `resolveVersion`: `KATA_EXTENSION_VERSION` (`x.y.z`) when set, else the `version` of `extension/package.json`. No server URL is read at build.
 - `extension/build/manifest.mjs` `composeManifest` adds no host permission; the server origin is granted at runtime.
+- Scan button (side panel): `extension/src/sidepanelBoot.ts` `onScan` sends `panel:scan`; the `panel:scan` case of the message switch in `extension/src/background.ts` runs the scan on the open page (content script `scan`, then `runScan`).
+- Firefox vs Chrome permissions (`extension/build/manifest.mjs`): Chrome adds `sidePanel` to `permissions` and `side_panel`; Firefox adds no side-panel permission and uses `sidebar_action` with background `scripts`.
 - `extension/src/bridge.ts:27` `newChannel` (random channel id), `:36` `injectStub` (inline page stub at document_start), `:60` `startBridge`, `:93` `runBridge` (exact-origin check); message types `bridge:load` and `bridge:save`.
 - `extension/src/bridgeRegister.ts` `bridgeMatchPatterns` (`<scheme>://*/c/*` of the saved origin), `registerBridge` (id `kata-bridge`, `bridge.js`, document_start, persists across sessions), `syncBridge` (after sign-in, disconnect, install and startup), `wireBridgeRegistration` (install, startup, origin permission removed).
 - `extension/src/sidepanelBoot.ts` `onSignIn` (origin grant, then `panel:signIn`), `onDisconnect`; `extension/src/background.ts` `signIn` (probe `GET /v1/health/deep`, enrol, save session, sync bridge), `disconnect`.
