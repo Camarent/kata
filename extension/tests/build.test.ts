@@ -10,7 +10,7 @@ const EXTENSION_DIR = process.cwd();
 const BUILD_TIMEOUT_MS = 120_000;
 const BROWSERS = ["firefox", "chrome"] as const;
 /** Files every browser output folder must contain. */
-const OUTPUT_FILES = ["manifest.json", "background.js", "content.js", "sidepanelBoot.js", "sidepanel.html"];
+const OUTPUT_FILES = ["manifest.json", "background.js", "content.js", "bridge.js", "sidepanelBoot.js", "sidepanel.html"];
 
 function distPath(browser: string, file: string): string {
   return join(EXTENSION_DIR, "dist", browser, file);
@@ -35,6 +35,13 @@ describe("built extension", () => {
     const source = readFileSync(distPath(browser, "content.js"), "utf8");
     // A classic script compiles as one; a top-level import or export is a SyntaxError.
     expect(() => new Script(source, { filename: "content.js" })).not.toThrow();
+  });
+
+  it.each(BROWSERS)("dist/%s/bridge.js is a classic script that carries the stub source", (browser) => {
+    const source = readFileSync(distPath(browser, "bridge.js"), "utf8");
+    // The stub text is injected into the page at run time; the bundle must hold it verbatim.
+    expect(() => new Script(source, { filename: "bridge.js" })).not.toThrow();
+    expect(source).toContain("win.claude");
   });
 
   it("firefox manifest uses sidebar_action and the gecko id, not side_panel", () => {

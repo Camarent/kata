@@ -29,6 +29,7 @@ const BASE_URL_DEFINE = "__KATA_BASE_URL__";
 const SCRIPTS = [
   { entry: "src/background.ts", out: "background.js", format: "esm" },
   { entry: "src/content.ts", out: "content.js", format: "iife" },
+  { entry: "src/bridge.ts", out: "bridge.js", format: "iife" },
   { entry: "src/sidepanelBoot.ts", out: "sidepanelBoot.js", format: "esm" },
 ];
 

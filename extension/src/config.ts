@@ -13,6 +13,9 @@ declare const __KATA_BASE_URL__: string;
 export const DEFAULT_BASE_URL: string =
   typeof __KATA_BASE_URL__ !== "undefined" ? __KATA_BASE_URL__ : "http://127.0.0.1:8080";
 
+/** Origin (scheme, host, port) of the core: the only origin whose course pages get the progress bridge. */
+export const CORE_ORIGIN: string = new URL(DEFAULT_BASE_URL).origin;
+
 /** Longest a single core request may take, in milliseconds. */
 export const REQUEST_TIMEOUT_MS = 5000;
 

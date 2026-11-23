@@ -1,8 +1,11 @@
 import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
+import type { BridgeMessage } from "./bridge";
+import { wireBridgeRegistration } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
 import { DEFAULT_BASE_URL, MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
-import { CoreAuthError, CoreClient, type ConceptMark } from "./coreClient";
+import { CoreAuthError, CoreClient, type ConceptMark, type ProgressDoc } from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
+import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
 import type { SignInInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
@@ -47,6 +50,8 @@ export interface Backend {
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
   setConcept(conceptId: number, state: ConceptMark["state"]): Promise<void>;
+  /** Whole-document progress load and save for the course pages (see bridge.ts). */
+  progress: ProgressBridge;
 }
 
 /** Builds the backend over the chrome tabs API and the extension storage area. */
@@ -66,6 +71,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
   };
 
   return {
+    progress: createProgressBridge(clientFor, tokens),
+
     async signIn(input) {
       const client = clientFor(null);
       const token = await client.enrol(input.code, input.deviceLabel);
@@ -121,6 +128,17 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
   };
 }
 
+/**
+ * Routes one content-bridge message to the progress service. Its reply is the document or
+ * the short error text only; the session token never leaves this service.
+ */
+async function handleBridgeMessage(progress: ProgressBridge, message: BridgeMessage): Promise<PanelReply> {
+  if (!Number.isInteger(message.courseId) || message.courseId < 1) throw new Error("bad course id");
+  if (message.type === "bridge:load") return { ok: true, data: await progress.load(message.courseId) };
+  if (typeof message.doc !== "object" || message.doc === null) throw new Error("bad progress document");
+  return { ok: true, data: await progress.save(message.courseId, message.doc as ProgressDoc) };
+}
+
 /** Routes one panel message to the backend and returns its reply. */
 async function handlePanelMessage(backend: Backend, message: PanelMessage): Promise<PanelReply> {
   switch (message.type) {
@@ -152,9 +170,17 @@ function isPanelMessage(message: unknown): message is PanelMessage {
   );
 }
 
+/** True when `message` is one of the content-bridge message shapes. */
+function isBridgeMessage(message: unknown): message is BridgeMessage {
+  if (typeof message !== "object" || message === null) return false;
+  const type = (message as { type?: unknown }).type;
+  return type === "bridge:load" || type === "bridge:save";
+}
+
 /**
  * Registers the background listeners: the toolbar button opens the side panel and
- * flushes the offline mark queue; panel messages go to the backend.
+ * flushes the offline mark queue; panel messages go to the backend; bridge messages
+ * from the course pages go to the progress service.
  */
 export function wireBackground(api: ChromeLike, backend: Backend): void {
   api.action.onClicked.addListener((tab) => {
@@ -165,8 +191,13 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
   });
 
   api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!isPanelMessage(message)) return false;
-    handlePanelMessage(backend, message).then(
+    const route = isPanelMessage(message)
+      ? handlePanelMessage(backend, message)
+      : isBridgeMessage(message)
+        ? handleBridgeMessage(backend.progress, message)
+        : undefined;
+    if (route === undefined) return false;
+    route.then(
       (reply) => sendResponse(reply),
       (err: unknown) => sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) }),
     );
@@ -177,4 +208,5 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
 // Service worker entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.action) {
   wireBackground(chrome, createBackend(chrome, chrome.storage.local));
+  wireBridgeRegistration(chrome.runtime, chrome.scripting);
 }

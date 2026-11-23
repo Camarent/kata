@@ -15,7 +15,7 @@ def test_manifest_base_is_mv3_with_expected_fields():
     assert manifest["manifest_version"] == 3
     assert manifest["name"] == "kata"
     assert manifest["version"] == "0.0.0"
-    assert manifest["permissions"] == ["storage", "activeTab"]
+    assert manifest["permissions"] == ["storage", "activeTab", "scripting"]
     assert manifest["host_permissions"] == ["http://127.0.0.1:8080/*"]
     assert manifest["action"] == {}
 
