@@ -22,6 +22,8 @@ ID_IN_MESSAGE = re.compile(r"(?<![\w-])([A-Za-z][\w-]*-\d+)(?![\w-])")
 # A unit name: letters, digits, `_` and `-`. Anything else (`/`, `..`, whitespace, shell characters) is refused.
 UNIT_NAME = re.compile(r"[A-Za-z0-9_-]+")
 # `dojo add` prints: `added N items to content/<unit>.jsonl: <first> .. <last>`, then the ids.
+# `dojo init <id> --title T --workspace <dir>` prints: `Created course <id> in <DIR>`.
+CREATED_LINE = re.compile(r"^Created course \S+ in (.+)$", re.MULTILINE)
 ADDED_HEADER = re.compile(r"^added \d+ items? to .*?: (\S+) \.\. (\S+)$", re.MULTILINE)
 INDEX_FILE = "index.html"
 MANIFEST_FILE = "manifest.json"
@@ -29,10 +31,15 @@ MANIFEST_FILE = "manifest.json"
 
 @dataclass(frozen=True)
 class DojoTrainerCli:
-    """Runs the `dojo` binary named by `argv_prefix`; `timeout` is in seconds per call."""
+    """Runs the `dojo` binary named by `argv_prefix`; `timeout` is in seconds per call.
+
+    `wasm` and `web` are optional asset paths passed to `build` only when non-empty.
+    """
 
     argv_prefix: list[str]
     timeout: float
+    wasm: str = ""
+    web: str = ""
 
     def _run(
         self, subcommand: str, args: list[str], stdin: str | None = None
@@ -51,6 +58,17 @@ class DojoTrainerCli:
             raise TrainerError(f"dojo {subcommand} timed out after {self.timeout}s") from exc
         except OSError as exc:
             raise TrainerError(f"dojo {subcommand} could not start: {exc}") from exc
+
+    def init(self, workspace: Path, course_id: str, title: str) -> Path:
+        """Creates the course folder under `workspace`; returns that folder (from dojo's `Created course` line)."""
+        if not UNIT_NAME.fullmatch(course_id) or course_id.startswith("-"):
+            raise TrainerError(f"invalid course id {course_id!r}")
+        proc = self._run("init", [course_id, "--title", title, "--workspace", str(workspace)])
+        _require_zero("init", proc)
+        match = CREATED_LINE.search(proc.stdout)
+        if match is None:
+            raise TrainerError("dojo init printed no course folder")
+        return Path(match.group(1).strip())
 
     def next_id(self, workdir: Path, unit: str) -> str:
         _check_unit(unit)
@@ -88,6 +106,9 @@ class DojoTrainerCli:
         for entry in raw:
             if not isinstance(entry, dict):
                 raise TrainerError("dojo validate: diagnostic is not an object")
+            # Warnings never fail a course: only severity=error diagnostics are returned.
+            if _text_field(entry, "severity", "validate") != "error":
+                continue
             message = _text_field(entry, "message", "validate")
             out.append(Diagnostic(item=_item_of(entry, message), message=message))
         return out
@@ -96,7 +117,12 @@ class DojoTrainerCli:
         _require_zero("lock", self._run("lock", [str(workdir)]))
 
     def build(self, workdir: Path, outdir: Path) -> list[str]:
-        _require_zero("build", self._run("build", [str(workdir), "--out", str(outdir)]))
+        args = [str(workdir), "--out", str(outdir)]
+        if self.wasm:
+            args += ["--wasm", self.wasm]
+        if self.web:
+            args += ["--web", self.web]
+        _require_zero("build", self._run("build", args))
         course_dir = _only_course_dir(outdir)
         return _artifact_files(course_dir)
 

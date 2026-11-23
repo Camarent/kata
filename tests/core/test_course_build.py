@@ -25,6 +25,7 @@ from support.scratch_db import ScratchDatabase
 FAKE_TRAINER = [sys.executable, str(Path(fake_dojo.__file__))]
 MISSING_TRAINER = ["/nonexistent/dojo"]
 FAKE_MARK = fake_dojo.INVALID_MARK
+WARN_MARK = fake_dojo.WARN_MARK
 
 
 @pytest.fixture
@@ -33,7 +34,7 @@ def conn(db: ScratchDatabase) -> Iterator[psycopg.Connection[Any]]:
         yield connection
 
 
-def _cfg(argv: list[str] = FAKE_TRAINER, min_items: int = 2, max_bytes: int = 1048576) -> Config:
+def _cfg(argv: list[str] = FAKE_TRAINER, min_items: int = 2, max_bytes: int = 16777216) -> Config:
     return Config(
         sections={
             "trainer": {
@@ -195,6 +196,49 @@ def test_build_ready_drops_invalid_item(conn: psycopg.Connection[Any]) -> None:
     assert _journal(conn, user, build.COURSE_READY_KIND) == 1
 
 
+def test_build_ready_keeps_warned_item(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "alice")
+    concepts = _concepts(conn)
+    _generate(
+        conn,
+        user,
+        concepts,
+        [_draft(concepts[0]), _draft(concepts[1]), _draft(concepts[0], prompt=f"{WARN_MARK} x")],
+    )
+    job = _build_job(conn, user)
+    build.run_build(conn, job, _cfg(), DojoTrainerCli(FAKE_TRAINER, 30))
+
+    course = get_course(conn, user, json.loads(job.payload)["course_id"])
+    assert course is not None
+    assert course.status == "ready"
+    assert course.error is None
+    # The warned item is not dropped: all three drafts end up in the course.
+    assert _count(conn, "course_item_map", course.id) == 3
+    assert _journal(conn, user, build.COURSE_FAILED_KIND) == 0
+
+
+def test_build_ready_with_long_title_and_control_chars(conn: psycopg.Connection[Any]) -> None:
+    user = _user(conn, "alice")
+    concepts = _concepts(conn)
+    title = "Tonal\nscales " + "t" * 200
+    course = create_course(conn, user, title, list(concepts))
+    job = _generate_job(conn, user, course, concepts)
+    generate_output_hook(conn, job, {"items": [_draft(concepts[0]), _draft(concepts[1])]})
+    build_job = _build_job(conn, user)
+    build.run_build(conn, build_job, _cfg(), DojoTrainerCli(FAKE_TRAINER, 30))
+
+    refreshed = get_course(conn, user, course.id)
+    assert refreshed is not None
+    assert refreshed.status == "ready"
+    assert refreshed.error is None
+
+
+def test_dojo_title_drops_control_chars_and_caps_length() -> None:
+    cleaned = build._dojo_title("Tonal\nscales " + "t" * 200)
+    assert "\n" not in cleaned
+    assert cleaned.startswith("Tonal") and len(cleaned) == build.DOJO_TITLE_CHARS
+
+
 def test_build_fails_below_min_items_with_summary(conn: psycopg.Connection[Any]) -> None:
     user = _user(conn, "alice")
     concepts = _concepts(conn)
@@ -249,7 +293,7 @@ def test_build_fails_when_trainer_missing(conn: psycopg.Connection[Any]) -> None
     assert course is not None
     assert course.status == "failed"
     assert course.error is not None
-    assert course.error.startswith("trainer: dojo next-id could not start")
+    assert course.error.startswith("trainer: dojo init could not start")
 
 
 def test_dojo_item_is_gap_in_unit_without_concept_id() -> None:

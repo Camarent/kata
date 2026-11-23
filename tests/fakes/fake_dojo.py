@@ -3,22 +3,31 @@
 Prints the text formats measured on the real dojo binary (see core/kata_core/trainer/dojo_cli.py).
 Items live in `<dir>/content/<unit>.jsonl`; ids are `<unit>-<n>`. Markers in a prompt:
 FAKE_INVALID gives an error diagnostic that names the item id; FAKE_NOID gives an error with
-no id in its message; FAKE_WARN gives a warning only (exit 0).
+no id in its message; FAKE_WARN gives a warning only (exit 0). A gap with a blank answer gives an
+error that names the item id.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 CONTENT_DIR = "content"
+TITLE_CHARS = 80
 INVALID_MARK = "FAKE_INVALID"
+# When set, every `build` call appends its argv as one JSON list per line to this file.
+ARGV_LOG_ENV = "FAKE_DOJO_ARGV_LOG"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
-PREFIX_RE = re.compile(r"[a-z][a-z0-9_]*")
+PREFIX_RE = re.compile(r"[a-z][a-z0-9_-]*")
+# Course ids for `init`: lowercase letters, digits and `-` only.
+COURSE_ID_RE = re.compile(r"[a-z0-9-]+")
+COURSE_FILE = "course.json"
 
 
 def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
@@ -32,6 +41,22 @@ def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
     return out
 
 
+def _init(course_id: str, title: str, workspace: Path) -> int:
+    if not COURSE_ID_RE.fullmatch(course_id):
+        sys.stderr.write(f"fake dojo: bad course id {course_id!r}: use lowercase letters, digits and '-'\n")
+        return 2
+    # Strict like the real dojo: no control characters, at most TITLE_CHARS characters.
+    if len(title) > TITLE_CHARS or any(unicodedata.category(ch) == "Cc" for ch in title):
+        sys.stderr.write(f"fake dojo: bad course title {title!r}\n")
+        return 2
+    course = workspace / course_id
+    course.mkdir(parents=True, exist_ok=True)
+    units = ["unit-1"]
+    (course / COURSE_FILE).write_text(json.dumps({"id": course_id, "title": title, "units": units}))
+    print(f"Created course {course_id} in {course}")
+    return 0
+
+
 def _next_number(workdir: Path, unit: str) -> int:
     path = workdir / CONTENT_DIR / f"{unit}.jsonl"
     if not path.exists():
@@ -39,15 +64,32 @@ def _next_number(workdir: Path, unit: str) -> int:
     return sum(1 for line in path.read_text().splitlines() if line) + 1
 
 
+def _units(workdir: Path) -> list[str] | None:
+    """Units of the course folder; None (after a message) when the folder has no course.json."""
+    course_file = workdir / COURSE_FILE
+    if not course_file.is_file():
+        sys.stderr.write(f"fake dojo: no course.json in {workdir}\n")
+        return None
+    return list(json.loads(course_file.read_text())["units"])
+
+
 def _next_id(workdir: Path, prefix: str) -> int:
     if not PREFIX_RE.fullmatch(prefix):
         sys.stderr.write(f"fake dojo: bad prefix {prefix!r}\n")
         raise SystemExit(2)
+    if _units(workdir) is None:
+        return 1
     print(f"{prefix}-{_next_number(workdir, prefix)}")
     return 0
 
 
 def _add(workdir: Path, unit: str) -> int:
+    units = _units(workdir)
+    if units is None:
+        return 1
+    if unit not in units:
+        sys.stderr.write(f"fake dojo: unit {unit!r} does not exist in course.json\n")
+        return 1
     data = json.loads(sys.stdin.read())
     items = data if isinstance(data, list) else [data]
     for item in items:
@@ -71,6 +113,8 @@ def _add(workdir: Path, unit: str) -> int:
 
 
 def _validate(workdir: Path) -> int:
+    if _units(workdir) is None:
+        return 2
     diagnostics: list[dict[str, Any]] = []
     for item_id, item in _read_items(workdir):
         prompt = str(item.get("prompt", ""))
@@ -80,6 +124,9 @@ def _validate(workdir: Path) -> int:
             diagnostics.append({"severity": "error", "code": "choice_few_options", **base, "message": message})
         if NOID_MARK in prompt:
             message = "answers list is empty"
+            diagnostics.append({"severity": "error", "code": "gap_empty_answer", **base, "message": message})
+        if any(not str(answer).strip() for answer in item.get("answers", [])):
+            message = f"{item_id}: gap answer is empty"
             diagnostics.append({"severity": "error", "code": "gap_empty_answer", **base, "message": message})
         if WARN_MARK in prompt:
             message = f"{item_id}: fake warning"
@@ -117,8 +164,18 @@ def _build(workdir: Path, outdir: Path) -> int:
     return 0
 
 
+def _log_argv(argv: list[str]) -> None:
+    log = os.environ.get(ARGV_LOG_ENV, "")
+    if log:
+        with open(log, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(argv) + "\n")
+
+
 def main(argv: list[str]) -> int:
     subcommand, rest = argv[0], argv[1:]
+    if subcommand == "init":
+        # init <course_id> --title <T> --workspace <dir>
+        return _init(rest[0], rest[2], Path(rest[4]))
     if subcommand == "next-id":
         return _next_id(Path(rest[0]), rest[1])
     if subcommand == "add":
@@ -131,6 +188,7 @@ def main(argv: list[str]) -> int:
     if subcommand == "lock":
         return _lock(Path(rest[0]))
     if subcommand == "build":
+        _log_argv(argv)
         return _build(Path(rest[0]), Path(rest[2]))
     sys.stderr.write(f"fake dojo: unknown subcommand {subcommand}\n")
     return 2

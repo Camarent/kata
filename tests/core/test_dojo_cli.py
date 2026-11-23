@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -12,7 +13,9 @@ from fakes import fake_dojo
 from kata_core.trainer.cli import Diagnostic, TrainerError
 from kata_core.trainer.dojo_cli import DojoTrainerCli
 
-GEO_ITEM = '{"type": "gap", "unit": "geo", "prompt": "The capital of Italy is ___.", "answers": ["Rome"]}'
+COURSE_ID = "geo-course"
+UNIT = "unit-1"
+GEO_ITEM = f'{{"type": "gap", "unit": "{UNIT}", "prompt": "The capital of Italy is ___.", "answers": ["Rome"]}}'
 
 
 @pytest.fixture
@@ -28,18 +31,29 @@ def dojo() -> DojoTrainerCli:
     return DojoTrainerCli(argv_prefix=[sys.executable, str(Path(fake_dojo.__file__))], timeout=30)
 
 
+@pytest.fixture
+def course(dojo: DojoTrainerCli, workdir: Path) -> Path:
+    """A course folder made by `init` (it has course.json); the commands below run in it."""
+    return dojo.init(workdir, COURSE_ID, "Geography")
+
+
 def _inline(code: str, timeout: float = 30) -> DojoTrainerCli:
     return DojoTrainerCli(argv_prefix=[sys.executable, "-c", code], timeout=timeout)
 
 
 def _item(prompt: str) -> str:
-    return f'{{"type": "gap", "unit": "geo", "prompt": "{prompt}", "answers": ["Rome"]}}'
+    return f'{{"type": "gap", "unit": "{UNIT}", "prompt": "{prompt}", "answers": ["Rome"]}}'
 
 
-def test_next_id_reads_text_id(dojo: DojoTrainerCli, workdir: Path) -> None:
-    assert dojo.next_id(workdir, "geo") == "geo-1"
-    dojo.add(workdir, GEO_ITEM)
-    assert dojo.next_id(workdir, "geo") == "geo-2"
+def test_next_id_reads_text_id(dojo: DojoTrainerCli, course: Path) -> None:
+    assert dojo.next_id(course, UNIT) == "unit-1-1"
+    dojo.add(course, GEO_ITEM)
+    assert dojo.next_id(course, UNIT) == "unit-1-2"
+
+
+def test_next_id_without_course_json_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
+    with pytest.raises(TrainerError, match="next-id exited 1"):
+        dojo.next_id(workdir, UNIT)
 
 
 def test_next_id_bad_prefix_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
@@ -54,16 +68,46 @@ def test_unit_outside_name_charset_raises(dojo: DojoTrainerCli, workdir: Path, u
         dojo.next_id(workdir, unit)
 
 
-def test_add_sends_json_on_stdin_and_parses_id(dojo: DojoTrainerCli, workdir: Path) -> None:
-    assert dojo.add(workdir, GEO_ITEM) == "geo-1"
-    stored = (workdir / fake_dojo.CONTENT_DIR / "geo.jsonl").read_text()
-    assert '"id": "geo-1"' in stored
+def test_add_sends_json_on_stdin_and_parses_id(dojo: DojoTrainerCli, course: Path) -> None:
+    assert dojo.add(course, GEO_ITEM) == "unit-1-1"
+    stored = (course / fake_dojo.CONTENT_DIR / f"{UNIT}.jsonl").read_text()
+    assert '"id": "unit-1-1"' in stored
     assert '"prompt": "The capital of Italy is ___."' in stored
 
 
-def test_add_shape_error_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
+def test_init_returns_course_folder_from_created_line(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    assert course == workdir / "geo-course"
+    assert (course / fake_dojo.COURSE_FILE).is_file()
+
+
+def test_init_without_created_line_raises(workdir: Path) -> None:
+    with pytest.raises(TrainerError, match="no course folder"):
+        _inline("pass").init(workdir, "geo", "Geography")
+
+
+@pytest.mark.parametrize("course_id", ["--workspace", "a/b", "", "geo x"])
+def test_init_course_id_outside_name_charset_raises(dojo: DojoTrainerCli, workdir: Path, course_id: str) -> None:
+    with pytest.raises(TrainerError, match="invalid course id"):
+        dojo.init(workdir, course_id, "Geography")
+
+
+def test_add_unit_missing_from_course_json_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    unknown = '{"type": "gap", "unit": "unit-2", "prompt": "p", "answers": ["a"]}'
+    with pytest.raises(TrainerError, match="does not exist in course.json"):
+        dojo.add(course, unknown)
+
+
+def test_add_known_hyphenated_unit_accepted(dojo: DojoTrainerCli, workdir: Path) -> None:
+    course = dojo.init(workdir, "geo-course", "Geography")
+    known = '{"type": "gap", "unit": "unit-1", "prompt": "p", "answers": ["a"]}'
+    assert dojo.add(course, known) == "unit-1-1"
+
+
+def test_add_shape_error_raises(dojo: DojoTrainerCli, course: Path) -> None:
     with pytest.raises(TrainerError, match="shape error"):
-        dojo.add(workdir, '{"unit": "geo"}')
+        dojo.add(course, f'{{"unit": "{UNIT}"}}')
 
 
 def test_add_without_unit_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
@@ -76,23 +120,24 @@ def test_add_non_json_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
         dojo.add(workdir, "geo item")
 
 
-def test_validate_names_item_id_from_message(dojo: DojoTrainerCli, workdir: Path) -> None:
-    bad_id = dojo.add(workdir, _item("broken FAKE_INVALID item"))
-    assert dojo.validate(workdir) == [
+def test_validate_names_item_id_from_message(dojo: DojoTrainerCli, course: Path) -> None:
+    bad_id = dojo.add(course, _item("broken FAKE_INVALID item"))
+    assert dojo.validate(course) == [
         Diagnostic(item=bad_id, message=f"{bad_id}: fake marked invalid")
     ]
 
 
-def test_validate_falls_back_to_file_line(dojo: DojoTrainerCli, workdir: Path) -> None:
-    dojo.add(workdir, _item("no id here FAKE_NOID"))
-    assert dojo.validate(workdir) == [
-        Diagnostic(item="content/geo.jsonl:1", message="answers list is empty")
+def test_validate_falls_back_to_file_line(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, _item("no id here FAKE_NOID"))
+    assert dojo.validate(course) == [
+        Diagnostic(item=f"content/{UNIT}.jsonl:1", message="answers list is empty")
     ]
 
 
-def test_validate_warnings_only_exit_zero(dojo: DojoTrainerCli, workdir: Path) -> None:
-    warned = dojo.add(workdir, _item("answer in FAKE_WARN prompt"))
-    assert dojo.validate(workdir) == [Diagnostic(item=warned, message=f"{warned}: fake warning")]
+def test_validate_warnings_only_exit_zero(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, _item("answer in FAKE_WARN prompt"))
+    # A warning is not an error: validate returns no diagnostics for it.
+    assert dojo.validate(course) == []
 
 
 def test_validate_exit_two_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
@@ -117,26 +162,25 @@ def test_validate_exit_one_without_errors_raises() -> None:
         _inline(code).validate(Path("."))
 
 
-def test_lock_ok_writes_ids_lock(dojo: DojoTrainerCli, workdir: Path) -> None:
-    dojo.add(workdir, GEO_ITEM)
-    dojo.lock(workdir)
-    assert (workdir / "ids.lock").is_file()
+def test_lock_ok_writes_ids_lock(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, GEO_ITEM)
+    dojo.lock(course)
+    assert (course / "ids.lock").is_file()
 
 
-def test_lock_failure_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
-    dojo.add(workdir, _item("bad FAKE_INVALID"))
+def test_lock_failure_raises(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, _item("bad FAKE_INVALID"))
     with pytest.raises(TrainerError, match="lock exited 1"):
-        dojo.lock(workdir)
+        dojo.lock(course)
 
 
-def test_build_lists_manifest_files_plus_index(dojo: DojoTrainerCli, workdir: Path) -> None:
-    dojo.add(workdir, GEO_ITEM)
-    outdir = workdir / "out"
-    course = workdir.name
-    assert dojo.build(workdir, outdir) == [
-        f"{course}/data/content.json",
-        f"{course}/index.html",
-        f"{course}/manifest.json",
+def test_build_lists_manifest_files_plus_index(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, GEO_ITEM)
+    outdir = course.parent / "out"
+    assert dojo.build(course, outdir) == [
+        f"{course.name}/data/content.json",
+        f"{course.name}/index.html",
+        f"{course.name}/manifest.json",
     ]
 
 
@@ -182,10 +226,10 @@ def test_build_many_course_dirs_raises(workdir: Path) -> None:
         _inline(code).build(workdir, workdir / "out")
 
 
-def test_build_content_error_raises(dojo: DojoTrainerCli, workdir: Path) -> None:
-    dojo.add(workdir, _item("bad FAKE_INVALID"))
+def test_build_content_error_raises(dojo: DojoTrainerCli, course: Path) -> None:
+    dojo.add(course, _item("bad FAKE_INVALID"))
     with pytest.raises(TrainerError, match="exited 1"):
-        dojo.build(workdir, workdir / "out")
+        dojo.build(course, course.parent / "out")
 
 
 def test_unit_with_shell_characters_is_refused(workdir: Path) -> None:
@@ -251,3 +295,44 @@ def test_missing_executable_raises(workdir: Path) -> None:
     cli = DojoTrainerCli(argv_prefix=[str(workdir / "no-such-dojo")], timeout=5)
     with pytest.raises(TrainerError, match="could not start"):
         cli.next_id(workdir, "geo")
+
+
+# Records the build argv (JSON, in the workdir) and writes the course folder the adapter expects.
+_RECORD_BUILD = (
+    "import json, pathlib, sys; "
+    "pathlib.Path(sys.argv[2], 'argv.json').write_text(json.dumps(sys.argv[1:])); "
+    "site = pathlib.Path(sys.argv[4]) / 'geo-course'; "
+    "(site / 'data').mkdir(parents=True); "
+    "(site / 'index.html').write_text('x'); "
+    "(site / 'data' / 'content.json').write_text('[]'); "
+    "(site / 'manifest.json').write_text('{}')"
+)
+
+
+def _build_argv(cli: DojoTrainerCli, workdir: Path) -> list[str]:
+    cli.build(workdir, workdir / "out")
+    return json.loads((workdir / "argv.json").read_text())
+
+
+def test_build_omits_asset_flags_when_empty(workdir: Path) -> None:
+    cli = _inline(_RECORD_BUILD)
+    assert _build_argv(cli, workdir) == ["build", str(workdir), "--out", str(workdir / "out")]
+
+
+def test_build_passes_asset_flags_when_set(workdir: Path) -> None:
+    cli = DojoTrainerCli(
+        argv_prefix=[sys.executable, "-c", _RECORD_BUILD],
+        timeout=30,
+        wasm="assets/wasm",
+        web="assets/web",
+    )
+    assert _build_argv(cli, workdir) == [
+        "build",
+        str(workdir),
+        "--out",
+        str(workdir / "out"),
+        "--wasm",
+        "assets/wasm",
+        "--web",
+        "assets/web",
+    ]
