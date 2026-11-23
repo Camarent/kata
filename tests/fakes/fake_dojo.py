@@ -25,6 +25,8 @@ ARGV_LOG_ENV = "FAKE_DOJO_ARGV_LOG"
 NOID_MARK = "FAKE_NOID"
 WARN_MARK = "FAKE_WARN"
 PREFIX_RE = re.compile(r"[a-z][a-z0-9_-]*")
+# Course ids for `init`: lowercase letters, digits and `-` only.
+COURSE_ID_RE = re.compile(r"[a-z0-9-]+")
 COURSE_FILE = "course.json"
 
 
@@ -40,6 +42,9 @@ def _read_items(workdir: Path) -> list[tuple[str, dict[str, Any]]]:
 
 
 def _init(course_id: str, title: str, workspace: Path) -> int:
+    if not COURSE_ID_RE.fullmatch(course_id):
+        sys.stderr.write(f"fake dojo: bad course id {course_id!r}: use lowercase letters, digits and '-'\n")
+        return 2
     # Strict like the real dojo: no control characters, at most TITLE_CHARS characters.
     if len(title) > TITLE_CHARS or any(unicodedata.category(ch) == "Cc" for ch in title):
         sys.stderr.write(f"fake dojo: bad course title {title!r}\n")

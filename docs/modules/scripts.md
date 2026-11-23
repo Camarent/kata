@@ -21,7 +21,7 @@ Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper
 - `scripts/deploy/validate_stack.py:153` `main(argv)` - checks `deploy/compose.yaml` (`:97` `check_compose`: published ports bound to loopback or the tailnet, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:140` `check_config_keys`). The model comes from `docker compose config` (`:52` `load_compose`); without docker it fails, it does not fall back to a parser.
 - `scripts/deploy/replay_tombstone.py:71` `main(argv)` - replays the tombstone file kept beside a dump (`:38` `parse`, `:55` `replay`).
 - `scripts/deploy/verify_counts.py:54` `main(argv)` - content-free row counts per table (`:34` `table_counts`, `:47` `differing_tables`) for the restore drill; prints counts and names only.
-- `scripts/smoke/dojo_real.py:60` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:20`); returns 0, 1 or 2 (`:31-33`). It runs `build_course_dir` (probe, init, add, validate, lock, build) on 8 synthetic drafts, expects 7 kept and 1 dropped, checks the required keys `index.html`, `data/content.json`, `manifest.json`, the `max_artifact_bytes` cap and the prompts in `data/content.json`; optional `KATA_TEST_DOJO_WASM` and `KATA_TEST_DOJO_WEB` are passed to `build`.
+- `scripts/smoke/dojo_real.py:129` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:30`); returns 0, 1 or 2 (`:54-56`). It runs `build_course_dir` (probe, init, add, validate, lock, build) on 8 synthetic drafts, expects 7 kept and 1 dropped, checks the required keys `index.html`, `data/content.json`, `manifest.json`, the `max_artifact_bytes` cap and the prompts in `data/content.json`; optional `KATA_TEST_DOJO_WASM` and `KATA_TEST_DOJO_WEB` are passed to `build`.
 - `scripts/bench/scoring.py:108` `score(expected, got)` -> `Score` (accuracy, abstain_rate, abstain_precision, per_state).
 - `scripts/bench/scoring.py:94` `load_cases(path)` -> `Cases`; validates every field, raises on malformed input.
 - `scripts/bench/scoring.py:16` `STATES` (`known`, `learning`, `new`, `abstain`), `:17` `MARKS`.
@@ -46,9 +46,11 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 ## scripts/smoke: real dojo
 `scripts/smoke/dojo_real.py` adds, validates, locks and builds one synthetic gap item (unit `geo`) with the `dojo` binary in a temp dir, then prints the built file names. It is opt-in and run by hand; check-all and CI never run it. Run line: `KATA_TEST_DOJO=<path to dojo> python scripts/smoke/dojo_real.py`.
 
-- Refused (exit 2, no run) unless `KATA_TEST_DOJO` names an executable file (`scripts/smoke/dojo_real.py:60-66`). The temp dir is removed when the run ends.
-- Exit codes (`scripts/smoke/dojo_real.py:31-33`): 0 when every step succeeds with no diagnostics; 1 on a diagnostic or a `TrainerError`; 2 when refused.
+- Refused (exit 2, no run) unless `KATA_TEST_DOJO` names an executable file (`scripts/smoke/dojo_real.py:133-135`). The temp dir is removed when the run ends.
+- Exit codes (`scripts/smoke/dojo_real.py:54-56`): 0 when every step succeeds with no diagnostics; 1 on a diagnostic or a `TrainerError`; 2 when refused.
 - Uses `DojoTrainerCli` (`core/kata_core/trainer/dojo_cli.py:29`) with a 60 s timeout per call. Tested by `tests/scripts/test_dojo_real.py`.
+- Init id probe runs first (`probe_init_ids` in `scripts/smoke/dojo_real.py`): `dojo init "Bad Id"` must exit non-zero, and the smoke prints that id-rule error text (`init rejects 'Bad Id': <text>`). `dojo init kata-<uuid>` must exit 0.
+- The id rules the real `dojo` enforces are not yet measured here. After the first real run, the lead records the measured rules in `docs/decisions.md` (lead step, not the dev).
 
 ## scripts/smoke
 `scripts/smoke/real_model.py` runs the 4 prepared cases (`scripts/smoke/data/cases.json`) against the Anthropic API. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (env file holds `KATA_CONFIG` and the key in `KATA_ANTHROPIC_API_KEY`):

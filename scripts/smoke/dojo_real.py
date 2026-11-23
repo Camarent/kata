@@ -3,15 +3,19 @@
 Opt-in and started by hand only: never run by check-all.sh or CI. Refused (exit 2, no run) unless
 KATA_TEST_DOJO is set to an executable file. Optional KATA_TEST_DOJO_WASM and KATA_TEST_DOJO_WEB
 are passed to `dojo build` when set. The run works in a temp dir that is removed at the end.
-Eight synthetic drafts go in; the one with an empty answer must be dropped by the probe. Exit 0
-only when every check passes; the built file list and sizes are printed.
+First the init id probe runs: `dojo init "Bad Id"` must exit non-zero with an error text (printed),
+and `dojo init kata-<uuid>` must exit 0. Eight synthetic drafts go in; the one with an empty answer
+must be dropped by the probe. Exit 0 only when every check passes; the built file list and sizes are printed.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
+import tempfile
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -41,6 +45,10 @@ SYNTHETIC_DRAFTS: list[dict[str, Any]] = [
 ]
 EXPECTED_KEPT = 7
 EXPECTED_DROPPED = 1
+# `dojo init` id probe: a bad id must fail with an error text; a `kata-<uuid>` id must pass.
+PROBE_BAD_ID = "Bad Id"
+PROBE_ID_PREFIX = "kata-"
+PROBE_TITLE = "Probe"
 REQUIRED_FILES = ("index.html", "data/content.json", "manifest.json")
 TIMEOUT_SECONDS = 60.0
 EXIT_OK = 0
@@ -55,6 +63,35 @@ class SmokeFailed(Exception):
 def _refuse(message: str) -> int:
     print(message, file=sys.stderr)
     return EXIT_REFUSED
+
+
+def _run_init(binary: str, course_id: str, workspace: Path) -> subprocess.CompletedProcess[str]:
+    """`dojo init <course_id>` with the same argv shape as DojoTrainerCli; raises SmokeFailed when it cannot run."""
+    argv = [binary, "init", course_id, "--title", PROBE_TITLE, "--workspace", str(workspace)]
+    try:
+        return subprocess.run(
+            argv, capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SmokeFailed(f"dojo init {course_id!r} timed out after {TIMEOUT_SECONDS}s") from exc
+    except OSError as exc:
+        raise SmokeFailed(f"dojo init {course_id!r} could not start: {exc}") from exc
+
+
+def probe_init_ids(binary: str) -> str:
+    """Check `dojo init` id rules: the bad id must exit non-zero, the kata id must exit 0. Returns the bad id's error text."""
+    with tempfile.TemporaryDirectory() as workspace:
+        bad = _run_init(binary, PROBE_BAD_ID, Path(workspace))
+        if bad.returncode == 0:
+            raise SmokeFailed(f"dojo init accepted bad id {PROBE_BAD_ID!r}")
+        error = (bad.stderr or bad.stdout).strip()
+        if not error:
+            raise SmokeFailed(f"dojo init printed no error text for bad id {PROBE_BAD_ID!r}")
+        good_id = f"{PROBE_ID_PREFIX}{uuid.uuid4().hex}"
+        good = _run_init(binary, good_id, Path(workspace))
+        if good.returncode != 0:
+            raise SmokeFailed(f"dojo init rejected {good_id!r}: {(good.stderr or good.stdout).strip()}")
+    return error
 
 
 def run_smoke(cli: TrainerCli, cfg: Config) -> BuiltCourse:
@@ -103,10 +140,12 @@ def main(env: Mapping[str, str]) -> int:
         web=env.get(WEB_ENV, ""),
     )
     try:
+        error = probe_init_ids(binary)
         built = run_smoke(cli, load_config(EXAMPLE_CONFIG, env={}))
     except (TrainerError, BuildRejected, SmokeFailed) as exc:
         print(f"dojo smoke failed: {exc}", file=sys.stderr)
         return EXIT_FAILED
+    print(f"init rejects {PROBE_BAD_ID!r}: {error}")
     _report(built)
     return EXIT_OK
 
