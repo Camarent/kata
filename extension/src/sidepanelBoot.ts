@@ -1,4 +1,4 @@
-import type { CourseLink, PanelMessage, PanelReply } from "./background";
+import type { CourseList, PanelMessage, PanelReply } from "./background";
 import { renderPanel, type PanelHandlers, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import type { MarkOutcome } from "./offlineQueue";
@@ -40,12 +40,15 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   };
   const draw = (): void => renderPanel(root, state, handlers);
 
-  /** Ready courses for the Courses section; a refused list leaves the section out. */
-  const loadCourses = async (): Promise<CourseLink[]> => {
+  /** Ready courses, limit and total for the Courses section; a refused list leaves the section out. */
+  const loadCourses = async (): Promise<void> => {
     const reply = await api.runtime.sendMessage({ type: "panel:courses" });
-    return reply.ok && Array.isArray(reply.data) ? (reply.data as CourseLink[]) : [];
+    const list = reply.ok ? (reply.data as CourseList | undefined) : undefined;
+    state.courses = list && Array.isArray(list.items) ? list.items : [];
+    state.courseLimit = list?.limit;
+    state.courseTotal = list?.total;
   };
-  if (state.session !== null) state.courses = await loadCourses();
+  if (state.session !== null) await loadCourses();
 
   /** Shows a sign-in or server message on the status line. */
   const notice = (text: string): void => {
@@ -60,6 +63,8 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.rows = [];
     state.review = null;
     state.courses = [];
+    state.courseLimit = undefined;
+    state.courseTotal = undefined;
     state.status = { kind: "idle" };
   };
 
@@ -92,7 +97,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       state.status = { kind: "idle" };
       // Change server: the old origin goes once the new session is saved.
       if (previous !== null && previous !== server.pattern) await api.permissions.remove({ origins: [previous] });
-      state.courses = await loadCourses();
+      await loadCourses();
       draw();
     },
 
@@ -150,9 +155,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);
     },
-    // Placeholder until the background delete message is wired (task-6): the panel shows this error.
-    async onDeleteCourse() {
-      throw new Error("Delete is not available yet");
+    async onDeleteCourse(courseId: number) {
+      const reply = await api.runtime.sendMessage({ type: "panel:deleteCourse", courseId });
+      if (!reply.ok) throw new Error(reply.error);
+      // The list and the "n of limit" count come from the core again, so the deleted course leaves the panel.
+      await loadCourses();
+      draw();
     },
   };
 
