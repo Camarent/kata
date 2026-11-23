@@ -134,6 +134,8 @@ web = ""
 timeout_seconds = 120
 # Cap on concepts per generated course.
 max_concepts = 10
+# Cap on courses one user may hold; 0 means unlimited, negative values fail startup.
+max_courses_per_user = 10
 # Items generated per concept.
 items_per_concept = 3
 # Minimum items a course must keep, else the job fails.

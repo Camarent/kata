@@ -531,3 +531,11 @@ Health route: the first-run probe calls `GET /v1/health/deep` (`extension/src/co
 Release assets: a `v*` tag runs `.github/workflows/release-extension.yml`. It runs the extension tests, builds both browsers, writes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS`, and publishes them as a GitHub release. The actions are pinned by major tag (`@v7`), the same as `.github/workflows/ci.yml`. Reason: one unbranded build per browser serves every server, so the owner installs the zip and types the server URL.
 
 Limit: none of these flows is tested in a real browser. Not covered: the origin permission prompt, the `kata-bridge` registration and the course-page bridge. Vitest checks them with fake browser APIs (`extension/tests/`); the browser tests load the built extension but do not drive a real core through these steps.
+
+## Course limit default lives in the example config (M16)
+
+Decided 2026-11-23. `trainer.max_courses_per_user` defaults to 10 only in `config/kata.example.toml` (and its copy `deploy/kata.host.toml`). `core/kata_core/config.py` holds no default. `MAX_COURSES_UNLIMITED = 0` is the single named constant for the unlimited value; the negative check and the later API route use it. Deviation from the brief, which asked for a named constant for the default: the config file is the one default home, as the other `[trainer]` keys are. Values must be integers; a negative value, a string, a bool or a float raises `ConfigError` at startup, from file or env override.
+
+Reason: one default home keeps the example and the host config in sync (the host file copies the example by hand, its header says so). A second default in code would drift from both.
+
+Limit: the course limit is only validated here; no route enforces it yet (later task).
