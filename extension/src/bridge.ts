@@ -1,5 +1,6 @@
-import { CORE_ORIGIN } from "./config";
+import { originOf, type SessionSource } from "./bridgeRegister";
 import { installStub, type StubWindow } from "./pageStub";
+import { TokenStore } from "./tokenStore";
 
 /** The part of `chrome.runtime` the bridge uses; tests pass a fake with this member. */
 export interface BridgeRuntime {
@@ -88,10 +89,20 @@ export function startBridge(win: StubWindow, runtime: BridgeRuntime, channel: st
 
 /**
  * Bridge entry on a course page: injects the stub with a fresh channel and starts answering it.
- * Does nothing unless the page is on the core origin.
+ * Does nothing when no session is saved or unless the page is on the saved session's origin.
+ * The session is read from storage first, so the stub lands after an async read: page scripts
+ * that run before that read finishes see no `window` stub. Known trade-off, kept so that the
+ * no-op rule holds for absent or mismatched sessions.
  */
-export function runBridge(win: StubWindow, doc: Document, runtime: BridgeRuntime, cryptoImpl: Crypto): void {
-  if (win.location.origin !== CORE_ORIGIN) return;
+export async function runBridge(
+  win: StubWindow,
+  doc: Document,
+  runtime: BridgeRuntime,
+  cryptoImpl: Crypto,
+  tokens: SessionSource,
+): Promise<void> {
+  const session = await tokens.loadSession();
+  if (!session || win.location.origin !== originOf(session.baseUrl)) return;
   const channel = newChannel(cryptoImpl);
   startBridge(win, runtime, channel);
   injectStub(doc, channel);
@@ -104,5 +115,6 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     document,
     { sendMessage: (message) => chrome.runtime.sendMessage(message) },
     crypto,
-  );
+    new TokenStore(chrome.storage.local),
+  ).catch((err: unknown) => console.error(err));
 }

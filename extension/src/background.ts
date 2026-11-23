@@ -254,5 +254,5 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
 // Service worker entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.action) {
   wireBackground(chrome, createBackend(chrome, chrome.storage.local));
-  wireBridgeRegistration(chrome.runtime, chrome.scripting);
+  wireBridgeRegistration(chrome.runtime, chrome.scripting, chrome.permissions, new TokenStore(chrome.storage.local));
 }

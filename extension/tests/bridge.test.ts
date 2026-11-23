@@ -178,15 +178,55 @@ describe("injected stub", () => {
     expect(newChannel(crypto)).not.toBe(first);
   });
 
-  it("the bridge does nothing on a page outside the core origin", () => {
-    const page = fakePage("https://evil.test");
-    const createElement = vi.fn();
-    const doc = { createElement, documentElement: { appendChild: vi.fn() } } as unknown as Document;
-    const runtime = { sendMessage: vi.fn() };
-    runBridge(page, doc, runtime, crypto);
-    expect(createElement).not.toHaveBeenCalled();
-    expect(runtime.sendMessage).not.toHaveBeenCalled();
-    expect(page.posted).toEqual([]);
+  describe("runBridge follows the saved session", () => {
+    /** Token store holding the session with `baseUrl`, or no session when undefined. */
+    async function sessionStore(baseUrl: string | undefined): Promise<TokenStore> {
+      const tokens = new TokenStore(memoryArea());
+      if (baseUrl !== undefined) await tokens.saveSession({ baseUrl, token: TOKEN });
+      return tokens;
+    }
+
+    /** A document stand-in that records whether the stub was injected, plus a runtime that records sends. */
+    function probes() {
+      const createElement = vi.fn(() => ({ textContent: "", remove() {} }));
+      const doc = { createElement, documentElement: { appendChild: vi.fn() } } as unknown as Document;
+      const runtime = { sendMessage: vi.fn() };
+      return { doc, createElement, runtime };
+    }
+
+    it("does nothing when no session is saved", async () => {
+      const page = fakePage(CORE_ORIGIN);
+      const { doc, createElement, runtime } = probes();
+      await runBridge(page, doc, runtime, crypto, await sessionStore(undefined));
+      expect(createElement).not.toHaveBeenCalled();
+      expect(runtime.sendMessage).not.toHaveBeenCalled();
+      expect(page.posted).toEqual([]);
+    });
+
+    it("does nothing on a page outside the saved session's origin", async () => {
+      const page = fakePage("https://evil.test");
+      const { doc, createElement, runtime } = probes();
+      await runBridge(page, doc, runtime, crypto, await sessionStore(CORE_ORIGIN));
+      expect(createElement).not.toHaveBeenCalled();
+      expect(runtime.sendMessage).not.toHaveBeenCalled();
+      expect(page.posted).toEqual([]);
+    });
+
+    it("does nothing when the saved base URL is invalid", async () => {
+      const page = fakePage(CORE_ORIGIN);
+      const { doc, createElement, runtime } = probes();
+      await runBridge(page, doc, runtime, crypto, await sessionStore("not a url"));
+      expect(createElement).not.toHaveBeenCalled();
+      expect(page.posted).toEqual([]);
+    });
+
+    it("injects the stub on a page of the saved session's origin, even on a non-default port", async () => {
+      const origin = "http://127.0.0.1:8080";
+      const page = fakePage(origin);
+      const { doc, createElement } = probes();
+      await runBridge(page, doc, { sendMessage: vi.fn() }, crypto, await sessionStore(`${origin}/base`));
+      expect(createElement).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
