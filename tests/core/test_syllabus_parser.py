@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from kata_core.importer.syllabus import (
     TITLE_LIMIT,
@@ -122,3 +124,14 @@ def test_empty_module_list_falls_back_to_whole_source() -> None:
 def test_validate_blank_source_raises() -> None:
     with pytest.raises(ParseError):
         validate_extracted("   ", [])
+
+
+@pytest.mark.parametrize("prefix", ["# Title", "1. Title"])
+def test_long_trailing_spaces_parse_fast(prefix: str) -> None:
+    # A title followed by a long run of spaces must not backtrack quadratically in the line regexes.
+    line = prefix + " " * 200000 + "x"
+    started = time.perf_counter()
+    modules = parse_modules(line)
+    elapsed = time.perf_counter() - started
+    assert modules[0].title.endswith("x")
+    assert elapsed < 1.0
