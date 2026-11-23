@@ -19,7 +19,8 @@ import psycopg
 from kata_core.config import Config, load_config
 from kata_core.jobs.queue import Job
 from kata_core.journal.store import write_entry
-from kata_core.trainer.cli import SubprocessTrainerCli, TrainerCli, TrainerError
+from kata_core.trainer.cli import TrainerCli, TrainerError
+from kata_core.trainer.dojo_cli import DojoTrainerCli
 from kata_core.trainer.store import (
     add_artifacts,
     add_item_map,
@@ -33,6 +34,9 @@ COURSE_READY_KIND = "course.ready"
 COURSE_FAILED_KIND = "course.failed"
 DEFAULT_MEDIA_TYPE = "application/octet-stream"
 MAX_ERROR_CHARS = 2000
+# Every course item goes into this one dojo unit; dojo ids come back as `<unit>-<n>`.
+DOJO_UNIT = "kata"
+DOJO_ITEM_TYPE = "gap"
 
 
 class BuildRejected(Exception):
@@ -51,7 +55,7 @@ def course_id_of(job: Job) -> int:
 def handle(conn: psycopg.Connection[Any], job: Job) -> None:
     """Handler for `course.build`: load config, run the trainer CLI, record the course outcome."""
     cfg = load_config()
-    cli = SubprocessTrainerCli(
+    cli = DojoTrainerCli(
         argv_prefix=list(cfg.get("trainer", "command")),
         timeout=float(cfg.get("trainer", "timeout_seconds")),
     )
@@ -124,10 +128,20 @@ def _check_items(
     return kept, dropped
 
 
+def _dojo_item(draft: dict[str, Any]) -> dict[str, Any]:
+    """Map a stored draft `{concept_id, prompt, answer}` to a dojo gap item. `concept_id` stays out of it."""
+    return {
+        "type": DOJO_ITEM_TYPE,
+        "unit": DOJO_UNIT,
+        "prompt": draft["prompt"],
+        "answers": [draft["answer"]],
+    }
+
+
 def _add(cli: TrainerCli, workdir: Path, draft: dict[str, Any]) -> str:
-    """Add one draft as JSON text. The id must match the one `next-id` announced."""
-    expected = cli.next_id(workdir, str(draft.get("unit", "")))
-    added = cli.add(workdir, json.dumps(draft, sort_keys=True))
+    """Add one draft as a dojo item. The id must match the one `next-id` announced."""
+    expected = cli.next_id(workdir, DOJO_UNIT)
+    added = cli.add(workdir, json.dumps(_dojo_item(draft), sort_keys=True))
     if added != expected:
         raise TrainerError(f"trainer add gave id {added}, next-id said {expected}")
     return added

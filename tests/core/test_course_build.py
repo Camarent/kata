@@ -10,21 +10,21 @@ from typing import Any
 
 import psycopg
 import pytest
-from fakes import fake_trainer_cli
+from fakes import fake_dojo
 from kata_core.config import Config
 from kata_core.jobs.queue import Job, enqueue, get_job
 from kata_core.jobs.runner import load_registry
 from kata_core.storage.concepts import create_concept
 from kata_core.storage.taxonomy import ensure_category
 from kata_core.trainer import build
-from kata_core.trainer.cli import SubprocessTrainerCli
+from kata_core.trainer.dojo_cli import DojoTrainerCli
 from kata_core.trainer.job_kinds import generate_output_hook
 from kata_core.trainer.store import Course, create_course, get_course, read_files
 from support.scratch_db import ScratchDatabase
 
-FAKE_TRAINER = [sys.executable, str(Path(fake_trainer_cli.__file__))]
+FAKE_TRAINER = [sys.executable, str(Path(fake_dojo.__file__))]
 MISSING_TRAINER = ["/nonexistent/kata-trainer"]
-FAKE_MARK = fake_trainer_cli.INVALID_MARK
+FAKE_MARK = fake_dojo.INVALID_MARK
 
 
 @pytest.fixture
@@ -183,14 +183,15 @@ def test_build_ready_drops_invalid_item(conn: psycopg.Connection[Any]) -> None:
         [_draft(concepts[0]), _draft(concepts[1]), _draft(concepts[0], prompt=f"{FAKE_MARK} x")],
     )
     job = _build_job(conn, user)
-    build.run_build(conn, job, _cfg(), SubprocessTrainerCli(FAKE_TRAINER, 30))
+    build.run_build(conn, job, _cfg(), DojoTrainerCli(FAKE_TRAINER, 30))
 
     course = get_course(conn, user, json.loads(job.payload)["course_id"])
     assert course is not None
     assert course.status == "ready"
     assert course.error is None
     assert _count(conn, "course_item_map", course.id) == 2
-    assert _count(conn, "course_artifact", course.id) == 1
+    # The fake dojo writes data/content.json, manifest.json and index.html.
+    assert _count(conn, "course_artifact", course.id) == 3
     assert _journal(conn, user, build.COURSE_READY_KIND) == 1
 
 
@@ -208,14 +209,14 @@ def test_build_fails_below_min_items_with_summary(conn: psycopg.Connection[Any])
         ],
     )
     job = _build_job(conn, user)
-    build.run_build(conn, job, _cfg(min_items=2), SubprocessTrainerCli(FAKE_TRAINER, 30))
+    build.run_build(conn, job, _cfg(min_items=2), DojoTrainerCli(FAKE_TRAINER, 30))
 
     course = get_course(conn, user, json.loads(job.payload)["course_id"])
     assert course is not None
     assert course.status == "failed"
     assert course.error is not None
     assert course.error.startswith("2 of 3 items dropped, 1 left, 2 needed")
-    assert "fake: marked invalid" in course.error
+    assert "fake marked invalid" in course.error
     assert _count(conn, "course_artifact", course.id) == 0
     assert _count(conn, "course_item_map", course.id) == 0
     assert _journal(conn, user, build.COURSE_FAILED_KIND) == 1
@@ -226,7 +227,7 @@ def test_build_fails_when_artifacts_over_cap(conn: psycopg.Connection[Any]) -> N
     concepts = _concepts(conn)
     _generate(conn, user, concepts, [_draft(concepts[0]), _draft(concepts[1])])
     job = _build_job(conn, user)
-    build.run_build(conn, job, _cfg(max_bytes=10), SubprocessTrainerCli(FAKE_TRAINER, 30))
+    build.run_build(conn, job, _cfg(max_bytes=10), DojoTrainerCli(FAKE_TRAINER, 30))
 
     course = get_course(conn, user, json.loads(job.payload)["course_id"])
     assert course is not None
@@ -241,14 +242,24 @@ def test_build_fails_when_trainer_missing(conn: psycopg.Connection[Any]) -> None
     _generate(conn, user, concepts, [_draft(concepts[0]), _draft(concepts[1])])
     job = _build_job(conn, user)
     build.run_build(
-        conn, job, _cfg(argv=MISSING_TRAINER), SubprocessTrainerCli(MISSING_TRAINER, 30)
+        conn, job, _cfg(argv=MISSING_TRAINER), DojoTrainerCli(MISSING_TRAINER, 30)
     )
 
     course = get_course(conn, user, json.loads(job.payload)["course_id"])
     assert course is not None
     assert course.status == "failed"
     assert course.error is not None
-    assert course.error.startswith("trainer: trainer next-id could not start")
+    assert course.error.startswith("trainer: dojo next-id could not start")
+
+
+def test_dojo_item_is_gap_in_unit_without_concept_id() -> None:
+    draft = {"concept_id": 7, "prompt": "name a scale", "answer": "major"}
+    assert build._dojo_item(draft) == {
+        "type": "gap",
+        "unit": build.DOJO_UNIT,
+        "prompt": "name a scale",
+        "answers": ["major"],
+    }
 
 
 def test_registry_has_course_kinds() -> None:
