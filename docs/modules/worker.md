@@ -92,6 +92,13 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Router fallback is covered in `tests/worker/test_router.py`: a local failure with cloud disallowed exhausts the chain with no cloud call (`:127`); a local failure with cloud over cap exhausts it the same way (`:142`); a local failure falls to an allowed cloud provider with room (`:116`); an over-cap or blocked cloud call falls to local (`:92`, `:157`).
 - Local-first is only the default for the `tag` class (`config/kata.example.toml:75`); other classes list cloud first or cloud only (`:76-78`). The fallback is the chain order, never a hidden retry.
 
+## Local model: reasoning, empty reply, fences
+- `[model] reasoning_effort` (`config/kata.example.toml:39`, default `""`) is sent as `reasoning_effort` only when set (`worker/kata_worker/providers/local.py:52`); an empty value omits the field, so the model default applies.
+- Empty-reply guard: a local reply that is empty with `finish_reason` `length` raises `ProviderError` (`providers/local.py:69`): raise `max_tokens` or set `[model] reasoning_effort`. The router treats it as a provider failure.
+- Fence helper: `strip_fence` (`worker/kata_worker/model.py`) drops a code fence around a JSON reply before parsing; used by `handlers/syllabus.py:33` and `handlers/course.py`.
+- Thinking on and off, measured on the local model: thinking on not measured yet; run the local smoke with reasoning_effort on and off and record the numbers here; thinking off not measured yet; run the local smoke with reasoning_effort on and off and record the numbers here.
+- Per-task-class reasoning override: skipped. The provider `complete()` has no task class, so a per-class value would need a signature change across the router; not cheap. `reasoning_effort` is one value for the local provider.
+
 ## Smoke settings and prices
 - `PRICES` has `claude-haiku-5-5` at `(1_000_000, 5_000_000)` micro-USD per 1M tokens (`worker/kata_worker/providers/cost.py:23`); an unpriced model is refused.
 - The real-model smoke (`scripts/smoke/real_model.py`) uses this worker code. Its settings are the `[smoke]` section: `allowed_models = "claude-haiku-5-5"` and `budget_micro_usd = 500000` (`config/kata.example.toml:58-60`). The run is opt-in and never part of check-all or CI; see [scripts](scripts.md).

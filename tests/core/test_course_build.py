@@ -23,7 +23,7 @@ from kata_core.trainer.store import Course, create_course, get_course, read_file
 from support.scratch_db import ScratchDatabase
 
 FAKE_TRAINER = [sys.executable, str(Path(fake_dojo.__file__))]
-MISSING_TRAINER = ["/nonexistent/kata-trainer"]
+MISSING_TRAINER = ["/nonexistent/dojo"]
 FAKE_MARK = fake_dojo.INVALID_MARK
 
 
