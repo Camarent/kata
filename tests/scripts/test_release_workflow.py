@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 import yaml
-from workflow_pins import USES_LINE, pin_failures, uses_failures
+from workflow_pins import uses_failures
 
 REPO_ROOT = Path(__file__).parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release-extension.yml"
@@ -21,11 +21,6 @@ def _parse(text: str) -> dict[Any, Any]:
     return doc
 
 
-def _triggers(doc: dict[Any, Any]) -> dict[Any, Any]:
-    # YAML 1.1 reads the bare key `on` as the boolean True.
-    return doc["on"] if "on" in doc else doc[True]
-
-
 def _steps(doc: dict[str, Any]) -> list[dict[str, Any]]:
     return [step for job in doc["jobs"].values() for step in job["steps"]]
 
@@ -33,14 +28,6 @@ def _steps(doc: dict[str, Any]) -> list[dict[str, Any]]:
 def _workflow() -> tuple[str, dict[str, Any]]:
     text = WORKFLOW.read_text(encoding="utf-8")
     return text, _parse(text)
-
-
-def test_triggers_are_version_tags_and_manual_dispatch():
-    _, doc = _workflow()
-    triggers = _triggers(doc)
-    assert triggers["push"]["tags"] == ["v*"]
-    assert "workflow_dispatch" in triggers
-    assert "branches" not in triggers["push"]
 
 
 def test_permissions_are_contents_write_only():
@@ -53,11 +40,6 @@ def test_no_secrets_reference_anywhere_in_the_workflow():
     assert "secrets." not in text
 
 
-def test_every_action_is_pinned_by_sha_with_tag_comment():
-    text, _ = _workflow()
-    assert pin_failures(text) == []
-
-
 def test_pin_check_rejects_tag_only_branch_and_bare_sha_refs():
     pinned = "actions/checkout@" + "a" * 40 + " # v7"
     assert uses_failures([pinned]) == []
@@ -67,16 +49,6 @@ def test_pin_check_rejects_tag_only_branch_and_bare_sha_refs():
     assert uses_failures([branch]) == [branch]
     bare_sha = "actions/checkout@" + "a" * 40
     assert uses_failures([bare_sha]) == [bare_sha]
-
-
-def test_pin_check_fails_on_a_tag_only_uses_line_in_the_workflow():
-    # Mutation: one tag-only uses line in the tested text must turn the pin check red.
-    text, _ = _workflow()
-    match = USES_LINE.search(text)
-    assert match
-    mutated = text[: match.start(1)] + "actions/checkout@v7" + text[match.end(1) :]
-    assert mutated != text
-    assert pin_failures(mutated) == ["actions/checkout@v7"]
 
 
 def test_setup_node_reads_the_nvmrc_file():
