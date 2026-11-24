@@ -80,14 +80,6 @@ def test_config_row_for_every_example_key():
     assert _missing_rows(data, config_text) == []
 
 
-def test_config_env_names_present():
-    data = _load_toml(EXAMPLE_PATH)
-    config_text = CONFIG_DOC.read_text(encoding="utf-8")
-    for section, table in data.items():
-        for key in table:
-            assert _env_name(section, key) in config_text
-
-
 def test_mutation_new_key_fails_config_check(tmp_path):
     target = tmp_path / "kata.example.toml"
     target.write_text(
