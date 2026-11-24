@@ -113,13 +113,14 @@ def load_config(
             if (section, field) == _COURSE_LIMIT_KEY and not _is_course_limit(value):
                 raise ConfigError(
                     f"{section}.{field} must be an integer >= {MAX_COURSES_UNLIMITED} "
-                    f"(0 = unlimited), got {value!r}"
+                    f"(0 = unlimited), got a {type(value).__name__}"
                 )
             if section == _CAPABILITY_SECTION and not (
                 isinstance(value, str) and value in CAPABILITY_VALUES
             ):
                 raise ConfigError(
-                    f"{section}.{field} must be one of {sorted(CAPABILITY_VALUES)}, got {value!r}"
+                    f"{section}.{field} must be one of {sorted(CAPABILITY_VALUES)}, "
+                    f"got a {type(value).__name__}"
                 )
             values[field] = value
         sections[section] = MappingProxyType(values)

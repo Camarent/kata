@@ -254,6 +254,31 @@ def test_local_capability_non_string_file_value_raises(tmp_path: Path) -> None:
         load_config(path, env={})
 
 
+def test_local_capability_error_does_not_echo_env_value(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    with pytest.raises(ConfigError) as info:
+        load_config(path, env={"KATA_LOCAL_CAPABILITY_SUMMARY": "s3cret-x"})
+    message = str(info.value)
+    assert "s3cret-x" not in message
+    assert "got a str" in message
+    assert "local_capability.summary" in message
+
+
+def test_course_limit_error_does_not_echo_file_value(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("max_courses_per_user = 10", 'max_courses_per_user = "s3cret-x"'),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError) as info:
+        load_config(path, env={})
+    message = str(info.value)
+    assert "s3cret-x" not in message
+    assert "got a str" in message
+    assert "trainer.max_courses_per_user" in message
+
+
 def test_example_has_no_cloud_switch(tmp_path: Path) -> None:
     # The cloud turns on from the token alone: the example has no separate cloud switch section.
     cfg = load_config(_copy_example(tmp_path), env={})
