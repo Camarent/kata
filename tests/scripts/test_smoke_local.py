@@ -379,3 +379,38 @@ def test_no_warn_line_with_default_context(
     recorder = Recorder(_replies_for_cases())
     _, lines = _run(cli, capsys, ["--base-url", FLAG_URL], GOOD_ENV, recorder)
     assert not [line for line in lines if line.startswith("WARN ")]
+
+
+def test_config_error_refusal_prints_exact_stderr_line(
+    cli: ModuleType, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    missing = tmp_path / "absent.toml"
+    recorder = Recorder()
+    code = cli.main(
+        ["--config", str(missing)],
+        {GATE_ENV: "1", BASE_URL_ENV: ENV_URL},
+        httpx.MockTransport(recorder),
+        StepClock(),
+    )
+    assert code == EXIT_REFUSED
+    assert recorder.requests == []
+    assert capsys.readouterr().err == f"refused: config file not found: {missing}\n"
+
+
+def test_case_error_refusal_prints_exact_stderr_line(
+    cli: ModuleType, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken_cases() -> list[object]:
+        raise cli.SmokeError("cases file broken has no cases list")
+
+    monkeypatch.setattr(cli, "load_cases", broken_cases)
+    recorder = Recorder()
+    code = cli.main(
+        CONFIG_ARGS,
+        {GATE_ENV: "1", BASE_URL_ENV: ENV_URL},
+        httpx.MockTransport(recorder),
+        StepClock(),
+    )
+    assert code == EXIT_REFUSED
+    assert recorder.requests == []
+    assert capsys.readouterr().err == "refused: cases file broken has no cases list\n"

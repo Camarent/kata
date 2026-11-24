@@ -103,24 +103,24 @@ def load_config(
         if not isinstance(given, dict):
             raise ConfigError(f"missing section [{section}] in {file_arg}")
         values: dict[str, Any] = {}
-        for key in keys:
-            if key not in given:
-                raise ConfigError(f"missing key {section}.{key} in {file_arg}")
-            value = given[key]
-            env_name = f"{ENV_PREFIX}_{section}_{key}".upper()
+        for field in keys:
+            if field not in given:
+                raise ConfigError(f"missing key {section}.{field} in {file_arg}")
+            value = given[field]
+            env_name = f"{ENV_PREFIX}_{section}_{field}".upper()
             if env_name in env:
                 value = _cast(env[env_name], value, env_name)
-            if (section, key) == _COURSE_LIMIT_KEY and not _is_course_limit(value):
+            if (section, field) == _COURSE_LIMIT_KEY and not _is_course_limit(value):
                 raise ConfigError(
-                    f"{section}.{key} must be an integer >= {MAX_COURSES_UNLIMITED} "
+                    f"{section}.{field} must be an integer >= {MAX_COURSES_UNLIMITED} "
                     f"(0 = unlimited), got {value!r}"
                 )
             if section == _CAPABILITY_SECTION and not (
                 isinstance(value, str) and value in CAPABILITY_VALUES
             ):
                 raise ConfigError(
-                    f"{section}.{key} must be one of {sorted(CAPABILITY_VALUES)}, got {value!r}"
+                    f"{section}.{field} must be one of {sorted(CAPABILITY_VALUES)}, got {value!r}"
                 )
-            values[key] = value
+            values[field] = value
         sections[section] = MappingProxyType(values)
     return Config(sections=MappingProxyType(sections))
