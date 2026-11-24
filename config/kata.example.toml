@@ -76,20 +76,34 @@ case_timeout_seconds = 180
 warmup_timeout_seconds = 600
 num_ctx = 8192
 
-[routing]
+# Local first for every task class: the cloud (anthropic) is always after local in the chain, so a
+# class with no usable local provider falls to the cloud. The cloud turns on by itself when its
+# token (api_key_env) is set; there is no separate switch. Secret guard, per-repository opt-in and
+# the cost cap still apply to every cloud call.
 # Per task class: comma list of provider names, tried in order.
-tag = "local"
-explain = "anthropic,local"
-summary = "anthropic"
-batch = "anthropic"
+[routing]
+tag = "local,anthropic"
+explain = "local,anthropic"
+summary = "local,anthropic"
+batch = "local,anthropic"
 generate_course = "local,anthropic"
 extract_syllabus = "local,anthropic"
+
+# Per task class: the local model that answers it, or "cloud-only" when no local model is good
+# enough. kata-l and kata-m are the local models (see docs/research/benchmarks/RESULTS.md).
+[local_capability]
+tag = "kata-l"
+explain = "kata-l"
+summary = "kata-l"
+batch = "kata-l"
+generate_course = "kata-l"
+extract_syllabus = "kata-l"
 
 [providers]
 cloud_enabled = false
 
 [provider_local]
-task_classes = "tag,explain,generate_course,extract_syllabus"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus"
 
 [provider_anthropic]
 allow_cloud = false
