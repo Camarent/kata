@@ -36,6 +36,8 @@ SCHEMA_TABLES = {
     "jobs",
     "concepts",
     "concept_marks",
+    "concept_aliases",
+    "concept_ignored",
     "retrieval_entries",
     "usage_daily",
     "journal_entry",
