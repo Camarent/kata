@@ -47,7 +47,7 @@ class CoreErrorRouter:
 
 def _router(providers: dict[str, Any]) -> Router:
     chains = {syllabus_handler.SYLLABUS_CLASS: tuple(providers)}
-    policy = Policy.from_config(load_config(EXAMPLE_PATH, env={}))
+    policy = Policy.from_config(load_config(EXAMPLE_PATH, env={}), {})
     return Router(chains, providers, policy, [].append)
 
 

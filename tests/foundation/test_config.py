@@ -50,7 +50,6 @@ def test_example_has_required_sections() -> None:
         "cost",
         "routing",
         "local_capability",
-        "providers",
         "provider_local",
         "provider_anthropic",
         "policy",
@@ -107,10 +106,8 @@ def test_example_has_required_sections() -> None:
         "dimensions",
     }
     assert set(data["lesson_check"]) == {"min_score", "known_hits", "search_limit"}
-    assert set(data["providers"]) == {"cloud_enabled"}
     assert set(data["provider_local"]) == {"task_classes"}
     assert set(data["provider_anthropic"]) == {
-        "allow_cloud",
         "task_classes",
         "base_url",
         "model_name",
@@ -120,8 +117,6 @@ def test_example_has_required_sections() -> None:
         "api_version",
         "cache_system",
     }
-    assert data["providers"]["cloud_enabled"] is False
-    assert data["provider_anthropic"]["allow_cloud"] is False
     assert data["core"]["host"] == "127.0.0.1"
     assert data["database"]["host"] == "127.0.0.1"
 
@@ -262,11 +257,10 @@ def test_local_capability_non_string_file_value_raises(tmp_path: Path) -> None:
         load_config(path, env={})
 
 
-def test_env_overrides_bool_cloud_switch(tmp_path: Path) -> None:
-    path = _copy_example(tmp_path)
-    assert load_config(path, env={}).get("providers", "cloud_enabled") is False
-    cfg = load_config(path, env={"KATA_PROVIDERS_CLOUD_ENABLED": "true"})
-    assert cfg.get("providers", "cloud_enabled") is True
+def test_example_has_no_cloud_switch(tmp_path: Path) -> None:
+    # The cloud turns on from the token alone: the example has no separate cloud switch section.
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert "providers" not in cfg.sections
 
 
 def test_env_override_bad_cast_raises(tmp_path: Path) -> None:

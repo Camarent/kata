@@ -58,9 +58,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.batch` | "kata-l" | `KATA_LOCAL_CAPABILITY_BATCH` |
 | `local_capability.generate_course` | "kata-l" | `KATA_LOCAL_CAPABILITY_GENERATE_COURSE` |
 | `local_capability.extract_syllabus` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXTRACT_SYLLABUS` |
-| `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
 | `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
-| `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |
 | `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |

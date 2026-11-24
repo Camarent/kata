@@ -68,20 +68,19 @@ def _tag_reply(category: str, topic: str) -> str:
 def _local_router(cfg: Config) -> Router:
     """A router whose only provider is the local one, which calls the fake model over HTTP."""
     return Router(
-        {TAG_CLASS: ("local",)}, {"local": LocalProvider(cfg)}, Policy.from_config(cfg), [].append
+        {TAG_CLASS: ("local",)}, {"local": LocalProvider(cfg)}, Policy.from_config(cfg, {}), [].append
     )
 
 
 def _cloud_tag_policy(cfg: Config) -> Policy:
-    """Policy with the cloud switch on and the anthropic provider allowed to run tag."""
+    """Policy with the cloud token set and the anthropic provider allowed to run tag."""
     sections = dict(cfg.sections)
-    sections["providers"] = {"cloud_enabled": True}
     sections["provider_anthropic"] = {
         **cfg.sections["provider_anthropic"],
-        "allow_cloud": True,
         "task_classes": TAG_CLASS,
     }
-    return Policy.from_config(Config(sections=sections))
+    key_env = str(cfg.get("provider_anthropic", "api_key_env"))
+    return Policy.from_config(Config(sections=sections), {key_env: "test-key"})
 
 
 def test_run_once_tags_job_and_reports_scripted_topic(
@@ -161,7 +160,7 @@ def test_failing_first_provider_falls_to_second_and_reports_its_tag(
 def test_route_exhausted_fails_job(fake_core: FakeCore, token_env: str) -> None:
     cfg = _config(fake_core.url, "http://127.0.0.1:9")  # unused: the only provider is a fake
     local = FakeProvider(name="local", script=[ProviderError("local down")])
-    router = Router({TAG_CLASS: ("local",)}, {"local": local}, Policy.from_config(cfg), [].append)
+    router = Router({TAG_CLASS: ("local",)}, {"local": local}, Policy.from_config(cfg, {}), [].append)
     fake_core.enqueue({"id": 4, "payload": "text"})
     client = CoreClient(cfg, token=token_env)
 
