@@ -44,13 +44,11 @@ class FakeLedger:
         return self.spent
 
 
-def _config(cloud: bool) -> Config:
-    """Example config with the cloud switches set: `cloud` turns both on, or both off."""
-    base = load_config(EXAMPLE_PATH, env={})
-    sections: dict[str, Any] = dict(base.sections)
-    sections["providers"] = {"cloud_enabled": cloud}
-    sections["provider_anthropic"] = {**base.sections["provider_anthropic"], "allow_cloud": cloud}
-    return Config(sections=sections)
+TOKEN = {"KATA_ANTHROPIC_API_KEY": "test-key"}
+
+
+def _config() -> Config:
+    return load_config(EXAMPLE_PATH, env={})
 
 
 def _local(script: list[str | ProviderError] | None = None) -> FakeProvider:
@@ -68,7 +66,8 @@ def _router(
     log: list[str] | None = None,
 ) -> Router:
     sink = log if log is not None else []
-    return Router(chains, providers, Policy.from_config(_config(cloud)), sink.append)
+    policy = Policy.from_config(_config(), TOKEN if cloud else {})
+    return Router(chains, providers, policy, sink.append)
 
 
 def test_first_success_wins_and_later_provider_never_called() -> None:
@@ -90,7 +89,7 @@ def test_policy_disallowed_cloud_is_skipped_without_call() -> None:
 
 
 def test_over_cap_cloud_falls_to_local() -> None:
-    cfg = _config(cloud=True)
+    cfg = _config()
     cloud = capped(_cloud(), FakeLedger(spent=2_000_000), MODEL, cfg, lambda _: None)
     log: list[str] = []
     router = _router({EXPLAIN: ("anthropic", "local")}, {"local": _local(), "anthropic": cloud}, log=log)
@@ -115,7 +114,7 @@ def test_failing_provider_falls_to_next() -> None:
 
 def test_local_failure_falls_to_allowed_cloud_with_room() -> None:
     inner = _cloud()
-    cloud = capped(inner, FakeLedger(spent=0), MODEL, _config(cloud=True), lambda _: None)
+    cloud = capped(inner, FakeLedger(spent=0), MODEL, _config(), lambda _: None)
     router = _router(
         {EXPLAIN: ("local", "anthropic")},
         {"local": _local([ProviderError("boom")]), "anthropic": cloud},
@@ -141,7 +140,7 @@ def test_local_failure_with_cloud_disallowed_exhausts_without_cloud_call() -> No
 
 def test_local_failure_with_cloud_over_cap_exhausts_without_cloud_call() -> None:
     inner = _cloud()
-    cloud = capped(inner, FakeLedger(spent=2_000_000), MODEL, _config(cloud=True), lambda _: None)
+    cloud = capped(inner, FakeLedger(spent=2_000_000), MODEL, _config(), lambda _: None)
     router = _router(
         {EXPLAIN: ("local", "anthropic")},
         {"local": _local([ProviderError("boom")]), "anthropic": cloud},
@@ -218,7 +217,7 @@ def test_bad_config_raises_routing_error(chains: dict[str, tuple[str, ...]]) -> 
 
 
 def test_build_router_unknown_class_in_config_raises() -> None:
-    base = _config(cloud=False)
+    base = _config()
     routing = {**base.sections["routing"], "nope": "local"}
     cfg = Config(sections={**base.sections, "routing": routing})
     with pytest.raises(RoutingError):
@@ -228,13 +227,13 @@ def test_build_router_unknown_class_in_config_raises() -> None:
 def test_build_router_without_key_gives_local_only_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(router_module, "LocalProvider", lambda _cfg: _local())
     log: list[str] = []
-    router = build_router(_config(cloud=True), FakeLedger(), {}, lambda _: None, log.append)
+    router = build_router(_config(), FakeLedger(), {}, lambda _: None, log.append)
     assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=LOCAL_REPLY, provider="local")
     assert log == ["route explain: answered by local"]
 
 
 def test_build_router_missing_task_class_raises() -> None:
-    base = _config(cloud=False)
+    base = _config()
     routing = {k: v for k, v in base.sections["routing"].items() if k != EXPLAIN}
     cfg = Config(sections={**base.sections, "routing": routing})
     with pytest.raises(RoutingError):
@@ -243,7 +242,7 @@ def test_build_router_missing_task_class_raises() -> None:
 
 def test_build_router_guard_runs_before_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(router_module, "LocalProvider", lambda _cfg: _local())
-    cfg = _config(cloud=True)
+    cfg = _config()
     key_env = str(cfg.get("provider_anthropic", "api_key_env"))
     ledger = FakeLedger()
     routing = {**cfg.sections["routing"], EXPLAIN: "anthropic,local"}
@@ -253,3 +252,33 @@ def test_build_router_guard_runs_before_cap(monkeypatch: pytest.MonkeyPatch) -> 
     assert router.route(EXPLAIN, SYSTEM, f"key {AWS_KEY} end").provider == "local"
     assert "route explain: provider anthropic failed: SecretBlocked" in log
     assert ledger.reads == 0
+
+
+def _cloud_only_config() -> Config:
+    base = _config()
+    verdicts = {**base.sections["local_capability"], EXPLAIN: "cloud-only"}
+    return Config(sections={**base.sections, "local_capability": verdicts})
+
+
+def test_cloud_only_class_never_calls_local() -> None:
+    local, cloud = _local(), _cloud()
+    log: list[str] = []
+    policy = Policy.from_config(_cloud_only_config(), TOKEN)
+    router = Router(
+        {EXPLAIN: ("local", "anthropic")}, {"local": local, "anthropic": cloud}, policy, log.append
+    )
+    assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=CLOUD_REPLY, provider="anthropic")
+    assert local.calls == []
+    assert "route explain: answered by anthropic" in log
+
+
+def test_cloud_only_class_without_token_exhausts_without_any_call() -> None:
+    local, cloud = _local(), _cloud()
+    policy = Policy.from_config(_cloud_only_config(), {})
+    router = Router(
+        {EXPLAIN: ("local", "anthropic")}, {"local": local, "anthropic": cloud}, policy, [].append
+    )
+    with pytest.raises(RouteExhausted, match="local=skipped, anthropic=skipped"):
+        router.route(EXPLAIN, SYSTEM, USER)
+    assert local.calls == []
+    assert cloud.calls == []

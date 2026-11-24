@@ -49,7 +49,7 @@ def test_example_has_required_sections() -> None:
         "lesson_check",
         "cost",
         "routing",
-        "providers",
+        "local_capability",
         "provider_local",
         "provider_anthropic",
         "policy",
@@ -79,14 +79,12 @@ def test_example_has_required_sections() -> None:
         "rate_limit_seconds",
         "late_event_seconds",
     }
-    assert set(data["routing"]) == {
-        "tag",
-        "explain",
-        "summary",
-        "batch",
-        "generate_course",
-        "extract_syllabus",
-    }
+    task_classes = {"tag", "explain", "summary", "batch", "generate_course", "extract_syllabus"}
+    assert set(data["routing"]) == task_classes
+    assert set(data["local_capability"]) == task_classes
+    for name in task_classes:
+        assert data["routing"][name] == "local,anthropic"
+        assert data["local_capability"][name] == "kata-l"
     assert set(data["core"]) == {"host", "port", "public_url"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}
@@ -108,10 +106,8 @@ def test_example_has_required_sections() -> None:
         "dimensions",
     }
     assert set(data["lesson_check"]) == {"min_score", "known_hits", "search_limit"}
-    assert set(data["providers"]) == {"cloud_enabled"}
     assert set(data["provider_local"]) == {"task_classes"}
     assert set(data["provider_anthropic"]) == {
-        "allow_cloud",
         "task_classes",
         "base_url",
         "model_name",
@@ -121,8 +117,6 @@ def test_example_has_required_sections() -> None:
         "api_version",
         "cache_system",
     }
-    assert data["providers"]["cloud_enabled"] is False
-    assert data["provider_anthropic"]["allow_cloud"] is False
     assert data["core"]["host"] == "127.0.0.1"
     assert data["database"]["host"] == "127.0.0.1"
 
@@ -219,16 +213,54 @@ def test_env_overrides_each_key_with_cast(tmp_path: Path) -> None:
 
 def test_env_overrides_routing_chain(tmp_path: Path) -> None:
     path = _copy_example(tmp_path)
-    assert load_config(path, env={}).get("routing", "explain") == "anthropic,local"
+    assert load_config(path, env={}).get("routing", "explain") == "local,anthropic"
     cfg = load_config(path, env={"KATA_ROUTING_EXPLAIN": "local"})
     assert cfg.get("routing", "explain") == "local"
 
 
-def test_env_overrides_bool_cloud_switch(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "task_class", ["tag", "explain", "summary", "batch", "generate_course", "extract_syllabus"]
+)
+def test_routing_puts_local_before_cloud_for_every_class(tmp_path: Path, task_class: str) -> None:
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert cfg.get("routing", task_class) == "local,anthropic"
+    assert cfg.get("local_capability", task_class) == "kata-l"
+
+
+@pytest.mark.parametrize("value", ["kata-l", "kata-m", "cloud-only"])
+def test_local_capability_accepts_known_values(tmp_path: Path, value: str) -> None:
     path = _copy_example(tmp_path)
-    assert load_config(path, env={}).get("providers", "cloud_enabled") is False
-    cfg = load_config(path, env={"KATA_PROVIDERS_CLOUD_ENABLED": "true"})
-    assert cfg.get("providers", "cloud_enabled") is True
+    cfg = load_config(path, env={"KATA_LOCAL_CAPABILITY_SUMMARY": value})
+    assert cfg.get("local_capability", "summary") == value
+
+
+@pytest.mark.parametrize("bad", ["kata-x", "", "Cloud-Only"])
+def test_local_capability_bad_env_value_raises(tmp_path: Path, bad: str) -> None:
+    path = _copy_example(tmp_path)
+    with pytest.raises(ConfigError, match="local_capability.summary"):
+        load_config(path, env={"KATA_LOCAL_CAPABILITY_SUMMARY": bad})
+
+
+def test_local_capability_bad_file_value_raises(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace('batch = "kata-l"', 'batch = "gpt-9"'), encoding="utf-8")
+    with pytest.raises(ConfigError, match="local_capability.batch"):
+        load_config(path, env={})
+
+
+def test_local_capability_non_string_file_value_raises(tmp_path: Path) -> None:
+    path = _copy_example(tmp_path)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace('batch = "kata-l"', "batch = [1]"), encoding="utf-8")
+    with pytest.raises(ConfigError, match="local_capability.batch"):
+        load_config(path, env={})
+
+
+def test_example_has_no_cloud_switch(tmp_path: Path) -> None:
+    # The cloud turns on from the token alone: the example has no separate cloud switch section.
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert "providers" not in cfg.sections
 
 
 def test_env_override_bad_cast_raises(tmp_path: Path) -> None:

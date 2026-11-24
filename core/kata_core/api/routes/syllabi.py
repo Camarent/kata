@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from kata_core.api.deps import Conn, current_user, get_cfg, require_feature
+from kata_core.api.deps import Conn, current_user, get_cfg, refuse_needs_cloud, require_feature
 from kata_core.auth.service import AuthContext
 from kata_core.config import Config
 from kata_core.importer.syllabus import ParseError
@@ -127,6 +127,8 @@ def create_syllabus_route(body: SyllabusIn, ctx: Caller, conn: Conn, cfg: Cfg) -
                 raise LookupError(f"syllabus {syllabus_id} not readable by its owner")
             if not (cfg.get("syllabus", "model_extract") and _has_no_structure(syllabus, body.text)):
                 return out
+            # Raised inside the transaction: the import above is rolled back, nothing is written.
+            refuse_needs_cloud(cfg, SYLLABUS_EXTRACT_KIND)
             payload = {"syllabus_id": syllabus_id, "text": body.text}
             job_id = enqueue(conn, ctx.user_id, json.dumps(payload), kind=SYLLABUS_EXTRACT_KIND)
     except SyllabusTooLarge as exc:

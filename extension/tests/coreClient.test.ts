@@ -379,6 +379,12 @@ describe("CoreClient course create, delete and limits", () => {
     expect(courseErrorText(new CoreHttpError(422, "course_title_empty"))).toBe("Enter a course title.");
   });
 
+  it("courseErrorText maps needs_cloud to the short cloud-token text", () => {
+    expect(courseErrorText(new CoreHttpError(409, "needs_cloud"))).toBe(
+      "This needs a cloud model. Add a cloud token to turn it on.",
+    );
+  });
+
   it("courseErrorText falls back to the generic text for other errors", () => {
     const generic = "Could not save the course. Try again.";
     expect(courseErrorText(new CoreHttpError(500))).toBe(generic);

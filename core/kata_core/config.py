@@ -26,6 +26,10 @@ _FALSE = {"0", "false", "no", "off"}
 MAX_COURSES_UNLIMITED = 0
 _COURSE_LIMIT_KEY = ("trainer", "max_courses_per_user")
 
+# [local_capability]: per task class, the local model that answers it, or "cloud-only".
+_CAPABILITY_SECTION = "local_capability"
+CAPABILITY_VALUES = frozenset({"kata-l", "kata-m", "cloud-only"})
+
 
 class ConfigError(Exception):
     """Config file missing, unreadable, incomplete, or holding a bad override."""
@@ -110,6 +114,12 @@ def load_config(
                 raise ConfigError(
                     f"{section}.{key} must be an integer >= {MAX_COURSES_UNLIMITED} "
                     f"(0 = unlimited), got {value!r}"
+                )
+            if section == _CAPABILITY_SECTION and not (
+                isinstance(value, str) and value in CAPABILITY_VALUES
+            ):
+                raise ConfigError(
+                    f"{section}.{key} must be one of {sorted(CAPABILITY_VALUES)}, got {value!r}"
                 )
             values[key] = value
         sections[section] = MappingProxyType(values)

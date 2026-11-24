@@ -119,4 +119,5 @@ def build_router(
         task_class: _parse_chain(str(cfg.get(ROUTING_SECTION, task_class)))
         for task_class in routing
     }
-    return Router(chains, _build_providers(cfg, ledger, env, audit, log), Policy.from_config(cfg), log)
+    policy = Policy.from_config(cfg, env)
+    return Router(chains, _build_providers(cfg, ledger, env, audit, log), policy, log)

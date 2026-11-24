@@ -32,9 +32,9 @@ test the foundation, so it waits for a later milestone.
 - Adapters: (a) any OpenAI-compatible endpoint (local runtimes and hosted providers that offer
   that API); (b) a first-party API key; (c) optionally a vendor CLI as a subprocess, only for
   the large task class because start-up takes seconds.
-- Cloud is off by default. A cloud call needs both the provider's `allow_cloud` and the global
-  `[providers] cloud_enabled` set to true. Task classes are tag, explain, summary and batch.
-  The API key is read from the env var named by `api_key_env`, never from the config file.
+- Cloud is on by token alone: a cloud call needs the API key env var named by `api_key_env`
+  to be set, and the class listed in the provider's `task_classes` (see "Routing defaults are
+  local first, cloud by token (M17)"). The API key is read from that env var, never from the config file.
 - A cost cap is built into the core and spend is tracked per call, per user.
 - Chat subscriptions and APIs are billed separately; subscription tokens must not be used in
   application code. The application uses API keys through its adapters.
@@ -219,6 +219,16 @@ Decided 2026-11-21. Spend is kept in table `usage_daily`, keyed by (user_id, day
 ## Routing uses one provider chain per task class, with no implicit local fallback
 
 Decided 2026-11-21. `[routing]` in `config/kata.example.toml` lists one comma-ordered chain per task class; `worker/kata_worker/providers/router.py` `Router.route` tries them in order and the first reply wins. A provider the chain does not list is never called, so local is a fallback only when the chain names it (`tests/worker/test_router.py:152`). Each cloud provider is wrapped as `guarded(capped(inner))`: the secret guard runs before the cost cap, so a blocked text never reads the ledger or reaches the API. Task classes stay `tag`, `explain`, `summary` and `batch`. `lesson_check` is not a task class: it is a synchronous core call since phase 01, and no worker job runs it. Reason: the chain makes the order of providers visible in config, and the wrap order keeps secret text out of the spend path. Limit: a chain of only cloud providers fails the job when the cap or the guard refuses, with no local answer.
+
+Superseded in part by "Routing defaults are local first, cloud by token (M17)" (2026-11-24): the chain order is `local,anthropic` by default, and the cloud is on by token alone, not by `cloud_enabled`. The one chain per class and the wrap order still hold.
+
+## Routing defaults are local first, cloud by token (M17)
+
+Decided 2026-11-24. Every task class in `[routing]` of `config/kata.example.toml` (`tag`, `explain`, `summary`, `batch`, `generate_course`, `extract_syllabus`) lists `local,anthropic`: the local model answers first, the cloud is the second try. `[local_capability]` gives each class a verdict: a local model name (`kata-l` for every class for now) or `cloud-only`. A class marked `cloud-only` is never sent to the local provider; `worker/kata_worker/providers/policy.py` skips it there. The cloud is on when the env var named by `[provider_anthropic] api_key_env` is set and not empty. There is no `cloud_enabled` switch any more: text leaves the machine only when the token is set and the class is in the cloud provider's `task_classes`. Reason: the local model is the default, and the token is the one switch the owner already controls. Limit: the `kata-l` verdicts are a placeholder until the capability audit (`docs/research/benchmarks/LOCAL_AUDIT.md`) sets them; no live cloud call is made by the tests.
+
+## Needs-cloud jobs are refused with 409 before queueing (M17)
+
+Decided 2026-11-24. A job whose class is `cloud-only` in `[local_capability]`, with no cloud token in the environment, is not queued. `core/kata_core/jobs/needs_cloud.py` maps job kinds to task classes (`JOB_KIND_CLASS`; a kind not in it never needs the cloud). The API answers 409 with `detail.code` `needs_cloud` on `POST /v1/jobs` (`core/kata_core/api/routes/jobs.py:92`), on `POST /v1/courses` (`core/kata_core/api/routes/courses.py:148`) and on the syllabus extract route (`core/kata_core/api/routes/syllabi.py:131`). The check is `refuse_needs_cloud` (`core/kata_core/api/deps.py:61`). The extension shows a short needs-cloud text for that code (`extension/src/coreClient.ts:141`). Reason: a job that cannot run should fail at the request, not sit in the queue. Limit: the check reads the token from the core's environment only; a token set on the worker alone does not clear it.
 
 ## Secret scanner has no bypass
 

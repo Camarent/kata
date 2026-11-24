@@ -87,6 +87,21 @@ Project items after Milestone 0.
 - [ ] Trainer: real-browser check of the course panel (M16): create, delete with confirm, "n of
       limit" and the error texts. Vitest checks them with fake browser APIs only.
 
+## Local models (M17)
+
+- [ ] Capability audit on the PC: the lead runs `scripts/smoke/local_audit.py` with
+      `KATA_SMOKE_LOCAL=1` against the local model and records one row per model and class in
+      [`research/benchmarks/LOCAL_AUDIT.md`](research/benchmarks/LOCAL_AUDIT.md). Not run yet.
+- [ ] Set `[local_capability]` from the audit verdicts in `config/kata.example.toml` and
+      `deploy/kata.host.toml`: a class gets `cloud-only` where no local model is good enough.
+      Until then every class is `kata-l` (see [`decisions.md`](decisions.md), "Routing defaults
+      are local first, cloud by token (M17)").
+- [ ] M11 note, thinking on/off numbers for the local models (`kata-l` is not a thinking model,
+      `kata-m` is). Still open: the audit template does not answer it yet; close it once
+      `LOCAL_AUDIT.md` gives the on/off numbers.
+- [ ] Real cloud run for a cloud-only class: with the API key set, run one job of a `cloud-only`
+      class end to end (the 409 `needs_cloud` path is tested only with the token unset).
+
 ## Exam pages (experimental)
 
 Open question for the extension UI design (see [`design/extension-ui.md`](design/extension-ui.md)).

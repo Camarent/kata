@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.6] - 2026-11-24
+
+- feat(routing): local-first routing, needs_cloud refusal and local capability audit
+
 ## [0.1.5] - 2026-11-24
 
 - docs(extension): redo extension UI design with navigation, settings, auto-scan and block states

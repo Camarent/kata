@@ -40,18 +40,17 @@ class FakeClient:
         self.reported.append((job_id, category, topic))
 
 
-def _config(cloud: bool) -> Config:
-    """Example config with the cloud switches set: `cloud` turns both on, or both off."""
-    base = load_config(EXAMPLE_PATH, env={})
-    sections: dict[str, Any] = dict(base.sections)
-    sections["providers"] = {"cloud_enabled": cloud}
-    sections["provider_anthropic"] = {**base.sections["provider_anthropic"], "allow_cloud": cloud}
-    return Config(sections=sections)
+TOKEN = {"KATA_ANTHROPIC_API_KEY": "test-key"}
+
+
+def _config() -> Config:
+    return load_config(EXAMPLE_PATH, env={})
 
 
 def _router(providers: dict[str, Any], cloud: bool = True) -> Router:
+    """Router over `providers`; `cloud` sets whether the cloud token is present."""
     chains = {course_handler.COURSE_CLASS: tuple(providers)}
-    return Router(chains, providers, Policy.from_config(_config(cloud)), [].append)
+    return Router(chains, providers, Policy.from_config(_config(), TOKEN if cloud else {}), [].append)
 
 
 def _reply(items: list[dict[str, Any]]) -> str:

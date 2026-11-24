@@ -13,12 +13,13 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
-from kata_core.api.deps import Conn, current_user, get_cfg, require_feature
+from kata_core.api.deps import Conn, current_user, get_cfg, refuse_needs_cloud, require_feature
 from kata_core.auth.service import AuthContext
 from kata_core.config import MAX_COURSES_UNLIMITED, Config
 from kata_core.jobs.queue import enqueue
 from kata_core.knowledge.mastery import base_score
 from kata_core.trainer.gaps import GapRuleError, select_gaps
+from kata_core.trainer.job_kinds import COURSE_GENERATE_KIND
 from kata_core.trainer.store import (
     Course,
     DuplicateCourseTitle,
@@ -32,7 +33,6 @@ from kata_core.trainer.store import (
     title_taken,
 )
 
-COURSE_GENERATE_KIND = "course.generate"
 MIN_COURSE_LIMIT = 1
 MAX_COURSE_LIMIT = 100
 DEFAULT_COURSE_LIMIT = 50
@@ -140,10 +140,12 @@ def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> Co
 
     The course row and its `course.generate` job are written in one transaction. 422 when the title
     is empty, the rule finds nothing to study, or names a concept the caller cannot see. 409
+    `needs_cloud` when the generate task needs a cloud token that is not set. 409
     `course_limit` when the caller is at the limit, 409 `course_name_taken` when the title is taken.
     Errors return before the job is queued, so nothing is written.
     """
     _check_title(body.title)
+    refuse_needs_cloud(cfg, COURSE_GENERATE_KIND)
     lock_user(conn, ctx.user_id)
     limit = _course_limit(cfg)
     if limit != MAX_COURSES_UNLIMITED and count_courses(conn, ctx.user_id) >= limit:
