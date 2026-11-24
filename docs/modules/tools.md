@@ -25,5 +25,5 @@ Declares the repo's quality gates. Each gate is a plain command and mirrors the 
 - Lint and type config live in `pyproject.toml` (`[tool.ruff]` line length 100; `[tool.mypy]` strict on `core`).
 
 ## Depends on / used by
-- Depends on: `.venv` tools (ruff, mypy, pytest), npm in `extension/` (versions TODO(verify)).
+- Depends on: `.venv` tools (ruff, mypy, pytest), npm in `extension/` (versions TODO(verify): no `engines` field in any `package.json`; root `.nvmrc` pins Node 26).
 - Used by: `tests/foundation/test_gates.py`.

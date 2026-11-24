@@ -72,5 +72,5 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Release: a `v*` tag runs `.github/workflows/release-extension.yml`, which builds both browsers and publishes the zips and `SHA256SUMS`. Actions are pinned by major tag, like `ci.yml`.
 
 ## Depends on / used by
-- Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` or `.nvmrc` in repo); talks to `core` HTTP API (`docs/api.md`).
+- Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` field in any `package.json`; root `.nvmrc` pins Node 26); talks to `core` HTTP API (`docs/api.md`).
 - Used by: `tests/browser/conftest.py` loads `dist/<browser>/` in Firefox and Chrome (`docs/e2e.md`, "Browser tests"); `tests/e2e/driver.ts` imports `extension/src/scanner`, `scanSession`, `coreClient`, `offlineQueue`, `tokenStore`; `tests/foundation/test_extension_scaffold.py` checks manifest and package.json.
