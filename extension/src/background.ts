@@ -1,4 +1,4 @@
-import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
+import type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./content";
 import type { BridgeMessage } from "./bridge";
 import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
@@ -11,10 +11,13 @@ import {
   type ModelhostEngine,
   type ModelhostOutput,
   type ProgressDoc,
+  type TopicOverview,
 } from "./coreClient";
+import { runConceptScan, type ConceptScanError, type ConceptScanResult } from "./conceptScan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
+import { createRescanner, mergeMarks, type Rescanner } from "./rescan";
 import type { SignInInput } from "./sidepanel";
 import { validateServerUrl } from "./serverUrl";
 import { TokenStore, type StorageArea } from "./tokenStore";
@@ -26,9 +29,10 @@ export interface ChromeLike extends PanelOpenApi {
     onClicked: { addListener(listener: (tab: { windowId?: number }) => void): void };
   };
   tabs: {
-    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number }[]>;
+    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]>;
     sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
     create(properties: { url: string }): Promise<unknown>;
+    onUpdated: { addListener(listener: (tabId: number, changes: { url?: string }) => void): void };
   };
   runtime: RuntimeLike;
   scripting: ScriptingLike;
@@ -47,6 +51,10 @@ export type PanelMessage =
   | { type: "panel:signIn"; input: ServerSignIn }
   | { type: "panel:disconnect" }
   | { type: "panel:scan" }
+  | { type: "panel:scanConcepts" }
+  | { type: "panel:chooseConcept"; topicId: number; word: string; conceptId: number }
+  | { type: "panel:reassignConcept"; topicId: number; word: string; fromConceptId: number; toConceptId: number }
+  | { type: "panel:topicOverview"; topicId: number }
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
   | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
@@ -94,6 +102,18 @@ export interface Backend {
   /** Clears the session and the bridge; the offline mark queue is kept. */
   disconnect(): Promise<void>;
   scan(): Promise<ScanResult[]>;
+  /** Concept scan of the active page; starts the rescan of that page when it succeeds. */
+  scanConcepts(): Promise<ConceptScanResult | ConceptScanError>;
+  /** Remembers the concept the caller picked for a written word in a topic. */
+  chooseConcept(topicId: number, word: string, conceptId: number): Promise<void>;
+  /** Moves a written word from one concept to another and teaches the alias. */
+  reassignConcept(topicId: number, word: string, fromConceptId: number, toConceptId: number): Promise<void>;
+  /** Concept counts and concept list of one topic. */
+  topicOverview(topicId: number): Promise<TopicOverview>;
+  /** A watched page changed in the DOM: restarts the rescan debounce for that tab. */
+  pageMutated(tabId: number): void;
+  /** A tab navigated: the rescan of that tab stops. */
+  tabNavigated(tabId: number): void;
   markKnown(topicId: number): Promise<MarkOutcome>;
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
@@ -121,6 +141,30 @@ const MODELHOST_QUEUE: Record<"start" | "measure" | "status", (client: CoreClien
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Quiet time after the last page change before the concept rescan runs, in milliseconds. */
+const RESCAN_DEBOUNCE_MS = 1500;
+
+/** The page key: the URL without its fragment (the core keys classifications by it). */
+function pageKeyOf(url: string): string {
+  const page = new URL(url);
+  page.hash = "";
+  return page.toString();
+}
+
+/** Merges a rescan into the previous result: concepts known before keep their state, the rest take the new one. */
+function mergeScanResult(prev: ConceptScanResult, next: ConceptScanResult): ConceptScanResult {
+  const merged = mergeMarks(
+    prev.blocks.flatMap((block) => block.concepts),
+    next.blocks.flatMap((block) => block.concepts),
+  );
+  let at = 0;
+  const blocks = next.blocks.map((block) => ({
+    ...block,
+    concepts: block.concepts.map(() => merged[at++]),
+  }));
+  return { ...next, blocks };
+}
+
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
   const tokens = new TokenStore(area);
@@ -131,6 +175,53 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     const session = await tokens.loadSession();
     if (!session) throw new CoreAuthError("not signed in");
     return session;
+  };
+
+  /** The rescan in progress: its tab, page key, last merged result and stop function. */
+  let watched: { tabId: number; pageKey: string; last: ConceptScanResult; rescanner: Rescanner } | undefined;
+  /** Mutation callbacks of the watched pages, by tab id. */
+  const mutationHandlers = new Map<number, () => void>();
+
+  const stopRescan = (): void => {
+    watched?.rescanner.stop();
+    watched = undefined;
+  };
+
+  /** Asks the page for its blocks and runs the concept scan over them. */
+  const scanPage = async (session: Session, tabId: number, pageKey: string): Promise<ConceptScanResult | ConceptScanError> => {
+    const page = (await api.tabs.sendMessage(tabId, { type: "scan" })) as ScanResponse;
+    if (!page?.blocks) return { error: "page gave no blocks" };
+    return runConceptScan(clientFor(session), { pageKey, blocks: page.blocks }, { pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
+  };
+
+  /** One rescan: scans the watched page again and keeps the states known before. */
+  const rescanOnce = async (tabId: number): Promise<void> => {
+    const session = await tokens.loadSession();
+    const current = watched;
+    if (!session || !current || current.tabId !== tabId) return;
+    const next = await scanPage(session, tabId, current.pageKey);
+    if ("error" in next || watched !== current) return;
+    current.last = mergeScanResult(current.last, next);
+  };
+
+  const startRescan = (tabId: number, pageKey: string, first: ConceptScanResult): void => {
+    const rescanner = createRescanner({
+      observe(onMutation) {
+        mutationHandlers.set(tabId, onMutation);
+        api.tabs.sendMessage(tabId, { type: "watch" }).catch(() => undefined);
+        return () => {
+          if (mutationHandlers.get(tabId) === onMutation) mutationHandlers.delete(tabId);
+          api.tabs.sendMessage(tabId, { type: "unwatch" }).catch(() => undefined);
+        };
+      },
+      debounceMs: RESCAN_DEBOUNCE_MS,
+      setTimer: (fire, ms) => setTimeout(fire, ms),
+      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      onRescan: () => {
+        rescanOnce(tabId).catch(() => undefined);
+      },
+    });
+    watched = { tabId, pageKey, last: first, rescanner };
   };
 
   return {
@@ -149,6 +240,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     },
 
     async disconnect() {
+      stopRescan();
       await tokens.clearSession();
       await syncBridge(api.scripting, tokens);
     },
@@ -160,6 +252,42 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const page = (await api.tabs.sendMessage(tab.id, { type: "scan" })) as ScanResponse;
       if (!page?.blocks) throw new Error("page gave no blocks");
       return runScan(clientFor(session), page.blocks, { pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
+    },
+
+    async scanConcepts() {
+      const session = await requireSession();
+      // A new scan replaces the rescan of the page before it.
+      stopRescan();
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) throw new Error("no active tab");
+      if (tab.url === undefined) throw new Error("page has no URL");
+      const pageKey = pageKeyOf(tab.url);
+      const result = await scanPage(session, tab.id, pageKey);
+      if (!("error" in result)) startRescan(tab.id, pageKey, result);
+      return result;
+    },
+
+    async chooseConcept(topicId, word, conceptId) {
+      const session = await requireSession();
+      await clientFor(session).chooseConcept(topicId, word, conceptId);
+    },
+
+    async reassignConcept(topicId, word, fromConceptId, toConceptId) {
+      const session = await requireSession();
+      await clientFor(session).reassignConcept(topicId, word, fromConceptId, toConceptId);
+    },
+
+    async topicOverview(topicId) {
+      const session = await requireSession();
+      return clientFor(session).topicOverview(topicId);
+    },
+
+    pageMutated(tabId) {
+      mutationHandlers.get(tabId)?.();
+    },
+
+    tabNavigated(tabId) {
+      if (watched?.tabId === tabId) stopRescan();
     },
 
     async markKnown(topicId) {
@@ -280,6 +408,16 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
       return { ok: true };
     case "panel:scan":
       return { ok: true, data: await backend.scan() };
+    case "panel:scanConcepts":
+      return { ok: true, data: await backend.scanConcepts() };
+    case "panel:chooseConcept":
+      await backend.chooseConcept(message.topicId, message.word, message.conceptId);
+      return { ok: true };
+    case "panel:reassignConcept":
+      await backend.reassignConcept(message.topicId, message.word, message.fromConceptId, message.toConceptId);
+      return { ok: true };
+    case "panel:topicOverview":
+      return { ok: true, data: await backend.topicOverview(message.topicId) };
     case "panel:known":
       return { ok: true, data: await backend.markKnown(message.topicId) };
     case "panel:review":
@@ -316,6 +454,10 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:signIn" ||
     type === "panel:disconnect" ||
     type === "panel:scan" ||
+    type === "panel:scanConcepts" ||
+    type === "panel:chooseConcept" ||
+    type === "panel:reassignConcept" ||
+    type === "panel:topicOverview" ||
     type === "panel:known" ||
     type === "panel:review" ||
     type === "panel:setConcept" ||
@@ -325,6 +467,11 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:createCourse" ||
     type === "panel:modelhost"
   );
+}
+
+/** True when `message` is the content script's report of a DOM change on a watched page. */
+function isPageMutatedMessage(message: unknown): message is PageMutatedMessage {
+  return typeof message === "object" && message !== null && (message as { type?: unknown }).type === "page:mutated";
 }
 
 /** True when `message` is one of the content-bridge message shapes. */
@@ -347,7 +494,16 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
     backend.flush().catch(() => undefined);
   });
 
-  api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  api.tabs.onUpdated.addListener((tabId, changes) => {
+    if (changes.url !== undefined) backend.tabNavigated(tabId);
+  });
+
+  api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (isPageMutatedMessage(message)) {
+      const tabId = (sender as { tab?: { id?: number } }).tab?.id;
+      if (tabId !== undefined) backend.pageMutated(tabId);
+      return false;
+    }
     const route = isPanelMessage(message)
       ? handlePanelMessage(backend, message)
       : isBridgeMessage(message)

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBackend, wireBackground, type ChromeLike, type PanelReply } from "../src/background";
-import { handleContentMessage, registerContentScript, type RuntimeLike } from "../src/content";
+import { handleContentMessage, registerContentScript, type ContentMessage, type RuntimeLike } from "../src/content";
 import type { ScriptingLike } from "../src/bridgeRegister";
 import type { StorageArea } from "../src/tokenStore";
 
@@ -25,6 +25,7 @@ function memoryArea(initial: Record<string, unknown> = {}): StorageArea {
 /** Fake `chrome` object: captures the listeners so tests can fire them. */
 function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
   let clickListener: ((tab: { windowId?: number }) => void) | undefined;
+  let updatedListener: ((tabId: number, changes: { url?: string }) => void) | undefined;
   let messageListener:
     | ((message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | void)
     | undefined;
@@ -52,6 +53,11 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
       query: vi.fn(async () => [{ id: 7 }]),
       sendMessage: vi.fn(async () => ({ blocks: [] })),
       create: vi.fn(async () => ({})),
+      onUpdated: {
+        addListener(listener) {
+          updatedListener = listener;
+        },
+      },
       ...overrides,
     },
     runtime: {
@@ -60,6 +66,7 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
           messageListener = listener;
         },
       },
+      sendMessage: vi.fn(async () => undefined),
     },
     scripting,
   };
@@ -68,6 +75,10 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
     open,
     calls,
     click: (tab: { windowId?: number }) => clickListener?.(tab),
+    /** Fires a tab update, as the browser does on navigation. */
+    updated: (tabId: number, changes: { url?: string }) => updatedListener?.(tabId, changes),
+    /** Sends the content script's page-changed report from tab `tabId`. */
+    mutate: (tabId: number) => messageListener?.({ type: "page:mutated" }, { tab: { id: tabId } }, () => undefined),
     /** Sends a runtime message and resolves with what `sendResponse` got. */
     send: (message: unknown) =>
       new Promise<unknown>((resolve) => {
@@ -101,6 +112,7 @@ describe("content script", () => {
           listener = l;
         },
       },
+      sendMessage: async () => undefined,
     };
     registerContentScript(runtime, document);
     let reply: unknown;
@@ -108,6 +120,37 @@ describe("content script", () => {
       reply = r;
     });
     expect(reply).toMatchObject({ blocks: [{ text: expect.stringContaining("readable") }] });
+  });
+
+  it("reports each DOM change to the background while watched, and stops on unwatch", async () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<p>${LONG}</p>`;
+      let listener: ((m: unknown, s: unknown, r: (x: unknown) => void) => boolean | void) | undefined;
+      const sent: unknown[] = [];
+      const runtime: RuntimeLike = {
+        onMessage: {
+          addListener(l) {
+            listener = l;
+          },
+        },
+        sendMessage: async (message) => {
+          sent.push(message);
+          return undefined;
+        },
+      };
+      registerContentScript(runtime, document);
+      listener?.({ type: "watch" }, {}, () => undefined);
+      document.body.appendChild(document.createElement("p"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sent).toEqual([{ type: "page:mutated" }]);
+      listener?.({ type: "unwatch" }, {}, () => undefined);
+      document.body.appendChild(document.createElement("p"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sent).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -527,5 +570,169 @@ describe("sign-in, server change and disconnect", () => {
     expect(await area.get("kata.pending")).toEqual({ "kata.pending": [3] });
     expect(chrome.calls).toEqual(["unregister:kata-bridge"]);
     expect(await chrome.send({ type: "panel:scan" })).toEqual({ ok: false, error: "not signed in" });
+  });
+});
+
+/** Fake core for the concept scan: a stored classification, then one finished job with `output`. */
+function conceptFetch(output: unknown) {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (init?.method === "POST" && url.endsWith("/jobs")) {
+      return new Response(JSON.stringify({ id: 1 }), { status: 201 });
+    }
+    if (url.includes("/scan/classification")) {
+      const body = { area_id: 2, topic_id: 5, area: "a", topic: "t", candidates: [] };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }
+    return new Response(JSON.stringify({ status: "done", output }), { status: 200 });
+  }) as unknown as typeof fetch;
+}
+
+/** Extraction output: one block with a known, an ignored and an unknown concept. */
+const CONCEPT_OUTPUT = {
+  blocks: [
+    {
+      blockId: "b1",
+      concepts: [
+        { word: "alpha", conceptId: 10, state: "known" },
+        { word: "beta", conceptId: 11, state: "ignored" },
+        { word: "gamma", conceptId: 12, state: "unknown" },
+      ],
+    },
+  ],
+};
+
+/** Page scan answers with one block; any other content message gets no answer. */
+const pageBlocks = async (_tabId: number, message: ContentMessage) =>
+  message.type === "scan" ? { blocks: [{ id: "b1", text: LONG }] } : undefined;
+
+describe("background concept scan and rescan", () => {
+  const SESSION = { "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } };
+  const PAGE = [{ id: 7, url: "https://ex.test/page?x=1#top" }];
+
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("scanConcepts replies with the page concepts, ignored ones dropped, keyed by the URL without fragment", async () => {
+    const fetchImpl = conceptFetch(CONCEPT_OUTPUT);
+    const chrome = fakeChrome({ query: vi.fn(async () => PAGE), sendMessage: vi.fn(pageBlocks) });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), fetchImpl));
+    const reply = (await chrome.send({ type: "panel:scanConcepts" })) as PanelReply;
+    expect(reply).toEqual({
+      ok: true,
+      data: {
+        areaId: 2,
+        topicId: 5,
+        area: "a",
+        topic: "t",
+        blocks: [
+          {
+            blockId: "b1",
+            concepts: [
+              { word: "alpha", conceptId: 10, state: "known" },
+              { word: "gamma", conceptId: 12, state: "unknown" },
+            ],
+          },
+        ],
+      },
+    });
+    const keyed = (fetchImpl as unknown as { mock: { calls: [RequestInfo | URL][] } }).mock.calls.some(([url]) =>
+      String(url).includes(`page_key=${encodeURIComponent("https://ex.test/page?x=1")}`),
+    );
+    expect(keyed).toBe(true);
+  });
+
+  it("scanConcepts reports a page without blocks as an error reply", async () => {
+    const chrome = fakeChrome({ query: vi.fn(async () => PAGE), sendMessage: vi.fn(async () => undefined) });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION)));
+    const reply = (await chrome.send({ type: "panel:scanConcepts" })) as PanelReply;
+    expect(reply).toEqual({ ok: true, data: { error: "page gave no blocks" } });
+  });
+
+  it("chooseConcept, reassignConcept and topicOverview call the core with the topic and word", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/scan/overview?topic_id=5")) {
+        const body = { topic_id: 5, area: "a", topic: "t", counts: { new: 1, learning: 0, known: 1 }, concepts: [] };
+        return new Response(JSON.stringify(body), { status: 200 });
+      }
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), fetchImpl));
+    expect(await chrome.send({ type: "panel:chooseConcept", topicId: 5, word: "alpha", conceptId: 10 })).toEqual({ ok: true });
+    expect(await chrome.send({ type: "panel:reassignConcept", topicId: 5, word: "alpha", fromConceptId: 10, toConceptId: 12 })).toEqual({ ok: true });
+    const posted = (fetchImpl as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.filter(
+      ([url]) => url.endsWith("/scan/choice") || url.endsWith("/scan/reassign"),
+    );
+    expect(posted.map(([url, init]) => [url.split("/").pop(), JSON.parse(String(init?.body))])).toEqual([
+      ["choice", { topic_id: 5, word: "alpha", concept_id: 10 }],
+      ["reassign", { topic_id: 5, word: "alpha", from_concept_id: 10, to_concept_id: 12 }],
+    ]);
+    const overview = (await chrome.send({ type: "panel:topicOverview", topicId: 5 })) as PanelReply;
+    expect(overview).toEqual({
+      ok: true,
+      data: { topicId: 5, area: "a", topic: "t", counts: { new: 1, learning: 0, known: 1 }, concepts: [] },
+    });
+  });
+
+  it("a burst of page changes runs one rescan after the debounce, with fake timers", async () => {
+    vi.useFakeTimers();
+    const sendMessage = vi.fn(pageBlocks);
+    const chrome = fakeChrome({ query: vi.fn(async () => PAGE), sendMessage });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), conceptFetch(CONCEPT_OUTPUT)));
+    await chrome.send({ type: "panel:scanConcepts" });
+    const scans = () => sendMessage.mock.calls.filter(([, message]) => message.type === "scan").length;
+    expect(sendMessage).toHaveBeenCalledWith(7, { type: "watch" });
+    expect(scans()).toBe(1);
+
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(1000);
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(1000);
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(scans()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(scans()).toBe(2);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(scans()).toBe(2);
+  });
+
+  it("sign-out stops the rescan: no further scan and the page is told to unwatch", async () => {
+    vi.useFakeTimers();
+    const sendMessage = vi.fn(pageBlocks);
+    const chrome = fakeChrome({ query: vi.fn(async () => PAGE), sendMessage });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), conceptFetch(CONCEPT_OUTPUT)));
+    await chrome.send({ type: "panel:scanConcepts" });
+    chrome.mutate(7);
+    expect(await chrome.send({ type: "panel:disconnect" })).toEqual({ ok: true });
+    expect(sendMessage).toHaveBeenCalledWith(7, { type: "unwatch" });
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(sendMessage.mock.calls.filter(([, message]) => message.type === "scan")).toHaveLength(1);
+  });
+
+  it("navigating the watched tab stops its rescan", async () => {
+    vi.useFakeTimers();
+    const sendMessage = vi.fn(pageBlocks);
+    const chrome = fakeChrome({ query: vi.fn(async () => PAGE), sendMessage });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), conceptFetch(CONCEPT_OUTPUT)));
+    await chrome.send({ type: "panel:scanConcepts" });
+    chrome.updated(8, { url: "https://other.test/" });
+    chrome.updated(7, {});
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(sendMessage.mock.calls.filter(([, message]) => message.type === "scan")).toHaveLength(2);
+    chrome.updated(7, { url: "https://ex.test/next" });
+    expect(sendMessage).toHaveBeenCalledWith(7, { type: "unwatch" });
+    chrome.mutate(7);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(sendMessage.mock.calls.filter(([, message]) => message.type === "scan")).toHaveLength(2);
   });
 });
