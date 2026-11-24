@@ -5,7 +5,7 @@ summary: Editor extension (VS Code API, TypeScript) - save poster with local sto
 # editor
 
 ## Purpose
-Client for the editor signal: a VS Code extension that posts one `editor.save` event to the core each time a document is saved, and shows a quiet mark from the server as an Information diagnostic. It also runs the device hook installer on command. Sources in `editor/src/`; the entry is `editor/src/extension.ts` (`main` in `editor/package.json:5` points at `dist/extension.js`). The build is `tsc --noEmit` (`editor/package.json:52`); tests are vitest (`editor/package.json:53`).
+Client for the editor signal: a VS Code extension that posts one `editor.save` event to the core each time a document is saved, and shows a quiet mark from the server as an Information diagnostic. It also runs the device hook installer on command. Sources in `editor/src/`; the entry is `editor/src/extension.ts` (`main` in `editor/package.json:5` points at `dist/extension.js`). The build is `tsc --noEmit` (`editor/package.json:72`); tests are vitest (`editor/package.json:73`).
 
 ## Public surface
 - `editor/src/extension.ts:23` `activate` registers the install command, the info view, the diagnostics collection and the save listener; `:36` `deactivate` (nothing to release).
@@ -20,7 +20,7 @@ Client for the editor signal: a VS Code extension that posts one `editor.save` e
 - `editor/src/installHooks.ts:33` `installHooks` runs `python3 -m kata_device hooks install` (`:17-18`) in the workspace; `:21` `runExecFile` is the default runner over `node:child_process`. Never throws: a failure returns `ok: false` with the reason (`:37-39`).
 - `editor/src/config.ts:3` `KataConfig` (`serverUrl`, `token`, `stopPatterns`); `:11` `readConfig` takes an injected getter and maps a missing or mistyped value to empty.
 - `editor/src/infoView.ts:11` `registerInfoView`; `:5` `INFO_TEXT` is the stub text `Kata panel (stub)`.
-- Settings and contributions in `editor/package.json`: `kata.serverUrl` (`:30`), `kata.token` (`:35`), `kata.stopPatterns` (`:40`, regular expressions), command `kata.installHooks` (`:14`), view `kata.infoView` (`:22`), activation (`:6`).
+- Settings and contributions in `editor/package.json`: `kata.serverUrl` (`:50`), `kata.token` (`:55`), `kata.stopPatterns` (`:60`, regular expressions), command `kata.installHooks` (`:18`), view `kata.infoView` (`:42`), activation (`:6`).
 - Server route the poster calls: `POST /v1/events` (`core/kata_core/api/routes/events.py:99`; contract in `docs/api.md`, section for `POST /v1/events`).
 
 ## Key files
@@ -39,10 +39,10 @@ Client for the editor signal: a VS Code extension that posts one `editor.save` e
 - A document whose text matches any `kata.stopPatterns` entry posts nothing, not even a `skipped` marker on the server. The check is local and runs before the network call.
 - The poster never throws. A network error, a non-200 answer or a non-JSON body is `error`; no retry, no queue. Only `posted` updates diagnostics.
 - Settings are read on every save, so a change applies without a reload (`editor/src/extension.ts:2`).
-- Dev dependencies are pinned to exact versions in `editor/package.json:57-60`; the lock file is `editor/package-lock.json`. See `docs/decisions.md`.
+- Dev dependencies are pinned to exact versions in `editor/package.json:76-80`; the lock file is `editor/package-lock.json`. See `docs/decisions.md`.
 - The info view is a stub; the real panel comes in a later task.
 - The Node version is not pinned: TODO(verify) (no `engines` or `.nvmrc` in `editor/`).
 
 ## Depends on / used by
 - Depends on: VS Code extension host API (`vscode`); Node for `build` and `test` (`npm --prefix editor`); `python3` with the `kata_device` package for the install command; the core `POST /v1/events` route (`docs/api.md`).
-- Used by: `scripts/dev/check-all.sh --editor` runs `npm --prefix editor run build` and `run test:cov` (`scripts/dev/check-all.sh:146-148`); CI runs `npm --prefix editor run build` and `npm --prefix editor test` (no coverage) (`.github/workflows/ci.yml:54-56`).
+- Used by: `scripts/dev/check-all.sh --editor` runs `npm --prefix editor run build` and `run test:cov` (`scripts/dev/check-all.sh:146-148`); CI runs `npm --prefix editor run build` and `npm --prefix editor test` (no coverage) (`.github/workflows/ci.yml:58-60`).
