@@ -150,7 +150,11 @@ def set_concept_definition(
 def touch_concept_viewed(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
     """Set the last-viewed time of concept `concept_id` to now. Raises LookupError when the concept is not visible."""
     _require_visible(conn, user_id, concept_id)
-    conn.execute("UPDATE concepts SET last_viewed_at = now() WHERE id = %s", (concept_id,))
+    conn.execute(
+        "INSERT INTO concept_views (user_id, concept_id, last_viewed_at) VALUES (%s, %s, now()) "
+        "ON CONFLICT (user_id, concept_id) DO UPDATE SET last_viewed_at = excluded.last_viewed_at",
+        (user_id, concept_id),
+    )
 
 
 def ignore_concept(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
@@ -206,14 +210,15 @@ class VisibleConcept(NamedTuple):
 def list_visible_concepts(conn: psycopg.Connection[Any], user_id: int) -> list[VisibleConcept]:
     """Every concept `user_id` can see under a visible topic, minus the ones they ignore, ordered by concept id."""
     rows = conn.execute(
-        "SELECT c.id, c.label, m.state, c.added_at, c.last_viewed_at FROM concepts c "
+        "SELECT c.id, c.label, m.state, c.added_at, v.last_viewed_at FROM concepts c "
         "JOIN topics t ON t.id = c.topic_id "
         "LEFT JOIN concept_marks m ON m.concept_id = c.id AND m.user_id = %s "
+        "LEFT JOIN concept_views v ON v.concept_id = c.id AND v.user_id = %s "
         "WHERE (c.owner_user_id IS NULL OR c.owner_user_id = %s) "
         "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
         "AND NOT EXISTS (SELECT 1 FROM concept_ignored i WHERE i.user_id = %s AND i.concept_id = c.id) "
         "ORDER BY c.id",
-        (user_id, user_id, user_id, user_id),
+        (user_id, user_id, user_id, user_id, user_id),
     ).fetchall()
     return [
         VisibleConcept(int(cid), str(label), None if state is None else str(state), added, viewed)

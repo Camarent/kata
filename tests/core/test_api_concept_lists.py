@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
 from kata_core.planning.tracks_store import ItemSpec, create_track
-from kata_core.storage.concepts import ignore_concept
+from kata_core.storage.concepts import create_concept, ignore_concept, list_visible_concepts
 from kata_core.storage.users import create_user
 from support.scratch_db import ScratchDatabase
 
@@ -205,6 +205,26 @@ def test_viewed_stamps_and_404_when_not_visible(
     assert client.post(f"/concepts/{private}/viewed", headers=a).status_code == 204
     with db.connect() as conn:
         row = conn.execute(
-            "SELECT last_viewed_at FROM concepts WHERE id = %s", (private,)
+            "SELECT last_viewed_at FROM concept_views WHERE concept_id = %s", (private,)
         ).fetchone()
     assert row is not None and row[0] is not None
+
+
+def test_last_viewed_is_per_user_on_shared_concept(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    b = _token_for(client, db, cfg, "ben")
+    topic_id = _shared_topic(client, a, "python")
+    with db.connect() as conn:
+        shared = create_concept(conn, topic_id, "shared")
+    assert client.post(f"/concepts/{shared}/viewed", headers=a).status_code == 204
+    # Alice's view must not show up for Ben: last-viewed is stored per user.
+    assert _labels(client, b) == ["shared"]
+    listed_b = {row["concept_id"]: row for row in client.get("/concepts/sorted", headers=b).json()}
+    assert listed_b[shared]["last_viewed_at"] is None
+    listed_a = {row["concept_id"]: row for row in client.get("/concepts/sorted", headers=a).json()}
+    assert listed_a[shared]["last_viewed_at"] is not None
+    with db.connect() as conn:
+        bob_rows = {v.concept_id: v for v in list_visible_concepts(conn, _user_id(db, "ben"))}
+    assert bob_rows[shared].last_viewed_at is None

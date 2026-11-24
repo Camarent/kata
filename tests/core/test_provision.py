@@ -38,6 +38,7 @@ SCHEMA_TABLES = {
     "concept_marks",
     "concept_aliases",
     "concept_ignored",
+    "concept_views",
     "retrieval_entries",
     "usage_daily",
     "journal_entry",

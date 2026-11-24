@@ -67,11 +67,34 @@ def test_set_definition_on_invisible_concept_raises(conn: psycopg.Connection[Any
 def test_touch_viewed_sets_last_viewed_at(conn: psycopg.Connection[Any]) -> None:
     alice = _user(conn, "alice")
     concept = create_concept(conn, _topic(conn, "closures"), "free variables")
-    before = conn.execute("SELECT last_viewed_at FROM concepts WHERE id = %s", (concept,)).fetchone()
-    assert before is not None and before[0] is None
+    assert _count(conn, "SELECT count(*) FROM concept_views WHERE concept_id = %s", (concept,)) == 0
     touch_concept_viewed(conn, alice, concept)
-    after = conn.execute("SELECT last_viewed_at FROM concepts WHERE id = %s", (concept,)).fetchone()
+    after = conn.execute(
+        "SELECT last_viewed_at FROM concept_views WHERE user_id = %s AND concept_id = %s",
+        (alice, concept),
+    ).fetchone()
     assert after is not None and after[0] is not None
+
+
+def test_touch_viewed_upserts_and_leaves_concepts_column(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    concept = create_concept(conn, _topic(conn, "closures"), "free variables")
+    touch_concept_viewed(conn, alice, concept)
+    first = conn.execute(
+        "SELECT last_viewed_at FROM concept_views WHERE user_id = %s AND concept_id = %s",
+        (alice, concept),
+    ).fetchone()
+    touch_concept_viewed(conn, alice, concept)
+    second = conn.execute(
+        "SELECT last_viewed_at FROM concept_views WHERE user_id = %s AND concept_id = %s",
+        (alice, concept),
+    ).fetchone()
+    assert first is not None and second is not None
+    assert second[0] >= first[0]
+    views = "SELECT count(*) FROM concept_views WHERE user_id = %s AND concept_id = %s"
+    assert _count(conn, views, (alice, concept)) == 1
+    row = conn.execute("SELECT last_viewed_at FROM concepts WHERE id = %s", (concept,)).fetchone()
+    assert row is not None and row[0] is None
 
 
 def test_touch_viewed_on_invisible_concept_raises(conn: psycopg.Connection[Any]) -> None:
@@ -80,8 +103,7 @@ def test_touch_viewed_on_invisible_concept_raises(conn: psycopg.Connection[Any])
     concept = create_concept(conn, _topic(conn, "closures"), "free variables", owner_user_id=alice)
     with pytest.raises(LookupError):
         touch_concept_viewed(conn, bob, concept)
-    row = conn.execute("SELECT last_viewed_at FROM concepts WHERE id = %s", (concept,)).fetchone()
-    assert row is not None and row[0] is None
+    assert _count(conn, "SELECT count(*) FROM concept_views WHERE concept_id = %s", (concept,)) == 0
 
 
 def test_ignore_lists_and_unignore_restores(conn: psycopg.Connection[Any]) -> None:

@@ -150,6 +150,21 @@ def test_new_concept_columns_have_defaults(conn: psycopg.Connection[Any]) -> Non
     assert row[2] is None
 
 
+def test_concept_views_is_keyed_per_user(conn: psycopg.Connection[Any]) -> None:
+    columns = conn.execute(
+        "SELECT column_name, is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'concept_views' ORDER BY column_name"
+    ).fetchall()
+    assert columns == [("concept_id", "NO"), ("last_viewed_at", "NO"), ("user_id", "NO")]
+    pk = conn.execute(
+        "SELECT kcu.column_name FROM information_schema.table_constraints tc "
+        "JOIN information_schema.key_column_usage kcu ON kcu.constraint_name = tc.constraint_name "
+        "WHERE tc.table_name = 'concept_views' AND tc.constraint_type = 'PRIMARY KEY' "
+        "ORDER BY kcu.ordinal_position"
+    ).fetchall()
+    assert pk == [("user_id",), ("concept_id",)]
+
+
 def test_migration_keeps_existing_concept_rows(unmigrated: ScratchDatabase) -> None:
     # Apply every migration before 0015, insert a concept, then apply 0015.
     with tempfile.TemporaryDirectory() as tmp:
