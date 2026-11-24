@@ -44,6 +44,34 @@ class Capabilities:
 UNKNOWN = Capabilities(alone={}, together=frozenset(), loaded=())
 
 
+def _parse_models(body: dict[str, object]) -> dict[str, bool | None]:
+    """Per-model fit alone; a figure that is not a JSON boolean is unknown (None)."""
+    alone: dict[str, bool | None] = {}
+    models = body.get(MODELS_KEY)
+    if isinstance(models, dict):
+        for name, entry in models.items():
+            figure = entry.get(FITS_ALONE_KEY) if isinstance(entry, dict) else None
+            alone[name] = figure if isinstance(figure, bool) else None
+    return alone
+
+
+def _parse_pairs(body: dict[str, object]) -> frozenset[frozenset[str]]:
+    """Measured pairs that fit together; malformed entries are skipped."""
+    together: set[frozenset[str]] = set()
+    pairs = body.get(FITS_TOGETHER_KEY)
+    if isinstance(pairs, list):
+        for pair in pairs:
+            if isinstance(pair, list) and len(pair) == 2 and all(isinstance(name, str) for name in pair):
+                together.add(frozenset(pair))
+    return frozenset(together)
+
+
+def _parse_loaded(body: dict[str, object]) -> tuple[str, ...]:
+    """Names of the models loaded now; non-string entries are skipped."""
+    loaded_raw = body.get(LOADED_KEY)
+    return tuple(name for name in loaded_raw if isinstance(name, str)) if isinstance(loaded_raw, list) else ()
+
+
 def parse(body: object) -> Capabilities:
     """Read a decoded capabilities body. Anything but a schema 2 object gives UNKNOWN."""
     if not isinstance(body, dict):
@@ -51,21 +79,7 @@ def parse(body: object) -> Capabilities:
     schema = body.get("schema")
     if type(schema) is not int or schema != SCHEMA:
         return UNKNOWN
-    alone: dict[str, bool | None] = {}
-    models = body.get(MODELS_KEY)
-    if isinstance(models, dict):
-        for name, entry in models.items():
-            figure = entry.get(FITS_ALONE_KEY) if isinstance(entry, dict) else None
-            alone[name] = figure if isinstance(figure, bool) else None
-    together: set[frozenset[str]] = set()
-    pairs = body.get(FITS_TOGETHER_KEY)
-    if isinstance(pairs, list):
-        for pair in pairs:
-            if isinstance(pair, list) and len(pair) == 2 and all(isinstance(name, str) for name in pair):
-                together.add(frozenset(pair))
-    loaded_raw = body.get(LOADED_KEY)
-    loaded = tuple(name for name in loaded_raw if isinstance(name, str)) if isinstance(loaded_raw, list) else ()
-    return Capabilities(alone=alone, together=frozenset(together), loaded=loaded)
+    return Capabilities(alone=_parse_models(body), together=_parse_pairs(body), loaded=_parse_loaded(body))
 
 
 def fetch(info_url: str, timeout_seconds: float, transport: httpx.BaseTransport | None = None) -> Capabilities:
