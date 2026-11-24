@@ -71,6 +71,17 @@ To scan a page, open a lesson page, open the side panel and click "Scan this pag
 
 The worker runs model jobs next to a local Ollama server. The steps are in [`docs/deployment.md`](docs/deployment.md) and the settings in [`docs/configuration.md`](docs/configuration.md). No full run on a real machine is recorded yet.
 
+Model routing: each task class tries the providers in order and the first reply wins. The local model is first; the cloud is second and only runs when its API key env var is set. A class marked `cloud-only` in `[local_capability]` skips the local model. See [`docs/decisions.md`](docs/decisions.md), "Routing defaults are local first, cloud by token (M17)".
+
+| Task class | Provider order |
+|---|---|
+| tag | local,anthropic |
+| explain | local,anthropic |
+| summary | local,anthropic |
+| batch | local,anthropic |
+| generate_course | local,anthropic |
+| extract_syllabus | local,anthropic |
+
 ## Documentation
 
 - [`docs/INDEX.md`](docs/INDEX.md): index of all documentation.
