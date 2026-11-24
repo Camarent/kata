@@ -17,6 +17,7 @@ TASK_CLASSES = (
     "generate_course",
     "extract_syllabus",
     "scan_classify",
+    "scan_extract",
 )
 
 

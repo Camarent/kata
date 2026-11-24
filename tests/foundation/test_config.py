@@ -88,6 +88,7 @@ def test_example_has_required_sections() -> None:
         "generate_course",
         "extract_syllabus",
         "scan_classify",
+        "scan_extract",
     }
     assert set(data["routing"]) == task_classes
     assert set(data["local_capability"]) == task_classes
@@ -239,7 +240,8 @@ def test_env_overrides_routing_chain(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "task_class", ["tag", "explain", "summary", "batch", "generate_course", "extract_syllabus"]
+    "task_class",
+    ["tag", "explain", "summary", "batch", "generate_course", "extract_syllabus", "scan_extract"],
 )
 def test_routing_puts_local_before_cloud_for_every_class(tmp_path: Path, task_class: str) -> None:
     cfg = load_config(_copy_example(tmp_path), env={})

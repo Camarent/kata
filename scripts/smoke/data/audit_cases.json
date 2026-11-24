@@ -129,7 +129,7 @@
     {
       "id": "scan-classify-page",
       "task_class": "scan_classify",
-      "system": "SCAN_SYSTEM_PROMPT",
+      "system": "SCAN_CLASSIFY_SYSTEM_PROMPT",
       "prompt": "{\"page_key\": \"p-12\", \"text\": \"TCP is a connection-oriented protocol. The three-way handshake sends SYN, SYN-ACK and ACK before any data moves. Sequence numbers let the receiver reorder segments and detect loss.\", \"taxonomy\": [{\"area\": \"Networks\", \"topic\": \"TCP\"}, {\"area\": \"Networks\", \"topic\": \"UDP\"}, {\"area\": \"Security\", \"topic\": \"TLS\"}]}",
       "json": true,
       "list_key": "",
@@ -140,6 +140,23 @@
       "min_chars": 40,
       "max_chars": 2000,
       "max_seconds": 120,
+      "model": "kata-l",
+      "thinking": "unset"
+    },
+    {
+      "id": "scan-extract-aliases",
+      "task_class": "scan_extract",
+      "system": "SCAN_EXTRACT_SYSTEM_PROMPT",
+      "prompt": "{\"area\": \"networking\", \"topic\": \"TCP\", \"blocks\": [{\"id\": 1, \"text\": \"SYN-ACK starts the handshake, then the client sends the final ACK.\"}, {\"id\": 2, \"text\": \"A bridge joins two segments of one network below the IP layer.\"}], \"known\": [\"Three-way handshake\", \"Network bridge\"]}",
+      "json": true,
+      "list_key": "blocks",
+      "fields": ["id", "concepts"],
+      "min_items": 2,
+      "max_items": 2,
+      "script": "latin",
+      "min_chars": 80,
+      "max_chars": 4000,
+      "max_seconds": 300,
       "model": "kata-l",
       "thinking": "unset"
     }

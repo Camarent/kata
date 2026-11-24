@@ -53,6 +53,7 @@ def test_task_classes_are_fixed() -> None:
         "generate_course",
         "extract_syllabus",
         "scan_classify",
+        "scan_extract",
     )
 
 

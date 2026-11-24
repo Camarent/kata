@@ -94,6 +94,7 @@ batch = "local,anthropic"
 generate_course = "local,anthropic"
 extract_syllabus = "local,anthropic"
 scan_classify = "local,anthropic"
+scan_extract = "local,anthropic"
 
 # Per task class: the local model that answers it, or "cloud-only" when no local model is good
 # enough. kata-l and kata-m are the local models (see docs/research/benchmarks/RESULTS.md).
@@ -105,12 +106,13 @@ batch = "kata-l"
 generate_course = "kata-l"
 extract_syllabus = "kata-l"
 scan_classify = "kata-l"
+scan_extract = "kata-l"
 
 [provider_local]
-task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
 
 [provider_anthropic]
-task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify"
+task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
 base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"

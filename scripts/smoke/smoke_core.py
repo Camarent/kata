@@ -17,7 +17,10 @@ from typing import Any
 import httpx
 from kata_core.config import Config
 from kata_worker.handlers.course import COURSE_SYSTEM_PROMPT, parse_drafts
-from kata_worker.handlers.scan_classify import SCAN_SYSTEM_PROMPT, parse_classification
+from kata_worker.handlers.scan_classify import SCAN_SYSTEM_PROMPT as SCAN_CLASSIFY_SYSTEM_PROMPT
+from kata_worker.handlers.scan_classify import parse_classification
+from kata_worker.handlers.scan_extract import SCAN_SYSTEM_PROMPT as SCAN_EXTRACT_SYSTEM_PROMPT
+from kata_worker.handlers.scan_extract import parse_extraction
 from kata_worker.handlers.syllabus import SYLLABUS_SYSTEM_PROMPT, parse_modules
 from kata_worker.model import strip_fence
 from kata_worker.providers.anthropic import SECTION as PROVIDER_SECTION
@@ -42,13 +45,15 @@ DEFAULT_CASES = DATA_DIR / "cases.json"
 PROMPTS: dict[str, str] = {
     "COURSE_SYSTEM_PROMPT": COURSE_SYSTEM_PROMPT,
     "SYLLABUS_SYSTEM_PROMPT": SYLLABUS_SYSTEM_PROMPT,
-    "SCAN_SYSTEM_PROMPT": SCAN_SYSTEM_PROMPT,
+    "SCAN_CLASSIFY_SYSTEM_PROMPT": SCAN_CLASSIFY_SYSTEM_PROMPT,
+    "SCAN_EXTRACT_SYSTEM_PROMPT": SCAN_EXTRACT_SYSTEM_PROMPT,
 }
 # Shape check per task class for JSON replies; other JSON cases only need json.loads to pass.
 SHAPE_CHECKS: dict[str, Callable[[str], object]] = {
     "generate_course": parse_drafts,
     "extract_syllabus": parse_modules,
     "scan_classify": parse_classification,
+    "scan_extract": parse_extraction,
 }
 
 

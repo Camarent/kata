@@ -56,6 +56,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `routing.generate_course` | "local,anthropic" | `KATA_ROUTING_GENERATE_COURSE` |
 | `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
 | `routing.scan_classify` | "local,anthropic" | `KATA_ROUTING_SCAN_CLASSIFY` |
+| `routing.scan_extract` | "local,anthropic" | `KATA_ROUTING_SCAN_EXTRACT` |
 | `local_capability.tag` | "kata-l" | `KATA_LOCAL_CAPABILITY_TAG` |
 | `local_capability.explain` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXPLAIN` |
 | `local_capability.summary` | "kata-l" | `KATA_LOCAL_CAPABILITY_SUMMARY` |
@@ -63,8 +64,9 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.generate_course` | "kata-l" | `KATA_LOCAL_CAPABILITY_GENERATE_COURSE` |
 | `local_capability.extract_syllabus` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXTRACT_SYLLABUS` |
 | `local_capability.scan_classify` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_CLASSIFY` |
-| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
-| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `local_capability.scan_extract` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_EXTRACT` |
+| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
