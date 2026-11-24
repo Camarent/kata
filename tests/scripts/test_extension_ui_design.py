@@ -11,7 +11,8 @@ MOCKUP_DIR = REPO_ROOT / "docs" / "design" / "extension-ui"
 PANEL = MOCKUP_DIR / "panel-states.html"
 PAGE = MOCKUP_DIR / "lesson-page.html"
 TOKENS = MOCKUP_DIR / "tokens.css"
-FILES = (DESIGN, PANEL, PAGE, TOKENS)
+# Every mockup html and css file, so later mockups get the same checks at once.
+FILES = (DESIGN, *sorted(MOCKUP_DIR.glob("*.html")), *sorted(MOCKUP_DIR.glob("*.css")))
 
 # Heading prefixes the design doc must keep (section and screen titles).
 DOC_HEADINGS = (
