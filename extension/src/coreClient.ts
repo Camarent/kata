@@ -116,6 +116,8 @@ export interface ScanTopicCandidate {
 
 /** Classification of a page: the topic it belongs to, or `candidates` to choose from. */
 export interface ScanClassification {
+  /** Area of the topic; the extract job needs it. Absent in replies from an older core (then undefined). */
+  areaId?: number;
   topicId: number;
   area: string;
   topic: string;
@@ -406,12 +408,14 @@ export class CoreClient {
   async getClassification(pageKey: string): Promise<ScanClassification | null> {
     try {
       const res = await this.request<{
+        area_id?: number;
         topic_id: number;
         area: string;
         topic: string;
         candidates: { topic_id: number; area: string; topic: string }[];
       }>("GET", `/scan/classification?page_key=${encodeURIComponent(pageKey)}`);
       return {
+        areaId: res.area_id,
         topicId: res.topic_id,
         area: res.area,
         topic: res.topic,

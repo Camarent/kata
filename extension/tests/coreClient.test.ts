@@ -553,6 +553,7 @@ describe("CoreClient scan calls", () => {
   it("getClassification gets /scan/classification with the encoded page key and maps the reply", async () => {
     const pageKey = "https://ex.test/p?a=1&b=2";
     const { fn, calls } = fakeFetch(200, {
+      area_id: 3,
       topic_id: 7,
       area: "Maths",
       topic: "Algebra",
@@ -563,6 +564,7 @@ describe("CoreClient scan calls", () => {
     expect(calls[0].method).toBe("GET");
     expect(calls[0].url).toBe(`${BASE}/scan/classification?page_key=${encodeURIComponent(pageKey)}`);
     expect(out).toEqual({
+      areaId: 3,
       topicId: 7,
       area: "Maths",
       topic: "Algebra",
