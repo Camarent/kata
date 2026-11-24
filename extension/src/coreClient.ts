@@ -75,7 +75,19 @@ export interface JobStatus {
   status: string;
   topic: { id: number; category: string; label: string } | null;
   known: boolean | null;
+  /** Stored output of a modelhost job; null until the worker reports it. */
+  output?: Record<string, unknown> | null;
 }
+
+/** Output of a finished modelhost job (`ok` and `text` are required, `capabilities` optional). */
+export interface ModelhostOutput {
+  ok: boolean;
+  text: string;
+  capabilities?: Record<string, unknown>;
+}
+
+/** Engine named by a `modelhost.use` job. */
+export type ModelhostEngine = "ollama" | "strata" | "none";
 
 /** One row of `GET /marks`. */
 export interface MarkRow {
@@ -243,6 +255,43 @@ export class CoreClient {
   async enqueue(payload: string): Promise<number> {
     const res = await this.request<{ id: number }>("POST", "/jobs", { payload });
     return res.id;
+  }
+
+  /** Queue a modelhost job of `kind` with a JSON `payload`; returns the job id. Throws CoreHttpError (422) when refused. */
+  private async enqueueKind(kind: string, payload: string): Promise<number> {
+    const res = await this.request<{ id: number }>("POST", "/jobs", { payload, kind });
+    return res.id;
+  }
+
+  /** Queue `modelhost.up` (start the local model host); returns the job id. */
+  modelhostUp(): Promise<number> {
+    return this.enqueueKind("modelhost.up", "{}");
+  }
+
+  /** Queue `modelhost.use` (choose the engine); returns the job id. */
+  modelhostUse(engine: ModelhostEngine): Promise<number> {
+    return this.enqueueKind("modelhost.use", JSON.stringify({ engine }));
+  }
+
+  /** Queue `modelhost.measure` (measure the local model); returns the job id. */
+  modelhostMeasure(): Promise<number> {
+    return this.enqueueKind("modelhost.measure", "{}");
+  }
+
+  /** Queue `modelhost.status` (read the local model host state); returns the job id. */
+  modelhostStatus(): Promise<number> {
+    return this.enqueueKind("modelhost.status", "{}");
+  }
+
+  /**
+   * One check of a modelhost job: its output when done, "pending" while it has none yet.
+   * Throws Error when the job failed. The caller polls.
+   */
+  async modelhostResult(id: number): Promise<ModelhostOutput | "pending"> {
+    const status = await this.jobStatus(id);
+    if (status.status === "failed") throw new Error(`modelhost job ${id} failed`);
+    if (status.status !== "done" || !status.output) return "pending";
+    return status.output as unknown as ModelhostOutput;
   }
 
   /** Status of one of the caller's jobs. */

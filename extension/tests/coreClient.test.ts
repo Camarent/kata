@@ -452,3 +452,60 @@ describe("CoreClient health probe", () => {
     await expect(client.probe()).rejects.toBeInstanceOf(NotKataServerError);
   });
 });
+
+describe("CoreClient modelhost jobs", () => {
+  it("each modelhost enqueue posts its kind and payload to /jobs and returns the id", async () => {
+    const { fn, calls } = fakeFetch(200, { id: 5 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.modelhostUp()).toBe(5);
+    expect(await client.modelhostUse("ollama")).toBe(5);
+    expect(await client.modelhostMeasure()).toBe(5);
+    expect(await client.modelhostStatus()).toBe(5);
+    expect(calls.map((c) => c.url)).toEqual([`${BASE}/jobs`, `${BASE}/jobs`, `${BASE}/jobs`, `${BASE}/jobs`]);
+    expect(calls.map((c) => c.method)).toEqual(["POST", "POST", "POST", "POST"]);
+    expect(calls.map((c) => c.body)).toEqual([
+      { payload: "{}", kind: "modelhost.up" },
+      { payload: '{"engine":"ollama"}', kind: "modelhost.use" },
+      { payload: "{}", kind: "modelhost.measure" },
+      { payload: "{}", kind: "modelhost.status" },
+    ]);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+  });
+
+  it("modelhostUse sends the chosen engine in the payload", async () => {
+    const { fn, calls } = fakeFetch(200, { id: 6 });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.modelhostUse("none")).toBe(6);
+    expect(calls[0].body).toEqual({ payload: '{"engine":"none"}', kind: "modelhost.use" });
+  });
+
+  it("a 422 from a modelhost enqueue surfaces as CoreHttpError with the status and code", async () => {
+    const { fn } = fakeFetch(422, { detail: { code: "bad_payload" } });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    const err = await client.modelhostUse("strata").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(422);
+    expect((err as CoreHttpError).code).toBe("bad_payload");
+  });
+
+  it("modelhostResult returns pending while the job has no output", async () => {
+    const { fn, calls } = fakeFetch(200, { status: "queued", topic: null, known: null, output: null });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.modelhostResult(11)).toBe("pending");
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/jobs/11`);
+  });
+
+  it("modelhostResult returns the output of a done job", async () => {
+    const output = { ok: true, text: "running", capabilities: { gpu: false } };
+    const { fn } = fakeFetch(200, { status: "done", topic: null, known: null, output });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.modelhostResult(12)).toEqual(output);
+  });
+
+  it("modelhostResult throws when the job failed", async () => {
+    const { fn } = fakeFetch(200, { status: "failed", topic: null, known: null, output: null });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    await expect(client.modelhostResult(13)).rejects.toThrow("modelhost job 13 failed");
+  });
+});
