@@ -16,7 +16,7 @@
 # survive more than 15 s between pings; 90 s covers it.
 # Buffering: flush_interval -1 flushes each chunk at once on stream routes (no buffering).
 # Stream routes: core/kata_core/api has no text/event-stream or StreamingResponse route yet
-# (grep at task-9); the rule applies to the one proxied upstream, so it covers any stream route added later.
+# (grep core/kata_core for them); the rule applies to the one proxied upstream, so it covers any stream route added later.
 {
 	auto_https disable_redirects
 }

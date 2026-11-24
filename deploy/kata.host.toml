@@ -1,7 +1,7 @@
 # Host config for the container deployment (deploy/). Copied from config/kata.example.toml: same
 # sections and keys, values changed only where the containers need them. Keep in sync with it.
 #
-# Secrets: core reads no *_FILE variables (config/kata_core/config.py applies only the
+# Secrets: core reads no *_FILE variables (core/kata_core/config.py applies only the
 # KATA_<SECTION>_<KEY> overrides). Compose maps each secret file under deploy/secrets/ (layout in
 # deploy/secrets.example/README.md) into the env var named by the *_env key below. This file holds
 # env var names only, never secret values.
