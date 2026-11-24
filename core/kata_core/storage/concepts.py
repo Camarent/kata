@@ -7,7 +7,7 @@ is visible to that user too. Every query filters by user_id.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 import psycopg
 
@@ -191,3 +191,44 @@ def delete_concept(conn: psycopg.Connection[Any], user_id: int, concept_id: int)
     if owner_row is None or owner_row[0] is None:
         raise PermissionError(f"shared concept {concept_id} cannot be deleted by user {user_id}")
     conn.execute("DELETE FROM concepts WHERE id = %s", (concept_id,))
+
+
+class VisibleConcept(NamedTuple):
+    """A concept a user can see and has not ignored, with the user's mark state (None when unmarked)."""
+
+    concept_id: int
+    label: str
+    state: str | None
+    added_at: datetime
+    last_viewed_at: datetime | None
+
+
+def list_visible_concepts(conn: psycopg.Connection[Any], user_id: int) -> list[VisibleConcept]:
+    """Every concept `user_id` can see under a visible topic, minus the ones they ignore, ordered by concept id."""
+    rows = conn.execute(
+        "SELECT c.id, c.label, m.state, c.added_at, c.last_viewed_at FROM concepts c "
+        "JOIN topics t ON t.id = c.topic_id "
+        "LEFT JOIN concept_marks m ON m.concept_id = c.id AND m.user_id = %s "
+        "WHERE (c.owner_user_id IS NULL OR c.owner_user_id = %s) "
+        "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
+        "AND NOT EXISTS (SELECT 1 FROM concept_ignored i WHERE i.user_id = %s AND i.concept_id = c.id) "
+        "ORDER BY c.id",
+        (user_id, user_id, user_id, user_id),
+    ).fetchall()
+    return [
+        VisibleConcept(int(cid), str(label), None if state is None else str(state), added, viewed)
+        for cid, label, state, added, viewed in rows
+    ]
+
+
+def concept_mark_states(
+    conn: psycopg.Connection[Any], user_id: int, concept_ids: list[int]
+) -> dict[int, str]:
+    """Mark state of `user_id` for each id in `concept_ids` that has a mark. Unmarked ids are absent."""
+    if not concept_ids:
+        return {}
+    rows = conn.execute(
+        "SELECT concept_id, state FROM concept_marks WHERE user_id = %s AND concept_id = ANY(%s)",
+        (user_id, concept_ids),
+    ).fetchall()
+    return {int(cid): str(state) for cid, state in rows}
