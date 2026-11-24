@@ -46,7 +46,7 @@ test the foundation, so it waits for a later milestone.
 
 Two layers behind a scanner interface. Client masking in the terminal session tool uses a
 small dependency-free pattern list. The core scans
-every outgoing text before any cloud call with `core/kata_core/egress/scanner.py`, no subprocess (for the hook, superseded by the section at line 270). TruffleHog is rejected (AGPL licence does not fit
+every outgoing text before any cloud call with `core/kata_core/egress/scanner.py`, no subprocess (for the hook, superseded by "Pre-commit scans staged lines in process with the one scanner"). TruffleHog is rejected (AGPL licence does not fit
 an MIT repository).
 
 ## Local model selection
@@ -74,7 +74,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
   rename migrates users' states. Each user's private overlay never changes the shared tree.
 - **Thresholds.** Intervention thresholds are tuned per user from that user's own journal.
   Global defaults change only by the administrator, from content-free counts.
-- **Pre-commit secret check.** Runs the core scanner locally, so it does not depend on the core (superseded for the hook by the section at line 270: the scanner is `core/kata_core/egress/scanner.py`, no subprocess).
+- **Pre-commit secret check.** Runs the core scanner locally, so it does not depend on the core (superseded for the hook by "Pre-commit scans staged lines in process with the one scanner": the scanner is `core/kata_core/egress/scanner.py`, no subprocess).
 - **Automatic scan on page open.** Only on sites the user added, each a URL mask (a pattern
   with wildcards, so one entry can cover a whole platform); elsewhere a scan starts on a
   click. Background prefetch for a user without a worker is a setting, off by default.
@@ -407,7 +407,7 @@ Decided 2026-11-21. `[trainer] enabled`, `[syllabus] enabled` and `[planning] en
 
 ## D15 Config keys (all added by one phase-01 task to config/kata.example.toml)
 
-Decided 2026-11-21. Keys added to `config/kata.example.toml`: `[jobs] runner_poll_seconds, max_output_bytes`; `[routing] generate_course, extract_syllabus`, and provider `task_classes` gain the same two; `[trainer] enabled, command, timeout_seconds, max_concepts, items_per_concept, min_items, max_artifact_bytes, max_progress_bytes`; `[knowledge] trainer_step, trainer_max_step, known_threshold, learning_threshold, assertion_hold, base_known, base_learning, base_new`; `[syllabus] enabled, model_extract, max_bytes`; `[planning] enabled, skim_share, words_per_unit, minutes_skip, minutes_skim, minutes_practice, minutes_learn`.
+Decided 2026-11-21. Keys added to `config/kata.example.toml`: `[jobs] runner_poll_seconds, max_output_bytes`; `[routing] generate_course, extract_syllabus`, and provider `task_classes` gain the same two; `[trainer] enabled, command, timeout_seconds, max_concepts, min_items, max_artifact_bytes, max_progress_bytes`; `[knowledge] trainer_step, trainer_max_step, known_threshold, learning_threshold, assertion_hold, base_known, base_learning, base_new`; `[syllabus] enabled, model_extract, max_bytes`; `[planning] enabled, skim_share, words_per_unit, minutes_skip, minutes_skim, minutes_practice, minutes_learn`. Keys added later: `[trainer] max_courses_per_user` (M16), and `open_link_ttl_seconds` and `open_link_key_file` (see "Open-link tokens are HMAC-SHA256 signed").
 
 ## D16 Info surfaces
 

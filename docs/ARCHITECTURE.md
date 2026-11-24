@@ -16,9 +16,9 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/design/extension-ui.md` (side panel and lesson page UI design, static mockups in `docs/design/extension-ui/`), `docs/INDEX.md` (generated file and symbol list).
 
 ## Data and control flow
-1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:72`).
+1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:111`).
 2. Provisioning: `scripts/db/kata_db.py` calls `core/kata_core/storage/provision.py` to create databases and apply `core/migrations/*.sql`.
-3. Auth: admin creates a user and an enrolment code (`core/kata_core/auth/admin.py`). Client redeems the code at `POST /auth/enrol`; the core stores only sha256 digests and returns the raw token once. Every other route takes `Authorization: Bearer`, resolved by `current_user` (`core/kata_core/api/deps.py:60`).
+3. Auth: admin creates a user and an enrolment code (`core/kata_core/auth/admin.py`). Client redeems the code at `POST /auth/enrol`; the core stores only sha256 digests and returns the raw token once. Every other route takes `Authorization: Bearer`, resolved by `current_user` (`core/kata_core/api/deps.py:76`).
 4. Request: route module in `core/kata_core/api/routes/` -> repository in `core/kata_core/storage/` -> Postgres. `user_id` always comes from the token.
 5. Import: `POST /import` parses the skill-list text (`core/kata_core/importer/skill_list.py`) and writes topics and marks in one transaction; a bad line rejects the whole import.
 6. Tagging queue: client `POST /jobs` enqueues; a worker polls `GET /jobs/next?kind=...` (204 when empty; default kind `tag`), leases a job for `lease_seconds`, and posts `result`, `output` or `fail`. Expired leases are reclaimed (`core/kata_core/jobs/queue.py`). Known/new is decided in the core from marks, not by the model.
@@ -35,7 +35,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 
 ## Entry points
 - API app factory: `core/kata_core/api/app.py:11` `create_app(cfg)`. No server launcher in repo: TODO(verify).
-- Worker: `python -m kata_worker` (`worker/kata_worker/__main__.py:28` `main`); reads `[worker]` and the token env var; loop in `worker/kata_worker/loop.py:46` `run_forever`.
+- Worker: `python -m kata_worker` (`worker/kata_worker/__main__.py:28` `main`); reads `[worker]` and the token env var; loop in `worker/kata_worker/loop.py:61` `run_forever`.
 - Core job runner: `python -m kata_core.jobs` (`core/kata_core/jobs/__main__.py:17` `main`) runs the core-side job handlers and output hooks; launch: TODO(verify).
 - Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:77` `main`), run with `PYTHONPATH=core`.
 - DB CLI: `python3 scripts/db/kata_db.py` (`scripts/db/kata_db.py:35` `main`), run with `PYTHONPATH=core`.
@@ -44,7 +44,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 
 ## Build and test commands
 From `tools/gates.json` (plain commands): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
-Editor (from `editor/package.json`): `npm --prefix editor run build` (`tsc --noEmit`), `npm --prefix editor run test:cov` (vitest with coverage); CI runs build and `npm --prefix editor test` (`.github/workflows/ci.yml:54-56`).
+Editor (from `editor/package.json`): `npm --prefix editor run build` (`tsc --noEmit`), `npm --prefix editor run test:cov` (vitest with coverage); CI runs build and `npm --prefix editor test` (`.github/workflows/ci.yml:58-60`).
 The full check is `scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
 
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:29`). It refuses any embedder but `fake`.

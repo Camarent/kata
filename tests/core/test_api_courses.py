@@ -191,6 +191,9 @@ def test_zero_limit_is_unlimited(
     _limit(client, monkeypatch, cfg, 0)
     for title in ("First", "Second", "Third"):
         _create(client, headers, {"title": title, "concept_ids": [concept]})
+    with db.connect() as conn:
+        row = conn.execute("SELECT count(*) FROM course").fetchone()
+    assert row is not None and row[0] == 3
 
 
 def test_taken_title_is_409_name_taken_and_queues_nothing(

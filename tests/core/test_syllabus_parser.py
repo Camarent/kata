@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
 import time
 
 import pytest
 from kata_core.importer.syllabus import (
+    _HEADING,
+    _NUMBERED,
     TITLE_LIMIT,
     Module,
     ParseError,
@@ -135,3 +138,20 @@ def test_long_trailing_spaces_parse_fast(prefix: str) -> None:
     elapsed = time.perf_counter() - started
     assert modules[0].title.endswith("x")
     assert elapsed < 1.0
+
+
+@pytest.mark.parametrize("pattern", [_HEADING, _NUMBERED])
+def test_line_regexes_do_not_backtrack_on_space_run_before_newline(pattern: re.Pattern[str]) -> None:
+    # Mutant check: with `(.+)$` this input takes quadratic time (about 1 s at 20000 spaces).
+    text = ("#" if pattern is _HEADING else "1.") + " " * 40000 + "\nx\ny"
+    started = time.perf_counter()
+    assert pattern.match(text) is None
+    assert time.perf_counter() - started < 0.2
+
+
+@pytest.mark.parametrize("text", ["# ", "#   ", "1. ", "1.   "])
+def test_whitespace_only_title_is_body_text_not_a_module_boundary(text: str) -> None:
+    # Intended: a heading or numbered line needs a visible title; otherwise the text is one plain module.
+    source = text + "\nbody"
+    expected = Module(title=text.strip(), body=source.strip(), words=len(source.split()))
+    assert parse_modules(source) == [expected]

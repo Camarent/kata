@@ -44,7 +44,6 @@ def test_example_has_required_sections() -> None:
         "worker",
         "jobs",
         "model",
-        "client",
         "retrieval",
         "lesson_check",
         "cost",
@@ -98,7 +97,6 @@ def test_example_has_required_sections() -> None:
     }
     assert set(data["jobs"]) == {"lease_seconds", "runner_poll_seconds", "max_output_bytes"}
     assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds", "reasoning_effort"}
-    assert set(data["client"]) == {"request_timeout_seconds"}
     assert set(data["retrieval"]) == {
         "embedder",
         "model_name",
@@ -114,8 +112,6 @@ def test_example_has_required_sections() -> None:
         "model_name",
         "api_key_env",
         "timeout_seconds",
-        "max_tokens",
-        "api_version",
         "cache_system",
     }
     assert data["core"]["host"] == "127.0.0.1"

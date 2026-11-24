@@ -3,7 +3,7 @@
 1. **Embedding model.** Starting point: a small CPU model plus keyword retrieval. Revisit a
    multilingual model with real non-English questions; re-run the retrieval comparison on
    Postgres full-text search before relying on earlier numbers.
-2. **VPN product and reverse proxy** for remote access.
+2. **VPN product** for remote access. The reverse proxy is decided (Caddy on the private network, see `decisions.md` D19).
 3. **Local event queue** format and retry rules for terminal and editor events.
 4. **Backup** of the database to a second disk.
 5. **Cloud provider choice**, by tests on the real tasks (tagging, explanation, summary) and

@@ -131,7 +131,7 @@ services:
     ports:
       - "${KATA_BIND_ADDR:-127.0.0.1}:443:443"
     volumes:
-      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from the certificate command run by deploy/systemd/kata-cert.service (D19, see Caddyfile).
+      # Caddyfile: deploy/Caddyfile. TLS files come from the certificate command run by deploy/systemd/kata-cert.service (D19, see Caddyfile).
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - ${KATA_CERT_DIR:-/var/lib/kata/certs}:/var/run/tailscale/certs:ro

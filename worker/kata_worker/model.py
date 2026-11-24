@@ -1,14 +1,10 @@
-"""OpenAI-compatible model adapter: asks a local model for the category and topic of a text block.
-
-Settings come from the [model] section of the config (base_url, model_name, timeout_seconds).
-"""
+"""Tag reply helpers for the OpenAI-compatible model: prompt, reply parsing and fence stripping."""
 
 from __future__ import annotations
 
 import json
 
 import httpx
-from kata_core.config import Config
 
 CHAT_PATH = "/chat/completions"
 FENCE = "```"
@@ -58,33 +54,3 @@ def parse_tag(reply: str) -> tuple[str, str]:
     if not isinstance(topic, str) or not topic.strip():
         raise ModelError("model reply has no topic")
     return category.strip(), topic.strip()
-
-
-class ModelAdapter:
-    """Tags text blocks through an OpenAI-compatible /chat/completions endpoint."""
-
-    def __init__(self, config: Config) -> None:
-        self._base_url = str(config.get("model", "base_url"))
-        self._model_name = str(config.get("model", "model_name"))
-        self._timeout = float(config.get("model", "timeout_seconds"))
-
-    def tag(self, block_text: str) -> tuple[str, str]:
-        """Return (category, topic) for block_text; raise ModelError when the model fails."""
-        payload = {
-            "model": self._model_name,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": block_text},
-            ],
-        }
-        url = f"{self._base_url.rstrip('/')}{CHAT_PATH}"
-        try:
-            with httpx.Client(timeout=self._timeout) as client:
-                response = client.post(url, json=payload)
-        except httpx.TimeoutException as exc:
-            raise ModelError(f"model timed out after {self._timeout}s") from exc
-        except httpx.HTTPError as exc:
-            raise ModelError(f"model request failed: {exc}") from exc
-        if response.status_code != httpx.codes.OK:
-            raise ModelError(f"model returned status {response.status_code}")
-        return parse_tag(reply_content(response))

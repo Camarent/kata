@@ -114,6 +114,12 @@ highlights on exam pages, from page open until the person has finished answering
       only known after the answer is submitted, so this needs experiments on real exam pages
       before any design. Until then the default above holds.
 
+## Extension distribution
+
+- [ ] Store listing and self-updating extension: publish the extension to the Firefox and Chrome
+      stores and let it update itself. Needs store accounts; do it later, when the plugin works
+      properly in a real browser (see the real-browser items above).
+
 ## Deployment (M6) follow-ups
 
 - [ ] Real VM test: build the VM as in `docs/deployment.md` (Ubuntu Server LTS), run

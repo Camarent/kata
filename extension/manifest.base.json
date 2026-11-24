@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "kata",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "permissions": ["storage", "activeTab", "scripting", "permissions"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [

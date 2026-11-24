@@ -119,15 +119,19 @@ def test_line_typed_with_echo_off_is_not_captured() -> None:
     assert commands == []  # but the session never reports it
 
 
-@pytest.mark.parametrize(
-    ("line", "kind"),
-    [
-        ("sh: foo: command not found", "not_found"),
-        ("Traceback (most recent call last):", "traceback"),
-        ("cat: x: Permission denied", "permission"),
-        ("fatal error: boom", "error"),
-    ],
-)
+ERROR_CASES = [
+    ("sh: foo: command not found", "not_found"),
+    ("Traceback (most recent call last):", "traceback"),
+    ("cat: x: Permission denied", "permission"),
+    ("fatal error: boom", "error"),
+]
+
+
+def test_every_error_kind_has_a_case() -> None:
+    assert {kind for _, kind in ERROR_CASES} == ERROR_KINDS
+
+
+@pytest.mark.parametrize(("line", "kind"), ERROR_CASES)
 def test_reports_error_kind_not_text(line: str, kind: str) -> None:
     script = f"printf '%s\\n' '{line}'"
     _, output, _, errors = _run(["sh", "-c", script], b"")

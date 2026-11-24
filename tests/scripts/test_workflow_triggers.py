@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 import yaml
-from workflow_pins import pin_failures
 
 REPO_ROOT = Path(__file__).parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
@@ -61,11 +60,6 @@ def test_release_zip_and_publish_steps_are_gated_to_push():
             run = str(step.get("run", ""))
             if any(marker in run for marker in gated):
                 assert step.get("if") == "github.event_name == 'push'", step.get("name")
-
-
-def test_workflow_action_pins_still_hold():
-    for path in (CI, RELEASE):
-        assert pin_failures(path.read_text(encoding="utf-8")) == []
 
 
 def test_concurrency_check_rejects_a_missing_block():

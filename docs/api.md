@@ -6,7 +6,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 
 - Base address: the core listens on `core.host` and `core.port` (defaults `127.0.0.1` and `8080`).
 - Bodies are JSON unless noted. Responses are JSON unless the status is 204 (no body).
-- Every route except `POST /auth/enrol` needs `Authorization: Bearer <token>`. A missing or malformed header returns 401 `missing bearer token`. An unknown or revoked token returns 401 `invalid or revoked token`.
+- Every route except `POST /auth/enrol`, `GET /v1/health/deep` and `GET /c/{token}/{path}` needs `Authorization: Bearer <token>`. A missing or malformed header returns 401 `missing bearer token`. An unknown or revoked token returns 401 `invalid or revoked token`.
 - The user id always comes from the token, never from the body or the path.
 - A route marked with a feature (`trainer`, `syllabus`, `planning`) answers 404 `{"detail": "feature disabled: <name>"}` when that feature is off in the config (`[<name>] enabled`).
 
@@ -63,6 +63,8 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/v1/journal?limit=50&before_id=N` | bearer | query: `limit` 1..200 (default 50), `before_id` optional | 200 `{"items": [{"id", "kind", "detail", "created_at"}], "next_before_id": int \| null}`, newest first | 422 `limit` outside 1..200; `next_before_id` is null unless the page is full |
 | POST | `/v1/events` | bearer | `{"events": [raw event, ...]}` (at most 100, see Events) | 200 `{"results": [{"event_id", "status", "reason"}], "messages": [message, ...]}`, results in input order | 422 more than 100 events or body not in that shape; a bad event is reported in `results` and never fails the batch |
 | GET | `/v1/messages` | bearer | none | 200 `{"messages": [message, ...]}`, oldest first, at most 50 | |
+| GET | `/v1/health/deep` | none | none | 200 `{"status": "ok", "checks": {"db", "migrations"}}` | 503 `{"status": "fail", "failed": [...], "checks"}` when the database is unreachable or migrations are pending |
+| GET | `/capabilities` | none | none | 200 capabilities document, schema 2 (`models`, `fits_together`, `loaded_now`) | not a core route: served by the model host info service at `[modelhost] info_url` (default `http://127.0.0.1:11435`); the worker reads it, see [worker](modules/worker.md) |
 | POST | `/mcp` | bearer, `mcp` scope | one JSON-RPC 2.0 message (see MCP below) | 200 JSON-RPC reply; 204 for a valid notification (no `id`) | 401 missing, invalid or revoked token, or an `api` token; 200 with JSON-RPC error `-32700` for bad JSON |
 
 Notes:
