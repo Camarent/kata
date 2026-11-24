@@ -10,17 +10,22 @@ from the network, the pages are opened as file:// URLs.
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 CHROME_NAMES = ("google-chrome", "chromium", "chromium-browser")
 # Narrow phone-like viewport: the mockups are checked at this width.
 WINDOW_SIZE = "390,844"
-# Blink preferredColorScheme values: 1 is dark, 2 is light.
-SCHEMES = {"light": 2, "dark": 1}
+# Colour schemes rendered per page. Each one is forced through the <html data-theme> attribute,
+# which tokens.css reads. Headless Chrome ignores --blink-settings=preferredColorScheme.
+SCHEMES = ("light", "dark")
 RENDER_TIMEOUT_SECONDS = 60
+HTML_TAG = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
+THEME_ATTR = re.compile(r'\sdata-theme="[^"]*"')
 
 
 def find_chrome() -> str | None:
@@ -32,15 +37,27 @@ def find_chrome() -> str | None:
     return None
 
 
+def themed_html(text: str, scheme: str) -> str:
+    """Return the page with <html data-theme=SCHEME> set. Raises RuntimeError without <html>."""
+    match = HTML_TAG.search(text)
+    if match is None:
+        raise RuntimeError("no <html> tag to set the colour scheme on")
+    tag = match.group(0)
+    if THEME_ATTR.search(tag):
+        new_tag = THEME_ATTR.sub(f' data-theme="{scheme}"', tag, count=1)
+    else:
+        new_tag = f'{tag[:-1]} data-theme="{scheme}">'
+    return text[: match.start()] + new_tag + text[match.end() :]
+
+
 def render_one(chrome: str, html: Path, png: Path, scheme: str) -> None:
-    """Screenshot one page in one colour scheme. Raises RuntimeError when Chrome fails."""
+    """Screenshot one themed page for one colour scheme. Raises RuntimeError when Chrome fails."""
     command = [
         chrome,
         "--headless=new",
         "--no-sandbox",
         "--disable-gpu",
         f"--window-size={WINDOW_SIZE}",
-        f"--blink-settings=preferredColorScheme={SCHEMES[scheme]}",
         f"--screenshot={png}",
         html.resolve().as_uri(),
     ]
@@ -89,16 +106,27 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     total = len(pages) * len(SCHEMES)
     done = 0
-    for html in pages:
+    # Themed copies go to a scratch dir removed on exit; source files are never changed.
+    with tempfile.TemporaryDirectory() as scratch:
         for scheme in SCHEMES:
-            png = out_dir / f"{html.stem}-{scheme}.png"
-            try:
-                render_one(chrome, html, png, scheme)
-            except RuntimeError as error:
-                print(f"render_design_shots: {error}", file=sys.stderr)
-                return 1
-            done += 1
-            print(f"render_design_shots: {done}/{total} {png.name}", file=sys.stderr, flush=True)
+            theme_dir = Path(scratch) / scheme
+            theme_dir.mkdir()
+            for item in mockup_dir.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, theme_dir / item.name)
+            for html in pages:
+                png = out_dir / f"{html.stem}-{scheme}.png"
+                try:
+                    source = html.read_text(encoding="utf-8")
+                    themed = theme_dir / html.name
+                    themed.write_text(themed_html(source, scheme), encoding="utf-8")
+                    render_one(chrome, themed, png, scheme)
+                except (OSError, RuntimeError) as error:
+                    print(f"render_design_shots: {error}", file=sys.stderr)
+                    return 1
+                done += 1
+                line = f"render_design_shots: {done}/{total} {png.name}"
+                print(line, file=sys.stderr, flush=True)
     return 0
 
 

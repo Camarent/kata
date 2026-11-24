@@ -117,3 +117,40 @@ def test_chrome_failure_returns_error(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr(render_design_shots, "find_chrome", lambda: "/fake/chrome")
     monkeypatch.setattr(render_design_shots.subprocess, "run", failing_run)
     assert render_design_shots.main([str(mockups)]) == 1
+
+
+def test_themed_html_sets_or_replaces_data_theme() -> None:
+    plain = '<!doctype html><html lang="en"><body>x</body></html>'
+    assert render_design_shots.themed_html(plain, "dark") == (
+        '<!doctype html><html lang="en" data-theme="dark"><body>x</body></html>'
+    )
+    light = '<html lang="en" data-theme="light"><body>x</body></html>'
+    assert render_design_shots.themed_html(light, "dark") == (
+        '<html lang="en" data-theme="dark"><body>x</body></html>'
+    )
+
+
+def test_themed_html_without_html_tag_is_error() -> None:
+    with pytest.raises(RuntimeError, match="no <html> tag"):
+        render_design_shots.themed_html("<body>x</body>", "dark")
+
+
+def test_dark_and_light_pngs_differ_in_real_chrome(tmp_path: Path) -> None:
+    if render_design_shots.find_chrome() is None:
+        pytest.skip("no headless Chrome on PATH")
+    mockups = tmp_path / "mockups"
+    mockups.mkdir()
+    (mockups / "tokens.css").write_text(
+        ":root { --color-bg: #ffffff; }\n"
+        '[data-theme="dark"] { --color-bg: #000000; }\n'
+    )
+    (mockups / "page.html").write_text(
+        '<!doctype html><html lang="en"><head><link rel="stylesheet" href="tokens.css" />'
+        "</head><body style=\"margin:0;height:100vh;background:var(--color-bg)\"></body></html>\n"
+    )
+    out = tmp_path / "shots"
+    assert render_design_shots.main([str(mockups), "--out", str(out)]) == 0
+    light = (out / "page-light.png").read_bytes()
+    dark = (out / "page-dark.png").read_bytes()
+    assert light != dark
+    assert sorted(p.name for p in mockups.iterdir()) == ["page.html", "tokens.css"]
