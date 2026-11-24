@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import re
 import time
+from collections.abc import Callable
 
 import pytest
 from kata_core.importer.syllabus import (
-    _HEADING,
-    _NUMBERED,
     TITLE_LIMIT,
     Module,
     ParseError,
+    _heading_title,
+    _numbered_title,
     parse_modules,
     validate_extracted,
 )
@@ -140,13 +140,35 @@ def test_long_trailing_spaces_parse_fast(prefix: str) -> None:
     assert elapsed < 1.0
 
 
-@pytest.mark.parametrize("pattern", [_HEADING, _NUMBERED])
-def test_line_regexes_do_not_backtrack_on_space_run_before_newline(pattern: re.Pattern[str]) -> None:
-    # Mutant check: with `(.+)$` this input takes quadratic time (about 1 s at 20000 spaces).
-    text = ("#" if pattern is _HEADING else "1.") + " " * 40000 + "\nx\ny"
+@pytest.mark.parametrize(
+    ("title_of", "line"),
+    [(_heading_title, "#"), (_numbered_title, "1."), (_numbered_title, "9)"), (_numbered_title, "Module 9:")],
+)
+def test_line_matchers_do_not_slow_down_on_space_run(title_of: Callable[[str], str | None], line: str) -> None:
+    # Mutant check: a regex with `(.+)$` took quadratic time on this input (about 1 s at 20000 spaces).
+    # The space run sits inside the line (the matchers get stripped lines), so it reaches the matcher.
     started = time.perf_counter()
-    assert pattern.match(text) is None
-    assert time.perf_counter() - started < 0.2
+    assert title_of(line + " " * 100000 + "x") == "x"
+    assert time.perf_counter() - started < 1.0
+
+
+@pytest.mark.parametrize(
+    ("line", "title"),
+    [
+        ("1. Graphs", "Graphs"),
+        ("1) Graphs", "Graphs"),
+        ("Module 1: Graphs", "Graphs"),
+        ("module 2 - Graphs", "Graphs"),
+        ("MODULE 3. Graphs", "Graphs"),
+        ("Module 4) Graphs", "Graphs"),
+        ("Module1: Graphs", None),
+        ("1.Graphs", None),
+        ("1.", None),
+        ("Module 5:", None),
+    ],
+)
+def test_numbered_title_forms(line: str, title: str | None) -> None:
+    assert _numbered_title(line) == title
 
 
 @pytest.mark.parametrize("text", ["# ", "#   ", "1. ", "1.   "])
