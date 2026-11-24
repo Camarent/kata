@@ -43,10 +43,10 @@ and tests only; `--setup` only creates `.venv`, `extension/node_modules` and `ed
 
 CI is `.github/workflows/ci.yml`. It has three jobs:
 
-- `checks`: installs `pyproject.toml` with uv, then runs ruff (`ruff check .`), mypy
-  (`mypy core`), pytest (`pytest tests -m 'not flaky and not browser'`, no coverage), the extension build and
+- `checks`: installs `pyproject.toml` with uv, then runs ruff (`ruff check .`), mypy (`core` and the
+  smoke scripts), pytest (`pytest tests -m 'not flaky and not browser'`, no coverage), the extension build and
   `npm test`, then the editor steps (`npm --prefix editor ci`, `npm --prefix editor run build`,
-  `npm --prefix editor test`; `.github/workflows/ci.yml:54-56`, inside `checks`, not a separate job). It has no separate smoke step; the smoke tests run inside the pytest step, which
+  `npm --prefix editor test`; `.github/workflows/ci.yml:58-60`, inside `checks`, not a separate job). It has no separate smoke step; the smoke tests run inside the pytest step, which
   does not deselect them.
 - `secrets`: gitleaks over the full history.
 - `privacy`: the personal-address blocklist check (skipped when the `PRIVACY_BLOCKLIST` secret

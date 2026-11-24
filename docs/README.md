@@ -6,6 +6,10 @@
 | Roadmap and milestones | [`roadmap.md`](roadmap.md) |
 | System design | [`design/architecture.md`](design/architecture.md), [`design/overview.md`](design/overview.md) |
 | Decisions and stack | [`decisions.md`](decisions.md) |
+| Settings | [`configuration.md`](configuration.md) |
+| Running the core on a server | [`deployment.md`](deployment.md) |
+| Setting up a machine and running the checks | [`development.md`](development.md) |
+| Release steps | [`release.md`](release.md) |
 | Open questions | [`open-questions.md`](open-questions.md) |
 | Backlog | [`backlog.md`](backlog.md) |
 | API | [`api.md`](api.md) |
