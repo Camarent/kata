@@ -14,8 +14,8 @@ import re
 from dataclasses import dataclass
 
 TITLE_LIMIT = 120
-_HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
-_NUMBERED = re.compile(r"^(?:(?i:module)\s+\d+\s*[:.)-]\s*|\d+[.)]\s+)(.+)$")
+_HEADING = re.compile(r"^(#{1,6})\s+(\S.*)$")
+_NUMBERED = re.compile(r"^(?:(?i:module)\s+\d+\s*[:.)-]\s*|\d+[.)]\s+)(\S.*)$")
 
 
 class ParseError(ValueError):
