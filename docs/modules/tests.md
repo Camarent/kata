@@ -46,7 +46,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/foundation/test_core_config_keys.py:48`, `:54`, `:61` - `[policy]` example keys: bool and positive int, missing key raises `ConfigError`.
 - `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
 - `tests/worker/test_cost.py` - cost estimate in integer micro-USD from pinned prices.
-- `tests/worker/test_policy.py` - cloud policy: switch, `allow_cloud` and task class must all agree (`:49`); unknown names raise or deny.
+- `tests/worker/test_policy.py` - cloud policy: the cloud token (`api_key_env` set) and the task class in `[provider_anthropic] task_classes` must both hold; cloud-only classes refuse local (`:49`, `:66`); unknown names raise or deny.
 - `tests/worker/test_router.py` - router: first success wins and later providers are not called (`:74`); policy-denied cloud skipped without call (`:81`); over-cap and failing providers fall to the next (`:92`, `:101`); secret block falls to local (`:116`); exhausted names skipped and failed only (`:171`); no implicit local fallback (`:193`); `build_router` config errors (`:215`-`:236`); guard runs before cap (`:244`).
 - `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:82`, `:218`); missing key raises at construction (`:317`).
 - `tests/core/test_scanner.py` - secret scanner (`kata_core.egress.scanner`): expected kinds (`:33`), rule table coverage (`:37`), offset (`:42`), findings hold no text (`:48`), frozen (`:54`), low-entropy token not flagged (`:60`).

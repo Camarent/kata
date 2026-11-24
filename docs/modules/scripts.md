@@ -35,6 +35,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/bench/scoring.py` - stdlib-only case loader and scorer; no DB, no `kata_core` import.
 - `scripts/bench/cases.json` - synthetic fixture: 6 entries, 17 concepts covering every state.
 - `scripts/smoke/real_model.py` - opt-in real-model smoke CLI; `scripts/smoke/smoke_core.py` - case loader, checks, masking; tested by `tests/scripts/test_smoke_cli.py` and `tests/scripts/test_smoke_core.py`.
+- `scripts/smoke/local_audit.py` - opt-in local capability audit: the audit cases against a local model, scored and printed as a table (`scripts/smoke/audit_cases.py`, `scripts/smoke/audit_score.py`).
 - `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
 - `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
@@ -58,10 +59,21 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 `set -a; . <env file>; set +a; KATA_SMOKE_REAL=1 python scripts/smoke/real_model.py`
 
 - Refused (exit 2, no request sent) unless `KATA_SMOKE_REAL=1`, the key env var is set, and the model is on `[smoke] allowed_models` (`scripts/smoke/real_model.py:115-119`). `--model` picks a model; the default is the first id in the list.
-- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:67`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`scripts/smoke/real_model.py:78-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
+- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:69`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`scripts/smoke/real_model.py:78-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
 - Checks per case (`scripts/smoke/smoke_core.py:205`): the reply is non-empty; a JSON case must parse, and `generate_course` and `extract_syllabus` must also pass `parse_drafts` and `parse_modules` (`scripts/smoke/smoke_core.py:46-48`).
 - Exit codes (`scripts/smoke/real_model.py:55-57`, `:151`): 0 when every case passes; 1 when a case fails or the cost cap stops the run; 2 when refused.
 - The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`scripts/smoke/smoke_core.py:195-198`, `:255`).
+
+## scripts/smoke: local capability audit
+`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by the lead by hand; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:94`): `kata-l`, `kata-m` or `cloud-only` per task class.
+
+`KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_audit.py [--model NAME] [--api-key-env NAME]`
+
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_LOCAL=1` and a base URL is given: `--base-url` wins over `KATA_SMOKE_LOCAL_BASE_URL` (`scripts/smoke/local_audit.py:276-280`). `--api-key-env NAME` names an env var holding a bearer key; it is refused when that variable is unset (`scripts/smoke/local_audit.py:282-285`).
+- Flags: `--model` (repeatable) picks models; without it the run reads `[smoke_local] models` (`scripts/smoke/local_audit.py:294`). `--config` names the config file (default env `KATA_CONFIG`). `--base-url` sets the endpoint.
+- Scoring: each case is scored by `scripts/smoke/audit_score.py`; a model gets one unscored warm-up request first.
+- No URL and no key are stored: neither the base URL nor the key value reaches stdout, stderr or a file.
+- Exit codes: 0 only when every case of every model passes; 1 when any case fails; 2 when refused (`scripts/smoke/local_model.py:76, :89-91`, `EXIT_REFUSED`); 0 and 1 are `scripts/smoke/local_audit.py:309` (`EXIT_OK`, `EXIT_FAILED`).
 
 ## scripts/smoke: local model
 `scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
@@ -69,8 +81,8 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_model.py`
 
 - Refused (exit 2, no request sent) unless `KATA_SMOKE_LOCAL=1` and a base URL is given: `--base-url` wins over `KATA_SMOKE_LOCAL_BASE_URL` (`scripts/smoke/local_model.py:240-241`). Also refused when the config does not load, the cases do not load, or no model is named (`scripts/smoke/local_model.py:236-252`).
-- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`scripts/smoke/local_model.py:251`, `:106`). The example is `models = "kata-l"` (`config/kata.example.toml:72`).
-- Config keys in `[smoke_local]` (`config/kata.example.toml:71-75`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
+- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`scripts/smoke/local_model.py:251`, `:106`). The example is `models = "kata-l"` (`config/kata.example.toml:74`).
+- Config keys in `[smoke_local]` (`config/kata.example.toml:73-77`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
 - Warm-up: each model gets one request first (`scripts/smoke/local_model.py:138`, `:205`). Its result is neither printed nor counted, so a slow cold load does not fail a case.
 - Context warning: a case whose prompt estimate is over 75 percent of `num_ctx` prints `WARN model=... case=... prompt_estimate_tokens=... num_ctx=... over 75 percent` before it is sent (`scripts/smoke/local_model.py:64`, `:146-153`). It does not stop the case.
 - Output, one line per case (`scripts/smoke/smoke_core.py:312-320`): `<case> PASS|FAIL class=... prompt_tokens=... completion_tokens=... seconds=... tokens_per_s=... reason=<JSON> excerpt=<JSON>`. The excerpt is cut to 200 characters. Then one summary line per model: `summary model=... passes=N/M mean_seconds=... mean_tokens_per_s=... reasoning_effort=...` (`unset` when empty; `scripts/smoke/local_model.py:221-227`).
