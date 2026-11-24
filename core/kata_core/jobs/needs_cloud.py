@@ -19,7 +19,9 @@ PROVIDER_SECTION = "provider_anthropic"
 CLOUD_ONLY = "cloud-only"
 
 # Mirrors TASK_CLASSES in worker/kata_worker/providers/base.py, the canonical list.
-TASK_CLASSES = frozenset({"tag", "explain", "summary", "batch", "generate_course", "extract_syllabus"})
+TASK_CLASSES = frozenset(
+    {"tag", "explain", "summary", "batch", "generate_course", "extract_syllabus", "scan_classify"}
+)
 
 # Job kind -> task class. A kind missing here never needs the cloud.
 JOB_KIND_CLASS: dict[str, str] = {

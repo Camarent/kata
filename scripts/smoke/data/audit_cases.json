@@ -125,6 +125,23 @@
       "max_seconds": 300,
       "model": "kata-l",
       "thinking": "unset"
+    },
+    {
+      "id": "scan-classify-page",
+      "task_class": "scan_classify",
+      "system": "SCAN_SYSTEM_PROMPT",
+      "prompt": "{\"page_key\": \"p-12\", \"text\": \"TCP is a connection-oriented protocol. The three-way handshake sends SYN, SYN-ACK and ACK before any data moves. Sequence numbers let the receiver reorder segments and detect loss.\", \"taxonomy\": [{\"area\": \"Networks\", \"topic\": \"TCP\"}, {\"area\": \"Networks\", \"topic\": \"UDP\"}, {\"area\": \"Security\", \"topic\": \"TLS\"}]}",
+      "json": true,
+      "list_key": "",
+      "fields": [],
+      "min_items": null,
+      "max_items": null,
+      "script": "latin",
+      "min_chars": 40,
+      "max_chars": 2000,
+      "max_seconds": 120,
+      "model": "kata-l",
+      "thinking": "unset"
     }
   ]
 }

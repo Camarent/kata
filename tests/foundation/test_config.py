@@ -80,7 +80,15 @@ def test_example_has_required_sections() -> None:
         "rate_limit_seconds",
         "late_event_seconds",
     }
-    task_classes = {"tag", "explain", "summary", "batch", "generate_course", "extract_syllabus"}
+    task_classes = {
+        "tag",
+        "explain",
+        "summary",
+        "batch",
+        "generate_course",
+        "extract_syllabus",
+        "scan_classify",
+    }
     assert set(data["routing"]) == task_classes
     assert set(data["local_capability"]) == task_classes
     for name in task_classes:
