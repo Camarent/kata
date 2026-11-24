@@ -291,3 +291,34 @@ Invariants:
 ### Depends on / used by
 - Depends on: `kata_core.jobs.runner` (`OutputHook`, `load_registry`), `kata_core.jobs.queue` (`Job`).
 - Used by: `core/kata_core/api/routes/jobs.py` (422 on a bad payload); the worker's `kata_worker.modelhost` and handlers; the extension client (`extension/src/coreClient.ts:266-290`).
+
+## Page scan (M20)
+
+`core/kata_core/scan/` is the server side of the page scan: the extension reads a page, the worker classifies it and extracts its concepts, and the core matches the result to the owner's taxonomy and concepts. The owner's words always resolve inside one topic.
+
+- `core/kata_core/scan/job_kinds.py:13` `SCAN_CLASSIFY_KIND` = `scan.classify`, `:14` `SCAN_EXTRACT_KIND` = `scan.extract`; `:17` `OUTPUT_HOOKS` maps each kind to its hook, found by `load_registry` (`core/kata_core/jobs/runner.py:45`). The `tag` kind is unchanged and still served.
+- `core/kata_core/scan/classify.py:28` `classify_output_hook` - matches the worker's `{area, topic, candidates}` to a visible topic (case-insensitive, `:61` `match_taxonomy`); a miss creates the area and a private topic and marks the result `isNew`. It caches the classification per page and rewrites the output to `{areaId, topicId, area, topic, isNew, candidates}`. `candidates` are capped by `[scan] max_candidates`.
+- `core/kata_core/scan/extract.py:24` `extract_output_hook` - reads the payload `{area_id, topic_id, blocks: [{id, text}]}` (`:61` `_extract_payload`), refuses more than `[scan] max_blocks_per_job` blocks, skips each block the teachable check rejects, resolves the other concepts with `resolve_item`, drops concepts the owner ignores, and stores the rewritten blocks as the job output. A concept that needs the owner's choice keeps `conceptId` null and lists its candidates.
+- `core/kata_core/scan/resolve.py:46` `resolve_item` - order: a remembered choice wins (`get_choice`); two or more candidate names (`:21` `MIN_CANDIDATES`) ask the owner; otherwise the word or name is looked up in the topic; with no hit a private concept is created. `:37` `is_ignored` tells the hook whether to drop a concept.
+- `core/kata_core/scan/teachable.py:44` `teachable(text, min_chars)` - pure check; rejects text shorter than `[scan] min_block_chars`, contact details, cookie notices, navigation lists (`:35` `_is_nav_list`), footers, legal text and boilerplate.
+- `core/kata_core/scan/reassign.py:28` `reassign_word` - moves the owner's word from one concept to another of the same topic: removes the owner's private alias on the old concept, adds it to the new one (unless it is that concept's label) and remembers the choice. Marks are never touched. `LookupError` when a concept is not visible (404), `ValueError` when a concept is not in the topic (422).
+- `core/kata_core/scan/overview.py:18` `topic_overview` - read only; the concepts of a visible topic with the owner's mark state (unmarked counts as `new`; `:15` `STATES`), ordered by label, plus counts per state. Ignored concepts are left out.
+- `core/kata_core/scan/evaluation.py:40` `load_fixture`, `:48` `resolve_reply`, `:66` `score` - scores the classifier against a fixture of recorded replies, using the same resolution as the hook.
+- `core/kata_core/storage/page_scan.py` - `:15` `get_classification`, `:30` `put_classification`, `:47` `remember_choice`, `:63` `get_choice`.
+- `core/migrations/0018_page_scan.sql` - `page_classifications` `:5` (PK `user_id, page_key`; `topic_id`; `candidates` jsonb; cascade on user and topic delete) and `concept_choices` `:14` (PK `user_id, topic_id, word_key`; `concept_id`; cascade on user, topic and concept delete).
+
+Routes (all bearer, user id from `current_user`, never from the body or query; full table in `docs/api.md`):
+- `core/kata_core/api/routes/scan_pages.py:44` `GET /scan/classification` (`get_page_classification`; 404 when the owner has none or the topic is no longer visible; candidates with no visible topic are dropped).
+- `core/kata_core/api/routes/scan_pages.py:72` `POST /scan/choice` (`post_choice`; 204; 404 topic or concept not visible, 422 concept not in the topic).
+- `core/kata_core/api/routes/scan_reassign.py:31` `POST /scan/reassign` (`reassign_route`; 204; 404 not found, 422 concept not in the topic).
+- `core/kata_core/api/routes/scan_overview.py:22` `GET /scan/overview` (`get_scan_overview`; 404 when the topic is not visible).
+
+Invariants:
+- A word is only ever resolved inside its own topic.
+- Classification and choices are per owner: each row carries the owner's `user_id`.
+- The hook raises `LookupError` when the job is not leased by the caller (same as the other output hooks).
+- Tests: `tests/core/test_scan_*.py`, `tests/core/test_api_scan_*.py`, `tests/core/test_page_scan_store.py`.
+
+### Depends on / used by
+- Depends on: `kata_core.jobs.runner` (`OutputHook`, `load_registry`), `kata_core.jobs.queue` (`Job`, `store_output`), `kata_core.storage.taxonomy`, `kata_core.storage.concepts`, `kata_core.storage.concept_aliases`.
+- Used by: the worker's `scan.classify` and `scan.extract` handlers ([worker](worker.md)); the extension scan and rescan ([extension](extension.md)); the routes above.

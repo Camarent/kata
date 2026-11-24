@@ -67,6 +67,10 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | PUT | `/concepts/{concept_id}/ignore` | bearer | none | 204 (marks are kept) | 404 concept not found |
 | DELETE | `/concepts/{concept_id}/ignore` | bearer | none | 204 | 404 concept not ignored |
 | DELETE | `/concepts/{concept_id}` | bearer | none | 204 (removes the concept with its marks, aliases and ignore rows) | 404 concept not found; 403 shared concept |
+| GET | `/scan/classification?page_key=` | bearer | query: `page_key` (the page URL without fragment) | 200 `{"topic_id", "area", "topic", "candidates": [{"topic_id", "area", "topic"}]}`; candidates with no visible topic are dropped | 404 no classification for the page, or its topic is not visible |
+| POST | `/scan/choice` | bearer | `{"topic_id": int, "word": str (1..200 chars), "concept_id": int}` | 204 (remembers the concept for the word in the topic) | 404 topic or concept not visible; 422 concept not in the topic |
+| POST | `/scan/reassign` | bearer | `{"topic_id": int, "word": str, "from_concept_id": int, "to_concept_id": int}` | 204 (moves the word to the other concept, teaches the alias, remembers the choice; marks unchanged) | 404 topic or concept not found; 422 concept not in the topic |
+| GET | `/scan/overview?topic_id=` | bearer | query: `topic_id` | 200 `{"topicId", "area", "topic", "counts": {"new", "learning", "known"}, "concepts": [{"conceptId", "label", "state"}]}`; ignored concepts left out | 404 topic not found or not visible |
 | POST | `/lesson-check` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"results": [{"concept_id", "label", "state", "source", "evidence"}]}`, in input order | 404 a concept is not visible to the caller (nothing partial); 422 empty or non-integer list |
 | POST | `/usage` | bearer | `{"micro_usd": int}` (>= 0) | 204 | 422 negative or non-integer `micro_usd` |
 | GET | `/usage` | bearer | none | 200 `{"day": "YYYY-MM-DD", "micro_usd": int, "calls": int}` (UTC day) | zeros when nothing recorded |

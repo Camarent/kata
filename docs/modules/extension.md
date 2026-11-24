@@ -42,6 +42,14 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/manifest.base.json` permission `scripting` (dynamic registration of `bridge.js`); `extension/build/build.mjs` builds `bridge.js` as an IIFE.
 
 - Model host control (M18): `extension/src/coreClient.ts:261` `enqueueKind` (private) queues a `modelhost.*` job with `POST /jobs` and throws `CoreHttpError` on 422; `:267` `modelhostUp`, `:272` `modelhostUse(engine)` (payload `{"engine": ...}`), `:277` `modelhostMeasure`, `:282` `modelhostStatus`; `:290` `modelhostResult(id)` reads the job and returns its output or `"pending"`. The `output` field type is at `:79`. The control jobs are queued only; the GPU-PC worker runs them (see [worker](worker.md)).
+- Page scan client (M20): `extension/src/coreClient.ts:390` `scanClassify(pageKey, text, taxonomy)` queues `scan.classify`; `:395` `scanExtract(input)` queues `scan.extract` with payload `area_id`, `topic_id`, `blocks`, `area`, `topic`, `known` (both through `enqueueKind`, return the job id).
+- `extension/src/coreClient.ts:408` `getClassification(pageKey)` - `GET /scan/classification`; `null` on 404. The route returns no `area_id`, so `areaId` is undefined on a stored classification.
+- `extension/src/coreClient.ts:431` `chooseConcept(topicId, word, conceptId)` - `POST /scan/choice`; `:436` `reassignConcept(topicId, word, fromConceptId, toConceptId)` - `POST /scan/reassign`; `:446` `topicOverview(topicId)` - `GET /scan/overview`, mapped to `TopicOverview` (`:161`).
+- `extension/src/conceptScan.ts:100` `runConceptScan(client, page, opts)` - reuses the stored classification or queues `scan.classify` and waits for it, then queues `scan.extract` for the blocks and waits again. `waitForOutput` (`:50`) polls `jobStatus` every `pollMs` and gives up after `maxWaitMs`. Never throws: returns `ConceptScanResult` (`:31`) or `ConceptScanError` (`:40`). `:10` `ConceptScanClient` is the `Pick` of the four methods it uses; `:85` `withoutIgnored` drops ignored concepts on the client as well.
+- The extract request sends `known: []` today, so the worker gets no known concept names from the extension.
+- `topicOverview` reads snake_case keys (`topic_id`, `concept_id`), but `GET /scan/overview` answers camelCase (`topicId`, `conceptId`), so those mapped fields come out undefined until the two agree.
+- `extension/src/background.ts:194` runs `runConceptScan` with `POLL_MS` and `MAX_WAIT_MS`; `:208` starts the rescanner.
+- `extension/src/rescan.ts:53` `createRescanner(deps)` - observes page mutations; every mutation restarts one `debounceMs` timer, so a burst fires `onRescan` once; `stop()` cancels the timer and the observer. `:17` `mergeMarks(prev, next)` keeps the previous state of a concept seen before, so a rescan does not blank marks.
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
