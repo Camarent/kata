@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kata side panel: navigation map (static mockup)</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      /* Layout for the mockup sheet only: the map and one frame of the panel. */
+      main {
+        padding: var(--space-4);
+        display: grid;
+        gap: var(--space-4);
+        max-width: 960px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      h2 {
+        font-size: var(--font-size-small);
+        color: var(--color-text-muted);
+        font-weight: 600;
+        margin: 0 0 var(--space-2);
+      }
+      .intro {
+        margin: 0;
+        color: var(--color-text-muted);
+      }
+      /* One panel frame, narrow, to show where the controls sit. */
+      .frame {
+        width: 100%;
+        max-width: 360px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        background: var(--color-bg);
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 320px;
+      }
+      .frame-head,
+      .frame-tabs {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-surface);
+      }
+      .frame-head .grow {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .frame-body {
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+        align-content: start;
+      }
+      .frame-tabs {
+        border-top: 1px solid var(--color-border);
+      }
+      .frame-tabs button {
+        flex: 1;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-min);
+      }
+      .toggle .switch {
+        width: 36px;
+        height: 20px;
+        border-radius: 10px;
+        background: var(--color-border);
+        position: relative;
+        flex: none;
+      }
+      .toggle .switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--color-bg);
+      }
+      .toggle[data-on="true"] .switch {
+        background: var(--color-accent);
+      }
+      .toggle[data-on="true"] .switch::after {
+        left: 18px;
+      }
+      /* Numbered callouts point at the frame controls; the list below names them. */
+      .callout {
+        display: inline-grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--color-accent);
+        color: var(--color-accent-text);
+        font-size: 12px;
+        font-weight: 600;
+        flex: none;
+      }
+      .screens {
+        display: grid;
+        gap: var(--space-3);
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .screen {
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+        align-content: start;
+      }
+      .screen h3 {
+        font-size: var(--font-size);
+        margin: 0;
+      }
+      .screen p,
+      .screen ul {
+        margin: 0;
+      }
+      .screen ul {
+        padding-left: var(--space-4);
+      }
+      a {
+        color: var(--color-accent);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: var(--font-size-small);
+      }
+      th,
+      td {
+        text-align: left;
+        padding: var(--space-2);
+        border-bottom: 1px solid var(--color-border);
+        vertical-align: top;
+      }
+      th {
+        color: var(--color-text-muted);
+        font-weight: 600;
+      }
+      .state-list {
+        margin: 0;
+        padding-left: var(--space-4);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Side panel: navigation map</h1>
+        <p class="intro">
+          One map of every panel screen and the settings page. Each screen links to its mockup.
+          The panel has one header, one bottom tab bar, and Back on every screen below the first.
+        </p>
+      </header>
+
+      <section aria-labelledby="frame-title">
+        <h2 id="frame-title">A. Where the controls sit (home screen)</h2>
+        <div class="frame" id="nav-frame">
+          <div class="frame-head">
+            <button type="button" id="ctl-back" aria-label="Back" hidden>&larr; Back</button>
+            <button type="button" id="ctl-course-picker" class="grow" aria-haspopup="true">Course: Spanish A1 &#9662;</button>
+            <button type="button" id="ctl-settings" aria-label="Settings">&#9881;</button>
+          </div>
+          <div class="frame-body">
+            <button type="button" id="ctl-scan" class="primary">Scan this page</button>
+            <div class="toggle" id="ctl-auto-scan" data-on="false" role="switch" aria-checked="false" tabindex="0">
+              <span class="switch" aria-hidden="true"></span>
+              <span>Auto-scan this site</span>
+            </div>
+            <p class="intro">Results of the last scan appear here, grouped by topic.</p>
+          </div>
+          <div class="frame-tabs" role="tablist">
+            <button type="button" id="ctl-tab-page" role="tab" aria-selected="true">Page</button>
+            <button type="button" id="ctl-tab-review" role="tab" aria-selected="false">Review</button>
+          </div>
+        </div>
+        <ol class="state-list">
+          <li><span class="callout" aria-hidden="true">1</span> Back: top left of the header. Shown on every screen except Page. Returns to the screen before.</li>
+          <li><span class="callout" aria-hidden="true">2</span> Course picker: top middle of the header. Shows the current course. Opens the Courses screen.</li>
+          <li><span class="callout" aria-hidden="true">3</span> Settings entry: gear at top right of the header. Opens the Settings page.</li>
+          <li><span class="callout" aria-hidden="true">4</span> Scan button: first control under the header on the Page screen.</li>
+          <li><span class="callout" aria-hidden="true">5</span> Auto-scan toggle: under the scan button, for the current site only. Off by default.</li>
+          <li><span class="callout" aria-hidden="true">6</span> Review entry: right tab in the bottom tab bar. Opens the Review screen.</li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="screens-title">
+        <h2 id="screens-title">B. Screens and where they link</h2>
+        <ul class="screens">
+          <li class="screen" id="screen-home">
+            <h3>Home (Page tab)</h3>
+            <p>Scan button, auto-scan toggle, course line, last results.</p>
+            <ul>
+              <li>Scan button to Scanning</li>
+              <li>Course picker to Courses</li>
+              <li>Settings gear to Settings</li>
+              <li>Review tab to Review</li>
+            </ul>
+            <p><a href="panel-states.html#idle">Mockup: panel-states.html, Idle</a></p>
+          </li>
+          <li class="screen" id="screen-scanning">
+            <h3>Scanning</h3>
+            <p>Progress while the page is read. Cancel returns to Home.</p>
+            <p><a href="panel-states.html#scanning">Mockup: panel-states.html, Scanning</a></p>
+          </li>
+          <li class="screen" id="screen-results">
+            <h3>Results (grouped by topic)</h3>
+            <p>Rows grouped by topic. Selecting a row scrolls the page to its block.</p>
+            <ul>
+              <li>Row to the block on the page (no screen change)</li>
+              <li>Back to Home</li>
+            </ul>
+            <p><a href="panel-states.html#results-grouped">Mockup: panel-states.html, Results</a></p>
+          </li>
+          <li class="screen" id="screen-detail">
+            <h3>Detail (one block)</h3>
+            <p>One block with its state buttons and undo. Opened from a row.</p>
+            <ul>
+              <li>Back to Results</li>
+            </ul>
+            <p><a href="panel-states.html#i-know-this">Mockup: panel-states.html, I know this</a></p>
+          </li>
+          <li class="screen" id="screen-review">
+            <h3>Review</h3>
+            <p>Words to repeat. Opened from the Review tab.</p>
+            <p><a href="panel-states.html#review">Mockup: panel-states.html, Review</a></p>
+          </li>
+          <li class="screen" id="screen-courses">
+            <h3>Courses (list)</h3>
+            <p>Opened from the course picker. Selecting a course opens the course screen.</p>
+            <ul>
+              <li>Course to Course screen</li>
+              <li>New course to Create</li>
+              <li>Back to Home</li>
+            </ul>
+            <p><a href="panel-states.html#courses-list">Mockup: panel-states.html, Courses list</a></p>
+          </li>
+          <li class="screen" id="screen-course">
+            <h3>Course screen</h3>
+            <p>One course: name, topics, delete.</p>
+            <ul>
+              <li>Delete to Delete confirm, then Courses</li>
+              <li>Back to Courses</li>
+            </ul>
+            <p>
+              <a href="panel-states.html#courses-open">Mockup: panel-states.html, Course open</a>
+              and <a href="panel-states.html#courses-delete">Delete</a>
+            </p>
+          </li>
+          <li class="screen" id="screen-settings">
+            <h3>Settings</h3>
+            <p>Connection, auto-scan site list, appearance, about. Opened from the gear.</p>
+            <ul>
+              <li>Back to Home</li>
+            </ul>
+            <p><a href="settings.html">Mockup: settings.html (light and dark)</a></p>
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="states-title">
+        <h2 id="states-title">C. State screens (replace the normal screen while they apply)</h2>
+        <ul class="state-list">
+          <li>First run and sign-in: <a href="panel-states.html#first-run">First run</a>, <a href="panel-states.html#sign-in">Sign-in</a>. Shown until a server is connected and signed in.</li>
+          <li>Offline: <a href="panel-states.html#offline">Offline</a>. Shown over Home. Changes wait in the queue.</li>
+          <li>Sign-in expired: <a href="panel-states.html#auth-lost">Sign-in expired</a>. Shown over any screen; the person signs in again and returns.</li>
+          <li>Empty page and error: <a href="panel-states.html#empty-page">Empty page</a>, <a href="panel-states.html#error">Error</a>. Shown on Home.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="page-title">
+        <h2 id="page-title">D. The page</h2>
+        <p class="intro">
+          The page is not a panel screen. Selecting a panel row scrolls the page to its block; hover or focus on a
+          page block highlights its row. See <a href="lesson-page.html">lesson-page.html</a> for highlights and the
+          detail card.
+        </p>
+      </section>
+
+      <section aria-labelledby="table-title">
+        <h2 id="table-title">E. Moves between screens</h2>
+        <table>
+          <thead>
+            <tr><th scope="col">From</th><th scope="col">Control</th><th scope="col">To</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Home</td><td>Scan button</td><td>Scanning, then Results</td></tr>
+            <tr><td>Home</td><td>Course picker</td><td>Courses</td></tr>
+            <tr><td>Home</td><td>Settings gear</td><td>Settings</td></tr>
+            <tr><td>Home</td><td>Review tab</td><td>Review</td></tr>
+            <tr><td>Results</td><td>Row</td><td>Page block (scroll), Detail</td></tr>
+            <tr><td>Detail, Courses, Course, Settings, Review</td><td>Back</td><td>The screen before</td></tr>
+            <tr><td>Any screen</td><td>Page tab</td><td>Home</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
