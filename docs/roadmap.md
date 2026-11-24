@@ -193,21 +193,44 @@ outbound HTTP; control jobs `modelhost.up`, `modelhost.use`, `modelhost.measure`
 root, and takes a fixed allow-list of subcommands. Decision: "Local models through a worker on the
 user's GPU machine (M18)" in `decisions.md`.
 
-## Milestone 19: UI redesign backend
+## Milestone 19: concept model (in progress)
 
-**Scope.** Serve the backend lists the redesigned extension UI needs:
+**Scope.** Area > Topic > Concept identity and the per-user data the redesigned UI reads:
 
-- Concept extraction with aliases and definitions; area, topic and concept identity (D54).
-- Page classification and a per-block concept list.
-- Lists, and delete or ignore of a concept (D55).
-- Dynamic rescans.
-- Quiz pool (D45 to D47) and exam (D35, D51).
-- Tracks (D11 to D16).
-- Sort fields (D42).
+- Area, topic and concept identity unique on (area, topic, name) (D54); alias table (D53);
+  concept definition line (D55).
+- Per-user mark new, learning or known, keyed by concept id; block state derived from concepts.
+- Added date, last viewed and relevance fields for sorts (D42).
+- Ignored list and hard delete (D55).
+- Migrate today's `topic_aliases` and block marks. API and tests only.
 
-## Milestone 20: UI implementation
+## Milestone 20: scan
 
-**Scope.** Build the extension UI on the M19 backend, following the design in
+**Scope.** Page classification, concept extraction, aliases, the "Which one?" choice and dynamic
+rescan (D53, D54, D55).
+
+## Milestone 21: learn
+
+**Scope.** Lists, tracks (D11 to D16) and courses in the redesigned UI and API.
+
+## Milestone 22: quiz and exam results
+
+**Scope.** Quizzes in kata (quiz pool D45 to D47). Dojo course exams stay in dojo; kata imports
+their results with a confirm step (D58). Exam rules: D35, D51.
+
+## Milestone 23: jobs
+
+**Scope.** Summary, jokes, and PDF and image reading as jobs.
+
+## Milestone 24: review and sync
+
+**Scope.** Review API, search, filters and an offline queue.
+
+## Milestone 25: UI implementation
+
+**Scope.** Build the extension UI on the backend from M19 to M24. The approved design is linked in
+[`decisions.md`](decisions.md) (D1 to D55); D56 to D58 are round 2 design feedback, not yet in
+`decisions.md`. The design sketch is in
 [`design/extension-ui.md`](design/extension-ui.md).
 
 ## Later
@@ -215,8 +238,9 @@ user's GPU machine (M18)" in `decisions.md`.
 Video transcripts, a phone web app, Chrome packaging, passkeys, deeper terminal tracking,
 exam mode hardening, a public path for single pages.
 
-Extension UI: design v2 is done (navigation, settings, auto-scan and block states; see
-[`design/extension-ui.md`](design/extension-ui.md)). The UI implementation waits for owner approval.
+Extension UI: design v2 is approved (2026-11-24; navigation, settings, auto-scan and block states;
+see [`design/extension-ui.md`](design/extension-ui.md) and [`decisions.md`](decisions.md)). The UI
+implementation is milestone 25.
 
 ## Out of scope for now
 
