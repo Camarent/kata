@@ -11,7 +11,9 @@ MOCKUP_DIR = REPO_ROOT / "docs" / "design" / "extension-ui"
 PANEL = MOCKUP_DIR / "panel-states.html"
 PAGE = MOCKUP_DIR / "lesson-page.html"
 TOKENS = MOCKUP_DIR / "tokens.css"
-FILES = (DESIGN, PANEL, PAGE, TOKENS)
+BACKLOG = REPO_ROOT / "docs" / "backlog.md"
+# Every mockup html and css file, so later mockups get the same checks at once.
+FILES = (DESIGN, *sorted(MOCKUP_DIR.glob("*.html")), *sorted(MOCKUP_DIR.glob("*.css")))
 
 # Heading prefixes the design doc must keep (section and screen titles).
 DOC_HEADINGS = (
@@ -31,7 +33,11 @@ DOC_HEADINGS = (
     "### 2.12 Empty page",
     "### 2.13 Error",
     "### 2.14 Allowed sites",
+    "### 2.15 Navigation map",
+    "### 2.16 Settings page",
+    "### 2.17 Auto-scan this site",
     "## 3. The page: highlights and detail",
+    "### 3.1 Long text split",
     "## 4. Scan trigger",
     "## 5. Keyboard and focus order",
     "## 6. Accessibility rules",
@@ -40,7 +46,17 @@ DOC_HEADINGS = (
 )
 
 # Accessibility terms the design must state in plain words.
-DOC_TERMS = ("contrast", "focus order", "reduced motion", "Scan this page")
+DOC_TERMS = (
+    "contrast", "focus order", "reduced motion", "Scan this page",
+    "Learning", "Known by course", "Exam pages",
+    "extension-ui/block-states.html", "extension-ui/long-lesson.html",
+)
+
+# Lesson mark classes the tokens must define (labels, not colour alone).
+TOKEN_CLASSES = (".mark-known", ".mark-learning", ".mark-new", ".mark-untagged")
+
+# Ids the panel mockup must keep; the auto-scan toggle is the switch for 2.17.
+PANEL_IDS = ("auto-scan-toggle",)
 
 # Every side panel state has a section with this id in panel-states.html.
 STATE_IDS = (
@@ -82,6 +98,19 @@ def test_panel_mockup_has_every_state_id() -> None:
     html = PANEL.read_text(encoding="utf-8")
     for state in STATE_IDS:
         assert f'id="{state}"' in html, state
+    for element_id in PANEL_IDS:
+        assert f'id="{element_id}"' in html, element_id
+
+
+def test_tokens_define_every_mark_class() -> None:
+    css = TOKENS.read_text(encoding="utf-8")
+    for css_class in TOKEN_CLASSES:
+        assert re.search(re.escape(css_class) + r"\s*[{,:]", css), css_class
+
+
+def test_backlog_has_exam_pages_entry() -> None:
+    backlog = BACKLOG.read_text(encoding="utf-8")
+    assert any(line.startswith("## Exam pages") for line in backlog.splitlines()), "Exam pages"
 
 
 def test_design_files_have_no_network_or_private_names() -> None:

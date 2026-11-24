@@ -87,6 +87,18 @@ Project items after Milestone 0.
 - [ ] Trainer: real-browser check of the course panel (M16): create, delete with confirm, "n of
       limit" and the error texts. Vitest checks them with fake browser APIs only.
 
+## Exam pages (experimental)
+
+Open question for the extension UI design (see [`design/extension-ui.md`](design/extension-ui.md)).
+A page marked as an exam must not give hints. Safe default until decided: no marks and no
+highlights on exam pages, from page open until the person has finished answering.
+
+- [ ] Exam page detection: how a page is marked as an exam (site hint, user flag, or a
+      per-site rule). Not decided.
+- [ ] Result detection (pass or fail): can come later and may set topics to Known. Results are
+      only known after the answer is submitted, so this needs experiments on real exam pages
+      before any design. Until then the default above holds.
+
 ## Deployment (M6) follow-ups
 
 - [ ] Real VM test: build the VM as in `docs/deployment.md` (Ubuntu Server LTS), run
