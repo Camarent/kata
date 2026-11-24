@@ -92,7 +92,7 @@ def test_queued_job_has_no_topic(client: TestClient, db: ScratchDatabase, cfg: C
     headers = _user_token(client, db, cfg, "ana")
     job_id = _enqueue(client, headers, "tag this")
     body = client.get(f"/jobs/{job_id}", headers=headers).json()
-    assert body == {"status": "queued", "topic": None, "known": None}
+    assert body == {"status": "queued", "topic": None, "known": None, "output": None}
 
 
 def test_other_user_cannot_read_or_complete_job(

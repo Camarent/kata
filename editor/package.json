@@ -6,6 +6,10 @@
   "activationEvents": [
     "onStartupFinished",
     "onCommand:kata.installHooks",
+    "onCommand:kata.modelhostUp",
+    "onCommand:kata.modelhostUse",
+    "onCommand:kata.modelhostMeasure",
+    "onCommand:kata.modelhostStatus",
     "onView:kata.infoView"
   ],
   "contributes": {
@@ -13,6 +17,22 @@
       {
         "command": "kata.installHooks",
         "title": "Kata: Install git hooks"
+      },
+      {
+        "command": "kata.modelhostUp",
+        "title": "Kata: Model host up"
+      },
+      {
+        "command": "kata.modelhostUse",
+        "title": "Kata: Model host use engine"
+      },
+      {
+        "command": "kata.modelhostMeasure",
+        "title": "Kata: Model host measure"
+      },
+      {
+        "command": "kata.modelhostStatus",
+        "title": "Kata: Model host status"
       }
     ],
     "views": {

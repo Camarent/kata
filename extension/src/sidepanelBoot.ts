@@ -1,4 +1,4 @@
-import type { CourseList, PanelMessage, PanelReply } from "./background";
+import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply } from "./background";
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
@@ -191,6 +191,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       // The list and the "n of limit" count come from the core again, so the deleted course leaves the panel.
       await loadCourses();
       draw();
+    },
+
+    async onModelhost(request: ModelhostRequest) {
+      const reply = await api.runtime.sendMessage({ type: "panel:modelhost", request });
+      if (!reply.ok) throw new Error(reply.error);
+      return reply.data as ModelhostResult;
     },
   };
 

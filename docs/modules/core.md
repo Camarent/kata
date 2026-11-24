@@ -266,3 +266,22 @@ Env names: `KATA_URL` (core base URL), `KATA_TOKEN` (device token), `KATA_TERM_M
 ### Depends on / used by
 - Stdlib only (no `kata_core` import). Talks to `POST /v1/events`.
 - Tests: `tests/term/`.
+
+## Modelhost (M18)
+
+`core/kata_core/modelhost/` holds the job kinds that control the GPU-PC model host: `modelhost.up`, `modelhost.use`, `modelhost.measure`, `modelhost.status`. The core validates and stores them; it runs none of them. The GPU-PC worker runs `modelctl` (see [worker](worker.md)).
+
+- `core/kata_core/modelhost/spec.py:14` `ENGINES` (`ollama`, `strata`, `none`); `:15` `MAX_TEXT`; `:18` `validate_payload(kind, payload)` - `modelhost.use` needs exactly `{"engine": <ENGINES>}`, the other three need `{}`; anything else raises `ValueError`.
+- `core/kata_core/api/routes/jobs.py:96-100` - `POST /jobs` calls `validate_payload` for a `modelhost.*` kind and answers 422 with nothing queued (see [api](../api.md)).
+- `core/kata_core/modelhost/job_kinds.py:18` `check_output(output)` - output must be `{ok: bool, text: str, capabilities?: object}`, `text` at most `MAX_TEXT` characters; otherwise `ValueError` and the job is not done.
+- `core/kata_core/modelhost/job_kinds.py:37` `OUTPUT_HOOKS` - one hook per kind, found by `load_registry` (`core/kata_core/jobs/runner.py:45`). The package has no `HANDLERS`, so the core runner never claims these kinds.
+- `core/kata_core/api/routes/jobs.py:72` - `GET /jobs/{job_id}` returns the stored `output` (null until the worker posts it).
+
+Invariants:
+- Jobs are per user: a worker token claims only its own user's jobs (`/jobs/next`).
+- The core never works out what fits. Fit comes from the worker's measured capabilities document (schema 2), see [worker](worker.md).
+- Tests: `tests/core/test_api_modelhost_jobs.py`.
+
+### Depends on / used by
+- Depends on: `kata_core.jobs.runner` (`OutputHook`, `load_registry`), `kata_core.jobs.queue` (`Job`).
+- Used by: `core/kata_core/api/routes/jobs.py` (422 on a bad payload); the worker's `kata_worker.modelhost` and handlers; the extension client (`extension/src/coreClient.ts:266-290`).

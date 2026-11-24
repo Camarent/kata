@@ -183,3 +183,24 @@ minutes_skip = 1
 minutes_skim = 5
 minutes_practice = 15
 minutes_learn = 30
+
+# Model host: the GPU-PC model control and info service. Only the GPU-PC worker sets control_enabled = true.
+[modelhost]
+# Off by default: the worker never sends control requests unless this is true.
+control_enabled = false
+# Off by default: the scheduler never runs model swaps unless this is true.
+schedule = false
+# Base URL of the model host info service (loopback default; the GPU-PC serves it).
+info_url = "http://127.0.0.1:11435"
+# Path to the modelctl executable on the GPU-PC. Empty = not installed here.
+modelctl_path = ""
+# Directory of the model host checkout that holds modelctl. Empty = not installed here.
+modelhost_dir = ""
+# Seconds before a modelctl control run is killed.
+control_timeout_seconds = 120
+# Seconds before a capabilities request to the info service times out.
+capabilities_timeout_seconds = 10
+# Seconds a fetched capabilities document stays fresh before it is fetched again.
+capabilities_ttl_seconds = 300
+# Cap on the text the model host returns to the worker, in bytes.
+max_text_bytes = 262144

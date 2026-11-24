@@ -107,5 +107,14 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
 | `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
 | `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
+| `modelhost.control_enabled` | false | `KATA_MODELHOST_CONTROL_ENABLED` |
+| `modelhost.schedule` | false | `KATA_MODELHOST_SCHEDULE` |
+| `modelhost.info_url` | "http://127.0.0.1:11435" | `KATA_MODELHOST_INFO_URL` |
+| `modelhost.modelctl_path` | "" | `KATA_MODELHOST_MODELCTL_PATH` |
+| `modelhost.modelhost_dir` | "" | `KATA_MODELHOST_MODELHOST_DIR` |
+| `modelhost.control_timeout_seconds` | 120 | `KATA_MODELHOST_CONTROL_TIMEOUT_SECONDS` |
+| `modelhost.capabilities_timeout_seconds` | 10 | `KATA_MODELHOST_CAPABILITIES_TIMEOUT_SECONDS` |
+| `modelhost.capabilities_ttl_seconds` | 300 | `KATA_MODELHOST_CAPABILITIES_TTL_SECONDS` |
+| `modelhost.max_text_bytes` | 262144 | `KATA_MODELHOST_MAX_TEXT_BYTES` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.

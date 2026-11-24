@@ -3,7 +3,15 @@ import type { BridgeMessage } from "./bridge";
 import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
-import { CoreAuthError, CoreClient, CoreHttpError, type ConceptMark, type ProgressDoc } from "./coreClient";
+import {
+  CoreAuthError,
+  CoreClient,
+  CoreHttpError,
+  type ConceptMark,
+  type ModelhostEngine,
+  type ModelhostOutput,
+  type ProgressDoc,
+} from "./coreClient";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
@@ -45,7 +53,14 @@ export type PanelMessage =
   | { type: "panel:courses" }
   | { type: "panel:openCourse"; courseId: number }
   | { type: "panel:deleteCourse"; courseId: number }
-  | { type: "panel:createCourse"; title: string };
+  | { type: "panel:createCourse"; title: string }
+  | { type: "panel:modelhost"; request: ModelhostRequest };
+/** One local model host action from the panel: start, measure, status, or choose the engine. */
+export type ModelhostRequest =
+  | { action: "start" | "measure" | "status" }
+  | { action: "use"; engine: ModelhostEngine };
+/** Finished output of a modelhost job, or "pending" when the PC worker has not answered in time. */
+export type ModelhostResult = ModelhostOutput | "pending";
 
 /** Reply to a panel message: the result, or the error text. */
 /** A refused panel message; `status` and `code` are set when the core refused it (CoreHttpError). */
@@ -91,9 +106,20 @@ export interface Backend {
   deleteCourse(courseId: number): Promise<void>;
   /** Queues a new course with the given title; a refusal from the core rejects with CoreHttpError. */
   createCourse(title: string): Promise<void>;
+  /** Queues a modelhost job and waits up to MAX_WAIT_MS; "pending" when the worker has not answered by then. */
+  modelhost(request: ModelhostRequest): Promise<ModelhostResult>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
   progress: ProgressBridge;
 }
+
+/** Queues the modelhost job for each action that takes no payload. */
+const MODELHOST_QUEUE: Record<"start" | "measure" | "status", (client: CoreClient) => Promise<number>> = {
+  start: (client) => client.modelhostUp(),
+  measure: (client) => client.modelhostMeasure(),
+  status: (client) => client.modelhostStatus(),
+};
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
@@ -205,6 +231,21 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const session = await requireSession();
       await clientFor(session).createCourse(title);
     },
+
+    async modelhost(request) {
+      const session = await requireSession();
+      const client = clientFor(session);
+      const id =
+        request.action === "use"
+          ? await client.modelhostUse(request.engine)
+          : await MODELHOST_QUEUE[request.action](client);
+      const deadline = Date.now() + MAX_WAIT_MS;
+      for (;;) {
+        const result = await client.modelhostResult(id);
+        if (result !== "pending" || Date.now() >= deadline) return result;
+        await sleep(POLL_MS);
+      }
+    },
   };
 }
 
@@ -262,6 +303,8 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
         if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
         throw err;
       }
+    case "panel:modelhost":
+      return { ok: true, data: await backend.modelhost(message.request) };
   }
 }
 
@@ -279,7 +322,8 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:courses" ||
     type === "panel:openCourse" ||
     type === "panel:deleteCourse" ||
-    type === "panel:createCourse"
+    type === "panel:createCourse" ||
+    type === "panel:modelhost"
   );
 }
 

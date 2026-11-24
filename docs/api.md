@@ -21,12 +21,12 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/topics` | bearer | `{"category": str, "label": str, "private": bool = false}` | 200 `{"id", "category", "label", "private"}` | 422 on empty fields |
 | POST | `/topics/{topic_id}/aliases` | bearer | `{"alias": str}` | 200 `{"id", "topic_id", "alias", "private": true}` | 404 topic not found |
 | POST | `/import` | bearer | raw UTF-8 text, skill list format (see below) | 200 `{"created_topics": int, "marked": int}` | 422 bad line or body not UTF-8; nothing changes |
-| POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | |
+| POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | 422 a `modelhost.*` kind whose payload its allow-list refuses (`core/kata_core/api/routes/jobs.py:96-100`); nothing queued |
 | GET | `/jobs/next?kind=` | bearer | query: repeated `kind`, optional | 200 `{"id": int, "payload": str}` | 204 nothing queued; no `kind` means `tag` only |
 | POST | `/jobs/{job_id}/result` | bearer | `{"category": str, "topic": str}` | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/fail` | bearer | none | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/output` | bearer | `{"output": {...}}` (JSON object) | 204; runs the kind's output hook in the same transaction | 404 job not found or not leased by the caller; 413 output above `[jobs] max_output_bytes`; 422 the job kind has no output hook (nothing stored) |
-| GET | `/jobs/{job_id}` | bearer | none | 200 `{"status": str, "topic": {"id", "category", "label"} or null, "known": bool or null}` | 404 job not found |
+| GET | `/jobs/{job_id}` | bearer | none | 200 `{"status": str, "topic": {"id", "category", "label"} or null, "known": bool or null, "output": object or null}` | 404 job not found |
 | POST | `/v1/courses` | bearer, `trainer` feature | `{"concept_ids": [int, ...] \| null, "title": str = ""}` | 202 course fields plus `"job_id"` | 409 `course_limit` at `[trainer] max_courses_per_user` (any status counts); 409 `course_name_taken` for a title the user already has (case, spaces and ends ignored); 422 `course_title_empty` for an empty or whitespace title; 422 the gap rule finds nothing to study, or a named concept is not visible to the caller |
 | GET | `/v1/courses?limit=50&before_id=N` | bearer, `trainer` feature | query: `limit` 1..100 (default 50), `before_id` optional | 200 `{"items": [course, ...], "next_before_id": int \| null, "limit": int, "total": int}`, newest first; `limit` is the course limit (0 means unlimited), `total` counts all the caller's courses | 422 `limit` outside 1..100; `next_before_id` is null unless the page is full |
 | GET | `/v1/courses/{course_id}` | bearer, `trainer` feature | none | 200 course: `{"id", "title", "status", "concept_ids", "error", "created_at", "updated_at"}` | 404 course not found or not the caller's |
@@ -68,6 +68,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 Notes:
 
 - `GET /jobs/next` answers 204 when nothing is queued. The worker polls it; there is no push channel.
+- `modelhost.up`, `modelhost.use`, `modelhost.measure` and `modelhost.status` are queued with `POST /jobs` and read back with `GET /jobs/{job_id}`. The worker posts `{ok, text[, capabilities]}` with `POST /jobs/{job_id}/output`; the hook checks it (`core/kata_core/modelhost/job_kinds.py:18`) and `output` stays null until then (`core/kata_core/api/routes/jobs.py:72`). Only the GPU-PC worker claims them.
 - `known` in `GET /jobs/{job_id}` is computed from the caller's marks. The model only picks the topic.
 - A topic created with `private: false` (the default) is shared. A private topic and a private alias belong to the caller.
 - Concept marks are a second layer under topics. `state` is `known`, `learning` or `new`; a concept is visible when its topic is visible and it is shared or owned by the caller. `GET /concepts/marks` lists only the caller's marks. Topic marks (`/marks`) are unchanged.

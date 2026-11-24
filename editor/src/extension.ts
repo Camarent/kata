@@ -5,6 +5,16 @@ import { readConfig } from "./config";
 import { applyMessages } from "./diagnostics";
 import { registerInfoView } from "./infoView";
 import { installHooks } from "./installHooks";
+import {
+  MAX_POLLS,
+  MODELHOST_COMMAND_KINDS,
+  POLL_INTERVAL_MS,
+  payloadFor,
+  resultMessage,
+  runModelhostJob,
+  USE_ENGINES,
+  USE_KIND,
+} from "./modelhost";
 import { postEvent } from "./poster";
 
 export const INSTALL_COMMAND = "kata.installHooks";
@@ -14,6 +24,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const diagnostics = vscode.languages.createDiagnosticCollection("kata");
   context.subscriptions.push(
     vscode.commands.registerCommand(INSTALL_COMMAND, () => runInstall()),
+    ...Object.entries(MODELHOST_COMMAND_KINDS).map(([command, kind]) =>
+      vscode.commands.registerCommand(command, () => runModelhost(kind)),
+    ),
     registerInfoView(),
     diagnostics,
     vscode.workspace.onDidSaveTextDocument((doc) => postSave(doc, diagnostics)),
@@ -33,6 +46,28 @@ async function runInstall(): Promise<void> {
   const result = await installHooks(cwd);
   const prefix = result.ok ? "Kata: hooks installed" : "Kata: hooks install failed";
   await vscode.window.showInformationMessage(`${prefix}: ${result.output}`);
+}
+
+// Queues the modelhost job of `kind` and shows the worker's answer. modelhost.use asks for the
+// engine first; cancelling the pick queues nothing.
+async function runModelhost(kind: string): Promise<void> {
+  let engine: string | undefined;
+  if (kind === USE_KIND) {
+    engine = await vscode.window.showQuickPick([...USE_ENGINES]);
+    if (engine === undefined) {
+      return;
+    }
+  }
+  const cfg = readConfig((key) => vscode.workspace.getConfiguration().get(key));
+  const result = await runModelhostJob(
+    cfg,
+    kind,
+    payloadFor(kind, engine),
+    (input, init) => fetch(input, init),
+    (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    { intervalMs: POLL_INTERVAL_MS, maxPolls: MAX_POLLS },
+  );
+  await vscode.window.showInformationMessage(resultMessage(kind, result));
 }
 
 // Posts one editor.save event for the saved document; the stop check runs inside postEvent.

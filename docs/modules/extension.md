@@ -41,6 +41,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/background.ts:135` `handleBridgeMessage` (`bridge:load` / `bridge:save` to the progress service; replies `{ok,data}` or `{ok:false,error}`).
 - `extension/manifest.base.json` permission `scripting` (dynamic registration of `bridge.js`); `extension/build/build.mjs` builds `bridge.js` as an IIFE.
 
+- Model host control (M18): `extension/src/coreClient.ts:261` `enqueueKind` (private) queues a `modelhost.*` job with `POST /jobs` and throws `CoreHttpError` on 422; `:267` `modelhostUp`, `:272` `modelhostUse(engine)` (payload `{"engine": ...}`), `:277` `modelhostMeasure`, `:282` `modelhostStatus`; `:290` `modelhostResult(id)` reads the job and returns its output or `"pending"`. The `output` field type is at `:79`. The control jobs are queued only; the GPU-PC worker runs them (see [worker](worker.md)).
+
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
 - `extension/build/manifest.mjs` - per-browser keys (Chrome side panel, Firefox sidebar and gecko id). See `docs/decisions.md`.

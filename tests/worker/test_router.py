@@ -225,7 +225,7 @@ def test_build_router_unknown_class_in_config_raises() -> None:
 
 
 def test_build_router_without_key_gives_local_only_chain(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(router_module, "LocalProvider", lambda _cfg: _local())
+    monkeypatch.setattr(router_module, "build_local", lambda _cfg, _log: _local())
     log: list[str] = []
     router = build_router(_config(), FakeLedger(), {}, lambda _: None, log.append)
     assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=LOCAL_REPLY, provider="local")
@@ -241,7 +241,7 @@ def test_build_router_missing_task_class_raises() -> None:
 
 
 def test_build_router_guard_runs_before_cap(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(router_module, "LocalProvider", lambda _cfg: _local())
+    monkeypatch.setattr(router_module, "build_local", lambda _cfg, _log: _local())
     cfg = _config()
     key_env = str(cfg.get("provider_anthropic", "api_key_env"))
     ledger = FakeLedger()

@@ -18,6 +18,9 @@ export const host = {
   diagnosticCollections: [] as string[],
   settings: {} as Record<string, unknown>,
   workspaceRoot: undefined as string | undefined,
+  messages: [] as string[],
+  quickPickAnswer: undefined as string | undefined,
+  quickPickItems: [] as string[][],
 };
 
 export function resetHost(): void {
@@ -28,6 +31,9 @@ export function resetHost(): void {
   host.diagnosticCollections.length = 0;
   host.settings = {};
   host.workspaceRoot = undefined;
+  host.messages.length = 0;
+  host.quickPickAnswer = undefined;
+  host.quickPickItems.length = 0;
 }
 
 function disposable(fn: () => void): Disposed {
@@ -35,7 +41,14 @@ function disposable(fn: () => void): Disposed {
 }
 
 export const window = {
-  showInformationMessage: (_message: string): Promise<undefined> => Promise.resolve(undefined),
+  showInformationMessage: (message: string): Promise<undefined> => {
+    host.messages.push(message);
+    return Promise.resolve(undefined);
+  },
+  showQuickPick: (items: string[]): Promise<string | undefined> => {
+    host.quickPickItems.push([...items]);
+    return Promise.resolve(host.quickPickAnswer);
+  },
   registerWebviewViewProvider: (
     viewId: string,
     provider: { resolveWebviewView(view: { webview: { html: string } }): void },

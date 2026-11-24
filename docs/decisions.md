@@ -569,3 +569,17 @@ Decided 2026-11-23. A user holds at most `[trainer] max_courses_per_user` course
 Reason: each course runs a generate job and a build job, so the limit caps that work per user; unique titles let the list tell courses apart.
 
 Limit: the limit and the title rule are checked by the API tests and the Vitest panel tests with fake browser APIs; no real browser run drives them.
+
+## Local models through a worker on the user's GPU machine (M18)
+
+Decided 2026-11-23.
+
+- The worker is user-side. It pulls jobs from core over plain outbound HTTP, and core never needs its address (see "Worker link"). For local models, one worker runs on the GPU machine next to Ollama and talks to `127.0.0.1`. The Ollama port and the model-host info service port both come from settings. The web server never reaches the GPU machine, so it needs no network grant to it.
+- It is the same worker program as on the web server, with its own device token for the user. The web server's worker stays for cloud jobs.
+- The extension is the single entry point, meaning whichever client the user runs (browser extension or VS Code extension). Both use the same core control jobs. A browser cannot run `modelctl`, and core is remote, so control goes client, core, job queue, GPU-machine worker, `modelctl`. Control jobs: `modelhost.up`, `modelhost.use`, `modelhost.measure`, `modelhost.status`.
+- Permissions: the worker runs as the normal user that owns the model-host folder and its `data/` (this avoids root-owned `data/` errors) and is in the docker group; it never runs as root. It accepts a fixed allow-list of subcommands with validated arguments, never a shell string. A control job runs only for the user whose device token the worker holds.
+- kata never calculates what fits. It asks `GET /capabilities` and reads `schema` 2: `fits_alone` is the measured answer and `fits_together` the measured pairs. `null` means unknown, never "fits". `kata-l` and `kata-m` never fit together, so the scheduler swaps them.
+- Cloud turns on when its token is configured (see the routing entry). The per-repository code opt-in stays for now.
+- No machine-specific numbers (sizes, headroom) appear in code, docs or tests.
+
+Reason: the GPU machine sits behind the user's own network, so it must reach out; keeping one worker program and one job queue avoids a second control path.
