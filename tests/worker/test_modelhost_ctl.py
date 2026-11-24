@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from kata_core.config import CONFIG_ENV, Config
-from kata_core.modelhost.spec import MEASURE_KIND, STATUS_KIND, UP_KIND, USE_KIND
+from kata_core.modelhost.spec import MAX_TEXT, MEASURE_KIND, STATUS_KIND, UP_KIND, USE_KIND
 from kata_worker.modelhost.ctl import ControlRunner, default_runner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -122,6 +122,15 @@ def test_output_is_capped_at_max_text_bytes(runner: ControlRunner) -> None:
     ok, text = runner.run(UP_KIND, "{}")
     assert ok is True
     assert text == "x" * MAX_TEXT_BYTES
+
+
+def test_text_is_truncated_to_core_max_text(fake_modelctl: Path, tmp_path: Path) -> None:
+    def long_output(argv: list[str], cwd: str, timeout: int, limit: int) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(argv, 0, stdout=b"x" * 5000, stderr=b"")
+
+    ok, text = ControlRunner(_config(str(fake_modelctl), str(tmp_path)), runner=long_output).run(UP_KIND, "{}")
+    assert ok is True
+    assert text == "x" * MAX_TEXT
 
 
 def test_injection_engine_rejected_before_spawn(fake_modelctl: Path, tmp_path: Path) -> None:

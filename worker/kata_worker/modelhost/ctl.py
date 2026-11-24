@@ -16,7 +16,14 @@ from collections.abc import Callable
 from typing import IO
 
 from kata_core.config import Config, load_config
-from kata_core.modelhost.spec import MEASURE_KIND, STATUS_KIND, UP_KIND, USE_KIND, validate_payload
+from kata_core.modelhost.spec import (
+    MAX_TEXT,
+    MEASURE_KIND,
+    STATUS_KIND,
+    UP_KIND,
+    USE_KIND,
+    validate_payload,
+)
 
 ARGV_FOR_KIND: dict[str, tuple[str, ...]] = {
     UP_KIND: ("up",),
@@ -126,7 +133,7 @@ class ControlRunner:
             return False, TIMEOUT_MESSAGE.format(seconds=self._timeout)
         except OSError as exc:
             return False, f"modelctl could not start: {exc.strerror or exc}"
-        text = done.stdout.decode("utf-8", errors="replace")
+        text = done.stdout.decode("utf-8", errors="replace")[:MAX_TEXT]
         return done.returncode == 0, text
 
 
