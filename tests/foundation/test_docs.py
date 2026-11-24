@@ -7,6 +7,7 @@ from kata_core.config import EXAMPLE_PATH
 
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
+CONFIG_DOC = ROOT / "docs" / "configuration.md"
 DECISIONS = ROOT / "docs" / "decisions.md"
 
 # Names of people and hardware that must not appear in the docs.
@@ -37,9 +38,9 @@ def _table_rows(text: str) -> dict[str, list[str]]:
     return rows
 
 
-def _missing_rows(data: dict, readme_text: str) -> list[str]:
-    """Return every section.key whose README row is absent or wrong."""
-    rows = _table_rows(readme_text)
+def _missing_rows(data: dict, config_text: str) -> list[str]:
+    """Return every section.key whose configuration row is absent or wrong."""
+    rows = _table_rows(config_text)
     missing = []
     for section, table in data.items():
         for key, value in table.items():
@@ -55,34 +56,56 @@ def _missing_rows(data: dict, readme_text: str) -> list[str]:
     return missing
 
 
-def test_readme_has_configuration_section():
+def test_readme_links_to_configuration_doc():
     text = README.read_text(encoding="utf-8")
-    assert "## Configuration" in text
+    assert "(docs/configuration.md)" in text
+    assert _table_rows(text) == {}
 
 
-def test_readme_row_for_every_example_key():
+# Words that belong in internal notes, not in the public README.
+README_BANNED = (
+    "Proxmox", "tailnet", "tailscale", "pipeline.json", "cs-qrun", "release_script",
+)
+
+
+def test_readme_has_no_internal_wording():
+    text = README.read_text(encoding="utf-8")
+    for word in README_BANNED:
+        assert word.lower() not in text.lower(), f"README.md contains {word!r}"
+
+
+def test_config_row_for_every_example_key():
     data = _load_toml(EXAMPLE_PATH)
-    readme_text = README.read_text(encoding="utf-8")
-    assert _missing_rows(data, readme_text) == []
+    config_text = CONFIG_DOC.read_text(encoding="utf-8")
+    assert _missing_rows(data, config_text) == []
 
 
-def test_readme_env_names_present():
+def test_config_env_names_present():
     data = _load_toml(EXAMPLE_PATH)
-    readme_text = README.read_text(encoding="utf-8")
+    config_text = CONFIG_DOC.read_text(encoding="utf-8")
     for section, table in data.items():
         for key in table:
-            assert _env_name(section, key) in readme_text
+            assert _env_name(section, key) in config_text
 
 
-def test_mutation_new_key_fails_readme_check(tmp_path):
+def test_mutation_new_key_fails_config_check(tmp_path):
     target = tmp_path / "kata.example.toml"
     target.write_text(
         EXAMPLE_PATH.read_text(encoding="utf-8") + "\n[extra]\nnew_key = 1\n",
         encoding="utf-8",
     )
     data = _load_toml(target)
-    readme_text = README.read_text(encoding="utf-8")
-    assert _missing_rows(data, readme_text) == ["extra.new_key"]
+    config_text = CONFIG_DOC.read_text(encoding="utf-8")
+    assert _missing_rows(data, config_text) == ["extra.new_key"]
+
+
+def test_mutation_deleted_key_row_fails_config_check():
+    data = _load_toml(EXAMPLE_PATH)
+    config_text = CONFIG_DOC.read_text(encoding="utf-8")
+    row = next(
+        line for line in config_text.splitlines() if line.startswith("| `core.port`")
+    )
+    assert _missing_rows(data, config_text.replace(row + "\n", "")) == ["core.port"]
 
 
 def test_decisions_record_initial_review_by_list_file():

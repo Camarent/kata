@@ -19,6 +19,7 @@ PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "kata"
 SERVER_VERSION = "0.0.0"
 DEFAULT_SEARCH_LIMIT = 5
+UNKNOWN_TOOL_NAME_MAX = 40
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -80,7 +81,7 @@ def handle(
     except _MethodNotFound:
         return _error(request_id, METHOD_NOT_FOUND, f"method not found: {method}")
     except InvalidParams as exc:
-        return _error(request_id, INVALID_PARAMS, str(exc))
+        return _error(request_id, INVALID_PARAMS, exc.public_message)
     return {"jsonrpc": JSONRPC_VERSION, "id": request_id, "result": result}
 
 
@@ -132,7 +133,7 @@ def _call_tool(
             raise InvalidParams("kata_concept_state needs a string concept")
         result = kata_concept_state(conn, user_id, concept, at)
     else:
-        raise InvalidParams(f"unknown tool: {name}")
+        raise InvalidParams(f"unknown tool: {name[:UNKNOWN_TOOL_NAME_MAX]}")
     return {"content": [{"type": "text", "text": result.text}], "isError": result.is_error}
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release hook for the pipeline (pipeline.json "release_script"). Run from the repo root.
+# Release hook: moves the project version to a new value. Run from the repo root.
 #   bump_version.sh current [REF]            print X.Y.Z (pyproject.toml at REF, default: working tree)
 #   bump_version.sh set OLD NEW "ENTRY"      move our own version from OLD to NEW, print the changed files
 #

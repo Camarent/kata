@@ -26,7 +26,15 @@ EGRESS_BLOCK_KIND = "egress_block"
 
 
 class InvalidParams(ValueError):
-    """Caller gave bad tool arguments. The RPC layer maps this to -32602."""
+    """Caller gave bad tool arguments. The RPC layer maps this to -32602.
+
+    `public_message` is the only text sent back to the caller; it is always a fixed string
+    chosen at the raise site.
+    """
+
+    def __init__(self, public_message: str) -> None:
+        super().__init__(public_message)
+        self.public_message = public_message
 
 
 @dataclass(frozen=True)

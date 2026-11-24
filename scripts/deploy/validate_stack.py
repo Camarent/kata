@@ -6,7 +6,7 @@ to fall back on, and the check never passes silently.
 
 Rules, named at the start of each failure line:
   no-host-port     a service other than caddy publishes a port, or caddy binds an address that
-                   is neither loopback nor tailscale
+                   is neither loopback nor the private network
   mem-limit        a service has no mem_limit
   secret-file      a top-level secret is not a file (it must have file:, not environment:)
   migrate-first    core does not wait for migrate to complete successfully

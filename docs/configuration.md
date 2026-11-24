@@ -1,0 +1,107 @@
+# Configuration
+
+Settings come from a TOML file (`config/kata.example.toml` is the template) and can be
+overridden per key with an environment variable named `KATA_<SECTION>_<KEY>`, upper case.
+The file path is read from `KATA_CONFIG` when not passed in.
+
+| Key | Default | Env var |
+| --- | --- | --- |
+| `core.host` | "127.0.0.1" | `KATA_CORE_HOST` |
+| `core.port` | 8080 | `KATA_CORE_PORT` |
+| `core.public_url` | "" | `KATA_CORE_PUBLIC_URL` |
+| `database.host` | "127.0.0.1" | `KATA_DATABASE_HOST` |
+| `database.port` | 5432 | `KATA_DATABASE_PORT` |
+| `database.name` | "kata_dev" | `KATA_DATABASE_NAME` |
+| `database.user` | "kata_dev" | `KATA_DATABASE_USER` |
+| `database.password_env` | "KATA_DATABASE_PASSWORD" | `KATA_DATABASE_PASSWORD_ENV` |
+| `auth.token_ttl_seconds` | 3600 | `KATA_AUTH_TOKEN_TTL_SECONDS` |
+| `auth.enrolment_ttl_seconds` | 86400 | `KATA_AUTH_ENROLMENT_TTL_SECONDS` |
+| `worker.poll_interval_seconds` | 5 | `KATA_WORKER_POLL_INTERVAL_SECONDS` |
+| `worker.request_timeout_seconds` | 30 | `KATA_WORKER_REQUEST_TIMEOUT_SECONDS` |
+| `worker.core_url` | "http://127.0.0.1:8080" | `KATA_WORKER_CORE_URL` |
+| `worker.core_hosts` | [] | `KATA_WORKER_CORE_HOSTS` |
+| `worker.token_env` | "KATA_WORKER_TOKEN" | `KATA_WORKER_TOKEN_ENV` |
+| `jobs.lease_seconds` | 300 | `KATA_JOBS_LEASE_SECONDS` |
+| `jobs.runner_poll_seconds` | 5 | `KATA_JOBS_RUNNER_POLL_SECONDS` |
+| `jobs.max_output_bytes` | 262144 | `KATA_JOBS_MAX_OUTPUT_BYTES` |
+| `model.base_url` | "http://127.0.0.1:11434/v1" | `KATA_MODEL_BASE_URL` |
+| `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
+| `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
+| `model.reasoning_effort` | "" | `KATA_MODEL_REASONING_EFFORT` |
+| `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
+| `retrieval.embedder` | "fake" | `KATA_RETRIEVAL_EMBEDDER` |
+| `retrieval.model_name` | "" | `KATA_RETRIEVAL_MODEL_NAME` |
+| `retrieval.rrf_k` | 60 | `KATA_RETRIEVAL_RRF_K` |
+| `retrieval.candidate_limit` | 50 | `KATA_RETRIEVAL_CANDIDATE_LIMIT` |
+| `retrieval.dimensions` | 64 | `KATA_RETRIEVAL_DIMENSIONS` |
+| `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
+| `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
+| `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
+| `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
+| `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
+| `cost.estimate_safety_percent` | 150 | `KATA_COST_ESTIMATE_SAFETY_PERCENT` |
+| `smoke.allowed_models` | "claude-haiku-5-5" | `KATA_SMOKE_ALLOWED_MODELS` |
+| `smoke.budget_micro_usd` | 500000 | `KATA_SMOKE_BUDGET_MICRO_USD` |
+| `smoke_local.models` | "kata-l" | `KATA_SMOKE_LOCAL_MODELS` |
+| `smoke_local.case_timeout_seconds` | 180 | `KATA_SMOKE_LOCAL_CASE_TIMEOUT_SECONDS` |
+| `smoke_local.warmup_timeout_seconds` | 600 | `KATA_SMOKE_LOCAL_WARMUP_TIMEOUT_SECONDS` |
+| `smoke_local.num_ctx` | 8192 | `KATA_SMOKE_LOCAL_NUM_CTX` |
+| `routing.tag` | "local" | `KATA_ROUTING_TAG` |
+| `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
+| `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |
+| `routing.batch` | "anthropic" | `KATA_ROUTING_BATCH` |
+| `routing.generate_course` | "local,anthropic" | `KATA_ROUTING_GENERATE_COURSE` |
+| `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
+| `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
+| `provider_local.task_classes` | "tag,explain,generate_course,extract_syllabus" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |
+| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
+| `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
+| `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
+| `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
+| `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
+| `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
+| `provider_anthropic.cache_system` | false | `KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM` |
+| `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
+| `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
+| `policy.nudge_enabled` | true | `KATA_POLICY_NUDGE_ENABLED` |
+| `policy.nudge_error_threshold` | 3 | `KATA_POLICY_NUDGE_ERROR_THRESHOLD` |
+| `policy.nudge_window_seconds` | 900 | `KATA_POLICY_NUDGE_WINDOW_SECONDS` |
+| `policy.stop_enabled` | true | `KATA_POLICY_STOP_ENABLED` |
+| `policy.stop_error_threshold` | 8 | `KATA_POLICY_STOP_ERROR_THRESHOLD` |
+| `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
+| `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
+| `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
+| `trainer.command` | ["/opt/trainer/dojo"] | `KATA_TRAINER_COMMAND` |
+| `trainer.wasm` | "" | `KATA_TRAINER_WASM` |
+| `trainer.web` | "" | `KATA_TRAINER_WEB` |
+| `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
+| `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
+| `trainer.max_courses_per_user` | 10 | `KATA_TRAINER_MAX_COURSES_PER_USER` |
+| `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
+| `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
+| `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
+| `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
+| `trainer.open_link_ttl_seconds` | 43200 | `KATA_TRAINER_OPEN_LINK_TTL_SECONDS` |
+| `trainer.open_link_key_file` | "" | `KATA_TRAINER_OPEN_LINK_KEY_FILE` |
+| `knowledge.trainer_step` | 0.1 | `KATA_KNOWLEDGE_TRAINER_STEP` |
+| `knowledge.trainer_max_step` | 0.3 | `KATA_KNOWLEDGE_TRAINER_MAX_STEP` |
+| `knowledge.known_threshold` | 0.8 | `KATA_KNOWLEDGE_KNOWN_THRESHOLD` |
+| `knowledge.learning_threshold` | 0.4 | `KATA_KNOWLEDGE_LEARNING_THRESHOLD` |
+| `knowledge.assertion_hold` | 3 | `KATA_KNOWLEDGE_ASSERTION_HOLD` |
+| `knowledge.base_known` | 0.9 | `KATA_KNOWLEDGE_BASE_KNOWN` |
+| `knowledge.base_learning` | 0.5 | `KATA_KNOWLEDGE_BASE_LEARNING` |
+| `knowledge.base_new` | 0.1 | `KATA_KNOWLEDGE_BASE_NEW` |
+| `syllabus.enabled` | true | `KATA_SYLLABUS_ENABLED` |
+| `syllabus.model_extract` | false | `KATA_SYLLABUS_MODEL_EXTRACT` |
+| `syllabus.max_bytes` | 524288 | `KATA_SYLLABUS_MAX_BYTES` |
+| `planning.enabled` | true | `KATA_PLANNING_ENABLED` |
+| `planning.skim_share` | 0.5 | `KATA_PLANNING_SKIM_SHARE` |
+| `planning.words_per_unit` | 400 | `KATA_PLANNING_WORDS_PER_UNIT` |
+| `planning.minutes_skip` | 1 | `KATA_PLANNING_MINUTES_SKIP` |
+| `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
+| `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
+| `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
+
+Defaults are the values in `config/kata.example.toml`. The example values are placeholders.

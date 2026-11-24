@@ -1,120 +1,51 @@
 # kata
 
-Local-first lesson tool. The core and the worker run on machines the user controls.
+kata is a self-hosted learning companion for people who already know a lot and need to learn adjacent material fast.
 
-## Configuration
+Status: early release (0.x). Interfaces may change between releases.
 
-Settings come from a TOML file (`config/kata.example.toml` is the template) and can be
-overridden per key with an environment variable named `KATA_<SECTION>_<KEY>`, upper case.
-The file path is read from `KATA_CONFIG` when not passed in.
+## What it does
 
-| Key | Default | Env var |
-| --- | --- | --- |
-| `core.host` | "127.0.0.1" | `KATA_CORE_HOST` |
-| `core.port` | 8080 | `KATA_CORE_PORT` |
-| `core.public_url` | "" | `KATA_CORE_PUBLIC_URL` |
-| `database.host` | "127.0.0.1" | `KATA_DATABASE_HOST` |
-| `database.port` | 5432 | `KATA_DATABASE_PORT` |
-| `database.name` | "kata_dev" | `KATA_DATABASE_NAME` |
-| `database.user` | "kata_dev" | `KATA_DATABASE_USER` |
-| `database.password_env` | "KATA_DATABASE_PASSWORD" | `KATA_DATABASE_PASSWORD_ENV` |
-| `auth.token_ttl_seconds` | 3600 | `KATA_AUTH_TOKEN_TTL_SECONDS` |
-| `auth.enrolment_ttl_seconds` | 86400 | `KATA_AUTH_ENROLMENT_TTL_SECONDS` |
-| `worker.poll_interval_seconds` | 5 | `KATA_WORKER_POLL_INTERVAL_SECONDS` |
-| `worker.request_timeout_seconds` | 30 | `KATA_WORKER_REQUEST_TIMEOUT_SECONDS` |
-| `worker.core_url` | "http://127.0.0.1:8080" | `KATA_WORKER_CORE_URL` |
-| `worker.core_hosts` | [] | `KATA_WORKER_CORE_HOSTS` |
-| `worker.token_env` | "KATA_WORKER_TOKEN" | `KATA_WORKER_TOKEN_ENV` |
-| `jobs.lease_seconds` | 300 | `KATA_JOBS_LEASE_SECONDS` |
-| `jobs.runner_poll_seconds` | 5 | `KATA_JOBS_RUNNER_POLL_SECONDS` |
-| `jobs.max_output_bytes` | 262144 | `KATA_JOBS_MAX_OUTPUT_BYTES` |
-| `model.base_url` | "http://127.0.0.1:11434/v1" | `KATA_MODEL_BASE_URL` |
-| `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
-| `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
-| `model.reasoning_effort` | "" | `KATA_MODEL_REASONING_EFFORT` |
-| `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
-| `retrieval.embedder` | "fake" | `KATA_RETRIEVAL_EMBEDDER` |
-| `retrieval.model_name` | "" | `KATA_RETRIEVAL_MODEL_NAME` |
-| `retrieval.rrf_k` | 60 | `KATA_RETRIEVAL_RRF_K` |
-| `retrieval.candidate_limit` | 50 | `KATA_RETRIEVAL_CANDIDATE_LIMIT` |
-| `retrieval.dimensions` | 64 | `KATA_RETRIEVAL_DIMENSIONS` |
-| `lesson_check.min_score` | 0.02 | `KATA_LESSON_CHECK_MIN_SCORE` |
-| `lesson_check.known_hits` | 3 | `KATA_LESSON_CHECK_KNOWN_HITS` |
-| `lesson_check.search_limit` | 5 | `KATA_LESSON_CHECK_SEARCH_LIMIT` |
-| `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
-| `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
-| `cost.estimate_safety_percent` | 150 | `KATA_COST_ESTIMATE_SAFETY_PERCENT` |
-| `smoke.allowed_models` | "claude-haiku-5-5" | `KATA_SMOKE_ALLOWED_MODELS` |
-| `smoke.budget_micro_usd` | 500000 | `KATA_SMOKE_BUDGET_MICRO_USD` |
-| `smoke_local.models` | "kata-l" | `KATA_SMOKE_LOCAL_MODELS` |
-| `smoke_local.case_timeout_seconds` | 180 | `KATA_SMOKE_LOCAL_CASE_TIMEOUT_SECONDS` |
-| `smoke_local.warmup_timeout_seconds` | 600 | `KATA_SMOKE_LOCAL_WARMUP_TIMEOUT_SECONDS` |
-| `smoke_local.num_ctx` | 8192 | `KATA_SMOKE_LOCAL_NUM_CTX` |
-| `routing.tag` | "local" | `KATA_ROUTING_TAG` |
-| `routing.explain` | "anthropic,local" | `KATA_ROUTING_EXPLAIN` |
-| `routing.summary` | "anthropic" | `KATA_ROUTING_SUMMARY` |
-| `routing.batch` | "anthropic" | `KATA_ROUTING_BATCH` |
-| `routing.generate_course` | "local,anthropic" | `KATA_ROUTING_GENERATE_COURSE` |
-| `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
-| `providers.cloud_enabled` | false | `KATA_PROVIDERS_CLOUD_ENABLED` |
-| `provider_local.task_classes` | "tag,explain,generate_course,extract_syllabus" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
-| `provider_anthropic.allow_cloud` | false | `KATA_PROVIDER_ANTHROPIC_ALLOW_CLOUD` |
-| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
-| `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
-| `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
-| `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
-| `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
-| `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
-| `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
-| `provider_anthropic.cache_system` | false | `KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM` |
-| `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
-| `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
-| `policy.nudge_enabled` | true | `KATA_POLICY_NUDGE_ENABLED` |
-| `policy.nudge_error_threshold` | 3 | `KATA_POLICY_NUDGE_ERROR_THRESHOLD` |
-| `policy.nudge_window_seconds` | 900 | `KATA_POLICY_NUDGE_WINDOW_SECONDS` |
-| `policy.stop_enabled` | true | `KATA_POLICY_STOP_ENABLED` |
-| `policy.stop_error_threshold` | 8 | `KATA_POLICY_STOP_ERROR_THRESHOLD` |
-| `policy.rate_limit_seconds` | 300 | `KATA_POLICY_RATE_LIMIT_SECONDS` |
-| `policy.late_event_seconds` | 120 | `KATA_POLICY_LATE_EVENT_SECONDS` |
-| `trainer.enabled` | true | `KATA_TRAINER_ENABLED` |
-| `trainer.command` | ["/opt/trainer/dojo"] | `KATA_TRAINER_COMMAND` |
-| `trainer.wasm` | "" | `KATA_TRAINER_WASM` |
-| `trainer.web` | "" | `KATA_TRAINER_WEB` |
-| `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
-| `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
-| `trainer.max_courses_per_user` | 10 | `KATA_TRAINER_MAX_COURSES_PER_USER` |
-| `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
-| `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
-| `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
-| `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
-| `trainer.open_link_ttl_seconds` | 43200 | `KATA_TRAINER_OPEN_LINK_TTL_SECONDS` |
-| `trainer.open_link_key_file` | "" | `KATA_TRAINER_OPEN_LINK_KEY_FILE` |
-| `knowledge.trainer_step` | 0.1 | `KATA_KNOWLEDGE_TRAINER_STEP` |
-| `knowledge.trainer_max_step` | 0.3 | `KATA_KNOWLEDGE_TRAINER_MAX_STEP` |
-| `knowledge.known_threshold` | 0.8 | `KATA_KNOWLEDGE_KNOWN_THRESHOLD` |
-| `knowledge.learning_threshold` | 0.4 | `KATA_KNOWLEDGE_LEARNING_THRESHOLD` |
-| `knowledge.assertion_hold` | 3 | `KATA_KNOWLEDGE_ASSERTION_HOLD` |
-| `knowledge.base_known` | 0.9 | `KATA_KNOWLEDGE_BASE_KNOWN` |
-| `knowledge.base_learning` | 0.5 | `KATA_KNOWLEDGE_BASE_LEARNING` |
-| `knowledge.base_new` | 0.1 | `KATA_KNOWLEDGE_BASE_NEW` |
-| `syllabus.enabled` | true | `KATA_SYLLABUS_ENABLED` |
-| `syllabus.model_extract` | false | `KATA_SYLLABUS_MODEL_EXTRACT` |
-| `syllabus.max_bytes` | 524288 | `KATA_SYLLABUS_MAX_BYTES` |
-| `planning.enabled` | true | `KATA_PLANNING_ENABLED` |
-| `planning.skim_share` | 0.5 | `KATA_PLANNING_SKIM_SHARE` |
-| `planning.words_per_unit` | 400 | `KATA_PLANNING_WORDS_PER_UNIT` |
-| `planning.minutes_skip` | 1 | `KATA_PLANNING_MINUTES_SKIP` |
-| `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
-| `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
-| `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
+- Keeps a model of what each learner already knows, per topic and per concept.
+- Reads the lesson page open in the browser when you click "Scan this page", and shows which parts are new to you.
+- Turns knowledge gaps into short practice courses.
+- Advises inside your own projects.
+- Runs on machines you control.
 
-Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
+## How it fits together
 
-## Install the extension
+- **Core service**: the HTTP API, storage in Postgres, accounts and tokens, and the job queue.
+- **Worker**: runs model jobs (tagging, course generation) next to a local model server. It polls the core for jobs.
+- **Browser extension**: the side panel and the page scanner. It talks only to the core you configure.
+- **Trainer**: builds the practice courses from the gaps the core finds.
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full map.
+
+## Quick start
+
+### 1. Run the core
+
+You need Python 3.11 or later and either local Postgres binaries or Docker. [`docs/development.md`](docs/development.md) has the full setup.
+
+```
+scripts/dev/pg.sh start                       # throwaway Postgres on 127.0.0.1
+eval "$(scripts/dev/pg.sh env)"               # point kata at it
+PYTHONPATH=core python3 -m kata_core          # with KATA_CONFIG set to your config file
+```
+
+Settings come from a TOML file, `config/kata.example.toml` is the template. Every key can be overridden with an environment variable. The full list is in [`docs/configuration.md`](docs/configuration.md). Stop the throwaway Postgres with `scripts/dev/pg.sh stop`.
+
+### 2. Install the extension
+
+Get the build for your browser from the latest release on the [Releases page](https://github.com/Camarent/kata/releases): `kata-extension-<version>-firefox.zip` or `kata-extension-<version>-chrome.zip`. Download `SHA256SUMS` from the same release and check the zip before you unzip it:
+
+```
+sha256sum -c SHA256SUMS
+```
+
+Or build it yourself: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
 
 The extension build has no server address in it. You type the server URL in the side panel the first time.
-
-Get the build: download the zip for your browser from the [Releases page](https://github.com/Camarent/kata/releases). Each `v*` tag publishes `kata-extension-<version>-firefox.zip`, `kata-extension-<version>-chrome.zip` and `SHA256SUMS` there. Or build it: `cd extension && npm ci && npm run build` writes `extension/dist/firefox/` and `extension/dist/chrome/`.
 
 Firefox (128.0 or later):
 1. Unzip the Firefox zip into a folder, or use `extension/dist/firefox/`.
@@ -126,46 +57,34 @@ Chrome:
 1. Unzip the Chrome zip into a folder, or use `extension/dist/chrome/`.
 2. Open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and pick that folder.
 
-First run:
+### 3. Connect
+
 1. On the core machine, with `KATA_CONFIG` set to your config file, create the user with `PYTHONPATH=core python3 -m kata_core.auth.admin create-user NAME`. Then print an enrolment code with `PYTHONPATH=core python3 -m kata_core.auth.admin enrol NAME`. The code is shown once and is not stored.
 2. Open the kata side panel from the toolbar button.
 3. Type the server URL (origin only, for example `http://127.0.0.1:8080`), the enrolment code and a device label, then click Connect. Accept the browser's permission prompt for that address.
 
-Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see `docs/decisions.md`, "Extension has no build-time server config (M15)").
+Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see [`docs/decisions.md`](docs/decisions.md), "Extension has no build-time server config (M15)").
 
-### Scan a lesson page
+To scan a page, open a lesson page, open the side panel and click "Scan this page". The page is read only when you click the button; kata never crawls pages.
 
-1. Open a lesson page in the browser.
-2. Open the kata side panel from the toolbar button.
-3. Click "Scan this page". The panel reads the open page and shows the topic marks for it.
+### Worker (not yet verified end to end)
 
-The page is read only when you click the button; kata never crawls pages.
+The worker runs model jobs next to a local Ollama server. The steps are in [`docs/deployment.md`](docs/deployment.md) and the settings in [`docs/configuration.md`](docs/configuration.md). No full run on a real machine is recorded yet.
 
-## Worker (GPU machine, not yet verified end to end)
+## Documentation
 
-The worker runs the model jobs next to Ollama. Not yet verified end to end: the steps below follow the config keys, but no full run on a real machine is recorded yet.
+- [`docs/INDEX.md`](docs/INDEX.md): index of all documentation.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the parts fit together.
+- [`docs/development.md`](docs/development.md): set up a machine and run the checks.
+- [`docs/release.md`](docs/release.md): how a release is made and checked.
+- [`docs/deployment.md`](docs/deployment.md): running the core on a server.
+- [`docs/configuration.md`](docs/configuration.md): every setting and its environment variable.
+- [`SECURITY.md`](SECURITY.md): how to report a vulnerability.
 
-1. Run Ollama on the worker machine with the model from `[model]` in `config/kata.example.toml`. `[model] base_url` (`config/kata.example.toml:37`, default `http://127.0.0.1:11434/v1`) must point at that Ollama.
-2. Set `[worker] core_url` (`config/kata.example.toml:24`, env `KATA_WORKER_CORE_URL`) to the core's address. Loopback is allowed by default; any other host goes in `worker.core_hosts`.
-3. Give the worker its own token, not a user's token. The worker reads it from the environment variable named by `worker.token_env` (default `KATA_WORKER_TOKEN`). How the core issues a worker token is not documented yet.
-4. Start the worker with `python -m kata_worker`. It reads the config file named by the env variable `KATA_CONFIG`.
+## Contributing
 
-## Development workflow
+Work happens on short-lived branches and goes through a pull request. Run the checks locally with `scripts/dev/check-all.sh`; the details are in [`docs/development.md`](docs/development.md).
 
-`master` is the only long-lived branch. Work happens on a short-lived branch, goes through a
-pull request, and is squash-merged once the GitHub `ci` workflow is green: `checks` (ruff,
-mypy, pytest against a Postgres service, extension build and tests), `secrets` (gitleaks over
-the full history) and `privacy` (a blocklist check of files and history). GitHub's free plan
-cannot enforce branch protection on private repositories, so the flow is by habit.
+## License
 
-Set up a machine and run the same checks locally with [`docs/development.md`](docs/development.md):
-
-```
-scripts/dev/check-all.sh              # all gates against a throwaway Postgres
-scripts/dev/install-hooks.sh      # privacy hooks (pre-commit, commit-msg)
-```
-
-The privacy hooks and the CI `privacy` job read a regex of personal strings. Keep it out of
-the repository: `git config --global --add privacy.blocklist '<regex>'` locally, and the same
-regex as the repository secret `PRIVACY_BLOCKLIST` for CI. Use the GitHub noreply address as
-your git identity. Documentation lives in [`docs/`](docs/README.md).
+MIT. See [`LICENSE`](LICENSE).

@@ -124,14 +124,14 @@ services:
     image: ${CADDY_IMAGE:?fill in deploy/versions.env}@${CADDY_DIGEST:?fill in deploy/versions.env}
     restart: unless-stopped
     environment:
-      KATA_TAILNET_NAME: ${KATA_TAILNET_NAME:?set KATA_TAILNET_NAME, the node tailnet name}
+      KATA_TAILNET_NAME: ${KATA_TAILNET_NAME:?set KATA_TAILNET_NAME, the node name}
     depends_on:
       core:
         condition: service_healthy
     ports:
       - "${KATA_BIND_ADDR:-127.0.0.1}:443:443"
     volumes:
-      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from `tailscale cert` run by deploy/systemd/kata-cert.service (D19, see Caddyfile).
+      # Caddyfile is task 9 (deploy/Caddyfile). TLS files come from the certificate command run by deploy/systemd/kata-cert.service (D19, see Caddyfile).
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - ${KATA_CERT_DIR:-/var/lib/kata/certs}:/var/run/tailscale/certs:ro

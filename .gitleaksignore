@@ -1,3 +1,6 @@
 # Synthetic test token that was committed as one literal before it was split into parts (tests/term/test_term_mask.py).
 # History cannot be rewritten, so the old finding is allowed by fingerprint.
 9a433a6be477ae17ed57ce2a7e39d5c8a38df196:tests/term/test_term_mask.py:generic-api-key:72
+
+# False positive: docstring text in the embedder module, not a credential.
+b9ecae700709cd413d304321f26bdcb8c3491b26:core/kata_core/retrieval/embedder.py:generic-api-key:31

@@ -15,6 +15,7 @@ from kata_core.config import Config
 from kata_core.journal.store import read_page
 from kata_core.mcp.gate import DATA_PREFIX
 from kata_core.mcp.rpc import handle
+from kata_core.mcp.tools import InvalidParams
 from kata_core.retrieval.embedder import FakeEmbedder
 from kata_core.retrieval.store import add_entry
 from kata_core.storage.concepts import create_concept, set_concept_mark
@@ -184,3 +185,58 @@ def test_malformed_requests(conn: psycopg.Connection[Any], cfg: Config) -> None:
 
 def _call_msg(name: str, args: dict[str, Any]) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": name, "arguments": args}}
+
+
+def test_invalid_params_reply_carries_only_the_fixed_message(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    ana = _user(conn, "ana")
+    reply = handle(conn, cfg, ana, _call_msg("kata_search", {"query": 5}), at=NOW)
+    assert reply is not None
+    assert reply["error"] == {"code": -32602, "message": "kata_search needs a string query"}
+
+
+def test_invalid_params_str_and_public_message_are_the_given_text() -> None:
+    exc = InvalidParams("x")
+    assert str(exc) == "x"
+    assert exc.public_message == "x"
+
+
+def test_invalid_params_has_no_detail_argument() -> None:
+    extra: dict[str, Any] = {"detail": "internal"}
+    with pytest.raises(TypeError):
+        InvalidParams("x", **extra)
+
+
+def test_tool_invalid_params_detail_never_reaches_the_reply(
+    conn: psycopg.Connection[Any], cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ana = _user(conn, "ana")
+
+    def leaky(*_args: Any, **_kwargs: Any) -> None:
+        raise InvalidParams("query rejected") from ValueError("internal: relation secret_index does not exist")
+
+    monkeypatch.setattr("kata_core.mcp.rpc.kata_search", leaky)
+    reply = handle(conn, cfg, ana, _call_msg("kata_search", {"query": "x"}), at=NOW)
+    assert reply is not None
+    assert reply["error"] == {"code": -32602, "message": "query rejected"}
+    assert "secret_index" not in str(reply)
+
+
+def test_internal_value_error_is_not_turned_into_a_reply(
+    conn: psycopg.Connection[Any], cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Internal(ValueError):
+        pass
+
+    def leaky(*_args: Any, **_kwargs: Any) -> None:
+        raise _Internal("internal: secret_index row 42")
+
+    monkeypatch.setattr("kata_core.mcp.rpc.kata_search", leaky)
+    with pytest.raises(_Internal):
+        handle(conn, cfg, _user(conn, "ana"), _call_msg("kata_search", {"query": "x"}), at=NOW)
+
+
+def test_unknown_tool_name_is_capped(conn: psycopg.Connection[Any], cfg: Config) -> None:
+    ana = _user(conn, "ana")
+    reply = handle(conn, cfg, ana, _call_msg("z" * 200, {}), at=NOW)
+    assert reply is not None
+    assert reply["error"]["message"] == "unknown tool: " + "z" * 40

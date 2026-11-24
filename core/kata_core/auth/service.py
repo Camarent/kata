@@ -40,6 +40,9 @@ class Authenticator(Protocol):
 
 def hash_secret(raw: str) -> str:
     """sha256 hex digest of a raw code or token. The only form that is stored."""
+    # CodeQL weak-sensitive-data-hashing false positive: the input is a random
+    # high-entropy token or code (secrets.token_urlsafe, SECRET_BYTES = 32), not a
+    # password. A fast hash is enough here; a KDF would add cost without adding entropy.
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 

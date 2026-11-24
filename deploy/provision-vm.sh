@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Provision a fresh Ubuntu Server VM for kata: Docker engine and compose plugin (official apt
 # repo, key pinned by fingerprint), qemu guest agent, unattended upgrades, a 2 GB swapfile,
-# and ufw (deny incoming, allow tailscale0, SSH only from the tailnet range).
+# and ufw (deny incoming, allow the private network interface, SSH only from the private network).
 #
 #   sudo deploy/provision-vm.sh              apply (needs root)
 #   deploy/provision-vm.sh --dry-run         print the commands that would run; change nothing (any user)
 #
-# Does not join the tailnet and holds no auth key: log this VM into tailscale by hand after it runs.
+# Does not join the private network and holds no auth key: log this VM into the private network by hand after it runs.
 # Every step checks the current state first, so a second run changes nothing already done.
-# Warning: ufw ends up allowing SSH only from the tailnet, so new SSH logins over a public IP fail
-# once it runs; join tailscale (existing sessions survive) before you log out.
+# Warning: ufw ends up allowing SSH only from the private network, so new SSH logins over a public IP fail
+# once it runs; join the private network (existing sessions survive) before you log out.
 set -euo pipefail
 
 DOCKER_KEY_URL="https://download.docker.com/linux/ubuntu/gpg"
@@ -163,7 +163,7 @@ ensure_firewall() {
     run ufw allow from "$TAILNET_CIDR" to any port "$SSH_PORT" proto tcp
   fi
   if ! ufw_has '^Status: active'; then
-    say "warning: enabling ufw cuts SSH from outside the tailnet; join tailscale before logging out"
+    say "warning: enabling ufw cuts SSH from outside the private network; join the private network before logging out"
     run ufw --force enable
   fi
 }

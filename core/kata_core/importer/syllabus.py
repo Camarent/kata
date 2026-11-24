@@ -14,8 +14,8 @@ import re
 from dataclasses import dataclass
 
 TITLE_LIMIT = 120
-_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-_NUMBERED = re.compile(r"^\s*(?:(?i:module)\s+\d+\s*[:.)-]\s*|\d+[.)]\s+)(.+?)\s*$")
+_HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
+_NUMBERED = re.compile(r"^(?:(?i:module)\s+\d+\s*[:.)-]\s*|\d+[.)]\s+)(.+)$")
 
 
 class ParseError(ValueError):
@@ -58,10 +58,15 @@ def validate_extracted(source: str, modules: list[Module]) -> list[Module]:
 
 
 def _split(lines: list[str], start: re.Pattern[str], title_group: int) -> list[Module]:
-    """Start a module at each line matching `start`; its body is the lines up to the next start."""
+    """Start a module at each line matching `start`; its body is the lines up to the next start.
+
+    Each line is stripped before matching, so the patterns need no trailing-whitespace group (a
+    `\\s*$` after a lazy title group backtracks quadratically on long runs of spaces). The body
+    keeps the original line.
+    """
     found: list[tuple[str, list[str]]] = []
     for line in lines:
-        match = start.match(line)
+        match = start.match(line.strip())
         if match:
             found.append((match.group(title_group), []))
         elif found:
