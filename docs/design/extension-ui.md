@@ -4,6 +4,8 @@ Status: design for owner review. No extension code changes yet; the implementati
 
 Visual mockups (static HTML and CSS, open from disk, no network):
 
+- [Navigation map](extension-ui/nav-map.html): every panel screen, the settings page and the course screen, and how a person moves between them (section 2.15).
+- [Settings page, light and dark](extension-ui/settings.html): connection, auto-scan site list, appearance and about (section 2.16).
 - [Side panel, all states](extension-ui/panel-states.html): every panel state side by side, light and dark.
 - [Sample lesson page, highlights](extension-ui/lesson-page.html): the page highlights in each state, light and dark, at narrow panel width.
 - Shared tokens: `extension-ui/tokens.css`.
@@ -105,6 +107,47 @@ The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome 
 - Reached from "Add this site" or from the Sites screen. The panel proposes a site pattern for the current host (the whole site), which the user can narrow or widen before saving. The pattern rules (URL masks) are in [`docs/design/detailed-architecture.md:228`](detailed-architecture.md#added-sites-url-masks) and section 5.3 of that file.
 - Rejected patterns (a bare `*`, a top-level domain only, or an empty host) show a reason next to the field.
 - The Sites list shows each allowed site with an enabled switch, Edit and Delete. Deleting a site asks for confirmation.
+
+### 2.15 Navigation map
+
+The map in [`extension-ui/nav-map.html`](extension-ui/nav-map.html) shows every screen and how a person moves between them. The text below is the same map.
+
+- **Home (Connected idle).** The main screen. Every other screen is one step away from here.
+- **Header.** Always visible on every screen. It holds the course picker (left), the settings entry (right, a gear icon with the text label "Settings") and the auto-scan toggle for the current site (below the header, on Home and Results only).
+- **Back.** Every screen except Home has a "Back" button at the top left. It returns to the screen that opened it. Pressing Escape does the same.
+- **Tabs.** Two tabs under the header: "Page" (scan, progress, results, detail) and "Review" (the review screen, keys 1, 2, 3). The tabs stay visible on the Page and Review screens.
+- **Settings and courses.** "Settings" and the course screen are reached from the header and go back to the screen they came from.
+
+Control placement, in the order a person sees them:
+
+| Control | Where it sits | Screen where it appears |
+|---|---|---|
+| Scan button ("Scan this page") | Top of Home, under the header, first action in the panel | Home, Results (as "Scan again") |
+| Course picker | Header, left, a select with the current course name | Every screen |
+| Auto-scan toggle ("Auto-scan this site") | Under the header, below the scan button | Home, Results |
+| Settings entry | Header, right, gear icon with the text "Settings" | Every screen |
+| Review entry | Second tab, "Review" | Every screen with tabs |
+
+Screens: Home, Scanning, Results, Detail (one block, from a result row), Review, Courses (list, create, delete, open), Course (one course), Settings. Each one is shown in `nav-map.html` with its id.
+
+### 2.16 Settings page
+
+The settings page is opened from the header entry (section 2.15). Mockups in light and dark: [`extension-ui/settings.html`](extension-ui/settings.html).
+
+- **Connection.** Server URL (text field, validated when saved), device label (text field), and "Sign out" (a button that asks for confirmation and removes the device login from this browser).
+- **Auto-scan sites.** A list of the sites the user allowed (section 2.17). Each row shows the site pattern and a "Remove" button. Remove deletes the site from the list and stops automatic scans there. Empty state: the text "No sites yet. Turn on Auto-scan this site in the panel on a page you want kata to scan when it opens."
+- **Appearance.** Theme choice: "Follow browser", "Light", "Dark". Default is "Follow browser" (section 7).
+- **About.** Extension version, the core server version (read from the server when connected), and a link to this design doc's section 6 for accessibility notes. No tracking settings: the extension has none.
+
+### 2.17 Auto-scan this site
+
+- **Off by default.** No site is allowed until the user turns the toggle on. A new install scans only on "Scan this page".
+- **The toggle.** The panel shows "Auto-scan this site" for the current site, under the header. On adds the site to the allow list (saves its URL mask and asks the browser for the host permission for that site). Off removes the site from the allow list and gives the permission back where the browser allows it.
+- **What runs.** A scan runs when a listed page opens (a full load). It uses the same progress and results screens as a click scan. Pages that are not listed are never scanned on open.
+- **Listed site, core offline.** No scan starts. The panel shows the Offline state (section 2.10). The toggle stays on. Nothing is queued for later.
+- **Listed site, signed out.** No scan starts. The panel shows the Sign-in expired state (section 2.11). The toggle stays on, and scans resume after sign-in on the next page open.
+- **Settings.** Section 2.16 lists the allowed sites with a Remove button, the same way the toggle removes them.
+- **Browser differences.** On Firefox and Chrome, the host permission is granted per site and can be revoked (see the browser table in `detailed-architecture.md`, section 5.3). The toggle changes only after the browser grants the permission. If the user refuses, the toggle stays off and the panel says "Permission not given; site not added". If the panel closes while the browser asks, the answer still applies when the panel opens again; the toggle shows the stored state. Edge is not covered by this design yet; it needs its own check before it is listed as supported.
 
 ## 3. The page: highlights and detail
 
