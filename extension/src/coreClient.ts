@@ -107,6 +107,63 @@ export interface ConceptMark {
   updated_at: string;
 }
 
+/** A topic the core offers for a page (`candidates` of a classification). */
+export interface ScanTopicCandidate {
+  topicId: number;
+  area: string;
+  topic: string;
+}
+
+/** Classification of a page: the topic it belongs to, or `candidates` to choose from. */
+export interface ScanClassification {
+  topicId: number;
+  area: string;
+  topic: string;
+  candidates: ScanTopicCandidate[];
+}
+
+/** Candidate concept a written word may mean (`candidates` of a scan concept item). */
+export interface ScanConceptCandidate {
+  conceptId: number;
+  label: string;
+}
+
+/** One word the concept scan found in a block; `conceptId` is null when no concept matched. */
+export interface ScanConceptItem {
+  word: string;
+  conceptId: number | null;
+  label: string;
+  definition: string;
+  state: ConceptMark["state"];
+  candidates: ScanConceptCandidate[];
+}
+
+/** Output of a `scan.extract` job for one block; `skipped` is set when the block had nothing to teach. */
+export interface ScanBlockOutput {
+  blockId: string;
+  skipped?: boolean;
+  concepts: ScanConceptItem[];
+}
+
+/** Input of `scanExtract`: the topic and the blocks to extract concepts from. */
+export interface ScanExtractInput {
+  areaId: number;
+  topicId: number;
+  blocks: { blockId: string; text: string }[];
+  area: string;
+  topic: string;
+  known: string[];
+}
+
+/** Concept counts and concept list of one topic (`GET /scan/overview`). */
+export interface TopicOverview {
+  topicId: number;
+  area: string;
+  topic: string;
+  counts: { new: number; learning: number; known: number };
+  concepts: { conceptId: number; label: string; state: ConceptMark["state"] }[];
+}
+
 /** One answer of `POST /lesson-check`. `state` is "abstain" when the core has no evidence. */
 export interface LessonCheckResult {
   concept_id: number;
@@ -325,6 +382,78 @@ export class CoreClient {
       concept_ids: conceptIds,
     });
     return res.results;
+  }
+
+  /** Queue `scan.classify` for a page (`page_key` is its URL without fragment); returns the job id. */
+  scanClassify(pageKey: string, text: string, taxonomy: string): Promise<number> {
+    return this.enqueueKind("scan.classify", JSON.stringify({ page_key: pageKey, text, taxonomy }));
+  }
+
+  /** Queue `scan.extract` for the blocks of one topic; returns the job id. */
+  scanExtract(input: ScanExtractInput): Promise<number> {
+    const payload = {
+      area_id: input.areaId,
+      topic_id: input.topicId,
+      blocks: input.blocks,
+      area: input.area,
+      topic: input.topic,
+      known: input.known,
+    };
+    return this.enqueueKind("scan.extract", JSON.stringify(payload));
+  }
+
+  /** The stored classification of a page, or null when the core has none (404). */
+  async getClassification(pageKey: string): Promise<ScanClassification | null> {
+    try {
+      const res = await this.request<{
+        topic_id: number;
+        area: string;
+        topic: string;
+        candidates: { topic_id: number; area: string; topic: string }[];
+      }>("GET", `/scan/classification?page_key=${encodeURIComponent(pageKey)}`);
+      return {
+        topicId: res.topic_id,
+        area: res.area,
+        topic: res.topic,
+        candidates: res.candidates.map((c) => ({ topicId: c.topic_id, area: c.area, topic: c.topic })),
+      };
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** Remember the concept the caller picked for a written word in a topic. */
+  async chooseConcept(topicId: number, word: string, conceptId: number): Promise<void> {
+    await this.request("POST", "/scan/choice", { topic_id: topicId, word, concept_id: conceptId });
+  }
+
+  /** Move a written word from one concept to another and teach the alias. */
+  async reassignConcept(topicId: number, word: string, fromConceptId: number, toConceptId: number): Promise<void> {
+    await this.request("POST", "/scan/reassign", {
+      topic_id: topicId,
+      word,
+      from_concept_id: fromConceptId,
+      to_concept_id: toConceptId,
+    });
+  }
+
+  /** Concept counts and concept list of one topic. */
+  async topicOverview(topicId: number): Promise<TopicOverview> {
+    const res = await this.request<{
+      topic_id: number;
+      area: string;
+      topic: string;
+      counts: { new: number; learning: number; known: number };
+      concepts: { concept_id: number; label: string; state: ConceptMark["state"] }[];
+    }>("GET", `/scan/overview?topic_id=${topicId}`);
+    return {
+      topicId: res.topic_id,
+      area: res.area,
+      topic: res.topic,
+      counts: res.counts,
+      concepts: res.concepts.map((c) => ({ conceptId: c.concept_id, label: c.label, state: c.state })),
+    };
   }
 
   /** The caller's ready courses, newest first (first page of `GET /v1/courses`). */
