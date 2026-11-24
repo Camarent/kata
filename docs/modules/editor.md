@@ -8,10 +8,11 @@ summary: Editor extension (VS Code API, TypeScript) - save poster with local sto
 Client for the editor signal: a VS Code extension that posts one `editor.save` event to the core each time a document is saved, and shows a quiet mark from the server as an Information diagnostic. It also runs the device hook installer on command. Sources in `editor/src/`; the entry is `editor/src/extension.ts` (`main` in `editor/package.json:5` points at `dist/extension.js`). The build is `tsc --noEmit` (`editor/package.json:52`); tests are vitest (`editor/package.json:53`).
 
 ## Public surface
-- `editor/src/extension.ts:13` `activate` registers the install command, the info view, the diagnostics collection and the save listener; `:23` `deactivate` (nothing to release).
-- `editor/src/extension.ts:10` `INSTALL_COMMAND` = `kata.installHooks`; `:11` `SAVE_EVENT_NAME` = `save`.
-- `editor/src/extension.ts:27` `runInstall` runs the installer in the first workspace folder; with no folder it shows a message and does nothing.
-- `editor/src/extension.ts:39` `postSave` reads settings on each save (`:40`), calls `postEvent` with the document language and full text (`:41-48`), and applies the result only when status is `posted` (`:49-51`).
+- `editor/src/extension.ts:23` `activate` registers the install command, the info view, the diagnostics collection and the save listener; `:36` `deactivate` (nothing to release).
+- Model host commands (M18): `editor/src/extension.ts:27` registers each `MODELHOST_COMMAND_KINDS` entry (`editor/src/modelhost.ts:13`: `kata.modelhostUp`, `kata.modelhostUse`, `kata.modelhostMeasure`, `kata.modelhostStatus`) to the local wrapper `runModelhost` (`editor/src/extension.ts:53`), which calls `runModelhostJob` (`editor/src/modelhost.ts:47`); `editor/src/modelhost.ts:21` `USE_ENGINES` (`ollama`, `strata`, `none`); `:38` `payloadFor(kind, engine)`; `runModelhostJob` queues the job and polls its output (`:23-24` poll settings). The GPU-PC worker runs the job (see [worker](worker.md)).
+- `editor/src/extension.ts:20` `INSTALL_COMMAND` = `kata.installHooks`; `:21` `SAVE_EVENT_NAME` = `save`.
+- `editor/src/extension.ts:40` `runInstall` runs the installer in the first workspace folder; with no folder it shows a message and does nothing.
+- `editor/src/extension.ts:74` `postSave` reads settings on each save (`:75`), calls `postEvent` with the document language and full text (`:76-83`), and applies the result only when status is `posted` (`:84-86`).
 - `editor/src/poster.ts:23` `postEvent`; stop check `:31` (returns `skipped` before any network call); event body `:34-39` with `payload: { language }` only (`:38`); request `:42-49` to `${serverUrl}/v1/events` with a Bearer token; errors `:50-61` (network `:50-52`, non-200 `:53-55`, non-JSON `:57-61`) return `error` and never throw.
 - `editor/src/poster.ts:16` `PostResult` = `posted` (with `messages`), `skipped`, or `error` (with `reason`).
 - `editor/src/stopPatterns.ts:3` `matchesStop`; an invalid regular expression source is skipped (`:8-9`).
@@ -29,6 +30,7 @@ Client for the editor signal: a VS Code extension that posts one `editor.save` e
 - `editor/src/diagnostics.ts` - quiet-mark rendering.
 - `editor/src/installHooks.ts` - starts the device installer; the hook files are written by `core/kata_device/hooks.py`.
 - `editor/src/config.ts` - settings reader.
+- `editor/src/modelhost.ts` - model host control commands: payloads, engine list, job polling.
 - `editor/src/vscode.d.ts` - the VS Code API surface the sources use.
 - `editor/tests/` - vitest suites for the modules above.
 

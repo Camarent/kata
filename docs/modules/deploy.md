@@ -54,6 +54,8 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - Backup passphrase file path comes from `KATA_BACKUP_PASSPHRASE_FILE`; never printed.
 - `provision-vm.sh` ends with ufw allowing SSH only from the private network: join the network before logging out.
 - Memory limits are required by compose (`:?` syntax): an env file must be passed.
+- The VM worker keeps `[modelhost] control_enabled = false` (`deploy/kata.host.toml:199`), so it never claims the `modelhost.*` control jobs (`worker/kata_worker/loop.py:37-39`).
+- The GPU-PC worker is not part of this stack. It runs as the user that owns the model-host folder and its `data/`, in the docker group, never as root, with that user's own device token (`docs/decisions.md:580`). Its settings are the `[modelhost]` keys (`config/kata.example.toml:188`).
 
 ## Depends on / used by
 - Depends on: `core/` (image contents, `kata_core` entry points), `config/kata.example.toml` (template keys must match, checked by `scripts/deploy/validate_stack.py`), Docker compose, the network client on the host.

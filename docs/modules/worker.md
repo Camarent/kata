@@ -5,7 +5,7 @@ summary: Tagging worker (Python) - pulls queued blocks from the core, asks a loc
 # worker
 
 ## Purpose
-Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a handler, runs that handler, and posts `result`, `output` or `fail` back to the core. Kinds: `tag` (block tagging through the provider router to a chat model) `course.generate` (item drafts for a course) and `syllabus.extract` (course modules from syllabus text). The worker never decides known/new; the core does.
+Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a handler, runs that handler, and posts `result`, `output` or `fail` back to the core. Kinds: `tag` (block tagging through the provider router to a chat model) `course.generate` (item drafts for a course) and `syllabus.extract` (course modules from syllabus text). Four control kinds, `modelhost.up`, `modelhost.use`, `modelhost.measure` and `modelhost.status`, run `modelctl` on the GPU-PC; they are claimed only when `[modelhost] control_enabled` is true (see Invariants). The worker never decides known/new; the core does.
 `worker/kata_worker/providers/` adds one completion protocol, a local and an Anthropic provider, a cloud policy (`Policy`) and a secret guard (`guarded`) that scans cloud text. `providers/cost.py` adds a daily cost cap (`capped`) for cloud calls, with spend kept on the core. The loop tags through `Router` (`worker/kata_worker/providers/router.py:60`), which walks the `[routing]` chain of the task class; `Policy`, `guarded` and `capped` gate each provider in that chain.
 
 ## Public surface
@@ -16,6 +16,14 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/handlers/tag.py:15` `KIND = "tag"`, `:16` `TAG_CLASS = "tag"`, `:21` `handle(job, router, client)` - tags the job text, reports `(category, topic)` or fails the job.
 - `worker/kata_worker/handlers/course.py:16` `KIND = "course.generate"`, `:17` `COURSE_CLASS = "generate_course"`, `:27` `parse_drafts(reply)`, `:42` `handle(job, router, client)` - posts `{"items": [...]}` as the job output (`CoreClient.output`) or fails the job.
 - `worker/kata_worker/handlers/syllabus.py:16` `KIND = "syllabus.extract"`, `:17` `SYLLABUS_CLASS = "extract_syllabus"`, `:45` `handle(job, router, client)` - asks the router for course modules and posts them as the job output, or fails the job; the core checks the modules (`core/kata_core/planning/job_kinds.py`).
+- `worker/kata_worker/loop.py:31` `claimable_handlers(cfg)` - the handler map the loop claims; the four `modelhost.*` kinds are dropped unless `[modelhost] control_enabled` is true (`:37`, key `:26`).
+- `worker/kata_worker/handlers/modelhost_common.py:45` `run_control(job, client, kind, with_capabilities=False)` - runs `modelctl` for the job kind and payload, posts `{ok, text}` (plus `capabilities` for status); a runner failure posts `ok: false` and does not fail the job (`:3-4`).
+- `worker/kata_worker/handlers/modelhost_up.py:15` `KIND = UP_KIND`, `:18` `handle`; `modelhost_use.py:15` `KIND = USE_KIND`; `modelhost_measure.py:15` `KIND = MEASURE_KIND`; `modelhost_status.py:15` `KIND = STATUS_KIND`, `:20` runs with capabilities.
+- `worker/kata_worker/modelhost/ctl.py:21` `ARGV_FOR_KIND` - the fixed allow-list of modelctl subcommands per kind (`use` is `USE_SUBCOMMAND`, `:26`); `:97` `ControlRunner`, `:133` `default_runner()`; `TIMEOUT_MESSAGE` `:27` (`[modelhost] control_timeout_seconds`).
+- `worker/kata_worker/modelhost/capabilities.py:15` `SCHEMA = 2`; `:47` `parse(body)` - only schema 2 is read, anything else gives `UNKNOWN` (`:44`); `:35` `Capabilities.fits_alone(model)` - `True`/`False` when measured, `None` when not.
+- `worker/kata_worker/modelhost/capabilities.py:71` `fetch(info_url, timeout_seconds)`; `:88` `CapabilitiesCache` - keeps one document for `[modelhost] capabilities_ttl_seconds`.
+- `worker/kata_worker/modelhost/schedule.py:21` `decide(model, caps) -> Decision` - a model is allowed only when `fits_alone` is `True`; `None` (not measured) is refused, never treated as fit (`:23-24`); a loaded model not measured together with it gives `swap=True`.
+- `worker/kata_worker/providers/scheduled.py:38` `ScheduledLocalProvider`, `:72` `build_local(cfg, log)` - wraps the local provider with the `decide` gate only when `[modelhost] schedule` is true.
 - `worker/kata_worker/core_client.py:62` `CoreClient` - `next_job` (`:92`), `report` (`:114`), `output` (`:122`), `fail` (`:128`); errors raise `CoreError` (`:28`).
 - `worker/kata_worker/core_client.py:53` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
 - `worker/kata_worker/model.py:63` `ModelAdapter(config)`; `:71` `tag(block_text) -> (category, topic)`. Not called by the loop (the `tag` handler uses `parse_tag`, `worker/kata_worker/handlers/tag.py:25`); only `tests/worker/test_model.py` uses it.
@@ -41,7 +49,8 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 
 ## Key files
 - `worker/kata_worker/loop.py` - pull loop; claims the handler kinds and calls the handler of the job's kind.
-- `worker/kata_worker/handlers/` - one module per job kind (`tag.py`, `course.py`, `syllabus.py`), discovered by `load_handlers`.
+- `worker/kata_worker/handlers/` - one module per job kind (`tag.py`, `course.py`, `syllabus.py`, `modelhost_up.py`, `modelhost_use.py`, `modelhost_measure.py`, `modelhost_status.py`), discovered by `load_handlers`.
+- `worker/kata_worker/modelhost/` - `ctl.py` (modelctl allow-list and runner), `capabilities.py` (info service document, schema 2), `schedule.py` (the fit gate `decide`).
 - `worker/kata_worker/core_client.py` - HTTP client to the core, loopback-only.
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
 - `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
@@ -61,6 +70,11 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - A job kind has one handler: the loop asks the core only for kinds in `load_handlers()` (`worker/kata_worker/loop.py:29`), so a new kind needs a new module in `handlers/`, not an edit to the loop.
 - `course.generate` output is posted with `POST /jobs/{id}/output`; the core checks it and queues `course.build` (`worker/kata_worker/handlers/course.py:54`). The worker does not build courses.
 - A `syllabus.extract` failure fails only that job (`worker/kata_worker/handlers/syllabus.py:54`); the core's output hook falls back to one module when the output is not a valid module list.
+- Control kinds are claimed only on the GPU-PC worker: `[modelhost] control_enabled` is false by default (`config/kata.example.toml:190`) and `deploy/kata.host.toml:199`; the VM worker keeps it false, so it never leases a control job (`worker/kata_worker/loop.py:37-39`).
+- The GPU-PC worker runs as the user that owns the model-host folder and its `data/`, in the docker group, never as root, with that user's own device token; it runs only the `ARGV_FOR_KIND` subcommands with no shell string (`docs/decisions.md:580`, `worker/kata_worker/modelhost/ctl.py:21`).
+- Control payloads are checked twice: core refuses a bad payload with 422 before queuing (`core/kata_core/api/routes/jobs.py:96-100`, `core/kata_core/modelhost/spec.py:18`); the worker runs `validate_payload` again before it runs modelctl (`worker/kata_worker/modelhost/ctl.py:109`).
+- A model with no measurement is never allowed: `fits_alone` returns `None` and `decide` refuses it (`worker/kata_worker/modelhost/schedule.py:23-24`); only schema 2 is read (`worker/kata_worker/modelhost/capabilities.py:52`).
+- modelctl output is read only up to `[modelhost] max_text_bytes` (`worker/kata_worker/modelhost/ctl.py:104`, `config/kata.example.toml:206`); the core's output hook rejects a `text` over `MAX_TEXT` characters (`core/kata_core/modelhost/spec.py:15`, `core/kata_core/modelhost/job_kinds.py:27`).
 - Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `parse_tag`).
 - Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:54-56`).
 - A cloud call is allowed only when the cloud token env var (`[provider_anthropic] api_key_env`, read by `core/kata_core/jobs/needs_cloud.py:31` `cloud_token_present`) is set and the task class is in `[provider_anthropic] task_classes`. There is no separate cloud switch: the token alone turns the cloud on (`worker/kata_worker/providers/policy.py:78`).
