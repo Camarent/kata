@@ -259,7 +259,7 @@ Env names: `KATA_URL` (core base URL), `KATA_TOKEN` (device token), `KATA_TERM_M
 
 ### Invariants and gotchas
 - The error signal is a kind only; no output text is stored or sent.
-- Closed set: `core/kata_term/session.py:30` `ERROR_KINDS` (built from `ERROR_PATTERNS` at line 24) is the full set of kinds `on_error` may receive: `not_found`, `traceback`, `permission`, `error`. Adding a kind means changing `ERROR_PATTERNS` and this list together; `tests/term/test_term_session.py:136` asserts every reported kind is in `ERROR_KINDS`.
+- Closed set: `core/kata_term/session.py:30` `ERROR_KINDS` (built from `ERROR_PATTERNS` at line 24) is the full set of kinds `on_error` may receive: `not_found`, `traceback`, `permission`, `error`. Adding a kind means changing `ERROR_PATTERNS` and this list together; `tests/term/test_term_session.py:140` asserts every reported kind is in `ERROR_KINDS`, and `test_every_error_kind_has_a_case` asserts every kind has a test case.
 - Masking runs before the spool write. The mask list and load errors are never logged or printed.
 - Delivery is at-least-once: `core/kata_term/cli.py:65` `_flush` drops an event from the spool only after its batch post returns; the server dedupes by `event_id`, so a retry is safe.
 - A failed post keeps events spooled; the session continues silently.
