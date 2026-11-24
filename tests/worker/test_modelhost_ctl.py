@@ -103,12 +103,6 @@ def test_nonzero_exit_is_not_ok(runner: ControlRunner) -> None:
     assert text == "fail"
 
 
-def test_timeout_returns_not_ok(runner: ControlRunner) -> None:
-    ok, text = runner.run(MEASURE_KIND, "{}")
-    assert ok is False
-    assert "timed out" in text
-
-
 def test_timeout_holds_even_when_grandchild_keeps_stdout(runner: ControlRunner) -> None:
     started = time.monotonic()
     ok, text = runner.run(MEASURE_KIND, "{}")

@@ -6,12 +6,10 @@ import json
 import socket
 import threading
 import time
-from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
-from fakes import fake_model as fake_model_module
 from fakes.fake_core import FakeCore
 from fakes.fake_model import FakeModel
 from fakes.fake_provider import FakeProvider
@@ -39,16 +37,6 @@ TOKEN_ENV = "KATA_WORKER_TOKEN"
 EXAMPLE_CONFIG = Path(__file__).resolve().parents[2] / "config" / "kata.example.toml"
 POLL_ENV = "KATA_WORKER_POLL_INTERVAL_SECONDS"
 
-
-@pytest.fixture
-def fake_model() -> Iterator[FakeModel]:
-    """A running fake model on 127.0.0.1; stopped and joined at teardown."""
-    model = FakeModel()
-    fake_model_module.start(model)
-    try:
-        yield model
-    finally:
-        fake_model_module.stop(model)
 
 
 @pytest.fixture

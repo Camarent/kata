@@ -26,30 +26,6 @@ ANTHROPIC_KEY_ENV = "KATA_ANTHROPIC_API_KEY"
 
 
 @pytest.fixture
-def fake_model() -> Iterator[FakeModel]:
-    """A running fake model on 127.0.0.1; stopped and joined at teardown."""
-    model = FakeModel()
-    fake_model_module.start(model)
-    try:
-        yield model
-    finally:
-        fake_model_module.stop(model)
-
-
-@pytest.fixture
-def silent_server() -> Iterator[str]:
-    """A loopback socket that accepts connections but never answers; closed at teardown."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.bind(("127.0.0.1", 0))
-        sock.listen(1)
-        host, port = sock.getsockname()[:2]
-        yield f"http://{host}:{port}"
-    finally:
-        sock.close()
-
-
-@pytest.fixture
 def refused_url() -> Iterator[str]:
     """A loopback port with nothing listening: bound, then closed before the call."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

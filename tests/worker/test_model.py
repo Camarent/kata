@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import socket
-from collections.abc import Iterator
-
 import pytest
 from fakes import fake_model as fake_model_module
 from fakes.fake_model import FakeModel
@@ -13,30 +10,6 @@ from kata_worker.model import ModelAdapter, ModelError
 
 BLOCK_TEXT = "TCP opens a connection with a three-way handshake."
 GOOD_REPLY = '{"category": "Networking", "topic": "TCP handshake"}'
-
-
-@pytest.fixture
-def fake_model() -> Iterator[FakeModel]:
-    """A running fake model on 127.0.0.1; stopped and joined at teardown."""
-    model = FakeModel()
-    fake_model_module.start(model)
-    try:
-        yield model
-    finally:
-        fake_model_module.stop(model)
-
-
-@pytest.fixture
-def silent_server() -> Iterator[str]:
-    """A loopback socket that accepts connections but never answers; closed at teardown."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.bind(("127.0.0.1", 0))
-        sock.listen(1)
-        host, port = sock.getsockname()[:2]
-        yield f"http://{host}:{port}"
-    finally:
-        sock.close()
 
 
 def _adapter(base_url: str, timeout: str | None = None) -> ModelAdapter:

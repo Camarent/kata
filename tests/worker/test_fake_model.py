@@ -4,23 +4,9 @@ from __future__ import annotations
 
 import http.client
 import json
-from collections.abc import Iterator
 from urllib.parse import urlparse
 
-import pytest
-from fakes import fake_model as fake_model_module
 from fakes.fake_model import FakeModel
-
-
-@pytest.fixture
-def fake_model() -> Iterator[FakeModel]:
-    """A running fake model on 127.0.0.1; stopped and joined at teardown."""
-    model = FakeModel()
-    fake_model_module.start(model)
-    try:
-        yield model
-    finally:
-        fake_model_module.stop(model)
 
 
 def _post_chat(model: FakeModel, payload: dict[str, object]) -> tuple[int, bytes]:
