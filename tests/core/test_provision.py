@@ -39,6 +39,8 @@ SCHEMA_TABLES = {
     "concept_aliases",
     "concept_ignored",
     "concept_views",
+    "page_classifications",
+    "concept_choices",
     "retrieval_entries",
     "usage_daily",
     "journal_entry",
