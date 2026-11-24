@@ -131,3 +131,63 @@ def concept_label(conn: psycopg.Connection[Any], concept_id: int) -> str:
     if row is None:
         raise LookupError(f"concept {concept_id} does not exist")
     return str(row[0])
+
+
+def _require_visible(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
+    """Raise LookupError when concept `concept_id` is not visible to `user_id`."""
+    if not concept_visible(conn, user_id, concept_id):
+        raise LookupError(f"concept {concept_id} is not visible to user {user_id}")
+
+
+def set_concept_definition(
+    conn: psycopg.Connection[Any], user_id: int, concept_id: int, definition: str
+) -> None:
+    """Set the one-line definition of concept `concept_id`. Raises LookupError when the concept is not visible."""
+    _require_visible(conn, user_id, concept_id)
+    conn.execute("UPDATE concepts SET definition = %s WHERE id = %s", (definition, concept_id))
+
+
+def touch_concept_viewed(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
+    """Set the last-viewed time of concept `concept_id` to now. Raises LookupError when the concept is not visible."""
+    _require_visible(conn, user_id, concept_id)
+    conn.execute("UPDATE concepts SET last_viewed_at = now() WHERE id = %s", (concept_id,))
+
+
+def ignore_concept(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
+    """Hide concept `concept_id` from the lists of `user_id`. Its marks stay. Ignoring twice is a no-op.
+    Raises LookupError when the concept is not visible."""
+    _require_visible(conn, user_id, concept_id)
+    conn.execute(
+        "INSERT INTO concept_ignored (user_id, concept_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (user_id, concept_id),
+    )
+
+
+def unignore_concept(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> bool:
+    """Show concept `concept_id` in the lists of `user_id` again. Returns True when it was ignored."""
+    cur = conn.execute(
+        "DELETE FROM concept_ignored WHERE user_id = %s AND concept_id = %s",
+        (user_id, concept_id),
+    )
+    return cur.rowcount > 0
+
+
+def list_ignored(conn: psycopg.Connection[Any], user_id: int) -> list[tuple[int, str]]:
+    """Return (concept_id, label) for every concept `user_id` ignores, ordered by concept id."""
+    rows = conn.execute(
+        "SELECT i.concept_id, c.label FROM concept_ignored i "
+        "JOIN concepts c ON c.id = i.concept_id "
+        "WHERE i.user_id = %s ORDER BY i.concept_id",
+        (user_id,),
+    ).fetchall()
+    return [(int(cid), str(label)) for cid, label in rows]
+
+
+def delete_concept(conn: psycopg.Connection[Any], user_id: int, concept_id: int) -> None:
+    """Hard-delete a concept owned by `user_id`. Its marks, aliases and ignore rows go with it (cascade).
+    Raises LookupError when the concept is not visible, PermissionError when it is shared (owner NULL)."""
+    _require_visible(conn, user_id, concept_id)
+    owner_row = conn.execute("SELECT owner_user_id FROM concepts WHERE id = %s", (concept_id,)).fetchone()
+    if owner_row is None or owner_row[0] is None:
+        raise PermissionError(f"shared concept {concept_id} cannot be deleted by user {user_id}")
+    conn.execute("DELETE FROM concepts WHERE id = %s", (concept_id,))
