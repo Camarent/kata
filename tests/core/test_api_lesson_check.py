@@ -111,6 +111,8 @@ def test_other_users_concept_gives_404(client: TestClient, db: ScratchDatabase, 
     concept_id = _concept(client, a, private, "hidden idea")
     resp = client.post("/lesson-check", json={"concept_ids": [concept_id]}, headers=b)
     assert resp.status_code == 404
+    # the 404 must come from the hidden concept, not from some other failure
+    assert resp.json() == {"detail": "concept not found"}
 
 
 def test_one_invisible_concept_gives_404_for_the_whole_request(
