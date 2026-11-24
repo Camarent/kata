@@ -19,7 +19,7 @@ return outline || s.boxShadow !== 'none';
 """
 
 
-def test_signin_tab_order_and_focus_indicator(browser_name: str, driver: Any, page_server: str) -> None:
+def test_signin_tab_order_and_focus_indicator(browser_name: str, driver: Any) -> None:
     action_chains = pytest.importorskip("selenium.webdriver.common.action_chains")
     keys = pytest.importorskip("selenium.webdriver.common.keys")
     open_panel(driver, browser_name)

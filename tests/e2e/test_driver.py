@@ -7,9 +7,9 @@ import http.server
 import json
 import subprocess
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -107,24 +107,17 @@ def core() -> Iterator[tuple[FakeCore, str]]:
         thread.join(timeout=5)
 
 
-def _run(driver_js: Path, payload: dict) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["node", str(driver_js), json.dumps(payload)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-
-
 def _payload(base_url: str, code: str = "good-code") -> dict:
     return {"baseUrl": base_url, "code": code, "html": HTML, "pollMs": 5, "maxWaitMs": 5000}
 
 
-def test_driver_scans_tags_and_marks_known(driver_js: Path, core: tuple[FakeCore, str]) -> None:
+def test_driver_scans_tags_and_marks_known(
+    run_driver: Callable[[dict[str, Any]], subprocess.CompletedProcess[str]],
+    core: tuple[FakeCore, str],
+) -> None:
     state, base_url = core
     state.enrol_status = 200
-    proc = _run(driver_js, _payload(base_url))
+    proc = run_driver(_payload(base_url))
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout.strip().splitlines()[-1])
 
@@ -139,10 +132,13 @@ def test_driver_scans_tags_and_marks_known(driver_js: Path, core: tuple[FakeCore
     assert len(state.jobs) == 1
 
 
-def test_driver_exits_1_on_auth_error(driver_js: Path, core: tuple[FakeCore, str]) -> None:
+def test_driver_exits_1_on_auth_error(
+    run_driver: Callable[[dict[str, Any]], subprocess.CompletedProcess[str]],
+    core: tuple[FakeCore, str],
+) -> None:
     state, base_url = core
     state.enrol_status = 401
-    proc = _run(driver_js, _payload(base_url, code="bad-code"))
+    proc = run_driver(_payload(base_url, code="bad-code"))
     assert proc.returncode == 1
     assert "CoreAuthError" in proc.stderr
     assert state.marks == {}
