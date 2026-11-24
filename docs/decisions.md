@@ -174,7 +174,7 @@ Decided 2026-11-21. The content script used to match `<all_urls>`. It now matche
 
 ## Firefox gecko id was kata@kata.local (now kata@kata.invalid), minimum version 128.0
 
-Decided 2026-11-21. `browser_specific_settings.gecko.id` is `kata@kata.local` and `strict_min_version` is `128.0`, both set in `extension/build/manifest.mjs`. The id is a fixed value chosen for this project; 128.0 is the chosen minimum, not a claim about when `sidebar_action` appeared. Change the id and the minimum only together with the Firefox add-on listing, because the id is what Firefox uses to tell installed versions apart.
+Decided 2026-11-21. `browser_specific_settings.gecko.id` is `kata@kata.invalid` and `strict_min_version` is `128.0`, both set in `extension/build/manifest.mjs`. The id is a fixed value chosen for this project; 128.0 is the chosen minimum, not a claim about when `sidebar_action` appeared. Change the id and the minimum only together with the Firefox add-on listing, because the id is what Firefox uses to tell installed versions apart.
 
 Superseded in part by "Extension has no build-time server config (M15)" (2026-11-23): the gecko id is `kata@kata.invalid`. The minimum 128.0 is unchanged.
 
