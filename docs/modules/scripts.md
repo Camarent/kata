@@ -73,7 +73,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - Flags: `--model` (repeatable) picks models; without it the run reads `[smoke_local] models` (`scripts/smoke/local_audit.py:294`). `--config` names the config file (default env `KATA_CONFIG`). `--base-url` sets the endpoint.
 - Scoring: each case is scored by `scripts/smoke/audit_score.py`; a model gets one unscored warm-up request first.
 - No URL and no key are stored: neither the base URL nor the key value reaches stdout, stderr or a file.
-- Exit codes: 0 only when every case of every model passes; 1 when any case fails; 2 when refused (`scripts/smoke/local_model.py:76, :89-91`, `EXIT_REFUSED`); 0 and 1 are `scripts/smoke/local_audit.py:309` (`EXIT_OK`, `EXIT_FAILED`).
+- Exit codes: 0 only when every case of every model passes; 1 when any case fails; 2 when refused (`scripts/smoke/local_model.py:76, :89-91`, `EXIT_REFUSED`); 0 and 1 are `scripts/smoke/local_audit.py:310` (`EXIT_OK`, `EXIT_FAILED`).
 
 ## scripts/smoke: local model
 `scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
