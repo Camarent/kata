@@ -13,15 +13,30 @@ import threading
 from collections.abc import Mapping
 
 from kata_core.config import Config
+from kata_core.modelhost.spec import KINDS as MODELHOST_KINDS
 
 from kata_worker.core_client import CoreClient, CoreError
 from kata_worker.handlers import Handler, load_handlers
 from kata_worker.providers.guard import AuditEvent
 from kata_worker.providers.router import Router, build_router
+from kata_worker.providers.scheduled import MODELHOST_SECTION
 
 HANDLERS: Mapping[str, Handler] = load_handlers()
 
+CONTROL_KEY = "control_enabled"
+
 log = logging.getLogger(__name__)
+
+
+def claimable_handlers(cfg: Config) -> Mapping[str, Handler]:
+    """The handlers this worker claims: the modelhost control kinds only when [modelhost] control_enabled is true.
+
+    The VM worker and the GPU-PC worker share one queue, so a worker without control must not lease
+    a control job meant for the GPU-PC worker.
+    """
+    if cfg.get(MODELHOST_SECTION, CONTROL_KEY):
+        return HANDLERS
+    return {kind: handle for kind, handle in HANDLERS.items() if kind not in MODELHOST_KINDS}
 
 
 def run_once(client: CoreClient, router: Router, handlers: Mapping[str, Handler] = HANDLERS) -> bool:
@@ -48,9 +63,10 @@ def run_forever(cfg: Config, stop_event: threading.Event) -> None:
     client = CoreClient(cfg)
     router = build_router(cfg, client, os.environ, _audit_blocked, log.info)
     poll_interval = float(cfg.get("worker", "poll_interval_seconds"))
+    handlers = claimable_handlers(cfg)
     while not stop_event.is_set():
         try:
-            handled = run_once(client, router)
+            handled = run_once(client, router, handlers)
         except (CoreError, OSError, http.client.HTTPException) as exc:
             log.warning("core call failed: %s", exc)
             handled = False
