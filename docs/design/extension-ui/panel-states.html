@@ -109,13 +109,19 @@
         </div>
       </section>
 
-      <!-- Idle: signed in, nothing scanned yet -->
+      <!-- Idle: signed in, nothing scanned yet; auto-scan is off until the person turns it on -->
       <section class="state" id="idle" aria-labelledby="idle-title">
         <h2 id="idle-title">3. Idle</h2>
         <div class="panel-body">
           <div class="row">
             <span class="label">Course: Spanish A1</span>
+            <a href="settings.html">Settings</a>
           </div>
+          <label class="row">
+            <input id="auto-scan-toggle" type="checkbox" role="switch" />
+            <span>Auto-scan this site</span>
+          </label>
+          <p class="muted">Off: this site is not scanned on open.</p>
           <p class="muted">Open a lesson page, then scan it.</p>
           <div class="row">
             <button type="button" class="primary">Scan this page</button>
@@ -154,6 +160,13 @@
       <section class="state" id="results-grouped" aria-labelledby="results-title">
         <h2 id="results-title">6. Results, grouped</h2>
         <div class="panel-body">
+          <div class="row">
+            <label class="row">
+              <input id="auto-scan-toggle-results" type="checkbox" role="switch" />
+              <span>Auto-scan this site</span>
+            </label>
+            <a href="settings.html">Settings</a>
+          </div>
           <div>
             <h3 class="mark-new">New (2)</h3>
             <ul>
@@ -275,8 +288,10 @@
         <div class="panel-body">
           <p class="state-warning">No connection. Changes are kept and sent when you are back online.</p>
           <p class="muted">2 changes waiting</p>
+          <p class="muted">A listed auto-scan site is not scanned while offline.</p>
           <div class="row">
             <button type="button">Retry now</button>
+            <a href="settings.html">Check server address in settings</a>
           </div>
         </div>
       </section>
@@ -286,8 +301,10 @@
         <h2 id="auth-lost-title">14. Sign-in expired</h2>
         <div class="panel-body">
           <p class="state-warning">Your sign-in expired. Sign in again to continue.</p>
+          <p class="muted">A listed auto-scan site is not scanned while signed out. The site stays in the list.</p>
           <div class="row">
             <button type="button" class="primary">Sign in</button>
+            <a href="settings.html">Settings</a>
           </div>
         </div>
       </section>
