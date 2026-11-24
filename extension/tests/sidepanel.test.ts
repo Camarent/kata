@@ -18,6 +18,7 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
     onOpenCourse: vi.fn(async () => {}),
     onDeleteCourse: vi.fn(async () => {}),
     onCreateCourse: vi.fn(async () => {}),
+    onModelhost: vi.fn(async () => ({ ok: true, text: "done" })),
     ...overrides,
   };
 }
@@ -387,6 +388,88 @@ describe("renderPanel", () => {
       renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
       submitTitle("Chemistry");
       await vi.waitFor(() => expect(courseNote()).toBe("Could not save the course. Try again."));
+    });
+  });
+
+  describe("local model section", () => {
+    const modelText = (): string | null | undefined => root.querySelector("section.local-model p.modelhost-text")?.textContent;
+    const modelRows = (): string[] =>
+      [...root.querySelectorAll("section.local-model li.model")].map((li) => li.textContent ?? "");
+    const modelButton = (className: string): HTMLButtonElement =>
+      root.querySelector<HTMLButtonElement>(`section.local-model button.${className}`)!;
+    const draw = (h: PanelHandlers): void => renderPanel(root, { session, rows: [], status: { kind: "idle" }, courses }, h);
+
+    it.each([
+      ["modelhost-start", "Start", { action: "start" }],
+      ["modelhost-measure", "Measure", { action: "measure" }],
+      ["modelhost-status", "Status", { action: "status" }],
+    ])("runs the %s button as a %s request", async (className, label, request) => {
+      const h = handlers();
+      draw(h);
+      expect(modelButton(className).textContent).toBe(label);
+      modelButton(className).click();
+      expect(h.onModelhost).toHaveBeenCalledWith(request);
+      await vi.waitFor(() => expect(modelText()).toBe("done"));
+    });
+
+    it("sends the chosen engine with Use engine", async () => {
+      const h = handlers();
+      draw(h);
+      expect(modelButton("modelhost-use").textContent).toBe("Use engine");
+      const engine = root.querySelector<HTMLSelectElement>("section.local-model select")!;
+      expect([...engine.options].map((option) => option.value)).toEqual(["ollama", "strata", "none"]);
+      engine.value = "strata";
+      modelButton("modelhost-use").click();
+      expect(h.onModelhost).toHaveBeenCalledWith({ action: "use", engine: "strata" });
+      await vi.waitFor(() => expect(modelText()).toBe("done"));
+    });
+
+    it("disables the buttons while a job runs", async () => {
+      let finish = (): void => {};
+      const h = handlers({
+        onModelhost: vi.fn(() => new Promise<{ ok: boolean; text: string }>((resolve) => (finish = () => resolve({ ok: true, text: "done" })))),
+      });
+      draw(h);
+      modelButton("modelhost-start").click();
+      expect(modelButton("modelhost-start").disabled).toBe(true);
+      expect(modelButton("modelhost-use").disabled).toBe(true);
+      finish();
+      await vi.waitFor(() => expect(modelButton("modelhost-start").disabled).toBe(false));
+    });
+
+    it("shows the waiting text when the job is still pending after the timeout", async () => {
+      const h = handlers({ onModelhost: vi.fn(async () => "pending" as const) });
+      draw(h);
+      modelButton("modelhost-measure").click();
+      await vi.waitFor(() => expect(modelText()).toBe("waiting for the PC worker"));
+    });
+
+    it("shows each model's fits, with null shown as unknown", async () => {
+      const capabilities = {
+        models: {
+          qwen: { fits_alone: true, fits_together: null },
+          llama: { fits_alone: false, fits_together: false },
+          mini: {},
+        },
+      };
+      const h = handlers({ onModelhost: vi.fn(async () => ({ ok: true, text: "measured", capabilities })) });
+      draw(h);
+      modelButton("modelhost-measure").click();
+      await vi.waitFor(() => expect(modelRows()).toHaveLength(3));
+      expect(modelText()).toBe("measured");
+      expect(modelRows()).toEqual([
+        "qwen: alone fits, together unknown",
+        "llama: alone does not fit, together does not fit",
+        "mini: alone unknown, together unknown",
+      ]);
+    });
+
+    it("shows the error text when the job fails", async () => {
+      const h = handlers({ onModelhost: vi.fn(async () => Promise.reject(new Error("modelhost job 7 failed"))) });
+      draw(h);
+      modelButton("modelhost-status").click();
+      await vi.waitFor(() => expect(modelText()).toBe("modelhost job 7 failed"));
+      expect(modelButton("modelhost-status").disabled).toBe(false);
     });
   });
 

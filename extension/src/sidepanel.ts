@@ -1,8 +1,8 @@
-import type { CourseLink } from "./background";
+import type { CourseLink, ModelhostRequest, ModelhostResult } from "./background";
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
 import type { Session } from "./types";
-import { courseErrorText } from "./coreClient";
+import { courseErrorText, type ModelhostEngine } from "./coreClient";
 import { renderReview, type ReviewRow, type ReviewState } from "./reviewScreen";
 
 /** Group heading for rows whose block has no topic. */
@@ -67,6 +67,7 @@ export interface PanelHandlers {
   onOpenCourse: (courseId: number) => Promise<void>;
   onDeleteCourse: (courseId: number) => Promise<void>;
   onCreateCourse: (title: string) => Promise<void>;
+  onModelhost: (request: ModelhostRequest) => Promise<ModelhostResult>;
 }
 
 /** Creates an element with text content; never parses markup. */
@@ -325,6 +326,84 @@ function renderCourses(state: PanelState, handlers: PanelHandlers): HTMLElement 
   return section;
 }
 
+/** Engines the "Use engine" choice offers, in menu order. */
+const MODELHOST_ENGINES: ModelhostEngine[] = ["ollama", "strata", "none"];
+
+/** Text for one fit figure: yes, no, or unknown when the figure is null or absent. */
+function fitText(figure: unknown): string {
+  if (figure === true) return "fits";
+  if (figure === false) return "does not fit";
+  return "unknown";
+}
+
+/** One row per measured model from a capabilities document; absent or malformed entries show nothing. */
+function renderModelFits(capabilities: Record<string, unknown> | undefined): HTMLElement {
+  const list = el("ul", undefined, "models");
+  const models = capabilities?.models;
+  if (typeof models !== "object" || models === null) return list;
+  for (const [name, entry] of Object.entries(models)) {
+    const fields = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
+    const text = `${name}: alone ${fitText(fields.fits_alone)}, together ${fitText(fields.fits_together)}`;
+    list.append(el("li", text, "model"));
+  }
+  return list;
+}
+
+/**
+ * Local model section: Start, Measure, Status and Use engine (with its engine choice). Each button
+ * runs one modelhost job and shows its text and the per-model fits; buttons wait while a job runs.
+ */
+function renderLocalModel(handlers: PanelHandlers): HTMLElement {
+  const section = el("section", undefined, "local-model");
+  section.append(el("h2", "Local model"));
+  const text = el("p", undefined, "modelhost-text");
+  const models = el("div", undefined, "modelhost-models");
+  const engine = el("select", undefined, "modelhost-engine");
+  engine.setAttribute("aria-label", "Engine");
+  for (const choice of MODELHOST_ENGINES) engine.append(el("option", choice));
+  const actions: HTMLButtonElement[] = [];
+  const run = async (request: ModelhostRequest): Promise<void> => {
+    for (const button of actions) button.disabled = true;
+    text.textContent = "Working...";
+    try {
+      const result = await handlers.onModelhost(request);
+      if (result === "pending") {
+        text.textContent = "waiting for the PC worker";
+        models.replaceChildren();
+      } else {
+        text.textContent = result.text;
+        models.replaceChildren(renderModelFits(result.capabilities));
+      }
+    } catch (err) {
+      text.textContent = err instanceof Error ? err.message : String(err);
+      models.replaceChildren();
+    } finally {
+      for (const button of actions) button.disabled = false;
+    }
+  };
+  const button = (label: string, className: string, request: () => ModelhostRequest): HTMLButtonElement => {
+    const node = el("button", label, className);
+    node.type = "button";
+    node.addEventListener("click", () => void run(request()));
+    actions.push(node);
+    return node;
+  };
+  const useEngine = button("Use engine", "modelhost-use", () => ({
+    action: "use",
+    engine: engine.value as ModelhostEngine,
+  }));
+  section.append(
+    button("Start", "modelhost-start", () => ({ action: "start" })),
+    button("Measure", "modelhost-measure", () => ({ action: "measure" })),
+    button("Status", "modelhost-status", () => ({ action: "status" })),
+    engine,
+    useEngine,
+    text,
+    models,
+  );
+  return section;
+}
+
 /** Review screen: a Back button to the scan view, then one row per concept. */
 function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLElement {
   const view = el("div", undefined, "review-view");
@@ -364,6 +443,7 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
   root.append(scan);
   root.append(el("p", statusText(state.status), "status"));
   root.append(renderCourses(state, handlers));
+  root.append(renderLocalModel(handlers));
   if (state.rows.length === 0 && state.status.kind === "idle") {
     root.append(el("p", "Nothing scanned yet", "empty"));
     return;
