@@ -618,7 +618,7 @@ Decided 2026-11-24. Status: design decision, UI not built yet. Tier 1, authorita
 
 ## D47 Isolation of fetch and document reading
 
-Decided 2026-11-24. Status: design decision, UI not built yet. Fetch and HTML run with no container: a separate low-privilege process, no secrets, SSRF block, caps. The PDF and image reader runs in a sandboxed container (no network, read-only filesystem, no keys, file in and text out), built with that reader. Release default: a stage without a `release:` line is a patch release (checked 2026-11-24 in the pipeline code, not in this repo).
+Decided 2026-11-24. Status: design decision, UI not built yet. Fetch and HTML run with no container: a separate low-privilege process, no secrets, SSRF block, caps. The PDF and image reader runs in a sandboxed container (no network, read-only filesystem, no keys, file in and text out), built with that reader.
 
 ## D48 Ladder belongs to dojo
 
