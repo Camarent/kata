@@ -204,10 +204,20 @@ user's GPU machine (M18)" in `decisions.md`.
 - Ignored list and hard delete (D55).
 - Migrate today's `topic_aliases` and block marks. API and tests only.
 
-## Milestone 20: scan
+## Milestone 20: scan (shipped)
 
 **Scope.** Page classification, concept extraction, aliases, the "Which one?" choice and dynamic
-rescan (D53, D54, D55).
+rescan (D53, D54, D55). Shipped:
+
+- Job kinds `scan.classify` and `scan.extract`, with core output hooks that rewrite the job output.
+- Routes `GET /scan/classification`, `POST /scan/choice`, `POST /scan/reassign` and `GET /scan/overview`.
+- Page classification cached per page; the remembered "Which one?" pick per page topic.
+- Aliases merged into one concept; concept identity (area, topic, name) with classification first (D53, D54).
+- Teachable-content check before a concept is kept (D38).
+- Rescan on page change keeps marks by concept id (D55 item d).
+- Extension concept scan and rescan by concept id; the old tag job and the old extension scan keep working.
+- Classification evaluation set and pass bar.
+- Out of scope: uploaded-file filter.
 
 ## Milestone 21: learn
 
