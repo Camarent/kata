@@ -14,6 +14,15 @@ Visual mockups (static HTML and CSS, open from disk, no network):
 
 The mockups use generic sample text only. They show no real site and no personal data.
 
+Reference screenshots of the mockups, light and dark, are in [`extension-ui/shots/`](extension-ui/shots/README.md). They are rendered from the mockups by `scripts/dev/render_design_shots.py` with a local headless Chrome; do not edit them by hand:
+
+- [Navigation map](extension-ui/shots/nav-map-light.png) ([dark](extension-ui/shots/nav-map-dark.png)).
+- [Settings page](extension-ui/shots/settings-light.png) ([dark](extension-ui/shots/settings-dark.png)).
+- [Side panel, all states](extension-ui/shots/panel-states-light.png) ([dark](extension-ui/shots/panel-states-dark.png)).
+- [Sample lesson page](extension-ui/shots/lesson-page-light.png) ([dark](extension-ui/shots/lesson-page-dark.png)).
+- [Block states](extension-ui/shots/block-states-light.png) ([dark](extension-ui/shots/block-states-dark.png)).
+- [Long lesson](extension-ui/shots/long-lesson-light.png) ([dark](extension-ui/shots/long-lesson-dark.png)).
+
 ## 1. Principles for the UI
 
 - **Scan only on click or on allowed sites.** The extension reads a page only when the user presses "Scan this page", or when the page matches a site the user has added (an allowed site). Everywhere else, nothing is scanned or stored automatically. The rule comes from principle 5 in `docs/design/detailed-architecture.md` (section 2).
