@@ -63,6 +63,7 @@ declare module "vscode" {
 
   export const window: {
     showInformationMessage(message: string): Promise<unknown>;
+    showQuickPick(items: readonly string[]): Promise<string | undefined>;
     registerWebviewViewProvider(viewId: string, provider: WebviewViewProvider): Disposable;
   };
 
