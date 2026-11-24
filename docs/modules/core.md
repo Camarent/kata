@@ -9,7 +9,7 @@ Single source of truth for the knowledge model, taxonomy and marks. Exposes the 
 
 ## Public surface
 HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
-- `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. No server launcher found in the repo: TODO(verify) how uvicorn is started.
+- `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. Launcher: `python -m kata_core` (`core/kata_core/__main__.py:33` runs `uvicorn.run(create_app(cfg))`).
 - `core/kata_core/api/routes/__init__.py:14` `include_routers(app)` - includes every module that defines `router`.
 - `core/kata_core/api/deps.py:25` `get_cfg`, `:30` `get_conn`, `:39` `get_registry`, `:48` `require_feature(name)` (404 `feature disabled: <name>` when `[<name>] enabled` is off), `:72` `get_authenticator`, `:76` `current_user` - request dependencies.
 - `core/kata_core/api/routes/auth.py:35` `POST /enrol`, `:48` `GET /me`, `:56` `DELETE /devices/{device_id}`.
@@ -113,7 +113,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Cross-user access returns "not found", not "forbidden" (`get_job`, `complete`).
 - Private topics and aliases belong to their creator; shared topics are visible to all users.
 - Concept marks are private: every `concept_marks` row carries `user_id`, and `GET /concepts/marks` returns only the caller's rows. A concept is visible when its topic is visible and it is shared or owned by the caller (`concept_visible`, `core/kata_core/storage/concepts.py:36`); a mark on a hidden concept gets 404 (`LookupError` in `set_concept_mark`).
-- `pyproject.toml:5` comment says "stdlib only", but `pyproject.toml:6` lists fastapi, psycopg, httpx, uvicorn. Comment is stale (code fix outside docs/).
+- `pyproject.toml:6` comment says "stdlib only", but `pyproject.toml:7` lists fastapi, psycopg, httpx, uvicorn. Comment is stale (code fix outside docs/).
 - Migration files match `MIGRATION_GLOB` (`[0-9][0-9][0-9][0-9]_*.sql`, `core/kata_core/storage/provision.py:21`); applied state is tracked in `schema_migrations` (`core/kata_core/storage/provision.py:20`).
 - Retrieval entries are private per owner or shared (`owner_user_id` NULL). Both the keyword and the vector side filter on `owner_user_id IS NULL OR owner_user_id = <caller>`, so a private entry of one user never reaches another (`core/kata_core/retrieval/store.py:45`, `core/kata_core/retrieval/retriever.py:78`).
 - Vector ranking is cosine in Python over `real[]` embeddings, no pgvector yet; only entries whose `embedding_model` equals the active `embedder.name` are compared (`core/kata_core/retrieval/retriever.py:72-83`).

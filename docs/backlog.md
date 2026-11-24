@@ -123,8 +123,8 @@ highlights on exam pages, from page open until the person has finished answering
 ## Deployment (M6) follow-ups
 
 - [ ] Real VM test: build the VM as in `docs/deployment.md` (Ubuntu Server LTS), run
-      `deploy/provision-vm.sh` and the stack on it, and pass the deep health check. Owner steps in
-      `.notes/run-on-vm.md` (git-excluded). Not proven until run on the real VM.
+      `deploy/provision-vm.sh` and the stack on it, and pass the deep health check. Owner steps are
+      kept owner-local, outside the repo. Not proven until run on the real VM.
 - [ ] Real private network test: join the VM and the phone to the network, reach the node name over
       TLS from a phone (secure context for the phone page), and check that nothing listens on a
       public interface.

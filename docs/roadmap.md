@@ -97,16 +97,16 @@ the private network). A deep health check passes. A nightly encrypted dump runs.
 **Shipped.** The runbook is in [`deployment.md`](deployment.md) (D17 to D25 in
 `decisions.md`). The real VM run is still open in [`backlog.md`](backlog.md).
 
-## Milestone 7
+## Milestone 7 (skipped)
 
 No scope recorded: `decisions.md` and the git history have no entry under M7. The numbering goes
 from M6 to M10.
 
-## Milestone 8
+## Milestone 8 (skipped)
 
 No scope recorded: `decisions.md` and the git history have no entry under M8.
 
-## Milestone 9
+## Milestone 9 (skipped)
 
 No scope recorded: `decisions.md` and the git history have no entry under M9.
 
@@ -192,6 +192,23 @@ outbound HTTP; control jobs `modelhost.up`, `modelhost.use`, `modelhost.measure`
 `modelhost.status` go through the same job queue. The worker runs as the owning user, never as
 root, and takes a fixed allow-list of subcommands. Decision: "Local models through a worker on the
 user's GPU machine (M18)" in `decisions.md`.
+
+## Milestone 19: UI redesign backend
+
+**Scope.** Serve the backend lists the redesigned extension UI needs:
+
+- Concept extraction with aliases and definitions; area, topic and concept identity (D54).
+- Page classification and a per-block concept list.
+- Lists, and delete or ignore of a concept (D55).
+- Dynamic rescans.
+- Quiz pool (D45 to D47) and exam (D35, D51).
+- Tracks (D11 to D16).
+- Sort fields (D42).
+
+## Milestone 20: UI implementation
+
+**Scope.** Build the extension UI on the M19 backend, following the design in
+[`design/extension-ui.md`](design/extension-ui.md).
 
 ## Later
 

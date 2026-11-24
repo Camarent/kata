@@ -1,3 +1,4 @@
+Superseded by the redesign decisions 39-55 in decisions.md; replaced after the prototype is approved.
 # kata extension: UI design
 
 Status: design for owner review. No extension code changes yet; the implementation follows owner approval.

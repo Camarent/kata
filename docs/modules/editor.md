@@ -41,7 +41,7 @@ Client for the editor signal: a VS Code extension that posts one `editor.save` e
 - Settings are read on every save, so a change applies without a reload (`editor/src/extension.ts:2`).
 - Dev dependencies are pinned to exact versions in `editor/package.json:76-80`; the lock file is `editor/package-lock.json`. See `docs/decisions.md`.
 - The info view is a stub; the real panel comes in a later task.
-- The Node version is not pinned: TODO(verify) (no `engines` or `.nvmrc` in `editor/`).
+- The Node version is not pinned in `editor/`: TODO(verify) (no `engines` field and no `.nvmrc` in `editor/`; the root `.nvmrc` pins Node 26).
 
 ## Depends on / used by
 - Depends on: VS Code extension host API (`vscode`); Node for `build` and `test` (`npm --prefix editor`); `python3` with the `kata_device` package for the install command; the core `POST /v1/events` route (`docs/api.md`).

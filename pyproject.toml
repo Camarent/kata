@@ -1,6 +1,6 @@
 [project]
 name = "kata"
-version = "0.1.10"
+version = "0.1.11"
 requires-python = ">=3.11"
 license = "MIT"
 # stdlib only: tomllib ships with Python 3.11+, so no tomli dependency.

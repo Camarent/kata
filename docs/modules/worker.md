@@ -26,13 +26,13 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/scheduled.py:38` `ScheduledLocalProvider`, `:72` `build_local(cfg, log)` - wraps the local provider with the `decide` gate only when `[modelhost] schedule` is true.
 - `worker/kata_worker/core_client.py:62` `CoreClient` - `next_job` (`:92`), `report` (`:114`), `output` (`:122`), `fail` (`:128`); errors raise `CoreError` (`:28`).
 - `worker/kata_worker/core_client.py:53` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
-- `worker/kata_worker/model.py:46` `parse_tag(reply) -> (category, topic)` - strict reply parser used by `run_once`.
-- `worker/kata_worker/model.py:21` `ModelError`; `:36` `reply_content(response)` - reads the chat reply text, shared with `LocalProvider`.
+- `worker/kata_worker/model.py:42` `parse_tag(reply) -> (category, topic)` - strict reply parser used by `run_once`.
+- `worker/kata_worker/model.py:17` `ModelError`; `:32` `reply_content(response)` - reads the chat reply text, shared with `LocalProvider`.
 - `worker/kata_worker/providers/router.py:60` `Router(chains, providers, policy, log)` - `route(task_class, system, user) -> Routed` (`:76`); tries each provider of the chain in order, first reply wins.
 - `worker/kata_worker/providers/router.py:38` `Routed` - `reply`, `provider` (name of the answering provider).
 - `worker/kata_worker/providers/router.py:33` `RouteExhausted(ProviderError)` - every provider skipped or failed; `:29` `RoutingError` - bad `[routing]` or chain.
 - `worker/kata_worker/providers/router.py:108` `build_router(cfg, ledger, env, audit, log) -> Router` - builds chains from `[routing]`, providers (`:97` `_build_providers`) and `Policy`.
-- `worker/kata_worker/providers/base.py:12` `TASK_CLASSES` = `("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")`. `extract_syllabus` is served by the `syllabus.extract` handler.
+- `worker/kata_worker/providers/base.py:12` `TASK_CLASSES` = `("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")`. `extract_syllabus` is served by the `syllabus.extract` handler. `summary` is a task class with no handler (handlers: tag, course, syllabus, modelhost_*).
 - `worker/kata_worker/providers/base.py:38` `Provider` protocol - `name`, `is_cloud`, `complete(system, user) -> str` (`:44`); `ProviderError` at `:15`.
 - `worker/kata_worker/providers/local.py:30` `LocalProvider(config)` - `name = "local"`, `is_cloud = False`; `complete` at `:43`.
 - `worker/kata_worker/providers/anthropic.py:88` `AnthropicProvider(config, env, transport)` - `name = "anthropic"`, `is_cloud = True`; `complete` at `:117`.
@@ -74,7 +74,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - Control payloads are checked twice: core refuses a bad payload with 422 before queuing (`core/kata_core/api/routes/jobs.py:96-100`, `core/kata_core/modelhost/spec.py:18`); the worker runs `validate_payload` again before it runs modelctl (`worker/kata_worker/modelhost/ctl.py:116`).
 - A model with no measurement is never allowed: `fits_alone` returns `None` and `decide` refuses it (`worker/kata_worker/modelhost/schedule.py:23-24`); only schema 2 is read (`worker/kata_worker/modelhost/capabilities.py:75`).
 - modelctl output is read only up to `[modelhost] max_text_bytes` (`worker/kata_worker/modelhost/ctl.py:111`, `config/kata.example.toml:199`), then the worker truncates the decoded text to `MAX_TEXT` characters (`worker/kata_worker/modelhost/ctl.py:136`, the core limit in `core/kata_core/modelhost/spec.py:15`); the core's output hook rejects a `text` over `MAX_TEXT` characters (`core/kata_core/modelhost/job_kinds.py:27`), so the worker must not post more.
-- Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:46` `parse_tag`).
+- Model reply must be a JSON object with non-empty string `category` and `topic`; code fences are stripped first (`worker/kata_worker/model.py:42` `parse_tag`).
 - Core call errors (`CoreError`, `OSError`, `http.client.HTTPException`) are logged and the loop goes on (`worker/kata_worker/loop.py:70`).
 - A cloud call is allowed only when the cloud token env var (`[provider_anthropic] api_key_env`, read by `core/kata_core/jobs/needs_cloud.py:31` `cloud_token_present`) is set and the task class is in `[provider_anthropic] task_classes`. There is no separate cloud switch: the token alone turns the cloud on (`worker/kata_worker/providers/policy.py:78`).
 - A local call is allowed when the task class is in `[provider_local] task_classes` and is not `cloud-only` in `[local_capability]` (`worker/kata_worker/providers/policy.py:76-77`). For a `cloud-only` class the router skips local with no call and goes to the cloud, or raises `RouteExhausted` when no token is set.
