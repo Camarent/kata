@@ -10,9 +10,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from kata_core.api.routes.courses import COURSE_GENERATE_KIND
 from kata_core.config import Config
 from kata_core.planning.job_kinds import SYLLABUS_EXTRACT_KIND
+from kata_core.trainer.job_kinds import COURSE_GENERATE_KIND
 
 LOCAL_CAPABILITY_SECTION = "local_capability"
 PROVIDER_SECTION = "provider_anthropic"

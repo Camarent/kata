@@ -14,7 +14,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
-from kata_core.api.deps import Conn, current_user, get_cfg, get_registry
+from kata_core.api.deps import Conn, current_user, get_cfg, get_registry, refuse_needs_cloud
 from kata_core.auth.service import AuthContext
 from kata_core.config import Config
 from kata_core.jobs.queue import (
@@ -37,6 +37,7 @@ Caller = Annotated[AuthContext, Depends(current_user)]
 
 class EnqueueRequest(BaseModel):
     payload: str
+    kind: str = DEFAULT_KIND
 
 
 class EnqueueResponse(BaseModel):
@@ -81,9 +82,15 @@ def _topic_ref(conn: psycopg.Connection[Any], topic_id: int) -> TopicRef:
 
 
 @router.post("", response_model=EnqueueResponse)
-def create_job(body: EnqueueRequest, ctx: Caller, conn: Conn) -> EnqueueResponse:
-    """Queue a job for the caller."""
-    return EnqueueResponse(id=enqueue(conn, ctx.user_id, body.payload))
+def create_job(
+    body: EnqueueRequest, ctx: Caller, conn: Conn, cfg: Annotated[Config, Depends(get_cfg)]
+) -> EnqueueResponse:
+    """Queue a job of `kind` (tag when none) for the caller.
+
+    409 `needs_cloud` when that kind needs the cloud and no cloud token is set; nothing is queued.
+    """
+    refuse_needs_cloud(cfg, body.kind)
+    return EnqueueResponse(id=enqueue(conn, ctx.user_id, body.payload, kind=body.kind))
 
 
 @router.get("/next", response_model=ClaimResponse, responses={204: {"description": "none queued"}})

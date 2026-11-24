@@ -6,6 +6,7 @@ to point at the test database.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Iterator
 from typing import Annotated, Any
 
@@ -14,6 +15,7 @@ from fastapi import Depends, Header, HTTPException, Request
 
 from kata_core.auth.service import AuthContext, Authenticator, TokenAuthenticator
 from kata_core.config import Config
+from kata_core.jobs.needs_cloud import needs_cloud_for_kind
 from kata_core.jobs.runner import Registry, load_registry
 from kata_core.storage.provision import connect
 
@@ -51,6 +53,20 @@ def require_feature(name: str) -> Callable[[Config], None]:
             raise HTTPException(status_code=404, detail=f"feature disabled: {name}")
 
     return _check
+
+
+NEEDS_CLOUD_MESSAGE = "this task needs a cloud model and no cloud token is set"
+
+
+def refuse_needs_cloud(cfg: Config, kind: str) -> None:
+    """409 `needs_cloud` when a job of `kind` needs the cloud and no cloud token is in the environment.
+
+    Routes call it before they write anything, so a refused request leaves no row behind.
+    """
+    if needs_cloud_for_kind(cfg, kind, os.environ):
+        raise HTTPException(
+            status_code=409, detail={"code": "needs_cloud", "message": NEEDS_CLOUD_MESSAGE}
+        )
 
 
 def get_authenticator() -> Authenticator:
