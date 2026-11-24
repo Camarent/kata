@@ -1,7 +1,7 @@
 """Event envelope: validate one raw device event before it is stored.
 
 `validate` never raises on bad input: it returns an Envelope or a Rejection with a
-reason from REJECTION_REASONS. Events older than `now` are accepted here; the policy
+reason: BAD_ENVELOPE, UNKNOWN_TYPE or CLOCK_SKEW. Events older than `now` are accepted here; the policy
 layer decides whether late events are dropped.
 """
 
@@ -21,7 +21,6 @@ TERMINAL_TYPES = frozenset({"terminal.command", "terminal.error"})
 BAD_ENVELOPE = "bad_envelope"
 UNKNOWN_TYPE = "unknown_type"
 CLOCK_SKEW = "clock_skew"
-REJECTION_REASONS = frozenset({BAD_ENVELOPE, UNKNOWN_TYPE, CLOCK_SKEW})
 
 
 @dataclass(frozen=True)
