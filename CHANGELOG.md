@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.4] - 2026-11-24
+
+- chore(repo): licence, security policy, CI hardening, docs scrub, README rewrite
+
 ## [0.1.3] - 2026-11-23
 
 - docs(extension): UI design and static mockups
