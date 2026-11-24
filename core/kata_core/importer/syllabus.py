@@ -11,11 +11,14 @@ falls back to one module for the whole source.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 TITLE_LIMIT = 120
 _HEADING = re.compile(r"^(#{1,6})\s+(\S.*)$")
-_NUMBERED = re.compile(r"^(?:(?i:module)\s+\d+\s*[:.)-]\s*|\d+[.)]\s+)(\S.*)$")
+_MODULE_WORD = "module"
+_NUMBER_SEPARATORS = ":.)-"
+_NUMBER_DOT_SEPARATORS = ".)"
 
 
 class ParseError(ValueError):
@@ -33,10 +36,10 @@ def parse_modules(text: str) -> list[Module]:
     """Split syllabus text into modules. Raises ParseError when the text is blank."""
     if not text.strip():
         raise ParseError("syllabus text is empty")
-    headings = _split(text.splitlines(), _HEADING, title_group=2)
+    headings = _split(text.splitlines(), _heading_title)
     if headings:
         return headings
-    numbered = _split(text.splitlines(), _NUMBERED, title_group=1)
+    numbered = _split(text.splitlines(), _numbered_title)
     if numbered:
         return numbered
     return [_whole(text)]
@@ -57,18 +60,51 @@ def validate_extracted(source: str, modules: list[Module]) -> list[Module]:
     return list(modules)
 
 
-def _split(lines: list[str], start: re.Pattern[str], title_group: int) -> list[Module]:
-    """Start a module at each line matching `start`; its body is the lines up to the next start.
+def _heading_title(line: str) -> str | None:
+    """Title of a markdown heading line (already stripped), or None."""
+    match = _HEADING.match(line)
+    return match.group(2) if match else None
 
-    Each line is stripped before matching, so the patterns need no trailing-whitespace group (a
-    `\\s*$` after a lazy title group backtracks quadratically on long runs of spaces). The body
-    keeps the original line.
+
+def _numbered_title(line: str) -> str | None:
+    """Title of a numbered line ('1. T', '1) T', 'Module 1: T'; case-insensitive 'module'), or None.
+
+    Plain string scanning, linear in the line length: no regex, so no backtracking on runs of spaces.
+    The line must already be stripped.
+    """
+    is_module = line[: len(_MODULE_WORD)].lower() == _MODULE_WORD
+    rest = line[len(_MODULE_WORD) :] if is_module else line
+    if is_module:
+        if not rest[:1].isspace():
+            return None
+        rest = rest.lstrip()
+    digits = 0
+    while digits < len(rest) and rest[digits].isdecimal():
+        digits += 1
+    if digits == 0:
+        return None
+    rest = rest[digits:].lstrip() if is_module else rest[digits:]
+    if not rest:
+        return None
+    if is_module:
+        if rest[0] not in _NUMBER_SEPARATORS:
+            return None
+        return rest[1:].lstrip() or None
+    if rest[0] not in _NUMBER_DOT_SEPARATORS or not rest[1:2].isspace():
+        return None
+    return rest[1:].lstrip() or None
+
+
+def _split(lines: list[str], title_of: Callable[[str], str | None]) -> list[Module]:
+    """Start a module at each line whose `title_of` is not None; its body is the lines up to the next start.
+
+    Each line is stripped before matching. The body keeps the original line.
     """
     found: list[tuple[str, list[str]]] = []
     for line in lines:
-        match = start.match(line.strip())
-        if match:
-            found.append((match.group(title_group), []))
+        title = title_of(line.strip())
+        if title is not None:
+            found.append((title, []))
         elif found:
             found[-1][1].append(line)
     return [_module(title, body_lines) for title, body_lines in found]
