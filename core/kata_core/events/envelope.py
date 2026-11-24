@@ -1,8 +1,8 @@
 """Event envelope: validate one raw device event before it is stored.
 
 `validate` never raises on bad input: it returns an Envelope or a Rejection with a
-reason: BAD_ENVELOPE, UNKNOWN_TYPE or CLOCK_SKEW. Events older than `now` are accepted here; the policy
-layer decides whether late events are dropped.
+reason: BAD_ENVELOPE, UNKNOWN_TYPE or CLOCK_SKEW. Events older than `now` are accepted here;
+the policy layer decides whether late events are dropped.
 """
 
 from __future__ import annotations
