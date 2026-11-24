@@ -47,6 +47,12 @@ def concept_visible(conn: psycopg.Connection[Any], user_id: int, concept_id: int
     return topic_visible(conn, user_id, topic_id)
 
 
+def concept_topic_id(conn: psycopg.Connection[Any], concept_id: int) -> int | None:
+    """Return the topic `concept_id` belongs to, or None when the concept does not exist."""
+    row = conn.execute("SELECT topic_id FROM concepts WHERE id = %s", (concept_id,)).fetchone()
+    return None if row is None else int(row[0])
+
+
 def set_concept_mark(
     conn: psycopg.Connection[Any],
     user_id: int,
