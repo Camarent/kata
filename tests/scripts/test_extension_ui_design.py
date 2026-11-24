@@ -41,7 +41,11 @@ DOC_HEADINGS = (
 )
 
 # Accessibility terms the design must state in plain words.
-DOC_TERMS = ("contrast", "focus order", "reduced motion", "Scan this page")
+DOC_TERMS = (
+    "contrast", "focus order", "reduced motion", "Scan this page",
+    "Learning", "Known by course", "Exam pages",
+    "extension-ui/block-states.html", "extension-ui/long-lesson.html",
+)
 
 # Every side panel state has a section with this id in panel-states.html.
 STATE_IDS = (

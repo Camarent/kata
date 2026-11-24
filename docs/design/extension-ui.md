@@ -8,6 +8,8 @@ Visual mockups (static HTML and CSS, open from disk, no network):
 - [Settings page, light and dark](extension-ui/settings.html): connection, auto-scan site list, appearance and about (section 2.16).
 - [Side panel, all states](extension-ui/panel-states.html): every panel state side by side, light and dark.
 - [Sample lesson page, highlights](extension-ui/lesson-page.html): the page highlights in each state, light and dark, at narrow panel width.
+- [Block states](extension-ui/block-states.html): the four block states, their buttons, transitions and undo, with the panel rows that match the page (section 3).
+- [Long lesson](extension-ui/long-lesson.html): a long text split into sub-blocks, with the panel grouped by topic (section 3.1).
 - Shared tokens: `extension-ui/tokens.css`.
 
 The mockups use generic sample text only. They show no real site and no personal data.
@@ -17,7 +19,7 @@ The mockups use generic sample text only. They show no real site and no personal
 - **Scan only on click or on allowed sites.** The extension reads a page only when the user presses "Scan this page", or when the page matches a site the user has added (an allowed site). Everywhere else, nothing is scanned or stored automatically. The rule comes from principle 5 in `docs/design/detailed-architecture.md` (section 2).
 - **The panel shows what the user can do next.** Every state names one next action. Errors say what to do.
 - **The page stays quiet.** Highlights mark blocks; they never block reading, never pop up on their own, and never change the lesson text.
-- **Labels, not colour alone.** Each mark has an icon and a text label (see section 7).
+- **Labels, not colour alone.** Each mark has an icon and a text label (see section 6).
 
 ## 2. Side panel: screens and states
 
@@ -30,7 +32,7 @@ The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome 
 
 ### 2.2 Connected idle
 
-- Shows the current course (or "No course selected"), the "Scan this page" button, and the number of known, new and untagged blocks from the last scan of this page, if any.
+- Shows the current course (or "No course selected"), the "Scan this page" button, and the number of Known, New, Learning and Not tagged blocks from the last scan of this page, if any.
 - The "Scan this page" button is the only scan trigger. It is always visible in this state.
 - If the current page is an allowed site, the panel says so in plain text ("This site is allowed. Pages here scan when opened.").
 - If the current page is not an allowed site, the panel says "Scan this page scans once. Add this site to scan here each time you open it." with an "Add this site" action.
@@ -50,21 +52,38 @@ The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome 
 ### 2.5 Results, grouped by topic
 
 - Blocks are grouped by topic label. Each group has a heading with its count.
-- Groups in order: New, Known, Untagged. New comes first because it is what the user needs to read.
-- Each block row shows the topic label, a mark (New, Known or Untagged, with icon and text), and an "I know this" button for blocks that are not known yet.
+- Groups in order: New, Learning, Known, Not tagged. New comes first because it is what the user needs to read.
+- Each block row shows the topic label, a mark (New, Learning, Known or Not tagged, with icon and text), and the buttons of its state (section 2.6). Not tagged rows have no buttons.
+- Panel rows use the same outline, tint and tag as the block on the page (section 3). Hovering or focusing a row highlights its block, and the reverse.
 - Selecting a block row scrolls the page to that block and focuses it (see section 3).
+- Long lessons: blocks are split into sub-blocks and the panel groups them by topic (section 3.1).
 
 ### 2.6 Known and new marks
 
-- **New**: strong mark: filled icon, bold label "New", and the accent colour.
-- **Known**: muted mark: outline icon, label "Known".
-- **Untagged**: neutral mark: dashed icon, label "Not tagged". Untagged blocks are not scored.
+Block states. Three knowledge states and one scan result. The state key and the sample page are in [`extension-ui/block-states.html`](extension-ui/block-states.html).
+
+| State | Mark (icon and label) | Meaning | Buttons |
+|---|---|---|---|
+| New | "+" and "New", strong: accent colour, filled | Not in review yet. A scan found it as a lesson word. | Start learning; I know this |
+| Learning | "~" and "Learning" | In review. Answers still being checked. | Mark known; Back to new |
+| Known | check mark and "Known", muted: outline, no tint | Not in review. Set by you, or by the course when its topic moves to known. | Learn again; Back to new |
+| Not tagged | dash and "Not tagged", neutral: dashed | Scan result, not a knowledge state. The block was not scanned as a lesson word. Not scored. | None |
+
+- **Known by course.** States are kept per course. The same topic can be Known in one course and New in another. The panel shows the state for the course selected at scan time.
+- **Transitions.**
+  - New to Learning: Start learning, or answer 2 or 3 in review (Not sure, Not known).
+  - New to Known: I know this, or answer 1 in review.
+  - Learning to Known: Mark known.
+  - Known to Learning: Learn again.
+  - Learning or Known back to New: Back to new.
+  - Not tagged has no transitions: a new scan can replace it with a state.
+- **Undo.** Every change shows an Undo bar. Undo returns the block to its previous state. The bar stays until the next change, not for a fixed time.
 - The mark always has a text label. Colour is never the only signal.
 
 ### 2.7 "I know this"
 
 - Pressing "I know this" on a block sets the block's topic to known. The row moves from New to Known in place, and a short status line says "Marked as known: <topic>. Undo".
-- "Undo" is available for 10 seconds. After that it is removed from the status line; the mark can still be changed from the block row.
+- "Undo" stays until the next change (see the undo rule in section 2.6). The mark can still be changed from the block row.
 - The change is sent to the core. If the core is offline, the change is queued locally and the row shows "Saved on this device; will sync".
 
 ### 2.8 Review screen (keys 1, 2, 3)
@@ -156,14 +175,22 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 | Block state | Look (page) | Label on focus or hover |
 |---|---|---|
 | New | Strong outline and tint in the accent colour, with a "New" tag at the block start | "New: <topic>. Press I know this in the panel or Enter here." |
+| Learning | Outline and tint in the `--color-learning` token, with a "Learning" tag at the block start | "Learning: <topic>. Mark known in the panel to move it on." |
 | Known | Muted dotted outline, no tint, with a "Known" tag | "Known: <topic>." |
-| Untagged | No outline; a small neutral dot in the margin | "Not tagged." |
+| Not tagged | No outline; a small neutral dash tag, or a neutral dot in the margin | "Not tagged: scan result only." |
 
-- **Hover or focus detail.** Hovering a marked block, or moving keyboard focus onto it, shows a small detail card with the topic, the mark, and an "I know this" button. The card appears after a short delay and stays while the pointer or focus is on the card. It does not appear when the user is selecting text.
+- **Panel rows match the page.** A panel row uses the same outline, tint and tag as its block (`tokens.css` shares the colours). Hovering or focusing a block highlights its row, and selecting a row scrolls the page to its block and focuses it. Mockup: [`extension-ui/block-states.html`](extension-ui/block-states.html).
+- **Exam pages.** No marks and no highlights on exam pages, from page open until the person has finished answering. Exam page detection is an open question in [`docs/backlog.md`](../backlog.md) under "Exam pages (experimental)".
+
+- **Hover or focus detail.** Hovering a marked block, or moving keyboard focus onto it, shows a small detail card with the topic, the mark, and the buttons of its state (section 2.6). The card appears after a short delay and stays while the pointer or focus is on the card. It does not appear when the user is selecting text.
 - **Keyboard.** Each marked block is reachable by Tab only through a single "kata highlights" landmark list at the top of the page, not by tabbing through every paragraph. Enter on a list item opens its detail card.
 - **Clear.** A "Clear highlights" action in the panel removes the highlights from the page for this tab only. The marks stay saved. Reloading the page brings them back if the page is still scanned.
 - **Changing pages.** When the page changes without a full load (single-page navigation), the highlights are removed at once and the panel goes back to Connected idle. A new scan starts only when the user presses "Scan this page", or the page matches an allowed site.
 - **Page without a scan.** No highlight is drawn and the page shows nothing from kata.
+
+### 3.1 Long text split
+
+A long block is split into sub-blocks, so a single highlight does not cover a whole page of text. A sub-block is a span inside its paragraph: the text is unchanged, and only the mark is per sub-block. The panel groups the sub-blocks by topic, with one heading per topic and the same row style as in section 3. Mockup: [`extension-ui/long-lesson.html`](extension-ui/long-lesson.html), a split TCP lesson with the panel grouped by topic.
 
 ## 4. Scan trigger
 
@@ -185,7 +212,7 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 - **Contrast.** Text and interactive parts meet WCAG 2.2 AA: at least 4.5 to 1 for normal text, 3 to 1 for large text and for focus outlines and mark icons against their background. Light and dark themes both meet this.
 - **Focus order.** Follows the visual order (section 5). No focus trap except inside the review screen and dialogs, which release focus on close.
 - **Keyboard use.** Every action is available without a pointer. No action needs a timed key press or a drag.
-- **Not colour alone.** Each mark has an icon and a text label (New, Known, Not tagged). Errors have a text message and an icon, not only a red border. Highlights on the page have a tag or dot, not only a tint.
+- **Not colour alone.** Each mark has an icon and a text label (New, Learning, Known, Not tagged). Errors have a text message and an icon, not only a red border. Highlights on the page have a tag or dot, not only a tint.
 - **Reduced motion.** Under `prefers-reduced-motion: reduce` the progress bar does not animate, the detail card fades without motion, and no element slides. Progress is still shown as a number.
 - **Screen readers.** Status changes (scan progress, "Marked as known", errors) are announced in one polite live region. Errors that block an action use an assertive region once.
 - **Text size and width.** The panel works at 200% text size and at a width of about 280 px without horizontal scrolling. Labels wrap; they are not cut.
@@ -200,4 +227,4 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 
 - Whether "Scan this page" should show a short confirmation the first time per site.
 - Whether the review keys (1, 2, 3) should also be shown on the page detail card.
-- Final wording of the three marks (New, Known, Not tagged).
+- Final wording of the four marks (New, Learning, Known, Not tagged).
