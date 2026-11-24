@@ -17,8 +17,8 @@ Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper
 - `scripts/bench/lesson_check_bench.py:169` `_parser()` - flags `--config`, `--cases` (default `cases.json` beside the script), `--format text|markdown`.
 - `scripts/bench/lesson_check_bench.py:92` `run_bench(cfg, cases)` -> `BenchResult`; creates scratch DB, seeds, runs `check_lesson`, drops DB in `finally`.
 - `scripts/bench/lesson_check_bench.py:133` `render_markdown(result)`, `:155` `render_text(result)` - report shapes; labels and numbers only.
-- `scripts/deploy/check_image_rules.py:135` `main(argv)` - checks `deploy/Dockerfile` and `.dockerignore` (pinned base image, non-root user, healthcheck, no secret paths copied); `:91` `check(dockerfile, dockerignore)` -> list of problems.
-- `scripts/deploy/validate_stack.py:153` `main(argv)` - checks `deploy/compose.yaml` (`:97` `check_compose`: published ports bound to loopback or the private network, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:140` `check_config_keys`). The model comes from `docker compose config` (`:52` `load_compose`); without docker it fails, it does not fall back to a parser.
+- `scripts/deploy/check_image_rules.py:129` `main(argv)` - checks `deploy/Dockerfile` and `.dockerignore` (pinned base image, non-root user, healthcheck, no secret paths copied); `:85` `check(dockerfile, dockerignore)` -> list of problems.
+- `scripts/deploy/validate_stack.py:165` `main(argv)` - checks `deploy/compose.yaml` (`:104` `check_compose`: published ports bound to loopback or the private network, `mem_limit` set, pinned images, secrets as files, core waits for migrate to complete) and the host config template against `config/kata.example.toml` (`:152` `check_config_keys`). The model comes from `docker compose config` (`:69` `load_compose`); without docker it fails, it does not fall back to a parser.
 - `scripts/deploy/replay_tombstone.py:71` `main(argv)` - replays the tombstone file kept beside a dump (`:38` `parse`, `:55` `replay`).
 - `scripts/deploy/verify_counts.py:54` `main(argv)` - content-free row counts per table (`:34` `table_counts`, `:47` `differing_tables`) for the restore drill; prints counts and names only.
 - `scripts/smoke/dojo_real.py:142` `main(env)` - real-dojo smoke; gate `KATA_TEST_DOJO` (`:30`); returns 0, 1 or 2 (`:54-56`). It runs `build_course_dir` (probe, init, add, validate, lock, build) on 8 synthetic drafts, expects 7 kept and 1 dropped, checks the required keys `index.html`, `data/content.json`, `manifest.json`, the `max_artifact_bytes` cap, and the prompts in `data/content.json` `items`. `data/content.json` is an object (`version`, `course`, `items`, `lock`): `run_smoke` (`:97`) checks its version against the manifest, its course id, its items list and its lock ids (`:117-129`). Optional `KATA_TEST_DOJO_WASM` and `KATA_TEST_DOJO_WEB` are passed to `build`.
@@ -47,9 +47,9 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 ## scripts/smoke: real dojo
 `scripts/smoke/dojo_real.py` adds, validates, locks and builds one synthetic gap item (unit `geo`) with the `dojo` binary in a temp dir, then prints the built file names. It is opt-in and run by hand; check-all and CI never run it. Run line: `KATA_TEST_DOJO=<path to dojo> python scripts/smoke/dojo_real.py`.
 
-- Refused (exit 2, no run) unless `KATA_TEST_DOJO` names an executable file (`scripts/smoke/dojo_real.py:133-135`). The temp dir is removed when the run ends.
+- Refused (exit 2, no run) unless `KATA_TEST_DOJO` names an executable file (`scripts/smoke/dojo_real.py:146-148`). The temp dir is removed when the run ends.
 - Exit codes (`scripts/smoke/dojo_real.py:54-56`): 0 when every step succeeds with no diagnostics; 1 on a diagnostic or a `TrainerError`; 2 when refused.
-- Uses `DojoTrainerCli` (`core/kata_core/trainer/dojo_cli.py:29`) with a 60 s timeout per call. Tested by `tests/scripts/test_dojo_real.py`.
+- Uses `DojoTrainerCli` (`core/kata_core/trainer/dojo_cli.py:36`) with a 60 s timeout per call. Tested by `tests/scripts/test_dojo_real.py`.
 - Init id probe runs first (`probe_init_ids` in `scripts/smoke/dojo_real.py`): `dojo init "Bad Id"` must exit non-zero, and the smoke prints that id-rule error text (`init rejects 'Bad Id': <text>`). `dojo init kata-<uuid>` must exit 0.
 - The id rules the real `dojo` enforces are not yet measured here. After the first real run, the lead records the measured rules in `docs/decisions.md` (lead step, not the dev).
 
@@ -58,14 +58,14 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 
 `set -a; . <env file>; set +a; KATA_SMOKE_REAL=1 python scripts/smoke/real_model.py`
 
-- Refused (exit 2, no request sent) unless `KATA_SMOKE_REAL=1`, the key env var is set, and the model is on `[smoke] allowed_models` (`scripts/smoke/real_model.py:115-119`). `--model` picks a model; the default is the first id in the list.
-- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:69`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`scripts/smoke/real_model.py:78-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
+- Refused (exit 2, no request sent) unless `KATA_SMOKE_REAL=1`, the key env var is set, and the model is on `[smoke] allowed_models` (`scripts/smoke/real_model.py:105-130`). `--model` picks a model; the default is the first id in the list.
+- Cost: `[smoke] budget_micro_usd` (`config/kata.example.toml:66`) is the cap; the example value 500000 micro-USD is 0.50 USD. The run sets `[cost]` cap and warn to the budget (`scripts/smoke/real_model.py:78-86`) and stops at the cap (exit 1). Each case's cost is priced by the worker `cost.py`.
 - Checks per case (`scripts/smoke/smoke_core.py:205`): the reply is non-empty; a JSON case must parse, and `generate_course` and `extract_syllabus` must also pass `parse_drafts` and `parse_modules` (`scripts/smoke/smoke_core.py:46-48`).
 - Exit codes (`scripts/smoke/real_model.py:55-57`, `:151`): 0 when every case passes; 1 when a case fails or the cost cap stops the run; 2 when refused.
 - The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`scripts/smoke/smoke_core.py:195-198`, `:255`).
 
 ## scripts/smoke: local capability audit
-`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by the lead by hand; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:94`): `kata-l`, `kata-m` or `cloud-only` per task class.
+`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by the lead by hand; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:91`): `kata-l`, `kata-m` or `cloud-only` per task class.
 
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_audit.py [--model NAME] [--api-key-env NAME]`
 
@@ -81,8 +81,8 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_model.py`
 
 - Refused (exit 2, no request sent) unless `KATA_SMOKE_LOCAL=1` and a base URL is given: `--base-url` wins over `KATA_SMOKE_LOCAL_BASE_URL` (`scripts/smoke/local_model.py:240-241`). Also refused when the config does not load, the cases do not load, or no model is named (`scripts/smoke/local_model.py:236-252`).
-- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`scripts/smoke/local_model.py:251`, `:106`). The example is `models = "kata-l"` (`config/kata.example.toml:74`).
-- Config keys in `[smoke_local]` (`config/kata.example.toml:73-77`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
+- Models: `--model` (repeatable) picks models; without it the run uses `[smoke_local] models` in the order written (`scripts/smoke/local_model.py:251`, `:106`). The example is `models = "kata-l"` (`config/kata.example.toml:71`).
+- Config keys in `[smoke_local]` (`config/kata.example.toml:70-77`): `models`; `case_timeout_seconds` (180) per case; `warmup_timeout_seconds` (600) for the first request; `num_ctx` (8192), used only for the context warning. `[model] base_url` and `model_name` are overridden per run, not read from the example.
 - Warm-up: each model gets one request first (`scripts/smoke/local_model.py:138`, `:205`). Its result is neither printed nor counted, so a slow cold load does not fail a case.
 - Context warning: a case whose prompt estimate is over 75 percent of `num_ctx` prints `WARN model=... case=... prompt_estimate_tokens=... num_ctx=... over 75 percent` before it is sent (`scripts/smoke/local_model.py:64`, `:146-153`). It does not stop the case.
 - Output, one line per case (`scripts/smoke/smoke_core.py:312-320`): `<case> PASS|FAIL class=... prompt_tokens=... completion_tokens=... seconds=... tokens_per_s=... reason=<JSON> excerpt=<JSON>`. The excerpt is cut to 200 characters. Then one summary line per model: `summary model=... passes=N/M mean_seconds=... mean_tokens_per_s=... reasoning_effort=...` (`unset` when empty; `scripts/smoke/local_model.py:221-227`).
