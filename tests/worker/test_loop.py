@@ -18,7 +18,13 @@ from fakes.fake_provider import FakeProvider
 from kata_core.config import Config, load_config
 from kata_worker.core_client import CoreClient
 from kata_worker.handlers import course as course_handler
-from kata_worker.handlers import load_handlers
+from kata_worker.handlers import (
+    load_handlers,
+    modelhost_measure,
+    modelhost_status,
+    modelhost_up,
+    modelhost_use,
+)
 from kata_worker.handlers import syllabus as syllabus_handler
 from kata_worker.handlers import tag as tag_handler
 from kata_worker.handlers.tag import TAG_CLASS
@@ -211,6 +217,10 @@ def test_handler_registry_discovers_tag_course_and_syllabus_handlers() -> None:
         tag_handler.KIND: tag_handler.handle,
         course_handler.KIND: course_handler.handle,
         syllabus_handler.KIND: syllabus_handler.handle,
+        modelhost_up.KIND: modelhost_up.handle,
+        modelhost_use.KIND: modelhost_use.handle,
+        modelhost_measure.KIND: modelhost_measure.handle,
+        modelhost_status.KIND: modelhost_status.handle,
     }
     assert tag_handler.KIND == "tag"
 
