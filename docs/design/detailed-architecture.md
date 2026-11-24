@@ -299,7 +299,7 @@ Resources:
 | Jobs | `POST /v1/jobs`, `GET /v1/jobs/{id}`, `POST /v1/jobs/{id}/cancel`, `POST /v1/jobs/{id}/resume` | section 8.11 |
 | Courses | `POST /v1/courses` (job), `GET /v1/courses`, `DELETE /v1/courses/{id}`, `POST /v1/courses/{id}/open` (handoff code for the trainer origin), `POST /v1/courses/{id}/progress/import` | section 6.5 |
 | Trainer origin | `GET /c/{id}/enter`, static pages under `/c/{id}/`, `GET, PUT /c/{id}/progress` | served only on the trainer name; section 6.5 |
-| Worker | `POST /v1/worker/register`, `POST /v1/worker/poll`, `POST /v1/worker/requests/{id}/delta`, `POST /v1/worker/requests/{id}/done`, `POST /v1/worker/requests/{id}/error`, `POST /v1/worker/heartbeat`, `POST /v1/worker/goodbye` | section 6.3; pull link, all calls come from the worker |
+| Worker (proposed, historical: not built; the worker API is `POST /v1/jobs`, see `core/kata_core/api/routes/jobs.py:86`) | `POST /v1/worker/register`, `POST /v1/worker/poll`, `POST /v1/worker/requests/{id}/delta`, `POST /v1/worker/requests/{id}/done`, `POST /v1/worker/requests/{id}/error`, `POST /v1/worker/heartbeat`, `POST /v1/worker/goodbye` | section 6.3; pull link, all calls come from the worker |
 | Admin | `/v1/admin/users`, `/v1/admin/users/{id}/enrolment-codes`, `/v1/admin/users/{id}/limits`, `/v1/admin/taxonomy/...`, `/v1/admin/counts`, `/v1/admin/workers` | content-free; no impersonation |
 | MCP | `/mcp` | section 6.4 |
 
@@ -342,6 +342,8 @@ Decided: the link is pull-based over plain outbound HTTP. The worker asks the co
 In M0 the same pull code runs over loopback: a minimal `kata-worker` on the workstation polls the core on `127.0.0.1`. There is no separate direct local-model mechanism.
 
 Worker to core only (bearer token, scope `worker`, section 11.2). The session id from `register` travels in every later call; there is no session key and no worker address.
+
+Proposed, historical: this worker protocol was not built. The real worker API is `POST /v1/jobs` (`core/kata_core/api/routes/jobs.py:86`).
 
 | Call | Content | Answer |
 |---|---|---|
