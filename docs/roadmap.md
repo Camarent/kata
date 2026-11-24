@@ -130,20 +130,76 @@ Merged to master in `282cba3`. Opt-in Haiku and local-model smoke harnesses are 
 `4e3da45` and `5fbf115`. The real dojo and real model runs are open in
 [`backlog.md`](backlog.md).
 
-## Milestone 12: serve courses and bridge progress through the extension (not merged yet)
+## Milestone 12: serve courses and bridge progress through the extension (done)
 
 **Scope.** Serve built courses over HTTP by signed open links, and bridge dojo progress saves
 through the extension (`window.claude` stub, split parts reassembled in the bridge, no core
 migration).
 
-**Status.** Built on the m12 stage branch, not on master yet: the open-link signer, course route,
-open endpoint, progress round trip, side panel open action and the bridge content script are
-on the stage branch. Done once merged.
+**Shipped.** Merged to master. The open-link signer, course route, open endpoint, progress round
+trip, side panel open action and the bridge content script are on master
+(`core/kata_core/trainer/open_link.py`, `core/kata_core/api/routes/course_serve.py`). Decisions:
+"Open-link tokens are HMAC-SHA256 signed", "Course bridge design" in `decisions.md`.
+
+## Milestone 13: real dojo contract corrections (done)
+
+**Scope.** Fix the trainer adapter to the real `dojo` CLI: an `init` step, one unit, and
+warnings that never fail a build.
+
+**Shipped.** Artifact keys are relative to the course folder, so the root page is served. Decision:
+"Real dojo contract corrections (M13)"; its id rule was corrected by M14.
+
+## Milestone 14: real dojo contract corrections, part 2 (done)
+
+**Scope.** Correct the remaining dojo contract points found by the real CLI run.
+
+**Shipped.** `next-id` takes the id prefix (the unit name without `-`), and ids are `<prefix>-<n>`.
+Decision: "Real dojo contract corrections, part 2 (M14)" in `decisions.md`.
+
+## Milestone 15: extension has no build-time server config (done)
+
+**Scope.** Remove the fixed core address from the extension build.
+
+**Shipped.** The build has no fixed host; the user types the server URL in the side panel, and the
+origin is requested at sign-in. `KATA_EXTENSION_BASE_URL` is removed. Decision: "Extension has no
+build-time server config (M15)" in `decisions.md`.
+
+## Milestone 16: course limit and unique names (done)
+
+**Scope.** Limit courses per user and make course names unique per user; the side panel lists,
+creates and deletes courses.
+
+**Shipped.** `[trainer] max_courses_per_user` (default 10 in `config/kata.example.toml`; 0 means
+unlimited) is enforced by `POST /v1/courses`. Names are unique per user. Decisions: "Course limit
+default lives in the example config (M16)" and "Course limit and unique names (M16)".
+
+## Milestone 17: local-first routing (done)
+
+**Scope.** Try local models before cloud, and refuse jobs that need the cloud when no cloud
+token is set.
+
+**Shipped.** Default chain is `local,anthropic`; cloud turns on by token alone. Jobs that need the
+cloud are refused with 409 `needs_cloud` before they are queued. Decisions: "Routing defaults are
+local first, cloud by token (M17)" and "Needs-cloud jobs are refused with 409 before queueing
+(M17)". The local capability audit on the PC is still open in [`backlog.md`](backlog.md).
+
+## Milestone 18: local models through a worker on the GPU machine (done)
+
+**Scope.** Run local models on the user's GPU machine and control them from the client.
+
+**Shipped.** One worker program runs on the GPU machine next to Ollama and pulls jobs from core over
+outbound HTTP; control jobs `modelhost.up`, `modelhost.use`, `modelhost.measure` and
+`modelhost.status` go through the same job queue. The worker runs as the owning user, never as
+root, and takes a fixed allow-list of subcommands. Decision: "Local models through a worker on the
+user's GPU machine (M18)" in `decisions.md`.
 
 ## Later
 
 Video transcripts, a phone web app, Chrome packaging, passkeys, deeper terminal tracking,
 exam mode hardening, a public path for single pages.
+
+Extension UI: design v2 is done (navigation, settings, auto-scan and block states; see
+[`design/extension-ui.md`](design/extension-ui.md)). The UI implementation waits for owner approval.
 
 ## Out of scope for now
 
