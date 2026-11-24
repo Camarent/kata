@@ -26,7 +26,6 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/scheduled.py:38` `ScheduledLocalProvider`, `:72` `build_local(cfg, log)` - wraps the local provider with the `decide` gate only when `[modelhost] schedule` is true.
 - `worker/kata_worker/core_client.py:62` `CoreClient` - `next_job` (`:92`), `report` (`:114`), `output` (`:122`), `fail` (`:128`); errors raise `CoreError` (`:28`).
 - `worker/kata_worker/core_client.py:53` `resolve_token(cfg, env)` - reads the bearer token from the env var named by `[worker] token_env`.
-- `worker/kata_worker/model.py:63` `ModelAdapter(config)`; `:71` `tag(block_text) -> (category, topic)`. Not called by the loop (the `tag` handler uses `parse_tag`, `worker/kata_worker/handlers/tag.py:25`); only `tests/worker/test_model.py` uses it.
 - `worker/kata_worker/model.py:46` `parse_tag(reply) -> (category, topic)` - strict reply parser used by `run_once`.
 - `worker/kata_worker/model.py:21` `ModelError`; `:36` `reply_content(response)` - reads the chat reply text, shared with `LocalProvider`.
 - `worker/kata_worker/providers/router.py:60` `Router(chains, providers, policy, log)` - `route(task_class, system, user) -> Routed` (`:76`); tries each provider of the chain in order, first reply wins.

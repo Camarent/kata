@@ -1,49 +1,20 @@
-"""ModelAdapter asks the OpenAI-compatible model for (category, topic) and fails loudly on bad replies."""
+"""parse_tag and reply_content read the model's tag reply; they fail loudly on bad replies."""
 
 from __future__ import annotations
 
+import httpx
 import pytest
-from fakes import fake_model as fake_model_module
-from fakes.fake_model import FakeModel
-from kata_core.config import EXAMPLE_PATH, load_config
-from kata_worker.model import ModelAdapter, ModelError
+from kata_worker.model import ModelError, parse_tag, reply_content
 
-BLOCK_TEXT = "TCP opens a connection with a three-way handshake."
 GOOD_REPLY = '{"category": "Networking", "topic": "TCP handshake"}'
 
 
-def _adapter(base_url: str, timeout: str | None = None) -> ModelAdapter:
-    env = {"KATA_MODEL_BASE_URL": base_url}
-    if timeout is not None:
-        env["KATA_MODEL_TIMEOUT_SECONDS"] = timeout
-    return ModelAdapter(load_config(EXAMPLE_PATH, env=env))
+def test_good_reply_returns_category_and_topic() -> None:
+    assert parse_tag(GOOD_REPLY) == ("Networking", "TCP handshake")
 
 
-def test_good_reply_returns_category_and_topic(fake_model: FakeModel) -> None:
-    fake_model.add_reply(GOOD_REPLY)
-
-    category, topic = _adapter(fake_model.url).tag(BLOCK_TEXT)
-
-    assert (category, topic) == ("Networking", "TCP handshake")
-    request = fake_model.requests[0]
-    assert request.path == fake_model_module.CHAT_PATH
-    assert request.body["messages"][1] == {"role": "user", "content": BLOCK_TEXT}
-    assert request.body["model"] == "local-model"
-
-
-def test_fenced_reply_is_unwrapped(fake_model: FakeModel) -> None:
-    fake_model.add_reply(f"```json\n{GOOD_REPLY}\n```")
-
-    category, topic = _adapter(fake_model.url).tag(BLOCK_TEXT)
-
-    assert (category, topic) == ("Networking", "TCP handshake")
-
-
-def test_non_200_raises_model_error(fake_model: FakeModel) -> None:
-    fake_model.add_reply(500)
-
-    with pytest.raises(ModelError, match="status 500"):
-        _adapter(fake_model.url).tag(BLOCK_TEXT)
+def test_fenced_reply_is_unwrapped() -> None:
+    assert parse_tag(f"```json\n{GOOD_REPLY}\n```") == ("Networking", "TCP handshake")
 
 
 @pytest.mark.parametrize(
@@ -55,15 +26,34 @@ def test_non_200_raises_model_error(fake_model: FakeModel) -> None:
         '{"category": "Networking"}',
     ],
 )
-def test_bad_reply_raises_model_error(fake_model: FakeModel, reply: str) -> None:
-    fake_model.add_reply(reply)
+def test_bad_reply_raises_model_error(reply: str) -> None:
+    with pytest.raises(ModelError):
+        parse_tag(reply)
+
+
+def test_reply_content_returns_message_text() -> None:
+    response = httpx.Response(200, json={"choices": [{"message": {"content": GOOD_REPLY}}]})
+
+    assert reply_content(response) == GOOD_REPLY
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"choices": []},
+        {"choices": [{"message": {}}]},
+        {"choices": [{"message": {"content": ["not", "text"]}}]},
+    ],
+)
+def test_reply_without_text_content_raises_model_error(body: dict[str, object]) -> None:
+    response = httpx.Response(200, json=body)
 
     with pytest.raises(ModelError):
-        _adapter(fake_model.url).tag(BLOCK_TEXT)
+        reply_content(response)
 
 
-def test_timeout_raises_model_error(silent_server: str) -> None:
-    adapter = _adapter(silent_server, timeout="1")
+def test_reply_that_is_not_json_raises_model_error() -> None:
+    response = httpx.Response(200, content=b"<html>gateway</html>")
 
-    with pytest.raises(ModelError, match="timed out"):
-        adapter.tag(BLOCK_TEXT)
+    with pytest.raises(ModelError, match="no message content"):
+        reply_content(response)
