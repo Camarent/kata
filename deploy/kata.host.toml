@@ -206,3 +206,13 @@ capabilities_timeout_seconds = 10
 capabilities_ttl_seconds = 300
 # Cap on the text the model host returns to the worker, in bytes.
 max_text_bytes = 262144
+
+[scan]
+# Minimum classifier confidence (0..1) for a page to be classed without asking the owner.
+classify_pass_bar = 0.8
+# Cap on the candidate concepts offered for one block.
+max_candidates = 5
+# Blocks shorter than this many characters are skipped by the scan.
+min_block_chars = 40
+# Cap on the blocks one scan job may process.
+max_blocks_per_job = 40

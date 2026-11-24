@@ -24,6 +24,10 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `jobs.lease_seconds` | 300 | `KATA_JOBS_LEASE_SECONDS` |
 | `jobs.runner_poll_seconds` | 5 | `KATA_JOBS_RUNNER_POLL_SECONDS` |
 | `jobs.max_output_bytes` | 262144 | `KATA_JOBS_MAX_OUTPUT_BYTES` |
+| `scan.classify_pass_bar` | 0.8 | `KATA_SCAN_CLASSIFY_PASS_BAR` |
+| `scan.max_candidates` | 5 | `KATA_SCAN_MAX_CANDIDATES` |
+| `scan.min_block_chars` | 40 | `KATA_SCAN_MIN_BLOCK_CHARS` |
+| `scan.max_blocks_per_job` | 40 | `KATA_SCAN_MAX_BLOCKS_PER_JOB` |
 | `model.base_url` | "http://127.0.0.1:11434/v1" | `KATA_MODEL_BASE_URL` |
 | `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
 | `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |

@@ -33,6 +33,16 @@ runner_poll_seconds = 5
 # Cap on the output a job may store, in bytes.
 max_output_bytes = 262144
 
+[scan]
+# Minimum classifier confidence (0..1) for a page to be classed without asking the owner.
+classify_pass_bar = 0.8
+# Cap on the candidate concepts offered for one block.
+max_candidates = 5
+# Blocks shorter than this many characters are skipped by the scan.
+min_block_chars = 40
+# Cap on the blocks one scan job may process.
+max_blocks_per_job = 40
+
 [model]
 base_url = "http://127.0.0.1:11434/v1"
 model_name = "local-model"

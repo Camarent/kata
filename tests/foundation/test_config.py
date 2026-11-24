@@ -43,6 +43,7 @@ def test_example_has_required_sections() -> None:
         "auth",
         "worker",
         "jobs",
+        "scan",
         "model",
         "retrieval",
         "lesson_check",
@@ -96,6 +97,12 @@ def test_example_has_required_sections() -> None:
         "token_env",
     }
     assert set(data["jobs"]) == {"lease_seconds", "runner_poll_seconds", "max_output_bytes"}
+    assert set(data["scan"]) == {
+        "classify_pass_bar",
+        "max_candidates",
+        "min_block_chars",
+        "max_blocks_per_job",
+    }
     assert set(data["model"]) == {"base_url", "model_name", "timeout_seconds", "reasoning_effort"}
     assert set(data["retrieval"]) == {
         "embedder",
@@ -124,6 +131,14 @@ def test_load_returns_frozen_dataclass(tmp_path: Path) -> None:
     assert cfg.get("core", "port") == 8080
     with pytest.raises(dataclasses.FrozenInstanceError):
         cfg.sections = {}  # type: ignore[misc]  # frozen-check test needs a write
+
+
+def test_load_reads_scan_defaults(tmp_path: Path) -> None:
+    cfg = load_config(_copy_example(tmp_path), env={})
+    assert cfg.get("scan", "classify_pass_bar") == 0.8
+    assert cfg.get("scan", "max_candidates") == 5
+    assert cfg.get("scan", "min_block_chars") == 40
+    assert cfg.get("scan", "max_blocks_per_job") == 40
 
 
 def test_load_reads_trainer_defaults(tmp_path: Path) -> None:
