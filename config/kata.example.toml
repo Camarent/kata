@@ -40,9 +40,6 @@ timeout_seconds = 60
 # Reasoning effort sent with each request; empty omits the field.
 reasoning_effort = ""
 
-[client]
-request_timeout_seconds = 30
-
 [retrieval]
 embedder = "fake"
 model_name = ""
@@ -108,8 +105,6 @@ base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"
 timeout_seconds = 60
-max_tokens = 1024
-api_version = "2023-06-01"
 cache_system = false
 
 [policy]
@@ -138,8 +133,6 @@ timeout_seconds = 120
 max_concepts = 10
 # Cap on courses one user may hold; 0 means unlimited, negative values fail startup.
 max_courses_per_user = 10
-# Items generated per concept.
-items_per_concept = 3
 # Minimum items a course must keep, else the job fails.
 min_items = 5
 # Cap on the trainer artifact size, in bytes.

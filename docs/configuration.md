@@ -28,7 +28,6 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `model.model_name` | "local-model" | `KATA_MODEL_MODEL_NAME` |
 | `model.timeout_seconds` | 60 | `KATA_MODEL_TIMEOUT_SECONDS` |
 | `model.reasoning_effort` | "" | `KATA_MODEL_REASONING_EFFORT` |
-| `client.request_timeout_seconds` | 30 | `KATA_CLIENT_REQUEST_TIMEOUT_SECONDS` |
 | `retrieval.embedder` | "fake" | `KATA_RETRIEVAL_EMBEDDER` |
 | `retrieval.model_name` | "" | `KATA_RETRIEVAL_MODEL_NAME` |
 | `retrieval.rrf_k` | 60 | `KATA_RETRIEVAL_RRF_K` |
@@ -64,8 +63,6 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
 | `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
-| `provider_anthropic.max_tokens` | 1024 | `KATA_PROVIDER_ANTHROPIC_MAX_TOKENS` |
-| `provider_anthropic.api_version` | "2023-06-01" | `KATA_PROVIDER_ANTHROPIC_API_VERSION` |
 | `provider_anthropic.cache_system` | false | `KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM` |
 | `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
 | `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
@@ -83,7 +80,6 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.max_courses_per_user` | 10 | `KATA_TRAINER_MAX_COURSES_PER_USER` |
-| `trainer.items_per_concept` | 3 | `KATA_TRAINER_ITEMS_PER_CONCEPT` |
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
 | `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
 | `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
