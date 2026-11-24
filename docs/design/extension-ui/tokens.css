@@ -1,6 +1,7 @@
 /*
  * Design tokens for the kata side panel mockups (static, no build step).
- * Light is the default; dark follows prefers-color-scheme, or data-theme on <html>.
+ * Light is the default; dark follows prefers-color-scheme, or data-theme="dark" on <html>
+ * or on any element (a section can show dark inside a light page).
  * Motion is removed for users who ask for reduced motion.
  */
 
@@ -80,7 +81,7 @@
   }
 }
 
-:root[data-theme="dark"] {
+[data-theme="dark"] {
   --color-bg: #15181c;
   --color-surface: #1f242b;
   --color-text: #e6e9ee;
@@ -110,7 +111,7 @@
   color-scheme: light;
 }
 
-:root[data-theme="dark"] {
+[data-theme="dark"] {
   color-scheme: dark;
 }
 

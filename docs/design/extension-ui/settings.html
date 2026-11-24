@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kata side panel: settings (static mockup)</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      /* Layout for the mockup sheet only: the settings screen renders at panel width, light and dark. */
+      main {
+        padding: var(--space-4);
+        display: grid;
+        gap: var(--space-4);
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      }
+      .sheet {
+        width: 100%;
+        max-width: 360px;
+        border: 1px dashed var(--color-border);
+        border-radius: var(--radius);
+        padding: var(--space-3);
+        box-sizing: border-box;
+      }
+      .sheet > h2 {
+        margin: 0 0 var(--space-3);
+        font-size: var(--font-size-small);
+        color: var(--color-text-muted);
+        font-weight: 600;
+      }
+      /* The dark variant sets its own colours from tokens.css, so it reads correctly inside the light sheet. */
+      .variant {
+        background: var(--color-bg);
+        color: var(--color-text);
+        padding: var(--space-3);
+        border-radius: var(--radius);
+      }
+      .screen > * + * {
+        margin-top: var(--space-3);
+      }
+      .screen-head {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-min);
+      }
+      .screen-head h3 {
+        margin: 0;
+        font-size: var(--font-size);
+      }
+      .group {
+        border-top: 1px solid var(--color-border);
+        padding-top: var(--space-3);
+      }
+      .group > h3 {
+        margin: 0 0 var(--space-2);
+        font-size: var(--font-size-small);
+        color: var(--color-text-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+      }
+      .field + .field {
+        margin-top: var(--space-2);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-min);
+      }
+      .row .label {
+        flex: 1 1 auto;
+        overflow-wrap: anywhere;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      li + li {
+        margin-top: var(--space-2);
+      }
+      fieldset {
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+      legend {
+        margin-bottom: var(--space-1);
+        padding: 0;
+      }
+      label.choice {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-height: var(--touch-min);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Light variant: the default theme -->
+      <section class="sheet" id="settings-light" aria-labelledby="settings-light-title">
+        <h2 id="settings-light-title">Settings: light</h2>
+        <div class="variant screen">
+          <div class="screen-head">
+            <button type="button">Back</button>
+            <h3>Settings</h3>
+          </div>
+
+          <div class="group">
+            <h3>Connection</h3>
+            <div class="field">
+              <label for="sl-url">Server URL</label>
+              <input id="sl-url" type="url" value="your server address" />
+            </div>
+            <div class="field">
+              <label for="sl-device">Device label</label>
+              <input id="sl-device" type="text" value="Kitchen laptop" />
+            </div>
+            <p class="muted">Connected to your server.</p>
+            <div class="row">
+              <button type="button">Sign out</button>
+            </div>
+          </div>
+
+          <div class="group" id="sl-auto-scan">
+            <h3>Auto-scan sites</h3>
+            <p class="muted">Scan runs on page open for these sites only.</p>
+            <ul aria-label="Sites with auto-scan">
+              <li class="row">
+                <span class="label">lessons.example</span>
+                <button type="button" aria-label="Remove lessons.example">Remove</button>
+              </li>
+              <li class="row">
+                <span class="label">grammar.example</span>
+                <button type="button" aria-label="Remove grammar.example">Remove</button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="group">
+            <h3>Appearance</h3>
+            <fieldset>
+              <legend>Theme</legend>
+              <label class="choice"><input type="radio" name="theme-light" value="system" /> System</label>
+              <label class="choice"><input type="radio" name="theme-light" value="light" checked /> Light</label>
+              <label class="choice"><input type="radio" name="theme-light" value="dark" /> Dark</label>
+            </fieldset>
+          </div>
+
+          <div class="group">
+            <h3>About</h3>
+            <p class="muted">kata extension, version 0.1.3</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dark variant: the same screen with the dark token set -->
+      <section class="sheet" id="settings-dark" aria-labelledby="settings-dark-title">
+        <h2 id="settings-dark-title">Settings: dark</h2>
+        <div class="variant screen" data-theme="dark">
+          <div class="screen-head">
+            <button type="button">Back</button>
+            <h3>Settings</h3>
+          </div>
+
+          <div class="group">
+            <h3>Connection</h3>
+            <div class="field">
+              <label for="sd-url">Server URL</label>
+              <input id="sd-url" type="url" value="your server address" />
+            </div>
+            <div class="field">
+              <label for="sd-device">Device label</label>
+              <input id="sd-device" type="text" value="Kitchen laptop" />
+            </div>
+            <p class="muted">Connected to your server.</p>
+            <div class="row">
+              <button type="button">Sign out</button>
+            </div>
+          </div>
+
+          <div class="group">
+            <h3>Auto-scan sites</h3>
+            <p class="muted">Scan runs on page open for these sites only.</p>
+            <ul aria-label="Sites with auto-scan">
+              <li class="row">
+                <span class="label">lessons.example</span>
+                <button type="button" aria-label="Remove lessons.example">Remove</button>
+              </li>
+              <li class="row">
+                <span class="label">grammar.example</span>
+                <button type="button" aria-label="Remove grammar.example">Remove</button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="group">
+            <h3>Appearance</h3>
+            <fieldset>
+              <legend>Theme</legend>
+              <label class="choice"><input type="radio" name="theme-dark" value="system" /> System</label>
+              <label class="choice"><input type="radio" name="theme-dark" value="light" /> Light</label>
+              <label class="choice"><input type="radio" name="theme-dark" value="dark" checked /> Dark</label>
+            </fieldset>
+          </div>
+
+          <div class="group">
+            <h3>About</h3>
+            <p class="muted">kata extension, version 0.1.3</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Empty state: no site is listed for auto-scan yet -->
+      <section class="sheet" id="settings-auto-scan-empty" aria-labelledby="settings-empty-title">
+        <h2 id="settings-empty-title">Settings: auto-scan list empty</h2>
+        <div class="variant screen">
+          <div class="screen-head">
+            <button type="button">Back</button>
+            <h3>Settings</h3>
+          </div>
+          <div class="group">
+            <h3>Auto-scan sites</h3>
+            <p>No sites yet.</p>
+            <p class="muted">Turn on "Auto-scan this site" in the panel on a lesson page to add it here.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
