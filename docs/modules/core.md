@@ -9,7 +9,7 @@ Single source of truth for the knowledge model, taxonomy and marks. Exposes the 
 
 ## Public surface
 HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
-- `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. No server launcher found in the repo: TODO(verify) how uvicorn is started.
+- `core/kata_core/api/app.py:11` `create_app(cfg)` - FastAPI factory. Launcher: `python -m kata_core` (`core/kata_core/__main__.py:33` runs `uvicorn.run(create_app(cfg))`).
 - `core/kata_core/api/routes/__init__.py:14` `include_routers(app)` - includes every module that defines `router`.
 - `core/kata_core/api/deps.py:25` `get_cfg`, `:30` `get_conn`, `:39` `get_registry`, `:48` `require_feature(name)` (404 `feature disabled: <name>` when `[<name>] enabled` is off), `:72` `get_authenticator`, `:76` `current_user` - request dependencies.
 - `core/kata_core/api/routes/auth.py:35` `POST /enrol`, `:48` `GET /me`, `:56` `DELETE /devices/{device_id}`.
