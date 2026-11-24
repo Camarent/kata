@@ -602,7 +602,7 @@ Decided 2026-11-24. Status: design decision, UI not built yet. Lists in the UI (
 
 ## D43 Offline marking with a persistent queue
 
-Decided 2026-11-24. Status: design decision, UI not built yet. Marks made while the server is down show at once with a "not synced" dot. They are stored in the extension's `storage.local`, so they survive browser close, restart and page switch, and are sent in order when the server answers. The connection indicator shows the count ("server down, 3 not synced"). A queued user mark wins over a trainer update (D9). To verify before ui-impl: whether the extension has an outbox today.
+Decided 2026-11-24. Status: design decision, UI not built yet. Marks made while the server is down show at once with a "not synced" dot. They are stored in the extension's `storage.local`, so they survive browser close, restart and page switch, and are sent in order when the server answers. The connection indicator shows the count ("server down, 3 not synced"). A queued user mark wins over a trainer update (D9). To verify before the UI implementation milestone: whether the extension has an outbox today.
 
 ## D44 Settings page
 

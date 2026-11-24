@@ -205,7 +205,7 @@ user's GPU machine (M18)" in `decisions.md`.
 - Tracks (D11 to D16).
 - Sort fields (D42).
 
-## Milestone 20: UI implementation (ui-impl)
+## Milestone 20: UI implementation
 
 **Scope.** Build the extension UI on the M19 backend, following the design in
 [`design/extension-ui.md`](design/extension-ui.md).
