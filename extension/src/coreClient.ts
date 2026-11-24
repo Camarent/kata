@@ -138,6 +138,8 @@ export function courseErrorText(err: unknown): string {
       return "A course with this name already exists. Choose another title.";
     case "course_title_empty":
       return "Enter a course title.";
+    case "needs_cloud":
+      return "This needs a cloud model. Add a cloud token to turn it on.";
     default:
       return "Could not save the course. Try again.";
   }
