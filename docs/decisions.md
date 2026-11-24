@@ -583,3 +583,77 @@ Decided 2026-11-23.
 - No machine-specific numbers (sizes, headroom) appear in code, docs or tests.
 
 Reason: the GPU machine sits behind the user's own network, so it must reach out; keeping one worker program and one job queue avoids a second control path.
+
+## D39 Review is self-rating, with "Quiz me"
+
+Decided 2026-11-24. Status: design decision, UI not built yet. No "due" concept and no "you missed this" nagging: progress and velocity are the signals. Review is self-rating: the three buttons (Known, Learning, New) set the state directly (today `setConcept` in `extension/src/background.ts:52`). "Quiz me" gives up to 5 prefilled questions for one topic. A correct quiz answer moves New up to Learning (D19). Open: which concepts Review lists when nothing is due.
+
+## D40 Mark known after a quiz
+
+Decided 2026-11-24. Status: design decision, UI not built yet. At the end of a quiz each concept has a manual "Mark as Known" button, so the owner can confirm and the system holds that state with source `user`. A quiz alone moves only New to Learning (D19).
+
+## D41 Knowledge sources for quizzes (superseded)
+
+Decided 2026-11-24. Superseded by D45 (2026-11-24): the owner's own materials are not enough for quiz questions, so kata needs a source of general knowledge. The first option was the model's own knowledge or fetched reference sources, to decide with a research pass. Untrusted-text rules (D27) apply to anything fetched.
+
+## D42 Sorting in lists
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Lists in the UI (concepts, topics, lists, courses, tracks, sources) offer sort by name, added date, last viewed, and relevance (kata decides from the tracks), each in direct or inverse order. Backend: added date and last viewed fields, and a relevance score from tracks. Review lists concepts as a tree the owner picks from, with these sorts; nothing is pre-selected.
+
+## D43 Offline marking with a persistent queue
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Marks made while the server is down show at once with a "not synced" dot. They are stored in the extension's `storage.local`, so they survive browser close, restart and page switch, and are sent in order when the server answers. The connection indicator shows the count ("server down, 3 not synced"). A queued user mark wins over a trainer update (D9). To verify before ui-impl: whether the extension has an outbox today.
+
+## D44 Settings page
+
+Decided 2026-11-24. Status: design decision, UI not built yet. The settings page holds the connection and sign-out, the auto-scan site list with remove, jokes (on/off, frequency, source), and appearance. Server down disables Scan, Quiz and Generate. Signed out shows only the sign-in form.
+
+## D45 Quiz question sources
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Reference sources give better quality than the model's own knowledge; the model only writes questions from fetched text. Pipeline: core fetches (not the model); allowlisted domains only; plain text kept; size cap; no link following; private and internal IP addresses blocked (SSRF). The model gets the text as marked data, with no tools, no keys and no access to marks. Its output is strict JSON (question, 3-4 choices, answer index, source quote); core rejects other shapes, URLs and over-long text. Grounding check: the quote must appear verbatim in the fetched text. The extension renders with `textContent` only. Model choice reuses the existing routing (a job type plus a setting). Questions are cached per source. Open: the owner's sign-off wording on the model setting.
+
+## D46 Allowlist tiers for reference sources
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Tier 1, authoritative (RFCs and standards, official product docs, the owner's own materials): practice and exams. Tier 2, general reference (Wikipedia and similar, pinned revision, cached): practice only, labelled "general reference", never exams. Defaults are fixed in code. The owner adds domains per area in Settings; they land in Tier 2 with a warning and can be promoted by hand. Only free sources that read without an account; no paid or paywalled sources. Each default source's licence is checked before it is listed. Wikipedia (CC BY-SA) needs attribution and a link. Quotes are short, with a link; full text is never stored or republished.
+
+## D47 Isolation of fetch and document reading
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Fetch and HTML run with no container: a separate low-privilege process, no secrets, SSRF block, caps. The PDF and image reader runs in a sandboxed container (no network, read-only filesystem, no keys, file in and text out), built with that reader. Release default: a stage without a `release:` line is a patch release (checked 2026-11-24 in the pipeline code, not in this repo).
+
+## D48 Ladder belongs to dojo
+
+Decided 2026-11-24. Status: design decision, UI not built yet. The review ladder belongs to dojo. Kata has no due concept and does no scheduling. At course generation a concept's mark picks its starting rung: new gives the first rung, known is left out, learning gives the default rung, which the owner can choose per course. Verified in dojo-kit (see the dojo-kit facts entry below): the starting rung is a dojo stage number, not "3 to 7 days". This corrects my earlier reading of D13.
+
+## D49 Starting rung for learning concepts
+
+Decided 2026-11-24. Status: design decision, UI not built yet. One setting on the Generate course screen, "Learning concepts start at" (default: the 3-7 day rung in the first draft; to be a dojo stage number per the facts entry below). It applies to the whole course. A single concept can be changed afterwards in the course preview.
+
+## D50 Jokes and focus mode
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Jokes default ON, at most once per 2 hours, never during a quiz, while marking, or in focus mode. Settings: off switch, interval, and source (D24, D26, D28). Focus / Exam mode is one manual toggle button (floating card and panel). While on there are no jokes, no pin nudges, no inline quiz offers, no page highlights and no inline mark buttons (marking is off). Scanning still works and its results show only in the panel. The connection indicator stays. Focus mode ends by itself after a chosen time (default 3 hours) so it is not forgotten. Exam mode is not auto-detected. The "This is exam results" button records an exam result on the track goal (see D51). Open: option A (record only) or B (record plus per-domain proposals). Advice: build A first.
+
+## D51 Exam results
+
+Decided 2026-11-24. Status: design decision, UI not built yet. The owner wants option B: record the result (date, pass/fail, score) plus optional per-domain scores. Kata proposes moving concepts of weak domains from Known to Learning, and the owner confirms each one. Build order: record first, then per-domain proposals. This needs a mapping from exam domains to areas, topics or concepts. Where no mapping exists, the owner picks topics by hand. Open: where the domain list comes from.
+
+## D52 One Summary button
+
+Decided 2026-11-24. Status: design decision, UI not built yet. The floating card has ONE "Summary" button. Its view holds both the knowledge summary and the page text summary, each labelled. The glossary ban on a bare "Summary" applies to text that does not say which view it means.
+
+## D53 Concepts and aliases
+
+Decided 2026-11-24. Status: design decision, UI not built yet. A segment-level term that only combines two concepts is not a concept of its own. SYN and ACK stay separate concepts, because each is one flag and ACK recurs in every later segment. "SYN-ACK" and "Three-way handshake" are one concept, Three-way handshake. "SYN-ACK" is an alias: it highlights on the page and opens that concept. Consequence: SYN-ACK cannot be marked Known alone. Concept extraction merges aliases into one concept. This applies to the prototype sample, the glossary (term Alias) and the backend concept extraction.
+
+Backend: today only topics have aliases (`topic_aliases`, `core/kata_core/storage/taxonomy.py`). The milestone adds concept aliases: a per-concept alias list (case-insensitive lookup, shared or private like topics). Extraction returns the canonical name plus alias words and merges them into the existing concept. The scan output carries the written word plus the concept id.
+
+## D54 Concept identity is area, topic and name
+
+Decided 2026-11-24. Status: design decision, UI not built yet. A concept is identified by area, topic and name together. The same word under a different area or topic is a different concept with its own mark. Scan first classifies the page into area and topic (candidates: the user's existing taxonomy, then new ones), then extracts concepts and resolves aliases within that area and topic. When the model cannot decide, the hover menu shows "Which one?" with the candidates, and the pick is remembered for that page's topic. The menu item "Not this meaning" reassigns a highlight to another concept and teaches the alias. Backend: unique key (area, topic, name); alias unique per (area, topic); page classification cached per page; classification is the first model step of a scan and needs an evaluation set. This supersedes "topic only groups" where identity is concerned: a topic still does not decide block state.
+
+## D55 Prototype review round 1
+
+Decided 2026-11-24. Status: design decision, UI not built yet. Colours, style and block order are approved. Changes: (a) state buttons are icons (Known, Learning, New) with a tooltip and an accessible label, everywhere. (b) The concept menu shows a one-line definition (generated at extraction); "Not this meaning" stays as an icon and shows only when a definition is present. (c) Blocks, borders and menus never shift or cover page text. (d) Pages are dynamic: the extension rescans on page change (mutation watch, debounced) and keeps marks by concept id. (e) Quiz questions must not contain or imply the answer. Generator rule: answer words and obvious derivations must not appear in the question stem, checked after grounding. (f) All actions are local: next to the clicked item, with no cursor travel across the screen; the list picker opens beside its button. (g) Spacing of dropdowns and menus is fixed everywhere, including Focus mode. (h) Scan result concept rows are at most 2 lines, with icon buttons. (i) The Review tree is collapsed by default with counts, except the area and topic of the open page; it has Collapse all and Expand all; clicking a concept never expands the tree. (j) Wrong items: "Delete" removes from data (a later scan may bring it back as New); "Ignore from now on" hides it, it is never detected again, and it is managed in a list in Settings with restore. Both apply to concepts and topics, with undo. (k) Scale to 1000+ concepts: a search box, state filter icons, and an "Only this page" filter.
+
+## dojo-kit facts (verified 2026-11-24)
+
+Verified in the dojo-kit docs (audit, 2026-11-24). The default review ladder is 0, 1, 5, 10 and 30 days (5 stages; `DEFAULT_LADDER` in dojo-kit's `srs/mod.rs`, not in this repo; per-unit override via `srs.ladder`). Stages are numbered, not named. A unit counts as learned at stage 4 (dojo-kit's `docs/AUTHORING.md`, not in this repo). The known signal is the placement answer known or again (`ARCHITECTURE.md:37`, `applyPlacement`) and the session setting `knownDistinct`; there is no other known status. No separate exam question pool is documented: `examOnly` units and `poolAspects` topics are different features. Effect on D48 and D49: the starting rung at course generation is a dojo stage number, not "3 to 7 days". D35 exam support needs a dojo change or a kata-side exam flow.
