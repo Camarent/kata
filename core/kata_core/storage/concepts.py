@@ -142,8 +142,12 @@ def _require_visible(conn: psycopg.Connection[Any], user_id: int, concept_id: in
 def set_concept_definition(
     conn: psycopg.Connection[Any], user_id: int, concept_id: int, definition: str
 ) -> None:
-    """Set the one-line definition of concept `concept_id`. Raises LookupError when the concept is not visible."""
+    """Set the one-line definition of concept `concept_id`.
+    Raises LookupError when the concept is not visible, PermissionError when it is shared (owner NULL)."""
     _require_visible(conn, user_id, concept_id)
+    owner_row = conn.execute("SELECT owner_user_id FROM concepts WHERE id = %s", (concept_id,)).fetchone()
+    if owner_row is None or owner_row[0] is None:
+        raise PermissionError(f"shared concept {concept_id} cannot be edited by user {user_id}")
     conn.execute("UPDATE concepts SET definition = %s WHERE id = %s", (definition, concept_id))
 
 

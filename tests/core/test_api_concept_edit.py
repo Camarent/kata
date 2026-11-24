@@ -155,3 +155,39 @@ def test_shared_concept_cannot_be_deleted(
     with db.connect() as conn:
         shared_id = create_concept(conn, topic_id, "shared idea", None)
     assert client.delete(f"/concepts/{shared_id}", headers=a).status_code == 403
+
+
+def test_definition_on_shared_concept_is_403_and_unchanged(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    topic_id = _shared_topic(client, a, "python")
+    with db.connect() as conn:
+        shared_id = create_concept(conn, topic_id, "shared idea", None)
+    put = client.put(f"/concepts/{shared_id}/definition", json={"definition": "edited"}, headers=a)
+    assert put.status_code == 403
+    with db.connect() as conn:
+        row = conn.execute("SELECT definition FROM concepts WHERE id = %s", (shared_id,)).fetchone()
+    assert row is not None and row[0] == ""
+
+
+def test_definition_over_2000_chars_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    topic_id = _shared_topic(client, a, "python")
+    concept_id = _concept(client, a, topic_id, "free variables")
+    too_long = client.put(
+        f"/concepts/{concept_id}/definition", json={"definition": "x" * 2001}, headers=a
+    )
+    assert too_long.status_code == 422
+    at_limit = client.put(
+        f"/concepts/{concept_id}/definition", json={"definition": "x" * 2000}, headers=a
+    )
+    assert at_limit.status_code == 204
+
+
+def test_alias_over_200_chars_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    topic_id = _shared_topic(client, a, "python")
+    concept_id = _concept(client, a, topic_id, "free variables")
+    resp = client.post(f"/concepts/{concept_id}/aliases", json={"alias": "x" * 201}, headers=a)
+    assert resp.status_code == 422

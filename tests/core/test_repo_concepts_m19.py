@@ -46,11 +46,21 @@ def _count(conn: psycopg.Connection[Any], sql: str, params: tuple[Any, ...]) -> 
 
 def test_set_definition_stores_text(conn: psycopg.Connection[Any]) -> None:
     alice = _user(conn, "alice")
-    concept = create_concept(conn, _topic(conn, "closures"), "free variables")
+    concept = create_concept(conn, _topic(conn, "closures"), "free variables", owner_user_id=alice)
     set_concept_definition(conn, alice, concept, "variables a closure reads from its enclosing scope")
     row = conn.execute("SELECT definition FROM concepts WHERE id = %s", (concept,)).fetchone()
     assert row is not None
     assert row[0] == "variables a closure reads from its enclosing scope"
+
+
+def test_set_definition_on_shared_concept_raises_and_keeps_text(conn: psycopg.Connection[Any]) -> None:
+    alice = _user(conn, "alice")
+    concept = create_concept(conn, _topic(conn, "closures"), "free variables")
+    with pytest.raises(PermissionError):
+        set_concept_definition(conn, alice, concept, "shared edit")
+    row = conn.execute("SELECT definition FROM concepts WHERE id = %s", (concept,)).fetchone()
+    assert row is not None
+    assert row[0] == ""
 
 
 def test_set_definition_on_invisible_concept_raises(conn: psycopg.Connection[Any]) -> None:

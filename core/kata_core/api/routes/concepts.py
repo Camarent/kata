@@ -49,7 +49,7 @@ class ConceptOut(BaseModel):
 
 
 class ConceptAliasIn(BaseModel):
-    alias: str = Field(min_length=1)
+    alias: str = Field(min_length=1, max_length=200)
 
 
 class ConceptAliasOut(BaseModel):
@@ -60,7 +60,7 @@ class ConceptAliasOut(BaseModel):
 
 
 class ConceptDefinitionIn(BaseModel):
-    definition: str
+    definition: str = Field(max_length=2000)
 
 
 class IgnoredConceptOut(BaseModel):
@@ -173,9 +173,12 @@ def list_concept_aliases_route(concept_id: int, ctx: Caller, conn: Conn) -> list
 def put_concept_definition(
     concept_id: int, body: ConceptDefinitionIn, ctx: Caller, conn: Conn
 ) -> Response:
-    """Set the definition of a visible concept. 404 when the concept is not visible."""
+    """Set the definition of a concept the caller owns. 404 when not visible, 403 when the concept is shared."""
     _require_concept(conn, ctx.user_id, concept_id)
-    set_concept_definition(conn, ctx.user_id, concept_id, body.definition)
+    try:
+        set_concept_definition(conn, ctx.user_id, concept_id, body.definition)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="shared concept cannot be edited") from exc
     return Response(status_code=204)
 
 
