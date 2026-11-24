@@ -27,6 +27,7 @@ from kata_core.jobs.queue import (
     store_output,
 )
 from kata_core.jobs.runner import Registry, run_output_hook
+from kata_core.modelhost import spec as modelhost_spec
 from kata_core.storage.marks import is_known
 from kata_core.storage.taxonomy import ensure_category, ensure_topic
 
@@ -68,6 +69,7 @@ class JobStatusResponse(BaseModel):
     status: str
     topic: TopicRef | None
     known: bool | None  # noqa: V107 - serialised to JSON by FastAPI, no code reads it
+    output: dict[str, Any] | None = None  # the stored output, null until /output sets it
 
 
 def _topic_ref(conn: psycopg.Connection[Any], topic_id: int) -> TopicRef:
@@ -88,8 +90,14 @@ def create_job(
     """Queue a job of `kind` (tag when none) for the caller.
 
     409 `needs_cloud` when that kind needs the cloud and no cloud token is set; nothing is queued.
+    422 when a modelhost kind has a payload its allow-list refuses; nothing is queued.
     """
     refuse_needs_cloud(cfg, body.kind)
+    if body.kind in modelhost_spec.KINDS:
+        try:
+            modelhost_spec.validate_payload(body.kind, body.payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     return EnqueueResponse(id=enqueue(conn, ctx.user_id, body.payload, kind=body.kind))
 
 
@@ -170,9 +178,10 @@ def job_status(job_id: int, ctx: Caller, conn: Conn) -> JobStatusResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     if job.result_topic_id is None:
-        return JobStatusResponse(status=job.status, topic=None, known=None)
+        return JobStatusResponse(status=job.status, topic=None, known=None, output=job.output)
     return JobStatusResponse(
         status=job.status,
         topic=_topic_ref(conn, job.result_topic_id),
         known=is_known(conn, ctx.user_id, job.result_topic_id),
+        output=job.output,
     )
