@@ -194,13 +194,25 @@ def test_invalid_params_reply_carries_only_the_fixed_message(conn: psycopg.Conne
     assert reply["error"] == {"code": -32602, "message": "kata_search needs a string query"}
 
 
+def test_invalid_params_str_and_public_message_are_the_given_text() -> None:
+    exc = InvalidParams("x")
+    assert str(exc) == "x"
+    assert exc.public_message == "x"
+
+
+def test_invalid_params_has_no_detail_argument() -> None:
+    extra: dict[str, Any] = {"detail": "internal"}
+    with pytest.raises(TypeError):
+        InvalidParams("x", **extra)
+
+
 def test_tool_invalid_params_detail_never_reaches_the_reply(
     conn: psycopg.Connection[Any], cfg: Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ana = _user(conn, "ana")
 
     def leaky(*_args: Any, **_kwargs: Any) -> None:
-        raise InvalidParams("query rejected", detail="internal: relation secret_index does not exist")
+        raise InvalidParams("query rejected") from ValueError("internal: relation secret_index does not exist")
 
     monkeypatch.setattr("kata_core.mcp.rpc.kata_search", leaky)
     reply = handle(conn, cfg, ana, _call_msg("kata_search", {"query": "x"}), at=NOW)
