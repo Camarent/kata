@@ -9,6 +9,7 @@ and the job output is rewritten to the resolved ids and names.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import psycopg
@@ -57,17 +58,26 @@ def classify_output_hook(
         raise LookupError(f"job {job.id} of user {job.user_id} is not leased")
 
 
+def match_taxonomy(taxonomy: Sequence[tuple[str, str]], area: str, topic: str) -> int | None:
+    """Return the index of the first (area, topic) in `taxonomy` matching `area` and `topic`, ignoring case."""
+    wanted = (area.lower(), topic.lower())
+    for index, (taxonomy_area, taxonomy_topic) in enumerate(taxonomy):
+        if (taxonomy_area.lower(), taxonomy_topic.lower()) == wanted:
+            return index
+    return None
+
+
 def _match(
     visible: list[tuple[int, str, str, bool]],
     area: str,
     topic: str,
 ) -> tuple[int, str, str] | None:
     """Return (topic_id, area, topic) of the first visible topic matching area and topic, ignoring case."""
-    wanted = (area.lower(), topic.lower())
-    for topic_id, visible_area, visible_topic, _ in visible:
-        if (visible_area.lower(), visible_topic.lower()) == wanted:
-            return topic_id, visible_area, visible_topic
-    return None
+    index = match_taxonomy([(visible_area, visible_topic) for _, visible_area, visible_topic, _ in visible], area, topic)
+    if index is None:
+        return None
+    topic_id, visible_area, visible_topic, _ = visible[index]
+    return topic_id, visible_area, visible_topic
 
 
 def _classify_payload(job: Job) -> tuple[str, str]:
