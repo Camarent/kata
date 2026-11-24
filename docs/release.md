@@ -6,17 +6,17 @@ Every change after the first release ships as a release made by the pipeline. Th
 
 The version lives in five files: `pyproject.toml`, `extension/package.json`, the root entry of `extension/package-lock.json`, `extension/manifest.base.json`, and the `__version__` line of `core/kata_core/__init__.py`. The code is MIT licensed (`LICENSE`). `pyproject.toml` and `extension/package.json` both carry `"MIT"` as their licence field. A release does not change the licence.
 
-The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, made by the pipeline with `release: minor`. Audits and fix tasks must not change the version.
+The repo starts at `0.0.0`. That value is intentional: the first release is `v0.1.0`, a minor bump. Audits and fix tasks must not change the version.
 
-## Pipeline step order
+## Release steps
 
-1. A stage runs on its `stage/<feature>` branch and is squash-merged into `master`.
-2. The release step reads the `release:` line in the stage's `TASKS.md`:
-   - `release: minor` or `release: major`: the release hook (`scripts/release/bump_version.sh`, set by `release_script` in `pipeline.json`) moves the version from the old value to the new one in the four files above and adds the entry under a dated `## [X.Y.Z]` heading in `CHANGELOG.md`.
-   - `no-release`: nothing is bumped and no tag is made.
-3. The release step creates the tag `vX.Y.Z` on the release commit and pushes it.
+1. Merge the change into `master` (squash merge).
+2. When a release is due, bump the version from the repo root. Run `scripts/release/bump_version.sh current` to read the version now. Then run `scripts/release/bump_version.sh set OLD NEW "ENTRY"` with the old and new versions and a one-line CHANGELOG entry. The script moves the version in the five files above and adds the entry under a dated `## [X.Y.Z]` heading in `CHANGELOG.md`. Review the changed files and commit them.
+3. Create the tag `vX.Y.Z` on the release commit and push it: `git tag vX.Y.Z`, then `git push origin vX.Y.Z`.
 4. The tag triggers `.github/workflows/release-extension.yml` (see below).
 5. The VM takes the new code (see "VM" below).
+
+When no release is due, skip steps 2 to 4: no version change and no tag.
 
 The hook moves the version only in its own entries. A dependency that has the same number is never touched.
 

@@ -75,8 +75,7 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
   without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md`.
 
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
-`-m 'not flaky'`, extension build, extension test), each as a plain command with no `cs-qrun`
-wrapper. The pipeline runs `check-all` through `cs-qrun`; on a clean clone, run `check-all.sh`.
+`-m 'not flaky'`, extension build, extension test), each as a plain command. On a clean clone, run `scripts/dev/check-all.sh`.
 
 ## Coverage baseline
 

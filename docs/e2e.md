@@ -19,10 +19,10 @@ The end-to-end test in `tests/e2e/` runs the whole Milestone 0 loop in one proce
 ## Command
 
 ```
-cs-qrun -- python3 -m pytest tests/e2e
+python3 -m pytest tests/e2e
 ```
 
-`KATA_CONFIG` must point at your `kata.toml` in the environment. Without `cs-qrun`, run `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests/e2e`.
+`KATA_CONFIG` must point at your `kata.toml` in the environment. Run `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests/e2e` to set it for one run.
 
 Run it from the repository root. To run only the round trip: `python3 -m pytest tests/e2e/test_lesson_round_trip.py`.
 

@@ -5,7 +5,7 @@ summary: Quality gate definitions (ruff, mypy, smoke, pytest, extension build an
 # tools
 
 ## Purpose
-Declares the repo's quality gates. Each gate is a plain command with no `cs-qrun` wrapper and mirrors the full `scripts/dev/check-all.sh` chain. `pipeline.json` does not read this file; it runs one gate, `check-all`, through `cs-qrun`.
+Declares the repo's quality gates. Each gate is a plain command and mirrors the full `scripts/dev/check-all.sh` chain.
 
 ## Public surface
 - `tools/gates.json` - top-level key `gates` (`tools/gates.json:2`); list of `{name, cmd}`:
@@ -21,9 +21,9 @@ Declares the repo's quality gates. Each gate is a plain command with no `cs-qrun
 
 ## Invariants and gotchas
 - Gate names are exact (`test_entry_names_are_exact`); renaming breaks the test.
-- No `cmd` may contain `cs-qrun` (`test_no_cmd_runs_through_qrun`, `tests/foundation/test_gates.py:45`); the expected list lives in `EXPECTED_GATES` (`tests/foundation/test_gates.py:7`), so change both together.
+- No `cmd` may contain the qrun wrapper (`test_no_cmd_runs_through_qrun`, `tests/foundation/test_gates.py:45`); the expected list lives in `EXPECTED_GATES` (`tests/foundation/test_gates.py:7`), so change both together.
 - Lint and type config live in `pyproject.toml` (`[tool.ruff]` line length 100; `[tool.mypy]` strict on `core`).
 
 ## Depends on / used by
 - Depends on: `.venv` tools (ruff, mypy, pytest), npm in `extension/` (versions TODO(verify)).
-- Used by: `tests/foundation/test_gates.py`. Not read by `pipeline.json`.
+- Used by: `tests/foundation/test_gates.py`.
