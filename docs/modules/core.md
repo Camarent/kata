@@ -95,6 +95,11 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0012_syllabus.sql` - `syllabus`, `syllabus_module`, `syllabus_module_concept`.
 - `core/migrations/0013_tracks.sql` - `track`, `track_item`, `planning_budget`, `decision_point`.
 - `core/migrations/0014_course_unique_title.sql` - renames duplicate course titles per user (` (k)` suffix), then unique index `course_user_id_title_norm_uidx` on the normalised title. `NORMAL_TITLE_SQL` (`core/kata_core/trainer/store.py:28`) must match the index text; `tests/core/test_course_title_unique.py` checks it.
+- `core/migrations/0015_concept_model.sql` - schema of the concept model: table `concept_aliases` (unique per topic, alias and owner, case-insensitive), `concepts.definition`, `concepts.added_at`, `concepts.last_viewed_at`, table `concept_ignored`. Schema only.
+- `core/migrations/0016_topic_to_concept.sql` - data only: copies topic aliases and known topic marks to concepts (`concept_aliases`, `concept_marks`). Idempotent: every insert has an `ON CONFLICT` guard.
+- `core/kata_core/storage/concept_aliases.py` - `add_concept_alias`, `list_concept_aliases`, `resolve_concept` (case-insensitive; own match beats shared, label beats alias).
+- `core/kata_core/storage/concept_rank.py` - `concept_relevance` (sum of `priority + 1` over the caller's active tracks covering the concept) and `block_state` (derived from concept marks; a topic never decides it).
+- `core/kata_core/api/routes/concept_lists.py` - `GET /concepts/sorted`, `POST /concepts/block-state`, `POST /concepts/{id}/viewed`. Routes in `api/routes/concepts.py`: aliases, definition, ignore and hard delete.
 - `core/kata_core/planning/` - planning (see "Planning (M5)"): `syllabus_store.py`, `tracks_store.py` (every query filters by `user_id`), `triage.py` and `allocate.py` (pure), `plan.py` (`build_plan`), `decisions.py` (`open_point`, `decide`), `syllabus_flow.py`, `job_kinds.py`.
 - `core/kata_core/importer/syllabus.py` - syllabus text to modules (`parse_modules`) and extracted-module check (`validate_extracted`); pure, no database.
 - `core/migrations/0001_init.sql` - schema.

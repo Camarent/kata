@@ -654,6 +654,26 @@ Decided 2026-11-24. Status: design decision, UI not built yet. A concept is iden
 
 Decided 2026-11-24. Status: design decision, UI not built yet. Colours, style and block order are approved. Changes: (a) state buttons are icons (Known, Learning, New) with a tooltip and an accessible label, everywhere. (b) The concept menu shows a one-line definition (generated at extraction); "Not this meaning" stays as an icon and shows only when a definition is present. (c) Blocks, borders and menus never shift or cover page text. (d) Pages are dynamic: the extension rescans on page change (mutation watch, debounced) and keeps marks by concept id. (e) Quiz questions must not contain or imply the answer. Generator rule: answer words and obvious derivations must not appear in the question stem, checked after grounding. (f) All actions are local: next to the clicked item, with no cursor travel across the screen; the list picker opens beside its button. (g) Spacing of dropdowns and menus is fixed everywhere, including Focus mode. (h) Scan result concept rows are at most 2 lines, with icon buttons. (i) The Review tree is collapsed by default with counts, except the area and topic of the open page; it has Collapse all and Expand all; clicking a concept never expands the tree. (j) Wrong items: "Delete" removes from data (a later scan may bring it back as New); "Ignore from now on" hides it, it is never detected again, and it is managed in a list in Settings with restore. Both apply to concepts and topics, with undo. (k) Scale to 1000+ concepts: a search box, state filter icons, and an "Only this page" filter.
 
+## Concept aliases are unique per topic and owner
+
+Decided 2026-11-24. Table `concept_aliases` (migration `core/migrations/0015_concept_model.sql`) holds alternative names of a concept, with the concept's `topic_id`. Lookup is case-insensitive. An alias is unique per topic and owner; a shared alias has no owner. `resolve_concept` (`core/kata_core/storage/concept_aliases.py`) maps a word to one concept of a topic: the caller's own match beats a shared one, and a label beats an alias. Reason: D53 merges an alias into one concept, so a word must resolve to one id within its topic.
+
+## Concept identity is area, topic and name on the concept row
+
+Decided 2026-11-24. The `concepts` table keeps the identity of a concept (D54): the name is `label`, the topic is `topic_id`, the area is the category of that topic, and the owner is `owner_user_id`. No migration moves the identity. Reason: a second identity table would hold the same three values twice.
+
+## Concept definition, last view and ignore
+
+Decided 2026-11-24. Migration 0015 adds `concepts.definition` (empty by default), `concepts.added_at` and `concepts.last_viewed_at`. The definition and the last-viewed time sit on the concept row, so every user who sees the concept sees the same values. Ignore is per user: table `concept_ignored` hides a concept from that user's lists and keeps its marks (D55). Hard delete removes a concept the caller owns, with its marks, aliases and ignore rows; a shared concept gives 403. Reason: D55 separates "Ignore from now on", which keeps data, from "Delete", which removes it.
+
+## Sort fields and derived block state
+
+Decided 2026-11-24. The sort fields of D42 are name, added date, last viewed and relevance, each `asc` or `desc`. A concept never viewed sorts as the oldest time. Relevance is the sum of `priority + 1` over the caller's active tracks whose modules cover the concept; paused and dropped tracks add nothing (`core/kata_core/storage/concept_rank.py`). The state of a block comes from its concepts' marks: all new or unmarked gives `new`, all learning gives `learning`, all known gives `known`, anything else gives `mixed`. A topic never decides a block state. Reason: the block state must follow the concepts a user marked, not the grouping.
+
+## Topic data moves to concepts in migration 0016
+
+Decided 2026-11-24. Migration `core/migrations/0016_topic_to_concept.sql` copies data only. Each topic with a known mark or an alias gets one concept with the topic's name, known topic marks become known concept marks, and topic aliases become concept aliases. The visibility rule of the topic code applies: a private row moves only for its owner. Every insert has an `ON CONFLICT` guard, so a rerun adds no rows. Topic tables and the topic routes stay. Reason: the copy lets the concept routes read the existing marks while the old routes keep working.
+
 ## dojo-kit facts (verified 2026-11-24)
 
 Verified in the dojo-kit docs (audit, 2026-11-24). The default review ladder is 0, 1, 5, 10 and 30 days (5 stages; `DEFAULT_LADDER` in dojo-kit's `srs/mod.rs`, not in this repo; per-unit override via `srs.ladder`). Stages are numbered, not named. A unit counts as learned at stage 4 (dojo-kit's `docs/AUTHORING.md`, not in this repo). The known signal is the placement answer known or again (`ARCHITECTURE.md:37`, `applyPlacement`) and the session setting `knownDistinct`; there is no other known status. No separate exam question pool is documented: `examOnly` units and `poolAspects` topics are different features. Effect on D48 and D49: the starting rung at course generation is a dojo stage number, not "3 to 7 days". D35 exam support needs a dojo change or a kata-side exam flow.

@@ -57,6 +57,16 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/concepts/marks` | bearer | none | 200 list of `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | |
 | PUT | `/concepts/{concept_id}/mark` | bearer | `{"state": "known" \| "learning" \| "new", "evidence": str = ""}` | 200 `{"concept_id", "label", "state", "evidence", "created_at", "updated_at"}` | 404 concept not found; 422 unknown state |
 | DELETE | `/concepts/{concept_id}/mark` | bearer | none | 204 | 404 mark not found |
+| GET | `/concepts/sorted?sort=name\|added\|viewed\|relevance&order=asc\|desc` | bearer | query: `sort` (default `name`), `order` (default `asc`) | 200 list of `{"concept_id", "label", "state", "added_at", "last_viewed_at", "relevance"}`, ignored concepts left out | 422 unknown `sort` or `order` |
+| POST | `/concepts/block-state` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"state": "new" \| "learning" \| "known" \| "mixed"}` | 404 a concept is not visible to the caller; 422 empty list |
+| POST | `/concepts/{concept_id}/viewed` | bearer | none | 204 (stamps `last_viewed_at`) | 404 concept not found |
+| POST | `/concepts/{concept_id}/aliases` | bearer | `{"alias": str}` (at least one character) | 200 `{"id", "concept_id", "alias", "private": true}` | 404 concept not found; 409 alias already exists |
+| GET | `/concepts/{concept_id}/aliases` | bearer | none | 200 list of `{"id", "concept_id", "alias", "private"}`: shared aliases and the caller's own | 404 concept not found |
+| PUT | `/concepts/{concept_id}/definition` | bearer | `{"definition": str}` | 204 | 404 concept not found |
+| GET | `/concepts/ignored` | bearer | none | 200 list of `{"concept_id", "label"}`, ordered by concept id | |
+| PUT | `/concepts/{concept_id}/ignore` | bearer | none | 204 (marks are kept) | 404 concept not found |
+| DELETE | `/concepts/{concept_id}/ignore` | bearer | none | 204 | 404 concept not ignored |
+| DELETE | `/concepts/{concept_id}` | bearer | none | 204 (removes the concept with its marks, aliases and ignore rows) | 404 concept not found; 403 shared concept |
 | POST | `/lesson-check` | bearer | `{"concept_ids": [int, ...]}` (at least one id) | 200 `{"results": [{"concept_id", "label", "state", "source", "evidence"}]}`, in input order | 404 a concept is not visible to the caller (nothing partial); 422 empty or non-integer list |
 | POST | `/usage` | bearer | `{"micro_usd": int}` (>= 0) | 204 | 422 negative or non-integer `micro_usd` |
 | GET | `/usage` | bearer | none | 200 `{"day": "YYYY-MM-DD", "micro_usd": int, "calls": int}` (UTC day) | zeros when nothing recorded |
