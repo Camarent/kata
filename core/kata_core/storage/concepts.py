@@ -217,8 +217,15 @@ class VisibleConcept(NamedTuple):
     last_viewed_at: datetime | None
 
 
-def list_visible_concepts(conn: psycopg.Connection[Any], user_id: int) -> list[VisibleConcept]:
-    """Every concept `user_id` can see under a visible topic, minus the ones they ignore, ordered by concept id."""
+def list_visible_concepts(
+    conn: psycopg.Connection[Any], user_id: int, topic_id: int | None = None
+) -> list[VisibleConcept]:
+    """Every concept `user_id` can see under a visible topic, minus the ones they ignore, ordered by concept id.
+    `topic_id` narrows the list to the concepts of that one topic."""
+    topic_filter = "" if topic_id is None else "AND c.topic_id = %s "
+    params: tuple[int, ...] = (user_id, user_id, user_id, user_id, user_id)
+    if topic_id is not None:
+        params = (*params, topic_id)
     rows = conn.execute(
         "SELECT c.id, c.label, m.state, c.added_at, v.last_viewed_at FROM concepts c "
         "JOIN topics t ON t.id = c.topic_id "
@@ -227,8 +234,9 @@ def list_visible_concepts(conn: psycopg.Connection[Any], user_id: int) -> list[V
         "WHERE (c.owner_user_id IS NULL OR c.owner_user_id = %s) "
         "AND (t.owner_user_id IS NULL OR t.owner_user_id = %s) "
         "AND NOT EXISTS (SELECT 1 FROM concept_ignored i WHERE i.user_id = %s AND i.concept_id = c.id) "
-        "ORDER BY c.id",
-        (user_id, user_id, user_id, user_id, user_id),
+        + topic_filter
+        + "ORDER BY c.id",
+        params,
     ).fetchall()
     return [
         VisibleConcept(int(cid), str(label), None if state is None else str(state), added, viewed)
