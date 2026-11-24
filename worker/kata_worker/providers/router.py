@@ -18,8 +18,8 @@ from kata_worker.providers import anthropic
 from kata_worker.providers.base import TASK_CLASSES, Provider, ProviderError
 from kata_worker.providers.cost import Ledger, LogSink
 from kata_worker.providers.guard import AuditSink
-from kata_worker.providers.local import LocalProvider
 from kata_worker.providers.policy import PROVIDER_NAMES, Policy, PolicyError
+from kata_worker.providers.scheduled import build_local
 
 ROUTING_SECTION = "routing"
 SKIPPED = "skipped"
@@ -97,7 +97,7 @@ class Router:
 def _build_providers(
     cfg: Config, ledger: Ledger, env: Mapping[str, str], audit: AuditSink, log: LogSink
 ) -> dict[str, Provider]:
-    providers: dict[str, Provider] = {"local": LocalProvider(cfg)}
+    providers: dict[str, Provider] = {"local": build_local(cfg, log)}
     cloud = anthropic.build_cloud(cfg, ledger, env, audit, log)
     # No key: the cloud provider is absent, so the router skips it without a call.
     if cloud is not None:
