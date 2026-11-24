@@ -160,6 +160,7 @@ def _parse(argv: Sequence[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--api-key-env",
+        dest="bearer_env_name",
         default=None,
         help="name of the environment variable holding the bearer key (optional)",
     )
@@ -279,10 +280,10 @@ def main(
     if not base_url:
         return _refuse(f"refused: pass --base-url or set {BASE_URL_ENV}")
     api_key = ""
-    if args.api_key_env is not None:
-        api_key = env.get(args.api_key_env, "")
+    if args.bearer_env_name is not None:
+        api_key = env.get(args.bearer_env_name, "")
         if not api_key:
-            return _refuse(f"refused: set {args.api_key_env} in the environment")
+            return _refuse(f"refused: set {args.bearer_env_name} in the environment")
     try:
         config = load_config(args.config, env)
     except ConfigError as exc:
