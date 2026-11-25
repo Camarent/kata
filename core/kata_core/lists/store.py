@@ -46,6 +46,11 @@ def _owns(conn: psycopg.Connection[Any], user_id: int, list_id: int) -> bool:
     return row is not None
 
 
+def owns_list(conn: psycopg.Connection[Any], user_id: int, list_id: int) -> bool:
+    """True when `list_id` is a list of `user_id`. Lets callers tell 404 from an empty result."""
+    return _owns(conn, user_id, list_id)
+
+
 def create_list(conn: psycopg.Connection[Any], user_id: int, name: str) -> int:
     """Create an empty list named `name` for this user and return its id.
 
