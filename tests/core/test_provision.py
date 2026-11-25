@@ -72,6 +72,7 @@ SCHEMA_TABLES = {
     "exam_result_concept",
     "page_summary",
     "reader_document",
+    "joke_cache",
 }
 
 
