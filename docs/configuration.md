@@ -54,6 +54,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `routing.summary` | "local,anthropic" | `KATA_ROUTING_SUMMARY` |
 | `routing.batch` | "local,anthropic" | `KATA_ROUTING_BATCH` |
 | `routing.generate_course` | "local,anthropic" | `KATA_ROUTING_GENERATE_COURSE` |
+| `routing.quiz_generate` | "local,anthropic" | `KATA_ROUTING_QUIZ_GENERATE` |
 | `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
 | `routing.scan_classify` | "local,anthropic" | `KATA_ROUTING_SCAN_CLASSIFY` |
 | `routing.scan_extract` | "local,anthropic" | `KATA_ROUTING_SCAN_EXTRACT` |
@@ -65,8 +66,9 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.extract_syllabus` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXTRACT_SYLLABUS` |
 | `local_capability.scan_classify` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_CLASSIFY` |
 | `local_capability.scan_extract` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_EXTRACT` |
-| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
-| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `local_capability.quiz_generate` | "kata-l" | `KATA_LOCAL_CAPABILITY_QUIZ_GENERATE` |
+| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
@@ -122,5 +124,10 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `modelhost.capabilities_timeout_seconds` | 10 | `KATA_MODELHOST_CAPABILITIES_TIMEOUT_SECONDS` |
 | `modelhost.capabilities_ttl_seconds` | 300 | `KATA_MODELHOST_CAPABILITIES_TTL_SECONDS` |
 | `modelhost.max_text_bytes` | 262144 | `KATA_MODELHOST_MAX_TEXT_BYTES` |
+| `exams.max_import_bytes` | 262144 | `KATA_EXAMS_MAX_IMPORT_BYTES` |
+| `quiz.max_fetch_bytes` | 262144 | `KATA_QUIZ_MAX_FETCH_BYTES` |
+| `quiz.max_question_chars` | 400 | `KATA_QUIZ_MAX_QUESTION_CHARS` |
+| `quiz.max_questions_per_source` | 50 | `KATA_QUIZ_MAX_QUESTIONS_PER_SOURCE` |
+| `quiz.mini_quiz_size` | 5 | `KATA_QUIZ_MINI_QUIZ_SIZE` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.

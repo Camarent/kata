@@ -12,6 +12,7 @@ from typing import Any
 
 from kata_core.config import Config
 from kata_core.planning.job_kinds import SYLLABUS_EXTRACT_KIND
+from kata_core.quiz.job_kinds import QUIZ_GENERATE_KIND
 from kata_core.trainer.job_kinds import COURSE_GENERATE_KIND
 
 LOCAL_CAPABILITY_SECTION = "local_capability"
@@ -29,6 +30,7 @@ TASK_CLASSES = frozenset(
         "extract_syllabus",
         "scan_classify",
         "scan_extract",
+        "quiz_generate",
     }
 )
 
@@ -36,6 +38,7 @@ TASK_CLASSES = frozenset(
 JOB_KIND_CLASS: dict[str, str] = {
     COURSE_GENERATE_KIND: "generate_course",
     SYLLABUS_EXTRACT_KIND: "extract_syllabus",
+    QUIZ_GENERATE_KIND: "quiz_generate",
 }
 
 

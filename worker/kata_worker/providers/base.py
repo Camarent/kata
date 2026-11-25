@@ -18,6 +18,7 @@ TASK_CLASSES = (
     "extract_syllabus",
     "scan_classify",
     "scan_extract",
+    "quiz_generate",
 )
 
 

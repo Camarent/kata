@@ -11,6 +11,7 @@ from kata_core.jobs.needs_cloud import (
     needs_cloud_for_kind,
 )
 from kata_core.planning.job_kinds import SYLLABUS_EXTRACT_KIND
+from kata_core.quiz.job_kinds import QUIZ_GENERATE_KIND
 
 KEY_ENV = "KATA_TEST_CLOUD_KEY"
 TOKEN_ENV = {KEY_ENV: "sk-test"}
@@ -57,11 +58,18 @@ def test_cloud_token_present_reads_named_env_var() -> None:
     assert cloud_token_present(cfg, NO_TOKEN_ENV) is False
 
 
-def test_kind_table_maps_only_the_two_cloud_kinds() -> None:
+def test_kind_table_maps_only_the_cloud_kinds() -> None:
     assert JOB_KIND_CLASS == {
         "course.generate": "generate_course",
         SYLLABUS_EXTRACT_KIND: "extract_syllabus",
+        QUIZ_GENERATE_KIND: "quiz_generate",
     }
+
+
+def test_quiz_generate_needs_cloud_only_without_token() -> None:
+    cfg = _cfg(quiz_generate="cloud-only")
+    assert needs_cloud_for_kind(cfg, QUIZ_GENERATE_KIND, NO_TOKEN_ENV) is True
+    assert needs_cloud_for_kind(cfg, QUIZ_GENERATE_KIND, TOKEN_ENV) is False
 
 
 def test_needs_cloud_for_kind_uses_table() -> None:

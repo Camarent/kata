@@ -721,3 +721,48 @@ Decided 2026-11-24 (owner). Status: implemented in M21. Regenerating a course ke
 ## Start rung is a dojo ladder stage (D48, D49)
 
 Decided 2026-11-24 (owner). Status: implemented in M21; corrects the "3 to 7 days" wording of D49. The ladder belongs to dojo: stages 0, 1, 2 and 3 are the review stages at 0, 1, 5, 10 and 30 days. Stage 4 means learned and is never a start rung. Kata keeps no schedule. At course generation a new concept starts at stage 0, a learning concept at the course's `learning_rung` (default `trainer.learning_start_rung`, a stage from 0 to 3), and a known concept is left out. The `learning_rung` is chosen per course at create or from-list time. Reason: dojo stages are numbered, not named, so kata passes the stage number and not a duration.
+
+## Quiz pool sources and allowlist tiers (D45, D46, D47)
+
+Decided 2026-11-25 (M22). Status: implemented in M22 (`core/kata_core/quiz/`). Reference sources give better quality than the model's own knowledge, so the model writes questions only from fetched text. Pipeline: core fetches the source, not the model. Only allowlisted hosts, matched exactly over https on the default port; plain text kept; size cap; no link following; private and internal addresses blocked (SSRF). The model gets the text as marked data, with no tools, no keys and no access to marks. Its output is strict JSON (question, 3 or 4 choices, answer index, source quote); core rejects other shapes, URLs and over-long text. Grounding check: the quote must appear verbatim in the fetched text. The extension renders with `textContent` only. Questions are cached per source.
+
+Tiers:
+
+- Tier 1, authoritative (RFCs and standards, official product docs, the owner's own materials): may back practice and exams.
+- Tier 2, general reference (encyclopaedic pages, pinned revision, cached): practice only, labelled "general reference", never exams.
+- Defaults are fixed in code (`DEFAULT_SOURCES`). A domain the owner adds is always tier 2, with a warning. Nothing in the input promotes it to tier 1; promotion is by hand only.
+- Only free sources that read without an account. No paid or paywalled sources.
+- Quotes are short, with a link and the licence. Full text is never stored or republished.
+
+Default sources and licences (for owner confirmation; each licence page is the reference for its row):
+
+| Host | Tier | Licence | Licence page | Attribution |
+|---|---|---|---|---|
+| datatracker.ietf.org | 1 | IETF Trust Legal Provisions | https://trustee.ietf.org/license-info | not required |
+| docs.python.org | 1 | Python Software Foundation License | https://docs.python.org/3/license.html | not required |
+| developer.mozilla.org | 1 | CC BY-SA 2.5 | https://creativecommons.org/licenses/by-sa/2.5/ | required, with a link |
+| en.wikipedia.org | 2 | CC BY-SA 4.0 | https://creativecommons.org/licenses/by-sa/4.0/ | required, with a link |
+
+Every source row records its licence; a source without one is refused. A user domain has no published licence and records "not recorded: user domain, no published licence".
+
+## Quiz answers stay out of the stem (D55 item e)
+
+Decided 2026-11-25 (M22). Status: implemented in M22. Quiz questions must not contain or imply the answer. Generator rule: answer words and obvious derivations must not appear in the question stem. The check runs after the grounding check. The answer index is stored in core only; the client never sends it, and `GET /quiz/mini` returns no answer index. A mini quiz gives at most 5 prefilled questions.
+
+## Quiz model setting uses routing task class quiz_generate
+
+Decided 2026-11-25 (M22). Status: implemented in M22. The model step for questions reuses the existing routing: the job kind `quiz.generate` runs in the task class `quiz_generate`, and its provider chain comes from the routing setting. No new setting key. The worker handler for `quiz.generate` and its output hook are done in M22. The cloud gate is done in M22: `quiz.generate` is in `JOB_KIND_CLASS` (`core/kata_core/jobs/needs_cloud.py`), so the job-kind refusal applies to it. Open: the owner's sign-off wording for the model setting in Settings.
+
+## Fetch runs in the job runner process
+
+Decided 2026-11-25 (M22). Status: implemented in M22. `quiz.fetch` is a job handler, found by the job runner through the job registry. The handler checks the URL against the allowlist, fetches the source with the size cap and the SSRF block, stores it, and queues `quiz.generate`. The model call runs later as its own job. The separate sandbox for document reading (D47) is not part of M22; the PDF and image reader waits for M23.
+
+## Exam results are imported with a confirm step (D35, D58)
+
+Decided 2026-11-25 (owner, M22). Status: implemented in M22. Dojo course exams run in dojo. Kata only imports results, from dojo and from page exams, and each import waits for a confirm step before any concept is marked Known. Kata does not author exams. No dojo-kit change is needed. The D35 exam rule holds: exams use tier 1 sources only.
+
+Dojo placement experiment: implemented in M22 (`placement_known` in `core/kata_core/exams/placement.py`). A confirmed result writes the placement answer "known" for the confirmed concepts' course items into the progress document, through the progress store. When the course has no stored progress document, the write is skipped. Not yet run against a live dojo; the unit tests cover it.
+
+## Exam domain mapping is not built (D51 deferred)
+
+Decided 2026-11-25 (M22). Status: scope decision. Kata does not map exam domains. An import matches each result to concepts per concept, using the course item ids. Reason: the import needs no domain list, so a second taxonomy waits until the owner needs one.
