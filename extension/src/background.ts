@@ -13,11 +13,11 @@ import {
   type ProgressDoc,
   type TopicOverview,
 } from "./coreClient";
-import { runConceptScan, type ConceptScanError, type ConceptScanResult } from "./conceptScan";
+import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
+import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
-import { createRescanner, mergeMarks, type Rescanner } from "./rescan";
 import type { SignInInput } from "./sidepanel";
 import { validateServerUrl } from "./serverUrl";
 import { TokenStore, type StorageArea } from "./tokenStore";
@@ -141,30 +141,6 @@ const MODELHOST_QUEUE: Record<"start" | "measure" | "status", (client: CoreClien
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Quiet time after the last page change before the concept rescan runs, in milliseconds. */
-const RESCAN_DEBOUNCE_MS = 1500;
-
-/** The page key: the URL without its fragment (the core keys classifications by it). */
-function pageKeyOf(url: string): string {
-  const page = new URL(url);
-  page.hash = "";
-  return page.toString();
-}
-
-/** Merges a rescan into the previous result: concepts known before keep their state, the rest take the new one. */
-function mergeScanResult(prev: ConceptScanResult, next: ConceptScanResult): ConceptScanResult {
-  const merged = mergeMarks(
-    prev.blocks.flatMap((block) => block.concepts),
-    next.blocks.flatMap((block) => block.concepts),
-  );
-  let at = 0;
-  const blocks = next.blocks.map((block) => ({
-    ...block,
-    concepts: block.concepts.map(() => merged[at++]),
-  }));
-  return { ...next, blocks };
-}
-
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
   const tokens = new TokenStore(area);
@@ -177,52 +153,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     return session;
   };
 
-  /** The rescan in progress: its tab, page key, last merged result and stop function. */
-  let watched: { tabId: number; pageKey: string; last: ConceptScanResult; rescanner: Rescanner } | undefined;
-  /** Mutation callbacks of the watched pages, by tab id. */
-  const mutationHandlers = new Map<number, () => void>();
-
-  const stopRescan = (): void => {
-    watched?.rescanner.stop();
-    watched = undefined;
-  };
-
-  /** Asks the page for its blocks and runs the concept scan over them. */
-  const scanPage = async (session: Session, tabId: number, pageKey: string): Promise<ConceptScanResult | ConceptScanError> => {
-    const page = (await api.tabs.sendMessage(tabId, { type: "scan" })) as ScanResponse;
-    if (!page?.blocks) return { error: "page gave no blocks" };
-    return runConceptScan(clientFor(session), { pageKey, blocks: page.blocks }, { pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
-  };
-
-  /** One rescan: scans the watched page again and keeps the states known before. */
-  const rescanOnce = async (tabId: number): Promise<void> => {
-    const session = await tokens.loadSession();
-    const current = watched;
-    if (!session || !current || current.tabId !== tabId) return;
-    const next = await scanPage(session, tabId, current.pageKey);
-    if ("error" in next || watched !== current) return;
-    current.last = mergeScanResult(current.last, next);
-  };
-
-  const startRescan = (tabId: number, pageKey: string, first: ConceptScanResult): void => {
-    const rescanner = createRescanner({
-      observe(onMutation) {
-        mutationHandlers.set(tabId, onMutation);
-        api.tabs.sendMessage(tabId, { type: "watch" }).catch(() => undefined);
-        return () => {
-          if (mutationHandlers.get(tabId) === onMutation) mutationHandlers.delete(tabId);
-          api.tabs.sendMessage(tabId, { type: "unwatch" }).catch(() => undefined);
-        };
-      },
-      debounceMs: RESCAN_DEBOUNCE_MS,
-      setTimer: (fire, ms) => setTimeout(fire, ms),
-      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-      onRescan: () => {
-        rescanOnce(tabId).catch(() => undefined);
-      },
-    });
-    watched = { tabId, pageKey, last: first, rescanner };
-  };
+  const scanner = createConceptScanner({ api, tokens, clientFor, pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
 
   return {
     progress: createProgressBridge(clientFor, tokens),
@@ -240,7 +171,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     },
 
     async disconnect() {
-      stopRescan();
+      scanner.stopRescan();
       await tokens.clearSession();
       await syncBridge(api.scripting, tokens);
     },
@@ -257,13 +188,13 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     async scanConcepts() {
       const session = await requireSession();
       // A new scan replaces the rescan of the page before it.
-      stopRescan();
+      scanner.stopRescan();
       const [tab] = await api.tabs.query({ active: true, currentWindow: true });
       if (tab?.id === undefined) throw new Error("no active tab");
       if (tab.url === undefined) throw new Error("page has no URL");
       const pageKey = pageKeyOf(tab.url);
-      const result = await scanPage(session, tab.id, pageKey);
-      if (!("error" in result)) startRescan(tab.id, pageKey, result);
+      const result = await scanner.scanPage(session, tab.id, pageKey);
+      if (!("error" in result)) scanner.startRescan(tab.id, pageKey, result);
       return result;
     },
 
@@ -283,11 +214,11 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     },
 
     pageMutated(tabId) {
-      mutationHandlers.get(tabId)?.();
+      scanner.pageMutated(tabId);
     },
 
     tabNavigated(tabId) {
-      if (watched?.tabId === tabId) stopRescan();
+      scanner.tabNavigated(tabId);
     },
 
     async markKnown(topicId) {
