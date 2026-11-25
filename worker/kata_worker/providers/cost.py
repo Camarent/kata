@@ -10,12 +10,20 @@ skips the cap.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Protocol, runtime_checkable
 
 from kata_core.config import Config
 
-from kata_worker.providers.base import Provider, ProviderError, TokenUsage, UsageProvider
+from kata_worker.providers.base import (
+    Completion,
+    ImageInput,
+    Provider,
+    ProviderError,
+    TokenUsage,
+    UsageProvider,
+    require_vision,
+)
 
 # Pinned prices: model name -> (input, output) micro-USD per 1M tokens.
 PRICES: dict[str, tuple[int, int]] = {
@@ -62,12 +70,16 @@ def estimate_tokens(text: str) -> int:
     return -(-len(text) // TOKEN_CHARS)
 
 
-def cost_micro_usd(model: str, in_text: str, out_text: str) -> int:
-    """Estimated cost of one call in micro-USD, rounded up. Integer math only."""
+def cost_micro_usd(model: str, in_text: str, out_text: str, extra_in_tokens: int = 0) -> int:
+    """Estimated cost of one call in micro-USD, rounded up. Integer math only.
+
+    `extra_in_tokens` adds input tokens that are not text (the image tokens of a vision call).
+    """
     if model not in PRICES:
         raise PricingError(f"no pinned price for model {model}")
     price_in, price_out = PRICES[model]
-    total = estimate_tokens(in_text) * price_in + estimate_tokens(out_text) * price_out
+    in_tokens = estimate_tokens(in_text) + extra_in_tokens
+    total = in_tokens * price_in + estimate_tokens(out_text) * price_out
     return -(-total // MICRO_PER_TOKEN_UNIT)
 
 
@@ -88,7 +100,10 @@ def cost_from_usage(model: str, usage: TokenUsage) -> int:
 
 
 class CappedProvider:
-    """A Provider that enforces the daily cost cap on cloud calls. Built with `capped`."""
+    """A Provider that enforces the daily cost cap on cloud calls. Built with `capped`.
+
+    `image_tokens` is the input-token estimate of one image in a vision call ([cost] image_input_tokens).
+    """
 
     def __init__(
         self,
@@ -99,6 +114,7 @@ class CappedProvider:
         warn: int,
         safety_percent: int,
         log: LogSink,
+        image_tokens: int,
     ) -> None:
         if safety_percent < HUNDREDTHS:
             raise ProviderError(f"estimate_safety_percent must be at least 100, got {safety_percent}")
@@ -109,33 +125,51 @@ class CappedProvider:
         self._warn = warn
         self._safety = safety_percent
         self._log = log
+        self._image_tokens = image_tokens
         self.name = inner.name
         self.is_cloud = inner.is_cloud
 
     def complete(self, system: str, user: str) -> str:
         if not self.is_cloud:
             return self._inner.complete(system, user)
+        return self._metered(system, user, 0, lambda: self._text_call(system, user)).text
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Same cap as `complete`, with the image tokens counted in the estimate and the charge."""
+        inner = require_vision(self._inner)
+        if not self.is_cloud:
+            return inner.complete_vision(system, user, images)
+        return self._metered(
+            system, user, len(images), lambda: inner.complete_vision(system, user, images)
+        )
+
+    def _text_call(self, system: str, user: str) -> Completion:
+        if isinstance(self._inner, UsageProvider):
+            return self._inner.complete_with_usage(system, user)
+        return Completion(text=self._inner.complete(system, user), usage=None)
+
+    def _metered(
+        self, system: str, user: str, image_count: int, call: Callable[[], Completion]
+    ) -> Completion:
+        """Refuse over the cap, run `call`, record its cost and warn. Shared by text and vision calls."""
+        image_in = image_count * self._image_tokens
         # Price the model before any off-machine call, so an unpriced model cannot spend uncounted.
         # The input estimate raised by the safety percent (rounded up) is what this call may add.
-        estimate = cost_micro_usd(self._model, system + user, "")
+        estimate = cost_micro_usd(self._model, system + user, "", image_in)
         guard = -(-estimate * self._safety // HUNDREDTHS)
         spent = self._ledger.usage_today()
         if spent + guard >= self._cap:
             raise CapReached(spent, self._cap)
-        if isinstance(self._inner, UsageProvider):
-            completion = self._inner.complete_with_usage(system, user)
-            reply, usage = completion.text, completion.usage
+        completion = call()
+        if completion.usage is not None:
+            cost = cost_from_usage(self._model, completion.usage)
         else:
-            reply, usage = self._inner.complete(system, user), None
-        if usage is not None:
-            cost = cost_from_usage(self._model, usage)
-        else:
-            cost = cost_micro_usd(self._model, system + user, reply)
+            cost = cost_micro_usd(self._model, system + user, completion.text, image_in)
         self._ledger.record_usage(cost)
         total = self._ledger.usage_today()
         if total >= self._warn:
             self._log(f"cost warn: spent {total} of warn {self._warn} micro-USD")
-        return reply
+        return completion
 
 
 def capped(
@@ -145,4 +179,5 @@ def capped(
     cap = int(cfg.get("cost", "cap_micro_usd"))
     warn = int(cfg.get("cost", "warn_micro_usd"))
     safety = int(cfg.get("cost", "estimate_safety_percent"))
-    return CappedProvider(inner, ledger, model, cap, warn, safety, log)
+    image_tokens = int(cfg.get("cost", "image_input_tokens"))
+    return CappedProvider(inner, ledger, model, cap, warn, safety, log, image_tokens)

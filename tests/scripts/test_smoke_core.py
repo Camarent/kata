@@ -90,7 +90,7 @@ def _stack(
     usage = smoke.UsageTransport(httpx.MockTransport(recorder))
     inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
     ledger = smoke.MemoryLedger()
-    capped = CappedProvider(inner, ledger, HAIKU, cap, cap, 150, lambda message: None)
+    capped = CappedProvider(inner, ledger, HAIKU, cap, cap, 150, lambda message: None, 1600)
     return capped, ledger, usage
 
 
@@ -232,7 +232,7 @@ def test_provider_error_is_a_fail_not_a_stop(smoke: ModuleType) -> None:
     usage = smoke.UsageTransport(httpx.MockTransport(server_error))
     inner = AnthropicProvider(_config(), env={KEY_ENV: KEY}, transport=usage)
     ledger = smoke.MemoryLedger()
-    capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, 150, lambda message: None)
+    capped = CappedProvider(inner, ledger, HAIKU, CAP, CAP, 150, lambda message: None, 1600)
     result = smoke.run_case(_case(smoke, "explain"), capped, ledger, usage, model=HAIKU, secret=KEY)
     assert result.passed is False
     assert KEY not in smoke.format_line(result)

@@ -9,13 +9,20 @@ is a fallback only when the chain lists it. `build_router` builds the providers 
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from kata_core.config import Config
 
 from kata_worker.providers import anthropic
-from kata_worker.providers.base import TASK_CLASSES, Provider, ProviderError
+from kata_worker.providers.base import (
+    TASK_CLASSES,
+    ImageInput,
+    Provider,
+    ProviderError,
+    VisionProvider,
+    require_vision,
+)
 from kata_worker.providers.cost import Ledger, LogSink
 from kata_worker.providers.guard import AuditSink
 from kata_worker.providers.policy import PROVIDER_NAMES, Policy, PolicyError
@@ -23,6 +30,7 @@ from kata_worker.providers.scheduled import build_local
 
 ROUTING_SECTION = "routing"
 SKIPPED = "skipped"
+NO_VISION = "no_vision"
 CHAIN_SEPARATOR = ","
 
 
@@ -74,6 +82,25 @@ class Router:
         self._log = log
 
     def route(self, task_class: str, system: str, user: str) -> Routed:
+        return self._walk(task_class, lambda provider: provider.complete(system, user))
+
+    def route_vision(
+        self, task_class: str, system: str, user: str, images: Sequence[ImageInput]
+    ) -> Routed:
+        """Like `route`, but only providers that take images answer; text-only ones are skipped."""
+        return self._walk(
+            task_class,
+            lambda provider: require_vision(provider).complete_vision(system, user, images).text,
+            can_answer=lambda provider: isinstance(provider, VisionProvider),
+        )
+
+    def _walk(
+        self,
+        task_class: str,
+        call: Callable[[Provider], str],
+        can_answer: Callable[[Provider], bool] = lambda _provider: True,
+    ) -> Routed:
+        """Try the chain in order: first reply wins. Skips, failures and unsuited providers are logged."""
         if task_class not in TASK_CLASSES:
             raise PolicyError(f"unknown task class: {task_class}")
         outcomes: list[str] = []
@@ -82,8 +109,11 @@ class Router:
             if provider is None or not self._policy.allows(provider, task_class):
                 outcomes.append(f"{name}={SKIPPED}")
                 continue
+            if not can_answer(provider):
+                outcomes.append(f"{name}={NO_VISION}")
+                continue
             try:
-                reply = provider.complete(system, user)
+                reply = call(provider)
             except ProviderError as exc:
                 kind = type(exc).__name__
                 outcomes.append(f"{name}={kind}")

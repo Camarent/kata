@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from kata_worker.providers.base import Completion, ProviderError, TokenUsage
+from kata_worker.providers.base import Completion, ImageInput, ProviderError, TokenUsage
 
 EXHAUSTED_MESSAGE = "fake provider script exhausted"
 
@@ -23,12 +24,22 @@ class FakeProvider:
     script: list[str | ProviderError] = field(default_factory=list)
     usage_script: list[TokenUsage | None] = field(default_factory=list)
     calls: list[tuple[str, str]] = field(default_factory=list)
+    # Each complete_vision() call: (system, user, images), in call order.
+    vision_calls: list[tuple[str, str, tuple[ImageInput, ...]]] = field(default_factory=list)
 
     def complete(self, system: str, user: str) -> str:
         return self.complete_with_usage(system, user).text
 
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Answer like `complete_with_usage` and record the images; the script is shared with complete."""
+        self.vision_calls.append((system, user, tuple(images)))
+        return self._answer()
+
     def complete_with_usage(self, system: str, user: str) -> Completion:
         self.calls.append((system, user))
+        return self._answer()
+
+    def _answer(self) -> Completion:
         if not self.script:
             raise ProviderError(EXHAUSTED_MESSAGE)
         entry = self.script.pop(0)
