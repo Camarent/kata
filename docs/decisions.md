@@ -751,7 +751,7 @@ Decided 2026-11-25 (M22). Status: implemented in M22. Quiz questions must not co
 
 ## Quiz model setting uses routing task class quiz_generate
 
-Decided 2026-11-25 (M22). Status: implemented in M22. The model step for questions reuses the existing routing: the job kind `quiz.generate` runs in the task class `quiz_generate`, and its provider chain comes from the routing setting. No new setting key. Open: the owner's sign-off wording for the model setting in Settings.
+Decided 2026-11-25 (M22). Status: implemented in M22. The model step for questions reuses the existing routing: the job kind `quiz.generate` runs in the task class `quiz_generate`, and its provider chain comes from the routing setting. No new setting key. The worker handler for `quiz.generate` and its output hook are done in M22. The cloud gate is done in M22: `quiz.generate` is in `JOB_KIND_CLASS` (`core/kata_core/jobs/needs_cloud.py`), so the job-kind refusal applies to it. Open: the owner's sign-off wording for the model setting in Settings.
 
 ## Fetch runs in the job runner process
 
