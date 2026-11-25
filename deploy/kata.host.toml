@@ -189,6 +189,8 @@ minutes_skip = 1
 minutes_skim = 5
 minutes_practice = 15
 minutes_learn = 30
+# Days of known-mark history a goal's velocity is measured over (D15).
+velocity_window_days = 14
 
 # Model host: the GPU-PC model control and info service. Only the GPU-PC worker sets control_enabled = true.
 [modelhost]

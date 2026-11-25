@@ -111,6 +111,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
 | `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
 | `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
+| `planning.velocity_window_days` | 14 | `KATA_PLANNING_VELOCITY_WINDOW_DAYS` |
 | `modelhost.control_enabled` | false | `KATA_MODELHOST_CONTROL_ENABLED` |
 | `modelhost.schedule` | false | `KATA_MODELHOST_SCHEDULE` |
 | `modelhost.info_url` | "http://127.0.0.1:11435" | `KATA_MODELHOST_INFO_URL` |

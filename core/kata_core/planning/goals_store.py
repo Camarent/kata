@@ -207,3 +207,23 @@ def goal_concepts(conn: psycopg.Connection[Any], user_id: int, goal_id: int) -> 
         )
         for row in rows
     ]
+
+
+def goal_marks(
+    conn: psycopg.Connection[Any], user_id: int, goal_id: int
+) -> list[tuple[int, str | None, datetime | None]]:
+    """(concept_id, mark state, mark updated_at) for each concept a goal of `user_id` covers.
+
+    State and time are None for an unmarked concept. Empty when the goal is foreign or missing.
+    """
+    rows = conn.execute(
+        "SELECT c.concept_id, m.state, m.updated_at FROM track_goal_concept c "
+        "JOIN track_goal g ON g.id = c.goal_id JOIN track t ON t.id = g.track_id "
+        "LEFT JOIN concept_marks m ON m.concept_id = c.concept_id AND m.user_id = t.user_id "
+        "WHERE c.goal_id = %s AND t.user_id = %s ORDER BY c.concept_id",
+        (goal_id, user_id),
+    ).fetchall()
+    return [
+        (int(concept_id), None if state is None else str(state), updated)
+        for concept_id, state, updated in rows
+    ]
