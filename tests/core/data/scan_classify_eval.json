@@ -1,0 +1,34 @@
+{
+  "taxonomy": [
+    {"area": "Biology", "topic": "Cells"},
+    {"area": "Biology", "topic": "Genetics"},
+    {"area": "History", "topic": "Ancient Rome"},
+    {"area": "Mathematics", "topic": "Algebra"},
+    {"area": "Chemistry", "topic": "Acids and bases"}
+  ],
+  "cases": [
+    {"page_key": "p01", "text": "Mitochondria produce ATP through cellular respiration.", "expected": {"area": "Biology", "topic": "Cells"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Cells\", \"candidates\": []}"},
+    {"page_key": "p02", "text": "Mendel crossed pea plants to track inherited traits.", "expected": {"area": "Biology", "topic": "Genetics"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Genetics\", \"candidates\": []}"},
+    {"page_key": "p03", "text": "The Senate met in the Forum to debate new laws.", "expected": {"area": "History", "topic": "Ancient Rome"}, "reply": "{\"area\": \"History\", \"topic\": \"Ancient Rome\", \"candidates\": []}"},
+    {"page_key": "p04", "text": "Solving 2x + 3 = 11 means isolating x on one side.", "expected": {"area": "Mathematics", "topic": "Algebra"}, "reply": "{\"area\": \"Mathematics\", \"topic\": \"Algebra\", \"candidates\": []}"},
+    {"page_key": "p05", "text": "A pH below seven marks an acidic solution.", "expected": {"area": "Chemistry", "topic": "Acids and bases"}, "reply": "{\"area\": \"Chemistry\", \"topic\": \"Acids and bases\", \"candidates\": []}"},
+    {"page_key": "p06", "text": "Chromosomes carry the genes of an organism.", "expected": {"area": "Biology", "topic": "Genetics"}, "reply": "{\"area\": \"biology\", \"topic\": \"genetics\", \"candidates\": []}"},
+    {"page_key": "p07", "text": "The cell membrane controls what enters and leaves the cell.", "expected": {"area": "Biology", "topic": "Cells"}, "reply": "{\"area\": \"BIOLOGY\", \"topic\": \"CELLS\", \"candidates\": []}"},
+    {"page_key": "p08", "text": "Caesar crossed the Rubicon in 49 BC.", "expected": {"area": "History", "topic": "Ancient Rome"}, "reply": "{\"area\": \"history\", \"topic\": \"ancient rome\", \"candidates\": []}"},
+    {"page_key": "p09", "text": "Polynomials are sums of powers of a variable.", "expected": {"area": "Mathematics", "topic": "Algebra"}, "reply": "{\"area\": \"mathematics\", \"topic\": \"algebra\", \"candidates\": []}"},
+    {"page_key": "p10", "text": "Titration finds the concentration of an unknown acid.", "expected": {"area": "Chemistry", "topic": "Acids and bases"}, "reply": "{\"area\": \"chemistry\", \"topic\": \"acids and bases\", \"candidates\": []}"},
+    {"page_key": "p11", "text": "Ribosomes assemble proteins from amino acids.", "expected": {"area": "Biology", "topic": "Cells"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Cells\", \"candidates\": []}"},
+    {"page_key": "p12", "text": "Dominant alleles mask recessive ones in heterozygotes.", "expected": {"area": "Biology", "topic": "Genetics"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Genetics\", \"candidates\": []}"},
+    {"page_key": "p13", "text": "Roman emperors ruled from Rome and the provinces.", "expected": {"area": "History", "topic": "Ancient Rome"}, "reply": "{\"area\": \"History\", \"topic\": \"Ancient Rome\", \"candidates\": []}"},
+    {"page_key": "p14", "text": "Solve simultaneous equations by substitution.", "expected": {"area": "Mathematics", "topic": "Algebra"}, "reply": "{\"area\": \"Mathematics\", \"topic\": \"Algebra\", \"candidates\": []}"},
+    {"page_key": "p15", "text": "Plate boundaries drive earthquakes and volcanoes.", "expected": {"area": "Earth Science", "topic": "Plate tectonics"}, "reply": "{\"area\": \"Earth Science\", \"topic\": \"Plate tectonics\", \"candidates\": []}"},
+    {"page_key": "p16", "text": "Food webs trace energy from producers to predators.", "expected": {"area": "Biology", "topic": "Ecology"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Ecology\", \"candidates\": []}"},
+    {"page_key": "p17", "text": "The Industrial Revolution moved work from homes into factories.", "expected": {"area": "History", "topic": "Industrial Revolution"}, "reply": "{\"area\": \"History\", \"topic\": \"Industrial Revolution\", \"candidates\": []}"},
+    {"page_key": "p18", "text": "Covalent bonds share electrons between atoms.", "expected": {"area": "Chemistry", "topic": "Chemical bonding"}, "reply": "{\"area\": \"Chemistry\", \"topic\": \"Chemical bonding\", \"candidates\": []}"},
+    {"page_key": "p19", "text": "Photosynthesis converts light energy into sugar inside chloroplasts.", "expected": {"area": "Biology", "topic": "Cells"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Cells\", \"candidates\": [{\"area\": \"Biology\", \"topic\": \"Cells\"}, {\"area\": \"Biology\", \"topic\": \"Genetics\"}]}"},
+    {"page_key": "p20", "text": "Equilibrium constants describe reversible reactions at balance.", "expected": {"area": "Chemistry", "topic": "Acids and bases"}, "reply": "{\"area\": \"Chemistry\", \"topic\": \"Acids and bases\", \"candidates\": [{\"area\": \"Chemistry\", \"topic\": \"Acids and bases\"}, {\"area\": \"Chemistry\", \"topic\": \"Chemical bonding\"}]}"},
+    {"page_key": "p21", "text": "The Gracchi brothers proposed land reform in Rome.", "expected": {"area": "History", "topic": "Ancient Rome"}, "reply": "{\"area\": \"History\", \"topic\": \"Ancient Rome\", \"candidates\": [{\"area\": \"History\", \"topic\": \"Ancient Rome\"}, {\"area\": \"History\", \"topic\": \"Industrial Revolution\"}]}"},
+    {"page_key": "p22", "text": "Enzymes lower the activation energy of a reaction.", "expected": {"area": "Biology", "topic": "Cells"}, "reply": "{\"area\": \"Biology\", \"topic\": \"Cells\", \"candidates\": []}"},
+    {"page_key": "p23", "text": "Matrices represent linear maps between vector spaces.", "expected": {"area": "Mathematics", "topic": "Algebra"}, "reply": "{\"area\": \"Mathematics\", \"topic\": \"Algebra\", \"candidates\": []}"}
+  ]
+}

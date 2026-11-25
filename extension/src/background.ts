@@ -1,4 +1,4 @@
-import type { ContentMessage, RuntimeLike, ScanResponse } from "./content";
+import type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./content";
 import type { BridgeMessage } from "./bridge";
 import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
 import { openPanel, type PanelOpenApi } from "./browser";
@@ -11,7 +11,10 @@ import {
   type ModelhostEngine,
   type ModelhostOutput,
   type ProgressDoc,
+  type TopicOverview,
 } from "./coreClient";
+import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
+import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
@@ -26,9 +29,10 @@ export interface ChromeLike extends PanelOpenApi {
     onClicked: { addListener(listener: (tab: { windowId?: number }) => void): void };
   };
   tabs: {
-    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number }[]>;
+    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]>;
     sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
     create(properties: { url: string }): Promise<unknown>;
+    onUpdated: { addListener(listener: (tabId: number, changes: { url?: string }) => void): void };
   };
   runtime: RuntimeLike;
   scripting: ScriptingLike;
@@ -47,6 +51,10 @@ export type PanelMessage =
   | { type: "panel:signIn"; input: ServerSignIn }
   | { type: "panel:disconnect" }
   | { type: "panel:scan" }
+  | { type: "panel:scanConcepts" }
+  | { type: "panel:chooseConcept"; topicId: number; word: string; conceptId: number }
+  | { type: "panel:reassignConcept"; topicId: number; word: string; fromConceptId: number; toConceptId: number }
+  | { type: "panel:topicOverview"; topicId: number }
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
   | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
@@ -94,6 +102,18 @@ export interface Backend {
   /** Clears the session and the bridge; the offline mark queue is kept. */
   disconnect(): Promise<void>;
   scan(): Promise<ScanResult[]>;
+  /** Concept scan of the active page; starts the rescan of that page when it succeeds. */
+  scanConcepts(): Promise<ConceptScanResult | ConceptScanError>;
+  /** Remembers the concept the caller picked for a written word in a topic. */
+  chooseConcept(topicId: number, word: string, conceptId: number): Promise<void>;
+  /** Moves a written word from one concept to another and teaches the alias. */
+  reassignConcept(topicId: number, word: string, fromConceptId: number, toConceptId: number): Promise<void>;
+  /** Concept counts and concept list of one topic. */
+  topicOverview(topicId: number): Promise<TopicOverview>;
+  /** A watched page changed in the DOM: restarts the rescan debounce for that tab. */
+  pageMutated(tabId: number): void;
+  /** A tab navigated: the rescan of that tab stops. */
+  tabNavigated(tabId: number): void;
   markKnown(topicId: number): Promise<MarkOutcome>;
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
@@ -133,6 +153,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     return session;
   };
 
+  const scanner = createConceptScanner({ api, tokens, clientFor, pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
+
   return {
     progress: createProgressBridge(clientFor, tokens),
 
@@ -149,6 +171,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
     },
 
     async disconnect() {
+      scanner.stopRescan();
       await tokens.clearSession();
       await syncBridge(api.scripting, tokens);
     },
@@ -160,6 +183,42 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const page = (await api.tabs.sendMessage(tab.id, { type: "scan" })) as ScanResponse;
       if (!page?.blocks) throw new Error("page gave no blocks");
       return runScan(clientFor(session), page.blocks, { pollMs: POLL_MS, maxWaitMs: MAX_WAIT_MS });
+    },
+
+    async scanConcepts() {
+      const session = await requireSession();
+      // A new scan replaces the rescan of the page before it.
+      scanner.stopRescan();
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) throw new Error("no active tab");
+      if (tab.url === undefined) throw new Error("page has no URL");
+      const pageKey = pageKeyOf(tab.url);
+      const result = await scanner.scanPage(session, tab.id, pageKey);
+      if (!("error" in result)) scanner.startRescan(tab.id, pageKey, result);
+      return result;
+    },
+
+    async chooseConcept(topicId, word, conceptId) {
+      const session = await requireSession();
+      await clientFor(session).chooseConcept(topicId, word, conceptId);
+    },
+
+    async reassignConcept(topicId, word, fromConceptId, toConceptId) {
+      const session = await requireSession();
+      await clientFor(session).reassignConcept(topicId, word, fromConceptId, toConceptId);
+    },
+
+    async topicOverview(topicId) {
+      const session = await requireSession();
+      return clientFor(session).topicOverview(topicId);
+    },
+
+    pageMutated(tabId) {
+      scanner.pageMutated(tabId);
+    },
+
+    tabNavigated(tabId) {
+      scanner.tabNavigated(tabId);
     },
 
     async markKnown(topicId) {
@@ -280,6 +339,16 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
       return { ok: true };
     case "panel:scan":
       return { ok: true, data: await backend.scan() };
+    case "panel:scanConcepts":
+      return { ok: true, data: await backend.scanConcepts() };
+    case "panel:chooseConcept":
+      await backend.chooseConcept(message.topicId, message.word, message.conceptId);
+      return { ok: true };
+    case "panel:reassignConcept":
+      await backend.reassignConcept(message.topicId, message.word, message.fromConceptId, message.toConceptId);
+      return { ok: true };
+    case "panel:topicOverview":
+      return { ok: true, data: await backend.topicOverview(message.topicId) };
     case "panel:known":
       return { ok: true, data: await backend.markKnown(message.topicId) };
     case "panel:review":
@@ -316,6 +385,10 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:signIn" ||
     type === "panel:disconnect" ||
     type === "panel:scan" ||
+    type === "panel:scanConcepts" ||
+    type === "panel:chooseConcept" ||
+    type === "panel:reassignConcept" ||
+    type === "panel:topicOverview" ||
     type === "panel:known" ||
     type === "panel:review" ||
     type === "panel:setConcept" ||
@@ -325,6 +398,11 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:createCourse" ||
     type === "panel:modelhost"
   );
+}
+
+/** True when `message` is the content script's report of a DOM change on a watched page. */
+function isPageMutatedMessage(message: unknown): message is PageMutatedMessage {
+  return typeof message === "object" && message !== null && (message as { type?: unknown }).type === "page:mutated";
 }
 
 /** True when `message` is one of the content-bridge message shapes. */
@@ -347,7 +425,16 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
     backend.flush().catch(() => undefined);
   });
 
-  api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  api.tabs.onUpdated.addListener((tabId, changes) => {
+    if (changes.url !== undefined) backend.tabNavigated(tabId);
+  });
+
+  api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (isPageMutatedMessage(message)) {
+      const tabId = (sender as { tab?: { id?: number } }).tab?.id;
+      if (tabId !== undefined) backend.pageMutated(tabId);
+      return false;
+    }
     const route = isPanelMessage(message)
       ? handlePanelMessage(backend, message)
       : isBridgeMessage(message)

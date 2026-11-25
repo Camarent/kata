@@ -677,3 +677,31 @@ Decided 2026-11-24. Migration `core/migrations/0016_topic_to_concept.sql` copies
 ## dojo-kit facts (verified 2026-11-24)
 
 Verified in the dojo-kit docs (audit, 2026-11-24). The default review ladder is 0, 1, 5, 10 and 30 days (5 stages; `DEFAULT_LADDER` in dojo-kit's `srs/mod.rs`, not in this repo; per-unit override via `srs.ladder`). Stages are numbered, not named. A unit counts as learned at stage 4 (dojo-kit's `docs/AUTHORING.md`, not in this repo). The known signal is the placement answer known or again (`ARCHITECTURE.md:37`, `applyPlacement`) and the session setting `knownDistinct`; there is no other known status. No separate exam question pool is documented: `examOnly` units and `poolAspects` topics are different features. Effect on D48 and D49: the starting rung at course generation is a dojo stage number, not "3 to 7 days". D35 exam support needs a dojo change or a kata-side exam flow.
+
+## Scan merges aliases into one concept
+
+Decided 2026-11-24. Status: design decision, implemented in M20. A word that the page uses for a concept already known under another name is an alias, not a second concept (D53). The extraction step returns the canonical name and the alias words, and merges them into the existing concept of that area and topic. The scan output carries the written word and the concept id. Reason: one concept has one mark, so "SYN-ACK" and "Three-way handshake" cannot disagree about whether the user knows them.
+
+## Scan identity is area, topic and name, classified first
+
+Decided 2026-11-24. Status: design decision, implemented in M20. The scan classifies each page into area and topic before it extracts concepts (D54). The candidates are the user's existing taxonomy first, then new names. The classification is cached per page, so a page is classified once and a rescan of the same page reuses the result. Aliases are resolved only inside the area and topic found by the classification. Reason: the same word in another area is another concept with its own mark, so resolution must not cross areas.
+
+## Scan quality: evaluation set and pass bar
+
+Decided 2026-11-24. Status: design decision, implemented in M20. The classification step has a fixed evaluation set of labelled pages and a pass bar that the run must meet before the classification is used for a page. The set and the bar live in the repository next to the scan tests, so a change to the classifier is checked against the same pages every time. Reason: a classifier that drifts without a test shows up first as wrong marks for the user.
+
+## Rescan keeps marks by concept id
+
+Decided 2026-11-24. Status: design decision, implemented in M20 (D55 item d). When the page changes, the extension runs a concept scan again and keeps every mark by concept id. A concept that disappears from the page keeps its mark; a concept that is new on the page starts as New. Reason: the mark belongs to the concept, not to the position of the word on the page.
+
+## Teachable-content check before a concept is kept (D38)
+
+Decided 2026-11-24. Status: design decision, implemented in M20. The extraction step drops a candidate that is not teachable content, such as a menu label, a navigation word or a line of page chrome, before the concept is stored. The check runs on the extraction output in core, not in the extension. Reason: a concept the user cannot learn from the page only fills the review list.
+
+## "Which one?" and "Not this meaning" behaviour
+
+Decided 2026-11-24. Status: design decision, implemented in M20 (D54, D55 item b). When the model cannot pick one concept for a highlight, the hover menu shows "Which one?" with the candidates. The user's pick is remembered for that page's topic, so the same page does not ask again. The menu item "Not this meaning" moves the highlight to another concept and records the alias, so the next scan of the same word picks the right concept. "Not this meaning" shows only when a definition is present (D55 item b). Reason: the choice is taught once and used by every later scan.
+
+## Uploaded-file filter is out of scope for M20
+
+Decided 2026-11-24. Status: scope decision. Filtering scanned content by an uploaded file is not part of M20. The scan works on the page the user is viewing only. Reason: the upload path has no design yet, and a filter on it would change the scan contract twice.

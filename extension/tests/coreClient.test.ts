@@ -509,3 +509,119 @@ describe("CoreClient modelhost jobs", () => {
     await expect(client.modelhostResult(13)).rejects.toThrow("modelhost job 13 failed");
   });
 });
+
+describe("CoreClient scan calls", () => {
+  it("scanClassify queues scan.classify with the page key, text and taxonomy", async () => {
+    const { fn, calls } = fakeFetch(200, { id: 21 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.scanClassify("https://ex.test/p", "page text", "tax")).toBe(21);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/jobs`);
+    expect(calls[0].body).toEqual({
+      payload: JSON.stringify({ page_key: "https://ex.test/p", text: "page text", taxonomy: "tax" }),
+      kind: "scan.classify",
+    });
+  });
+
+  it("scanExtract queues scan.extract with area_id, topic_id, blocks, area, topic and known", async () => {
+    const { fn, calls } = fakeFetch(200, { id: 22 });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    const input = {
+      areaId: 3,
+      topicId: 7,
+      blocks: [{ blockId: "b1", text: "a block" }],
+      area: "Maths",
+      topic: "Algebra",
+      known: ["sum"],
+    };
+    expect(await client.scanExtract(input)).toBe(22);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/jobs`);
+    expect(calls[0].body).toEqual({
+      payload: JSON.stringify({
+        area_id: 3,
+        topic_id: 7,
+        blocks: [{ blockId: "b1", text: "a block" }],
+        area: "Maths",
+        topic: "Algebra",
+        known: ["sum"],
+      }),
+      kind: "scan.extract",
+    });
+  });
+
+  it("getClassification gets /scan/classification with the encoded page key and maps the reply", async () => {
+    const pageKey = "https://ex.test/p?a=1&b=2";
+    const { fn, calls } = fakeFetch(200, {
+      area_id: 3,
+      topic_id: 7,
+      area: "Maths",
+      topic: "Algebra",
+      candidates: [{ topic_id: 8, area: "Maths", topic: "Geometry" }],
+    });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    const out = await client.getClassification(pageKey);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/scan/classification?page_key=${encodeURIComponent(pageKey)}`);
+    expect(out).toEqual({
+      areaId: 3,
+      topicId: 7,
+      area: "Maths",
+      topic: "Algebra",
+      candidates: [{ topicId: 8, area: "Maths", topic: "Geometry" }],
+    });
+  });
+
+  it("getClassification resolves null on 404 (no classification yet)", async () => {
+    const { fn } = fakeFetch(404, { detail: "not found" });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.getClassification("https://ex.test/none")).toBeNull();
+  });
+
+  it("getClassification throws CoreHttpError on other failures", async () => {
+    const { fn } = fakeFetch(500, { detail: "boom" });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    const err = await client.getClassification("https://ex.test/p").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(500);
+  });
+
+  it("chooseConcept posts topic, word and concept to /scan/choice", async () => {
+    const { fn, calls } = fakeFetch(200, {});
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    await client.chooseConcept(7, "sum", 40);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/scan/choice`);
+    expect(calls[0].body).toEqual({ topic_id: 7, word: "sum", concept_id: 40 });
+  });
+
+  it("reassignConcept posts topic, word and both concept ids to /scan/reassign", async () => {
+    const { fn, calls } = fakeFetch(200, {});
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    await client.reassignConcept(7, "sum", 40, 41);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/scan/reassign`);
+    expect(calls[0].body).toEqual({ topic_id: 7, word: "sum", from_concept_id: 40, to_concept_id: 41 });
+  });
+
+  it("topicOverview gets /scan/overview for the topic and maps the counts and concepts", async () => {
+    const { fn, calls } = fakeFetch(200, {
+      topic_id: 7,
+      area: "Maths",
+      topic: "Algebra",
+      counts: { new: 1, learning: 2, known: 3 },
+      concepts: [{ concept_id: 40, label: "sum", state: "known" }],
+    });
+    const client = new CoreClient({ baseUrl: BASE, timeoutMs: 1000, fetchImpl: fn });
+    const out = await client.topicOverview(7);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/scan/overview?topic_id=7`);
+    expect(out).toEqual({
+      topicId: 7,
+      area: "Maths",
+      topic: "Algebra",
+      counts: { new: 1, learning: 2, known: 3 },
+      concepts: [{ conceptId: 40, label: "sum", state: "known" }],
+    });
+  });
+});

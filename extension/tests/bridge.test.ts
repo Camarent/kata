@@ -122,7 +122,7 @@ function fakeApi(): { api: ChromeLike; runtime: BridgeRuntime } {
   let listener: ((message: unknown, sender: unknown, reply: (answer: unknown) => void) => boolean | void) | undefined;
   const api = {
     action: { onClicked: { addListener() {} } },
-    tabs: { query: async () => [], sendMessage: async () => undefined },
+    tabs: { query: async () => [], sendMessage: async () => undefined, onUpdated: { addListener() {} } },
     runtime: {
       onMessage: {
         addListener(next: typeof listener) {

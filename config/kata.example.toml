@@ -33,6 +33,16 @@ runner_poll_seconds = 5
 # Cap on the output a job may store, in bytes.
 max_output_bytes = 262144
 
+[scan]
+# Minimum classifier confidence (0..1) for a page to be classed without asking the owner.
+classify_pass_bar = 0.8
+# Cap on the candidate concepts offered for one block.
+max_candidates = 5
+# Blocks shorter than this many characters are skipped by the scan.
+min_block_chars = 40
+# Cap on the blocks one scan job may process.
+max_blocks_per_job = 40
+
 [model]
 base_url = "http://127.0.0.1:11434/v1"
 model_name = "local-model"
@@ -85,6 +95,8 @@ summary = "local,anthropic"
 batch = "local,anthropic"
 generate_course = "local,anthropic"
 extract_syllabus = "local,anthropic"
+scan_classify = "local,anthropic"
+scan_extract = "local,anthropic"
 
 # Per task class: the local model that answers it, or "cloud-only" when no local model is good
 # enough. kata-l and kata-m are the local models (see docs/research/benchmarks/RESULTS.md).
@@ -95,12 +107,14 @@ summary = "kata-l"
 batch = "kata-l"
 generate_course = "kata-l"
 extract_syllabus = "kata-l"
+scan_classify = "kata-l"
+scan_extract = "kata-l"
 
 [provider_local]
-task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
 
 [provider_anthropic]
-task_classes = "explain,summary,batch,generate_course,extract_syllabus"
+task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
 base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"

@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.13] - 2026-11-25
+
+- feat(scan): classify pages, extract concepts with aliases, rescan by concept id
+
 ## [0.1.12] - 2026-11-24
 
 - feat(core): concept model with aliases, definitions, marks and sort fields

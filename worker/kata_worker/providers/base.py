@@ -9,7 +9,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-TASK_CLASSES = ("tag", "explain", "summary", "batch", "generate_course", "extract_syllabus")
+TASK_CLASSES = (
+    "tag",
+    "explain",
+    "summary",
+    "batch",
+    "generate_course",
+    "extract_syllabus",
+    "scan_classify",
+    "scan_extract",
+)
 
 
 class ProviderError(Exception):
