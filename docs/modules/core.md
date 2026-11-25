@@ -361,3 +361,22 @@ Invariants and gotchas:
 - Core stores text only: the reader's page images are used by the worker and never reach core.
 - The worker's reply is untrusted: shape and caps are checked, and control characters are removed before storage.
 - Tests: `tests/core/test_api_summary.py`, `tests/core/test_summary_service.py`, `tests/core/test_api_reader.py`, `tests/core/test_reader_service.py`; worker side in `tests/worker/test_handler_summary.py` and `tests/worker/test_handler_reader_extract.py`.
+
+## Jokes (M23)
+
+Joke fetch as a core-only job. Migration `core/migrations/0024_joke_cache.sql` adds the `joke_cache` table; `storage/jokes.py` is its store. The job runs in core and no worker is involved. Contracts in [api](../api.md).
+
+- `core/kata_core/jokes/sources.py:29` `JOKE_SOURCES` is the server-side source list (the only place a joke host is named); `:54` `get_source(source_id)`; `:62` `enabled_sources(csv)` keeps the sources named in `[jokes] sources`, in `JOKE_SOURCES` order; unknown ids are dropped.
+- `core/kata_core/jokes/fetch.py:22` `JokeFetchError`; `:47` `fetch_joke(...)` runs the hardened fetch: https only, JSON content type, byte and time caps, SSRF block, and it reads one field through `:26` `_joke_field`.
+- `core/kata_core/jokes/sanitise.py:43` `sanitise_joke(raw, max_chars=...)` returns plain text or None; `:29` `_strip_controls` removes control characters.
+- `core/kata_core/jokes/service.py:38` `request_refill(conn, user_id, cfg, now)` queues `jokes.fetch` unless a fetch is busy or the last one is inside `refill_interval_seconds`; `:67` `next_joke(conn)` returns the oldest unserved joke and marks it served.
+- `core/kata_core/jokes/job_kinds.py:22` `JOKES_FETCH_KIND` = `jokes.fetch`; `:33` `fetch_handler` fetches, sanitises and stores one joke; registered in `HANDLERS`. `OUTPUT_HOOKS` (`:57`) is empty: no joke text goes through an output hook.
+- `core/kata_core/storage/jokes.py` - `:14` `put_joke(conn, source_id, text)`, `:23` `take_next_joke`, `:35` `unserved_count`, `:42` `prune(conn, keep)`.
+- Routes: `core/kata_core/api/routes/jokes.py` - `:44` `get_next_joke` (`GET /jokes/next`), `:68` `list_sources` (`GET /jokes/sources`); picked up by `include_routers`.
+
+Invariants and gotchas:
+- A client never names a URL: the job takes a source id from the server-side list, and the payload carries no joke text.
+- Joke text never reaches a job payload or a prompt; `tests/core/test_jokes_isolation.py` pins that.
+- `GET /jokes/next` refills even when it answers 404 `no joke cached`: the 404 is a response, not an exception, so the queued refill commits.
+- `[jokes] enabled` false turns the route into 404 `jokes disabled` and the sources list into `[]`.
+- Tests: `tests/core/test_api_jokes.py`, `tests/core/test_jokes_job.py`, `tests/core/test_jokes_hostile.py`, `tests/core/test_jokes_sanitise.py`, `tests/core/test_jokes_sources.py`, `tests/core/test_jokes_config.py`, `tests/core/test_joke_cache_schema.py`, `tests/core/test_jokes_isolation.py`.

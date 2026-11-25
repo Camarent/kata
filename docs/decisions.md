@@ -766,3 +766,15 @@ Dojo placement experiment: implemented in M22 (`placement_known` in `core/kata_c
 ## Exam domain mapping is not built (D51 deferred)
 
 Decided 2026-11-25 (M22). Status: scope decision. Kata does not map exam domains. An import matches each result to concepts per concept, using the course item ids. Reason: the import needs no domain list, so a second taxonomy waits until the owner needs one.
+
+## Document reading runs in a sandbox, text only to core (D47, D16)
+
+Decided 2026-11-25 (M23). Status: implemented in M23, shipped disabled. The reader parses PDFs and images inside the sandbox (D47: no network, read-only filesystem, no keys; file in, text out). The vision model runs outside the sandbox. Core gets text only: the result stores the text, the page count or a failure code, and the uploaded bytes are removed once the job is done. `[reader] enabled` is false until the owner turns it on; the upload route answers 409 `reader_disabled` before it reads the body.
+
+## Jokes are a core-only job with server-side sources (D24, D26-28, D30, D50)
+
+Decided 2026-11-25 (M23). Status: implemented in M23 on the backend; the joke UI is M25. The source list is server-side (`JOKE_SOURCES`); a client names a source id, never a URL. The `jokes.fetch` job runs in core only, through the hardened fetch (size and time caps, SSRF block, joke content types). The sanitiser makes plain text and cuts it to the joke cap. Served jokes come from the cache through `GET /jokes/next`. Joke text never reaches a job payload or a prompt. The cache refills at most once per refill interval per user.
+
+## Page summary cache per url and text hash
+
+Decided 2026-11-25 (M23). Status: implemented in M23. A summary is cached per `(url, text_sha256)` and shared by all users. A changed page text is summarised again. The page text is hashed and never logged.

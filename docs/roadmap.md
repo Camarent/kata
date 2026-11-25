@@ -232,8 +232,7 @@ D35, D48, D49). Shipped:
   (migration 0021; D35).
 - Course start rung as a dojo ladder stage: 0 for new, the course `learning_rung` for learning,
   left out when known; stage 4 is learned (D48, D49).
-- Not built: reading PDF pages that hold images (D16), needs a vision model and a cost check; it
-  waits for M23.
+- Reading PDF pages and images (D16) is built in M23: a sandboxed reader, shipped disabled.
 
 ## Milestone 22: quiz and exam results (shipped)
 
@@ -258,9 +257,16 @@ Success criteria:
 - The client never receives an answer index, and no exam result marks a concept Known without confirm.
 - Open for the owner: the licence rows in `decisions.md`, and the model setting wording.
 
-## Milestone 23: jobs
+## Milestone 23: jobs (shipped)
 
-**Scope.** Summary, jokes, and PDF and image reading as jobs.
+**Scope.** Summary, jokes, and PDF and image reading as jobs. Shipped:
+
+- Page summary cache per `(url, text_sha256)`, job `page.summary` (D16 summary path).
+- Joke fetch as the core-only job `jokes.fetch`: server-side source list, hardened fetch, plain-text
+  sanitiser, cache, `GET /jokes/next` and `GET /jokes/sources` (D24, D26 to D28, D30, D50).
+- Document reader `reader.extract` in a sandbox, text only to core (D47); shipped disabled.
+
+Not in M23: the offline fallback list and the joke UI are M25.
 
 ## Milestone 24: review and sync
 
