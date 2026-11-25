@@ -58,6 +58,7 @@ export type PanelMessage =
   | { type: "panel:known"; topicId: number }
   | { type: "panel:review" }
   | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
+  | { type: "panel:pending" }
   | { type: "panel:courses" }
   | { type: "panel:openCourse"; courseId: number }
   | { type: "panel:deleteCourse"; courseId: number }
@@ -117,7 +118,10 @@ export interface Backend {
   markKnown(topicId: number): Promise<MarkOutcome>;
   flush(): Promise<FlushResult | null>;
   review(): Promise<ReviewRow[]>;
+  /** Sets one concept mark; offline it is queued (see OfflineQueue), not an error. */
   setConcept(conceptId: number, state: ConceptMark["state"]): Promise<void>;
+  /** Marks waiting in the offline queue; the panel shows them in its connection indicator. */
+  pendingCount(): Promise<number>;
   /** The caller's ready courses (id and title only) with the course limit and total count. */
   courses(): Promise<CourseList>;
   /** Opens a ready course in a new tab; the URL must stay on the core origin. */
@@ -256,7 +260,13 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
 
     async setConcept(conceptId, state) {
       const session = await requireSession();
-      await clientFor(session).setConceptMark(conceptId, state);
+      await new OfflineQueue(area, clientFor(session)).markConcept(conceptId, state);
+    },
+
+    async pendingCount() {
+      const session = await tokens.loadSession();
+      if (!session) return 0;
+      return new OfflineQueue(area, clientFor(session)).count();
     },
 
     async courses() {
@@ -356,6 +366,8 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
     case "panel:setConcept":
       await backend.setConcept(message.conceptId, message.state);
       return { ok: true };
+    case "panel:pending":
+      return { ok: true, data: await backend.pendingCount() };
     case "panel:courses":
       return { ok: true, data: await backend.courses() };
     case "panel:openCourse":
@@ -392,6 +404,7 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:known" ||
     type === "panel:review" ||
     type === "panel:setConcept" ||
+    type === "panel:pending" ||
     type === "panel:courses" ||
     type === "panel:openCourse" ||
     type === "panel:deleteCourse" ||

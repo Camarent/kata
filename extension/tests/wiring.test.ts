@@ -299,6 +299,43 @@ describe("background wiring", () => {
     expect(JSON.parse(String(init.body))).toEqual({ state: "known", evidence: "" });
   });
 
+  it("setConcept offline queues the mark, the pending count shows it, and flush sends in order", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    let online = false;
+    const sent: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (!online) throw new TypeError("fetch failed");
+      sent.push(String(input));
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    const backend = createBackend(chrome.api, area, fetchImpl);
+    wireBackground(chrome.api, backend);
+    expect(await chrome.send({ type: "panel:setConcept", conceptId: 3, state: "known" })).toEqual({ ok: true });
+    expect(await chrome.send({ type: "panel:setConcept", conceptId: 4, state: "unknown" })).toEqual({ ok: true });
+    expect(await chrome.send({ type: "panel:pending" })).toEqual({ ok: true, data: 2 });
+    online = true;
+    expect(await backend.flush()).toEqual({ sent: 2, dropped: 0, kept: 0 });
+    expect(sent.map((url) => url.slice(url.indexOf("/concepts/")))).toEqual(["/concepts/3/mark", "/concepts/4/mark"]);
+    expect(await chrome.send({ type: "panel:pending" })).toEqual({ ok: true, data: 0 });
+  });
+
+  it("setConcept rethrows an auth error instead of queueing it", async () => {
+    const area = memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 401 })) as unknown as typeof fetch;
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
+    const reply = (await chrome.send({ type: "panel:setConcept", conceptId: 3, state: "known" })) as PanelReply;
+    expect(reply.ok).toBe(false);
+    expect(await area.get("kata.markQueue")).toEqual({});
+  });
+
+  it("pending count is zero without a session", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
+    expect(await chrome.send({ type: "panel:pending" })).toEqual({ ok: true, data: 0 });
+  });
+
   it("review and setConcept without a session reply with the auth error", async () => {
     const chrome = fakeChrome();
     wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
