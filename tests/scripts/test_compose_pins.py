@@ -101,3 +101,40 @@ def test_worker_disables_the_image_healthcheck():
     text = COMPOSE.read_text()
     block = text.split("\n  worker:\n", 1)[1].split("\n  caddy:\n", 1)[0]
     assert "healthcheck:\n      disable: true" in block
+
+
+DOCKERFILE = REPO_ROOT / "deploy" / "Dockerfile"
+
+
+def _dockerfile_instructions(text: str) -> list[str]:
+    """Join continuation lines (trailing backslash or leading `&&`) into one string per instruction."""
+    instructions: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("&&") and instructions:
+            instructions[-1] += " " + stripped
+        elif instructions and instructions[-1].endswith("\\"):
+            instructions[-1] = instructions[-1][:-1].rstrip() + " " + stripped
+        else:
+            instructions.append(stripped)
+    return instructions
+
+
+def test_dockerfile_creates_spool_dirs_owned_by_kata_before_user_switch():
+    """The reader volumes copy the image's owner on first mount; the kata user must own /spool/in and /spool/out."""
+    instructions = _dockerfile_instructions(DOCKERFILE.read_text())
+    user_index = instructions.index("USER kata")
+    spool_runs = [
+        index
+        for index, instruction in enumerate(instructions[:user_index])
+        if instruction.startswith("RUN ")
+        and "mkdir -p" in instruction
+        and "/spool/in" in instruction
+        and "/spool/out" in instruction
+        and "chown 10001:10001" in instruction
+        and "/spool/in" in instruction.split("chown", 1)[1]
+        and "/spool/out" in instruction.split("chown", 1)[1]
+    ]
+    assert spool_runs, "no RUN before USER kata creates and chowns /spool/in and /spool/out"

@@ -55,6 +55,9 @@ ENV PATH=/opt/venv/bin:$PATH \
     KATA_CORE_PORT=8080
 RUN groupadd --system --gid 10001 kata \
  && useradd --system --uid 10001 --gid kata --home-dir /app --shell /usr/sbin/nologin kata
+# Spool dirs for the worker/reader hand-off. Owned by kata so a new named volume copies that owner on first mount.
+RUN mkdir -p /spool/in /spool/out \
+ && chown 10001:10001 /spool/in /spool/out
 COPY --from=deps /opt/venv /opt/venv
 COPY --from=fetch /usr/local/bin/gitleaks /usr/local/bin/
 COPY --from=fetch /opt/trainer /opt/trainer
