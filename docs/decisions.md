@@ -705,3 +705,19 @@ Decided 2026-11-24. Status: design decision, implemented in M20 (D54, D55 item b
 ## Uploaded-file filter is out of scope for M20
 
 Decided 2026-11-24. Status: scope decision. Filtering scanned content by an uploaded file is not part of M20. The scan works on the page the user is viewing only. Reason: the upload path has no design yet, and a filter on it would change the scan contract twice.
+
+## Named lists hold concepts for a future course (D7, D8, D14, D34)
+
+Decided 2026-11-24 (owner). Status: implemented in M21. A named list is temporary storage of concepts that a person gathers from many pages before making a course. One page is not enough for a course. Each user has many lists, each with a unique name; a list can be renamed and deleted, and a concept can be removed from it. Adding a whole topic adds all its concepts at once. A list is separate from a course and from a track (D14): it works without any track. Generating a course from a list keeps the list (D34). Deleting a list keeps the courses made from it. Tables `concept_list` and `concept_list_item` (migration 0019) hold the lists and their concepts; the routes are under `/v1/lists`. Reason: the scan result offers "Add to list", so the list is the place where concepts gather before a course exists.
+
+## Track goals, sources and velocity (D11 to D16)
+
+Decided 2026-11-24 (owner). Status: implemented in M21, except reading PDF pages that hold images (D16), which is not built. A track holds several goals; each goal has its own progress. Progress is the known concepts divided by the concepts of the goal, read from the concept marks. A goal takes several sources (pasted text, file, current page), and a source links concept ids to the goal; more sources can be added later. Velocity is the concepts gained per day over the window `planning.velocity_window_days`. Pace is `slow`, `ok` or `fast` against the deadline, with a projected finish date; a goal without a deadline gives no warning. Reason: the owner reads progress and velocity as the only signals (D39). Image content of a PDF needs a vision model and a cost check, so it waits for M23.
+
+## Regenerate replaces the course in place (D35)
+
+Decided 2026-11-24 (owner). Status: implemented in M21. Regenerating a course keeps its id and adds one to its `version` (migration 0021, first version 1). It does not add a course row, so the course limit is not used up. The preview shows what carries over (concepts not yet known, with their marks), what is added (new gap concepts) and what is dropped (concepts now known or no longer visible). Regenerate is refused with 409 `course_busy` while the course is queued, generating or building. Reason: the owner does not want many courses for one subject.
+
+## Start rung is a dojo ladder stage (D48, D49)
+
+Decided 2026-11-24 (owner). Status: implemented in M21; corrects the "3 to 7 days" wording of D49. The ladder belongs to dojo: stages 0, 1, 2 and 3 are the review stages at 0, 1, 5, 10 and 30 days. Stage 4 means learned and is never a start rung. Kata keeps no schedule. At course generation a new concept starts at stage 0, a learning concept at the course's `learning_rung` (default `trainer.learning_start_rung`, a stage from 0 to 3), and a known concept is left out. The `learning_rung` is chosen per course at create or from-list time. Reason: dojo stages are numbered, not named, so kata passes the stage number and not a duration.
