@@ -6,13 +6,17 @@ Reuses the reply parsing and the chat path of kata_worker.model; text stays on t
 
 from __future__ import annotations
 
+import base64
+from collections.abc import Sequence
+
 import httpx
 from kata_core.config import Config
 
 from kata_worker.model import CHAT_PATH, ModelError, reply_content
-from kata_worker.providers.base import ProviderError
+from kata_worker.providers.base import Completion, ImageInput, ProviderError
 
 REASONING_KEY = "reasoning_effort"
+OLLAMA_IMAGES_KEY = "images"
 FINISH_LENGTH = "length"
 EMPTY_LENGTH_MESSAGE = (
     "model reply is empty and finish_reason is length: raise max_tokens or set [model] reasoning_effort"
@@ -42,11 +46,21 @@ class LocalProvider:
 
     def complete(self, system: str, user: str) -> str:
         """Return the reply text for one system and one user message; raise ProviderError on failure."""
+        return self._send(system, {"role": "user", "content": user})
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Return the reply for one user message with the images attached; raise ProviderError on failure."""
+        encoded = [base64.b64encode(data).decode("ascii") for _media_type, data in images]
+        text = self._send(system, {"role": "user", "content": user, OLLAMA_IMAGES_KEY: encoded})
+        return Completion(text=text, usage=None)
+
+    def _send(self, system: str, user_message: dict[str, object]) -> str:
+        """POST one chat request with the system message and `user_message`; raise ProviderError on failure."""
         payload: dict[str, object] = {
             "model": self._model_name,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                user_message,
             ],
         }
         if self._reasoning_effort:

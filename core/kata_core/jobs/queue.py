@@ -122,6 +122,14 @@ def store_output(
     return None if row is None else _job(row)
 
 
+def clear_output(conn: psycopg.Connection[Any], job_id: int, user_id: int) -> None:
+    """Drop the stored output of a job of `user_id`; used when an output hook rejects the reply."""
+    conn.execute(
+        "UPDATE jobs SET output = NULL WHERE id = %s AND user_id = %s",
+        (job_id, user_id),
+    )
+
+
 def fail(conn: psycopg.Connection[Any], job_id: int, user_id: int) -> bool:
     """Mark a leased job of `user_id` failed. Returns False when it is not leased by that user."""
     row = conn.execute(

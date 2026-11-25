@@ -10,7 +10,7 @@ models itself. An unreadable capabilities document is a ProviderError too.
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from kata_core.config import Config
 
@@ -21,7 +21,13 @@ from kata_worker.modelhost.capabilities import (
     fetch,
 )
 from kata_worker.modelhost.schedule import decide
-from kata_worker.providers.base import Provider, ProviderError
+from kata_worker.providers.base import (
+    Completion,
+    ImageInput,
+    Provider,
+    ProviderError,
+    require_vision,
+)
 from kata_worker.providers.cost import LogSink
 from kata_worker.providers.local import LocalProvider
 
@@ -57,6 +63,16 @@ class ScheduledLocalProvider:
 
     def complete(self, system: str, user: str) -> str:
         """Return the local reply when the model may run; raise ProviderError when it may not."""
+        self._gate()
+        return self._inner.complete(system, user)
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Same schedule gate as `complete`, then the local vision call."""
+        self._gate()
+        return require_vision(self._inner).complete_vision(system, user, images)
+
+    def _gate(self) -> None:
+        """Raise ProviderError when the model may not run now; log a swap. Shared by text and vision."""
         try:
             caps = self._capabilities.get(self._clock())
         except CapabilitiesError as exc:
@@ -66,7 +82,6 @@ class ScheduledLocalProvider:
             raise ProviderError(decision.reason)
         if decision.swap:
             self._log(f"schedule: {decision.reason}")
-        return self._inner.complete(system, user)
 
 
 def build_local(cfg: Config, log: LogSink) -> LocalProvider | ScheduledLocalProvider:

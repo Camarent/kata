@@ -6,6 +6,7 @@ and one user message into a reply string. Failures surface as ProviderError only
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -19,6 +20,7 @@ TASK_CLASSES = (
     "scan_classify",
     "scan_extract",
     "quiz_generate",
+    "vision",
 )
 
 
@@ -59,3 +61,21 @@ class UsageProvider(Protocol):
     """A provider that also returns the reply usage. `complete` is `complete_with_usage(...).text`."""
 
     def complete_with_usage(self, system: str, user: str) -> Completion: ...
+
+
+# One image: (media_type, raw bytes). The provider encodes the bytes for its own API.
+ImageInput = tuple[str, bytes]
+
+
+@runtime_checkable
+class VisionProvider(Protocol):
+    """A provider that takes images with the user message. Text-only providers do not match."""
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion: ...
+
+
+def require_vision(provider: Provider) -> VisionProvider:
+    """The provider as a VisionProvider; ProviderError when it has no complete_vision."""
+    if not isinstance(provider, VisionProvider):
+        raise ProviderError(f"provider {provider.name} does not take images")
+    return provider

@@ -63,6 +63,8 @@ def test_kind_table_maps_only_the_cloud_kinds() -> None:
         "course.generate": "generate_course",
         SYLLABUS_EXTRACT_KIND: "extract_syllabus",
         QUIZ_GENERATE_KIND: "quiz_generate",
+        "page.summary": "summary",
+        "reader.extract": "vision",
     }
 
 

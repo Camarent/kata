@@ -111,6 +111,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/lesson_check/checker.py` - per-concept known/learning/abstain rule (`check_lesson`); route in `api/routes/lesson_check.py`.
 - `core/kata_core/mcp/` and `core/kata_core/api/routes/mcp.py` - MCP server: raw JSON-RPC 2.0 (`rpc.py`), two read tools (`tools.py`), egress gate on every tool result (`gate.py`). Contract in `docs/api.md` (MCP).
 - `core/kata_core/retrieval/` - hybrid retrieval: `embedder.py` (embedder interface, fake and model embedders), `fusion.py` (RRF), `store.py` (entry writes and keyword search), `retriever.py` (keyword plus vector ranks fused).
+- `core/migrations/0023_m23_jobs.sql` - `page_summary` and `reader_document` (M23).
+- `core/migrations/0024_joke_cache.sql` - `joke_cache` (M23).
+- `core/kata_core/summary/`, `core/kata_core/reader/` and `core/kata_core/jokes/` - page summary, reader document and joke jobs (M23 sections below).
+- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set.
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.
@@ -341,3 +345,42 @@ Invariants and gotchas:
 - Regenerate is refused with 409 `course_busy` while the course is queued, generating or building.
 - Reading PDF pages with images is not built (D16). A goal source stores its body as text; no PDF is read.
 - Tests: `tests/core/test_lists_store.py`, `tests/core/test_api_named_lists.py`, `tests/core/test_api_list_course.py`, `tests/core/test_api_concept_lists.py`, `tests/core/test_goals_store.py`, `tests/core/test_api_track_goals.py`, `tests/core/test_velocity.py`, `tests/core/test_rungs.py`, `tests/core/test_api_course_regenerate.py`.
+
+## Summary and reader (M23)
+
+Page summary cache and reader document jobs. Migration `core/migrations/0023_m23_jobs.sql` (additive only) creates two tables: `page_summary` (one summary per `(url, text_sha256)`, shared by all users) and `reader_document` (one uploaded document per row, owned by `user_id`; `content` is the raw bytes, nulled once the job is done; `status` `queued`, `done` or `failed`; `text`, `page_count`, `error`).
+
+- `core/kata_core/summary/service.py:41` `summary_payload(url, text_hash, text)` - builds the `page.summary` payload; `:34` `build_prompt` puts the page text between fixed markers and raises ValueError when the text holds a marker (route 422). `:56` `sanitise_summary` drops control characters, collapses whitespace and cuts to `[summary] max_summary_chars`. `:69` `store_summary` checks the worker reply and caches it.
+- `core/kata_core/summary/job_kinds.py:18` `PAGE_SUMMARY_KIND` = `page.summary`; `:21` `summary_output_hook` calls `store_summary`; registered in `OUTPUT_HOOKS`.
+- `core/kata_core/reader/service.py:26` `magic_matches(media_type, data)` - the upload bytes must match the declared type; `:53` `pages_text` checks the reply pages against `[reader] max_pages` and `max_text_chars_per_page`; `:83` `store_result` stores the text, or the failure code, and sets the row status; a bad reply stores only the failed status and raises ValueError so the job fails (`:115` `_reject`).
+- `core/kata_core/reader/job_kinds.py:18` `READER_EXTRACT_KIND` = `reader.extract`; `:21` `extract_output_hook` loads `[reader]` and calls `store_result`; registered in `OUTPUT_HOOKS`. The job payload is `{"document_id": n}` only.
+- `core/kata_core/storage/page_summary.py` - `:14` `get_summary(conn, url, text_sha256)`, `:23` `put_summary`.
+- `core/kata_core/storage/reader_documents.py` - `:14` `insert_document`, `:32` `get_document` (filters by `user_id`), `:45` `get_file` (filters by `user_id`), `:59` `set_done`, `:74` `set_failed`.
+- Routes: `core/kata_core/api/routes/summary.py` (`POST /summary`, `GET /summary`) and `core/kata_core/api/routes/reader.py` (`POST /reader/documents`, `GET /reader/documents/{id}`, `GET /reader/documents/{id}/file`); both are picked up by `include_routers`. Contracts in [api](../api.md).
+
+Invariants and gotchas:
+- A summary is cached per `(url, text_sha256)`; a changed page text is summarised again. The page text is hashed, never logged.
+- The reader upload is refused before anything is stored: `409 reader_disabled` while off, then 415, 413, 400 magic bytes, 409 `needs_cloud`. `needs_cloud` is checked with `refuse_needs_cloud` before the row is written (`core/kata_core/api/deps.py:61`).
+- A document that belongs to another user reads as not found (404), for the status route and the file route alike.
+- Core stores text only: the reader's page images are used by the worker and never reach core.
+- The worker's reply is untrusted: shape and caps are checked, and control characters are removed before storage.
+- Tests: `tests/core/test_api_summary.py`, `tests/core/test_summary_service.py`, `tests/core/test_api_reader.py`, `tests/core/test_reader_service.py`; worker side in `tests/worker/test_handler_summary.py` and `tests/worker/test_handler_reader_extract.py`.
+
+## Jokes (M23)
+
+Joke fetch as a core-only job. Migration `core/migrations/0024_joke_cache.sql` adds the `joke_cache` table; `storage/jokes.py` is its store. The job runs in core and no worker is involved. Contracts in [api](../api.md).
+
+- `core/kata_core/jokes/sources.py:29` `JOKE_SOURCES` is the server-side source list (the only place a joke host is named); `:54` `get_source(source_id)`; `:62` `enabled_sources(csv)` keeps the sources named in `[jokes] sources`, in `JOKE_SOURCES` order; unknown ids are dropped.
+- `core/kata_core/jokes/fetch.py:22` `JokeFetchError`; `:47` `fetch_joke(...)` runs the hardened fetch: https only, JSON content type, byte and time caps, SSRF block, and it reads one field through `:26` `_joke_field`.
+- `core/kata_core/jokes/sanitise.py:43` `sanitise_joke(raw, max_chars=...)` returns plain text or None; `:29` `_strip_controls` removes control characters.
+- `core/kata_core/jokes/service.py:38` `request_refill(conn, user_id, cfg, now)` queues `jokes.fetch` unless a fetch is busy or the last one is inside `refill_interval_seconds`; `:67` `next_joke(conn)` returns the oldest unserved joke and marks it served.
+- `core/kata_core/jokes/job_kinds.py:22` `JOKES_FETCH_KIND` = `jokes.fetch`; `:33` `fetch_handler` fetches, sanitises and stores one joke; registered in `HANDLERS`. `OUTPUT_HOOKS` (`:57`) is empty: no joke text goes through an output hook.
+- `core/kata_core/storage/jokes.py` - `:14` `put_joke(conn, source_id, text)`, `:23` `take_next_joke`, `:35` `unserved_count`, `:42` `prune(conn, keep)`.
+- Routes: `core/kata_core/api/routes/jokes.py` - `:44` `get_next_joke` (`GET /jokes/next`), `:68` `list_sources` (`GET /jokes/sources`); picked up by `include_routers`.
+
+Invariants and gotchas:
+- A client never names a URL: the job takes a source id from the server-side list, and the payload carries no joke text.
+- Joke text never reaches a job payload or a prompt; `tests/core/test_jokes_isolation.py` pins that.
+- `GET /jokes/next` refills even when it answers 404 `no joke cached`: the 404 is a response, not an exception, so the queued refill commits.
+- `[jokes] enabled` false turns the route into 404 `jokes disabled` and the sources list into `[]`.
+- Tests: `tests/core/test_api_jokes.py`, `tests/core/test_jokes_job.py`, `tests/core/test_jokes_hostile.py`, `tests/core/test_jokes_sanitise.py`, `tests/core/test_jokes_sources.py`, `tests/core/test_jokes_config.py`, `tests/core/test_joke_cache_schema.py`, `tests/core/test_jokes_isolation.py`.

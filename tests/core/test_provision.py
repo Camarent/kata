@@ -70,6 +70,9 @@ SCHEMA_TABLES = {
     "quiz_question",
     "exam_result",
     "exam_result_concept",
+    "page_summary",
+    "reader_document",
+    "joke_cache",
 }
 
 

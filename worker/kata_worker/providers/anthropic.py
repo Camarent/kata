@@ -6,13 +6,14 @@ from the env var named in [provider_anthropic] api_key_env; it is never logged o
 
 from __future__ import annotations
 
+import base64
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import httpx
 from kata_core.config import Config
 
-from kata_worker.providers.base import Completion, Provider, ProviderError, TokenUsage
+from kata_worker.providers.base import Completion, ImageInput, Provider, ProviderError, TokenUsage
 from kata_worker.providers.cost import Ledger, LogSink, capped
 from kata_worker.providers.guard import AuditSink, guarded
 
@@ -21,6 +22,8 @@ MESSAGES_PATH = "/v1/messages"
 API_VERSION = "2023-06-01"
 MAX_TOKENS = 1024
 TEXT_BLOCK = "text"
+IMAGE_BLOCK = "image"
+BASE64_SOURCE = "base64"
 CACHE_CREATION_FIELD = "cache_creation_input_tokens"
 CACHE_READ_FIELD = "cache_read_input_tokens"
 CACHE_CONTROL_TYPE = "ephemeral"
@@ -120,11 +123,31 @@ class AnthropicProvider:
 
     def complete_with_usage(self, system: str, user: str) -> Completion:
         """Return the reply text and reported usage (None when absent or malformed); raise ProviderError on failure."""
+        return self._send(system, user_content=user)
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Return the reply for one user message with the images before its text; raise ProviderError on failure."""
+        blocks: list[dict[str, object]] = [
+            {
+                "type": IMAGE_BLOCK,
+                "source": {
+                    "type": BASE64_SOURCE,
+                    "media_type": media_type,
+                    "data": base64.b64encode(data).decode("ascii"),
+                },
+            }
+            for media_type, data in images
+        ]
+        blocks.append({"type": TEXT_BLOCK, "text": user})
+        return self._send(system, user_content=blocks)
+
+    def _send(self, system: str, *, user_content: str | list[dict[str, object]]) -> Completion:
+        """POST one Messages request and read the reply; raise ProviderError on transport, status or reply failure."""
         payload = {
             "model": self._model_name,
             "max_tokens": MAX_TOKENS,
             "system": self._system_field(system),
-            "messages": [{"role": "user", "content": user}],
+            "messages": [{"role": "user", "content": user_content}],
         }
         url = f"{self._base_url.rstrip('/')}{MESSAGES_PATH}"
         try:

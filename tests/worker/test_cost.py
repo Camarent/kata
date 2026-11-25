@@ -61,6 +61,7 @@ def _config(cap: int = 2_000_000, warn: int = 1_500_000, safety: int = 150) -> C
                 "cap_micro_usd": cap,
                 "warn_micro_usd": warn,
                 "estimate_safety_percent": safety,
+                "image_input_tokens": 1600,
             }
         }
     )
@@ -214,7 +215,17 @@ def test_capped_provider_keeps_identity_and_is_built_from_config() -> None:
 
 def test_capped_has_no_bypass_parameter() -> None:
     params = list(inspect.signature(CappedProvider.__init__).parameters)
-    assert params == ["self", "inner", "ledger", "model", "cap", "warn", "safety_percent", "log"]
+    assert params == [
+        "self",
+        "inner",
+        "ledger",
+        "model",
+        "cap",
+        "warn",
+        "safety_percent",
+        "log",
+        "image_tokens",
+    ]
     assert list(inspect.signature(capped).parameters) == ["inner", "ledger", "model", "cfg", "log"]
 
 

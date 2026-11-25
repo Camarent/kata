@@ -127,7 +127,7 @@ def test_unreadable_input_exits_two(tmp_path: Path):
 
 
 WORKER_COPY = "COPY worker/ /app/worker/"
-WORKER_PYTHONPATH = "PYTHONPATH=/app/core:/app/worker \\"
+WORKER_PYTHONPATH = "PYTHONPATH=/app/core:/app/worker:/app/reader \\"
 
 
 def _has_line(text: str, line: str) -> bool:
@@ -144,7 +144,7 @@ def _drop_worker_copy(text: str) -> str:
 
 
 def _drop_worker_pythonpath(text: str) -> str:
-    return _replace_once(text, WORKER_PYTHONPATH, "PYTHONPATH=/app/core \\")
+    return _replace_once(text, WORKER_PYTHONPATH, "PYTHONPATH=/app/core:/app/reader \\")
 
 
 def test_dockerfile_has_worker_layout():

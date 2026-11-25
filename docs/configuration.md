@@ -43,6 +43,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `cost.cap_micro_usd` | 2000000 | `KATA_COST_CAP_MICRO_USD` |
 | `cost.warn_micro_usd` | 1500000 | `KATA_COST_WARN_MICRO_USD` |
 | `cost.estimate_safety_percent` | 150 | `KATA_COST_ESTIMATE_SAFETY_PERCENT` |
+| `cost.image_input_tokens` | 1600 | `KATA_COST_IMAGE_INPUT_TOKENS` |
 | `smoke.allowed_models` | "claude-haiku-5-5" | `KATA_SMOKE_ALLOWED_MODELS` |
 | `smoke.budget_micro_usd` | 500000 | `KATA_SMOKE_BUDGET_MICRO_USD` |
 | `smoke_local.models` | "kata-l" | `KATA_SMOKE_LOCAL_MODELS` |
@@ -58,6 +59,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
 | `routing.scan_classify` | "local,anthropic" | `KATA_ROUTING_SCAN_CLASSIFY` |
 | `routing.scan_extract` | "local,anthropic" | `KATA_ROUTING_SCAN_EXTRACT` |
+| `routing.vision` | "local,anthropic" | `KATA_ROUTING_VISION` |
 | `local_capability.tag` | "kata-l" | `KATA_LOCAL_CAPABILITY_TAG` |
 | `local_capability.explain` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXPLAIN` |
 | `local_capability.summary` | "kata-l" | `KATA_LOCAL_CAPABILITY_SUMMARY` |
@@ -67,8 +69,9 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.scan_classify` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_CLASSIFY` |
 | `local_capability.scan_extract` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_EXTRACT` |
 | `local_capability.quiz_generate` | "kata-l" | `KATA_LOCAL_CAPABILITY_QUIZ_GENERATE` |
-| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
-| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
+| `local_capability.vision` | "cloud-only" | `KATA_LOCAL_CAPABILITY_VISION` |
+| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
@@ -129,5 +132,28 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `quiz.max_question_chars` | 400 | `KATA_QUIZ_MAX_QUESTION_CHARS` |
 | `quiz.max_questions_per_source` | 50 | `KATA_QUIZ_MAX_QUESTIONS_PER_SOURCE` |
 | `quiz.mini_quiz_size` | 5 | `KATA_QUIZ_MINI_QUIZ_SIZE` |
+| `summary.max_text_chars` | 20000 | `KATA_SUMMARY_MAX_TEXT_CHARS` |
+| `summary.max_summary_chars` | 2000 | `KATA_SUMMARY_MAX_SUMMARY_CHARS` |
+| `reader.enabled` | false | `KATA_READER_ENABLED` |
+| `reader.max_file_bytes` | 10485760 | `KATA_READER_MAX_FILE_BYTES` |
+| `reader.max_pages` | 50 | `KATA_READER_MAX_PAGES` |
+| `reader.min_page_chars` | 40 | `KATA_READER_MIN_PAGE_CHARS` |
+| `reader.max_image_side_px` | 1600 | `KATA_READER_MAX_IMAGE_SIDE_PX` |
+| `reader.max_image_bytes` | 2097152 | `KATA_READER_MAX_IMAGE_BYTES` |
+| `reader.max_images_per_document` | 20 | `KATA_READER_MAX_IMAGES_PER_DOCUMENT` |
+| `reader.max_text_chars_per_page` | 20000 | `KATA_READER_MAX_TEXT_CHARS_PER_PAGE` |
+| `reader.child_memory_mb` | 1024 | `KATA_READER_CHILD_MEMORY_MB` |
+| `reader.child_cpu_seconds` | 30 | `KATA_READER_CHILD_CPU_SECONDS` |
+| `reader.wall_seconds` | 60 | `KATA_READER_WALL_SECONDS` |
+| `reader.poll_seconds` | 1 | `KATA_READER_POLL_SECONDS` |
+| `reader.wait_seconds` | 120 | `KATA_READER_WAIT_SECONDS` |
+| `reader.spool_dir` | "/spool" | `KATA_READER_SPOOL_DIR` |
+| `jokes.enabled` | true | `KATA_JOKES_ENABLED` |
+| `jokes.sources` | "jokeapi,icanhazdadjoke" | `KATA_JOKES_SOURCES` |
+| `jokes.timeout_seconds` | 10 | `KATA_JOKES_TIMEOUT_SECONDS` |
+| `jokes.max_response_bytes` | 16384 | `KATA_JOKES_MAX_RESPONSE_BYTES` |
+| `jokes.max_joke_chars` | 300 | `KATA_JOKES_MAX_JOKE_CHARS` |
+| `jokes.cache_size` | 50 | `KATA_JOKES_CACHE_SIZE` |
+| `jokes.refill_interval_seconds` | 7200 | `KATA_JOKES_REFILL_INTERVAL_SECONDS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.

@@ -60,7 +60,7 @@ def test_enqueue_claim_result_then_status_shows_unknown(
 
     claimed = client.get("/jobs/next", headers=headers)
     assert claimed.status_code == 200
-    assert claimed.json() == {"id": job_id, "payload": "tag this"}
+    assert claimed.json() == {"id": job_id, "payload": "tag this", "kind": "tag"}
 
     assert _result(client, headers, job_id) == 204
 
@@ -227,6 +227,20 @@ def test_next_takes_kind_filter(client: TestClient, db: ScratchDatabase, cfg: Co
     assert resp.json()["id"] == job_id
 
 
+def test_next_returns_job_kind(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _user_token(client, db, cfg, "ana")
+    user_id = _user_id(client, headers)
+    _enqueue_kind(db, user_id, "reader.extract")
+    resp = client.get("/jobs/next", params={"kind": "reader.extract"}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["kind"] == "reader.extract"
+    tag_id = _enqueue(client, headers, "tag this")
+    resp = client.get("/jobs/next", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == tag_id
+    assert resp.json()["kind"] == "tag"
+
+
 def test_output_stores_and_runs_hook(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
     calls = _record_hook(client, "course.generate")
     headers = _user_token(client, db, cfg, "ana")
@@ -283,6 +297,28 @@ def test_output_without_hook_is_422_and_stores_nothing(
         row = conn.execute("SELECT output FROM jobs WHERE id = %s", (job_id,)).fetchone()
     assert row is not None
     assert row[0] is None
+
+
+def test_output_hook_rejecting_reply_is_422_and_fails_the_job(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    def _reject(conn: psycopg.Connection[Any], job: Any, output: dict[str, Any]) -> None:
+        raise ValueError("reply rejected")
+
+    client.app.dependency_overrides[get_registry] = lambda: Registry(
+        output_hooks={"course.generate": _reject}
+    )
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue_kind(db, _user_id(client, headers), "course.generate")
+    assert client.get("/jobs/next", params={"kind": "course.generate"}, headers=headers).status_code == 200
+    resp = client.post(f"/jobs/{job_id}/output", json={"output": {"ok": True}}, headers=headers)
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "reply rejected"
+    with db.connect() as conn:
+        row = conn.execute("SELECT status, output FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    assert row[0] == "failed"
+    assert row[1] is None
 
 
 def _feature_client(enabled: bool) -> TestClient:

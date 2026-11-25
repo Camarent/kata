@@ -17,6 +17,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - `deploy/compose.yaml:132` only published port: `${KATA_BIND_ADDR:-127.0.0.1}:443:443` (caddy).
 - `deploy/compose.yaml:153` network `data` is `internal: true` (postgres, core and worker); `egress` is the worker's outbound network.
 - `deploy/compose.yaml:31`, `:58`, `:85`, `:120`, `:140` `mem_limit` from `KATA_MEM_*`; compose fails without them.
+- `deploy/compose.yaml:126` service `reader` (document sandbox, command `python -m kata_reader`): `network_mode: none`, `read_only`, no secrets; `:190`, `:191` volumes `reader-in` (worker read-write, reader read-only) and `reader-out`; `:150` `mem_limit: ${KATA_MEM_READER:-512m}`, `:151` `cpus: ${KATA_CPU_READER:-1.0}`: the defaults apply when the env file sets neither (the `deploy/env/*.env` files do not set them). Hardening list and the `reader-hardened` rule: [reader](reader.md).
 - `deploy/compose.yaml:137` mounts `${KATA_CERT_DIR:-/var/lib/kata/certs}` read-only at the Caddy cert directory.
 - `deploy/Caddyfile:24` site on the node name variable; `:25` `tls` with host-written cert files under the Caddy cert directory.
 - `deploy/ship.sh:34` `ship_files` (the only files copied to the VM; never `secrets/` or the Dockerfile); `:41` `--rollback <tag>`; `:40` `--dry-run`; `:94` `build_image`; `:107` `docker save | ssh docker load`; `:115` `write_tag` (`KATA_IMAGE_TAG` into the VM env file); `:123` `deep_health`.
@@ -43,6 +44,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 
 ## Invariants and gotchas
 - Only caddy publishes a port; postgres, core and worker sit on the `internal` `data` network. Keep it that way.
+- The reader is on no network at all (`network_mode: none`), not even `data`; it gets its files and writes its results only through the `reader-in` and `reader-out` volumes. The worker reaches it through those volumes, never over a port.
 - The VM runs no builds: no `build:` key in `compose.yaml`; the image comes only from `ship.sh`. `ship.sh` copies only the `ship_files` list (`ship.sh:34`); the Dockerfile, `secrets/` and `compose.build.yaml` never reach the VM.
 - The node name variable and `KATA_BIND_ADDR` must be in the env file compose reads on the VM (`KATA_SHIP_ENV_FILE`, e.g. `env/vm.env`): `ship.sh` exports neither.
 - Secrets are mounted under `/run/secrets/`; core reads env vars only, so each service command exports them with `$$(cat ...)`. Never write a secret value into a file in the repo.

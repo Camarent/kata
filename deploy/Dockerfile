@@ -40,7 +40,7 @@ RUN curl -fsSL -o /tmp/trainer.tgz "${TRAINER_URL}" \
 FROM base AS deps
 COPY pyproject.toml /build/pyproject.toml
 RUN python -m venv /opt/venv \
- && python -c "import tomllib; print('\n'.join(tomllib.load(open('/build/pyproject.toml', 'rb'))['project']['dependencies']))" > /build/requirements.txt \
+ && python -c "import tomllib; project = tomllib.load(open('/build/pyproject.toml', 'rb'))['project']; print('\n'.join(project['dependencies'] + project['optional-dependencies']['reader']))" > /build/requirements.txt \
  && /opt/venv/bin/pip install --no-cache-dir -r /build/requirements.txt
 
 # Runtime: non-root user, venv, fetched tools, and the core package only.
@@ -49,12 +49,15 @@ ARG EMBED_MODEL_ID
 ARG EMBED_MODEL_REVISION
 LABEL kata.embed-model="${EMBED_MODEL_ID}@${EMBED_MODEL_REVISION}"
 ENV PATH=/opt/venv/bin:$PATH \
-    PYTHONPATH=/app/core:/app/worker \
+    PYTHONPATH=/app/core:/app/worker:/app/reader \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     KATA_CORE_PORT=8080
 RUN groupadd --system --gid 10001 kata \
  && useradd --system --uid 10001 --gid kata --home-dir /app --shell /usr/sbin/nologin kata
+# Spool dirs for the worker/reader hand-off. Owned by kata so a new named volume copies that owner on first mount.
+RUN mkdir -p /spool/in /spool/out \
+ && chown 10001:10001 /spool/in /spool/out
 COPY --from=deps /opt/venv /opt/venv
 COPY --from=fetch /usr/local/bin/gitleaks /usr/local/bin/
 COPY --from=fetch /opt/trainer /opt/trainer
@@ -63,6 +66,7 @@ COPY core/ /app/core/
 # kata_core.config reads its defaults from /app/config/kata.example.toml (EXAMPLE_PATH).
 COPY config/ /app/config/
 COPY worker/ /app/worker/
+COPY reader/ /app/reader/
 USER kata
 EXPOSE 8080
 # Deep health: DB reachable and all migrations applied. Port follows KATA_CORE_PORT.

@@ -55,6 +55,7 @@ def test_task_classes_are_fixed() -> None:
         "scan_classify",
         "scan_extract",
         "quiz_generate",
+        "vision",
     )
 
 

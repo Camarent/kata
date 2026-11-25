@@ -1,13 +1,17 @@
 [project]
 name = "kata"
-version = "0.1.15"
+version = "0.1.16"
 requires-python = ">=3.11"
 license = "MIT"
 # stdlib only: tomllib ships with Python 3.11+, so no tomli dependency.
 dependencies = ["fastapi==0.165.0", "psycopg[binary]==3.3.9", "httpx==0.28.1", "uvicorn==0.54.0"]
 
+[project.optional-dependencies]
+# Document extraction for the sandboxed reader (kata_reader); installed in the image's deps stage.
+reader = ["pypdfium2==5.15.2", "pillow==13.0.0"]
+
 [dependency-groups]
-dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "coverage==7.17.4", "ruff==0.17.6", "mypy==2.4.1", "pyyaml==6.0.3"]
+dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "coverage==7.17.4", "ruff==0.17.6", "mypy==2.4.1", "pyyaml==6.0.3", "pypdfium2==5.15.2", "pillow==13.0.0"]
 
 [tool.ruff]
 line-length = 100
@@ -18,7 +22,7 @@ files = ["core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["core"]
+pythonpath = ["core", "reader"]
 # strict_markers: an unregistered marker is an error, so a typo cannot silently skip a tier.
 strict_markers = true
 markers = [

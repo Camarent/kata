@@ -36,6 +36,8 @@ class FakeCore:
     usage_post_status: int = 204
     # When set, GET /usage answers 200 with these raw bytes instead of the total (broken-body tests).
     usage_body: bytes | None = None
+    # Reader documents by id: (media type, raw bytes), served by GET /reader/documents/{id}/file.
+    documents: dict[int, tuple[str, bytes]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _server: HTTPServer | None = None
     _thread: threading.Thread | None = None
@@ -134,6 +136,9 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
             if self.path == "/usage" and method in ("GET", "POST"):
                 self._usage(method, body)
                 return
+            if method == "GET" and len(parts) == 4 and parts[:2] == ["reader", "documents"]:
+                self._document(parts[2], parts[3])
+                return
             is_outcome = (
                 len(parts) == 3 and parts[0] == "jobs" and parts[2] in ("result", "fail", "output")
             )
@@ -141,6 +146,18 @@ def _make_handler(core: FakeCore) -> type[BaseHTTPRequestHandler]:
                 self._send(204)
                 return
             self._send(404, {"error": "not found"})
+
+        def _document(self, raw_id: str, part: str) -> None:
+            found = core.documents.get(int(raw_id)) if raw_id.isdigit() else None
+            if found is None or part != "file":
+                self._send(404, {"error": "not found"})
+                return
+            media_type, data = found
+            self.send_response(200)
+            self.send_header("Content-Type", media_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
 
         def do_GET(self) -> None:
             self._handle("GET")

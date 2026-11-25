@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 ALLOWED_SCHEMES = frozenset({"http", "https"})
+OK = 200
 NO_CONTENT = 204
 # The kind the core claims when a pull names no kind (D2): old workers keep getting `tag` jobs.
 DEFAULT_KIND = "tag"
@@ -67,6 +68,7 @@ class CoreClient:
         self._parts = _loopback_base(str(cfg.get("worker", "core_url")), core_hosts)
         self._timeout = float(cfg.get("worker", "request_timeout_seconds"))
         self._token = token if token is not None else resolve_token(cfg)
+        self._cfg = cfg
 
     def _connect(self) -> http.client.HTTPConnection:
         host = self._parts.hostname or ""
@@ -88,6 +90,35 @@ class CoreClient:
             return resp.status, resp.read()
         finally:
             conn.close()
+
+    def _fetch(self, path: str, limit: int) -> tuple[int, str, bytes]:
+        """GET one raw body: its status, its Content-Type and at most limit + 1 bytes of it."""
+        headers = {"Authorization": f"Bearer {self._token}"}
+        base = self._parts.path.rstrip("/")
+        conn = self._connect()
+        try:
+            conn.request("GET", base + path, headers=headers)
+            resp = conn.getresponse()
+            return resp.status, resp.getheader("Content-Type", ""), resp.read(limit + 1)
+        finally:
+            conn.close()
+
+    def document_file(self, document_id: int) -> tuple[str, bytes]:
+        """The stored media type and raw bytes of one reader document.
+
+        A body over `[reader] max_file_bytes`, a non-200 answer or a missing Content-Type is a CoreError.
+        """
+        path = f"/reader/documents/{document_id}/file"
+        limit = int(self._cfg.get("reader", "max_file_bytes"))
+        status, content_type, raw = self._fetch(path, limit)
+        if status != OK:
+            raise CoreError(f"GET {path} -> {status}")
+        if len(raw) > limit:
+            raise CoreError(f"GET {path}: body over max_file_bytes")
+        media_type = content_type.split(";", 1)[0].strip()
+        if not media_type:
+            raise CoreError(f"GET {path}: no Content-Type")
+        return media_type, raw
 
     def next_job(self, kinds: Sequence[str] = ()) -> Job | None:
         """Lease the oldest queued job of the named kinds; None when the core answers 204.

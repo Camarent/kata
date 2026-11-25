@@ -68,6 +68,8 @@ warn_micro_usd = 1500000
 # Pre-call guard: a cloud call is refused when spent + its estimated input cost * this percent / 100
 # reaches the cap. Must be at least 100.
 estimate_safety_percent = 150
+# Upper bound of the input tokens one image costs in a cloud call (vision pre-call estimate).
+image_input_tokens = 1600
 
 # Opt-in smoke run, started by the lead by hand (never by CI). allowed_models lists the
 # only models it may call; budget_micro_usd caps its spend. No secrets here: keys stay in env.
@@ -99,6 +101,8 @@ scan_classify = "local,anthropic"
 scan_extract = "local,anthropic"
 # Model for quiz questions: the routing chain of task class quiz_generate.
 quiz_generate = "local,anthropic"
+# Model for page images: the routing chain of task class vision.
+vision = "local,anthropic"
 
 # Per task class: the local model that answers it, or "cloud-only" when no local model is good
 # enough. kata-l and kata-m are the local models (see docs/research/benchmarks/RESULTS.md).
@@ -112,12 +116,14 @@ extract_syllabus = "kata-l"
 scan_classify = "kata-l"
 scan_extract = "kata-l"
 quiz_generate = "kata-l"
+# No local vision model is verified yet: vision needs the cloud token until one is.
+vision = "cloud-only"
 
 [provider_local]
-task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision"
 
 [provider_anthropic]
-task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate"
+task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision"
 base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"
@@ -232,3 +238,55 @@ max_question_chars = 400
 max_questions_per_source = 50
 # Questions in one mini quiz. At most 5.
 mini_quiz_size = 5
+
+[summary]
+# Cap on the characters of the page text one summary job reads.
+max_text_chars = 20000
+# Cap on the characters of one summary.
+max_summary_chars = 2000
+
+[reader]
+# The reader takes documents only when true. Off until the owner turns it on.
+enabled = false
+# Cap on the bytes one uploaded document may have.
+max_file_bytes = 10485760
+# Cap on the pages one document may have.
+max_pages = 50
+# A page with fewer text characters than this counts as scanned: its image goes to vision.
+min_page_chars = 40
+# Longest side of a page image sent to vision, in pixels.
+max_image_side_px = 1600
+# Cap on the bytes of one page image.
+max_image_bytes = 2097152
+# Cap on the page images one document may send to vision.
+max_images_per_document = 20
+# Cap on the text characters kept from one page.
+max_text_chars_per_page = 20000
+# Memory cap, in MB, of the sandboxed extract child process.
+child_memory_mb = 1024
+# CPU seconds cap of the sandboxed extract child process.
+child_cpu_seconds = 30
+# Wall-clock seconds cap of one extract.
+wall_seconds = 60
+# Seconds between two polls of the spool directory.
+poll_seconds = 1
+# Seconds the worker waits for one spool result.
+wait_seconds = 120
+# Directory the reader polls for jobs and writes results to.
+spool_dir = "/spool"
+
+[jokes]
+# Set false to stop the joke job fetching from the sources.
+enabled = true
+# Comma list of source ids the joke job may fetch from, in order: jokeapi, icanhazdadjoke.
+sources = "jokeapi,icanhazdadjoke"
+# Seconds one joke source fetch may take.
+timeout_seconds = 10
+# Cap on the bytes one joke source response may have.
+max_response_bytes = 16384
+# Cap on the characters of one joke.
+max_joke_chars = 300
+# Jokes the cache keeps ready for the next request.
+cache_size = 50
+# Seconds between two refills of the joke cache.
+refill_interval_seconds = 7200

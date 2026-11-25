@@ -111,6 +111,8 @@ services:
       disable: true
     volumes:
       - ./kata.host.toml:/config/kata.toml:ro
+      - reader-in:/spool/in:rw
+      - reader-out:/spool/out:rw
     networks:
       - data
       - egress
@@ -119,6 +121,34 @@ services:
         condition: service_healthy
     mem_limit: ${KATA_MEM_WORKER:?set KATA_MEM_WORKER, e.g. with --env-file deploy/env/small.env}
     cpus: ${KATA_CPU_WORKER:?set KATA_CPU_WORKER, e.g. with --env-file deploy/env/small.env}
+
+  # Reader: turns uploaded documents from the spool into text. No network, no secrets, read-only root.
+  reader:
+    image: kata:${KATA_IMAGE_TAG:?set KATA_IMAGE_TAG, the image tag built on dev}
+    restart: unless-stopped
+    environment: *core-env
+    command:
+      - python
+      - -m
+      - kata_reader
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+    # Same as the worker: the image HEALTHCHECK probes the core HTTP port, which the reader does not serve.
+    healthcheck:
+      disable: true
+    volumes:
+      - ./kata.host.toml:/config/kata.toml:ro
+      - reader-in:/spool/in:ro
+      - reader-out:/spool/out:rw
+    pids_limit: 128
+    mem_limit: ${KATA_MEM_READER:-512m}
+    cpus: ${KATA_CPU_READER:-1.0}
 
   caddy:
     image: ${CADDY_IMAGE:?fill in deploy/versions.env}@${CADDY_DIGEST:?fill in deploy/versions.env}
@@ -157,3 +187,5 @@ networks:
 volumes:
   pgdata: {}
   caddy-data: {}
+  reader-in: {}
+  reader-out: {}

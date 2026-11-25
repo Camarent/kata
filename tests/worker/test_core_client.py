@@ -213,3 +213,28 @@ def test_core_client_satisfies_ledger_protocol(fake_core: FakeCore) -> None:
 
     ledger: Ledger = client  # mypy checks the structural match with the Protocol
     assert isinstance(ledger, Ledger)
+
+
+def _cfg_with_reader(core_url: str, max_file_bytes: int = 1024) -> Config:
+    cfg = _cfg(core_url)
+    return Config(sections={**cfg.sections, "reader": {"max_file_bytes": max_file_bytes}})
+
+
+def test_document_file_returns_media_type_and_bytes(fake_core: FakeCore) -> None:
+    fake_core.documents[7] = ("application/pdf; charset=binary", b"%PDF-1.4 body")
+    client = CoreClient(_cfg_with_reader(fake_core.url), token=fake_core.token)
+    assert client.document_file(7) == ("application/pdf", b"%PDF-1.4 body")
+    assert fake_core.requests[-1].path == "/reader/documents/7/file"
+
+
+def test_document_file_unknown_id_is_core_error(fake_core: FakeCore) -> None:
+    client = CoreClient(_cfg_with_reader(fake_core.url), token=fake_core.token)
+    with pytest.raises(CoreError):
+        client.document_file(99)
+
+
+def test_document_file_over_max_file_bytes_is_core_error(fake_core: FakeCore) -> None:
+    fake_core.documents[8] = ("image/png", b"x" * 11)
+    client = CoreClient(_cfg_with_reader(fake_core.url, max_file_bytes=10), token=fake_core.token)
+    with pytest.raises(CoreError):
+        client.document_file(8)

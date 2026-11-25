@@ -8,12 +8,18 @@ config or env switch that skips the scan.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from kata_core.egress.scanner import scan
 
-from kata_worker.providers.base import Provider, ProviderError
+from kata_worker.providers.base import (
+    Completion,
+    ImageInput,
+    Provider,
+    ProviderError,
+    require_vision,
+)
 
 
 @dataclass(frozen=True)
@@ -45,13 +51,23 @@ class GuardedProvider:
         self.is_cloud = inner.is_cloud
 
     def complete(self, system: str, user: str) -> str:
-        if self.is_cloud:
-            findings = [*scan(system), *scan(user)]
-            for finding in findings:
-                self._audit(AuditEvent(kind=finding.kind, offset=finding.offset))
-            if findings:
-                raise SecretBlocked(sorted({finding.kind for finding in findings}))
+        self._scan(system, user)
         return self._inner.complete(system, user)
+
+    def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion:
+        """Scan the system and user text only; images are not scanned. Blocks before the inner call."""
+        self._scan(system, user)
+        return require_vision(self._inner).complete_vision(system, user, images)
+
+    def _scan(self, system: str, user: str) -> None:
+        """Raise SecretBlocked when a cloud call's text matches a secret rule; audit each finding."""
+        if not self.is_cloud:
+            return
+        findings = [*scan(system), *scan(user)]
+        for finding in findings:
+            self._audit(AuditEvent(kind=finding.kind, offset=finding.offset))
+        if findings:
+            raise SecretBlocked(sorted({finding.kind for finding in findings}))
 
 
 def guarded(inner: Provider, audit: AuditSink) -> GuardedProvider:
