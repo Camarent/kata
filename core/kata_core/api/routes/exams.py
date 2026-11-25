@@ -12,8 +12,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from kata_core.api.deps import Conn, current_user
+from kata_core.api.deps import Conn, current_user, get_cfg
 from kata_core.auth.service import AuthContext
+from kata_core.config import Config
 from kata_core.exams.parse import ExamParseError
 from kata_core.exams.service import (
     ExamLabelError,
@@ -28,6 +29,7 @@ from kata_core.storage.exam_results import StoredResult
 router = APIRouter(prefix="/exams")
 
 Caller = Annotated[AuthContext, Depends(current_user)]
+Cfg = Annotated[Config, Depends(get_cfg)]
 
 
 class ConfirmIn(BaseModel):
@@ -65,11 +67,28 @@ def _out(stored: StoredResult) -> ExamOut:
     )
 
 
+async def _read_capped(request: Request, cap: int) -> bytes:
+    """Read the request body chunk by chunk; 413 as soon as the total passes `cap` bytes."""
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > cap:
+            raise HTTPException(status_code=413, detail="body exceeds the import size cap")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.post("/import", response_model=ExamOut)
-async def import_exam(request: Request, ctx: Caller, conn: Conn) -> ExamOut:
+async def import_exam(request: Request, ctx: Caller, conn: Conn, cfg: Cfg) -> ExamOut:
     """Body: the exam result JSON (see kata_core.exams.parse). Stores it as pending and changes no mark.
-    422 when the payload is malformed, is not UTF-8, or names a concept the caller cannot see."""
-    raw = await request.body()
+    422 when the payload is malformed, is not UTF-8, or names a concept the caller cannot see.
+    413 when the body passes `[exams] max_import_bytes`, by Content-Length or by the bytes streamed."""
+    cap = int(cfg.get("exams", "max_import_bytes"))
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > cap:
+        raise HTTPException(status_code=413, detail="body exceeds the import size cap")
+    raw = await _read_capped(request, cap)
     try:
         payload = raw.decode("utf-8")
     except UnicodeDecodeError as exc:

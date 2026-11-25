@@ -124,6 +124,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `modelhost.capabilities_timeout_seconds` | 10 | `KATA_MODELHOST_CAPABILITIES_TIMEOUT_SECONDS` |
 | `modelhost.capabilities_ttl_seconds` | 300 | `KATA_MODELHOST_CAPABILITIES_TTL_SECONDS` |
 | `modelhost.max_text_bytes` | 262144 | `KATA_MODELHOST_MAX_TEXT_BYTES` |
+| `exams.max_import_bytes` | 262144 | `KATA_EXAMS_MAX_IMPORT_BYTES` |
 | `quiz.max_fetch_bytes` | 262144 | `KATA_QUIZ_MAX_FETCH_BYTES` |
 | `quiz.max_question_chars` | 400 | `KATA_QUIZ_MAX_QUESTION_CHARS` |
 | `quiz.max_questions_per_source` | 50 | `KATA_QUIZ_MAX_QUESTIONS_PER_SOURCE` |

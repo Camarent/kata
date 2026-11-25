@@ -60,6 +60,7 @@ def test_example_has_required_sections() -> None:
         "smoke",
         "smoke_local",
         "modelhost",
+        "exams",
         "quiz",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd", "estimate_safety_percent"}

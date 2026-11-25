@@ -227,6 +227,10 @@ min_block_chars = 40
 # Cap on the blocks one scan job may process.
 max_blocks_per_job = 40
 
+[exams]
+# Cap on the bytes one exam result import body may have. Larger bodies get 413.
+max_import_bytes = 262144
+
 [quiz]
 # Cap on the bytes one quiz source fetch reads.
 max_fetch_bytes = 262144

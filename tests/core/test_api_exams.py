@@ -201,3 +201,42 @@ def test_dismiss_leaves_marks_unchanged(client: TestClient, db: ScratchDatabase,
     assert right not in _marks(db, "ana")
     again = client.post(f"/exams/{imported['id']}/confirm", json={"concept_ids": [right]}, headers=a)
     assert again.status_code == 409
+
+
+def _padded_body(cap: int, size: int) -> bytes:
+    """A valid exam payload padded with trailing spaces (JSON whitespace) to exactly `size` bytes."""
+    body = _payload([("loops", True)]).encode()
+    return body + b" " * (size - len(body))
+
+
+def test_import_body_at_cap_passes(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, a, "python")
+    _concept(client, a, topic, "loops")
+    cap = int(cfg.get("exams", "max_import_bytes"))
+    resp = client.post("/exams/import", content=_padded_body(cap, cap), headers=a)
+    assert resp.status_code == 200
+
+
+def test_import_body_over_cap_by_content_length_is_413(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    cap = int(cfg.get("exams", "max_import_bytes"))
+    resp = client.post("/exams/import", content=_padded_body(cap, cap + 1), headers=a)
+    assert resp.status_code == 413
+
+
+def test_import_body_over_cap_streamed_is_413(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    """No Content-Length: httpx sends the body chunked, so only the streamed byte count can refuse it."""
+    a = _token_for(client, db, cfg, "ana")
+    cap = int(cfg.get("exams", "max_import_bytes"))
+    body = _padded_body(cap, cap + 1)
+    chunks = [body[i : i + 4096] for i in range(0, len(body), 4096)]
+    resp = client.post("/exams/import", content=iter(chunks), headers=a)
+    assert "content-length" not in {k.lower() for k in resp.request.headers}
+    assert resp.status_code == 413
+
+
+def test_import_bad_utf8_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    a = _token_for(client, db, cfg, "ana")
+    resp = client.post("/exams/import", content=b"\xff\xfe{}", headers=a)
+    assert resp.status_code == 422
