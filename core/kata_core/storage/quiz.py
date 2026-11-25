@@ -87,3 +87,39 @@ def list_questions(conn: psycopg.Connection[Any], limit: int) -> list[dict[str, 
         }
         for row in rows
     ]
+
+
+def list_mini_questions(conn: psycopg.Connection[Any], limit: int) -> list[dict[str, Any]]:
+    """Return up to `limit` cached questions with their source link, tier and licence.
+
+    The answer index is left out: the client never sees it. Capped at MINI_QUIZ_MAX like `list_questions`.
+    """
+    capped = max(0, min(limit, MINI_QUIZ_MAX))
+    rows = conn.execute(
+        "SELECT q.id, q.question, q.choices, s.url, s.tier, s.licence FROM quiz_question q "
+        "JOIN quiz_source s ON s.id = q.source_id "
+        "ORDER BY q.id LIMIT %s",
+        (capped,),
+    ).fetchall()
+    return [
+        {
+            "id": int(row[0]),
+            "question": row[1],
+            "choices": list(row[2]),
+            "source_url": row[3],
+            "tier": int(row[4]),
+            "licence": row[5],
+        }
+        for row in rows
+    ]
+
+
+def get_question(conn: psycopg.Connection[Any], question_id: int) -> dict[str, Any] | None:
+    """Return one cached question with its answer index, or None when no such question exists."""
+    row = conn.execute(
+        "SELECT id, choices, answer_index FROM quiz_question WHERE id = %s",
+        (question_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"id": int(row[0]), "choices": list(row[1]), "answer_index": int(row[2])}
