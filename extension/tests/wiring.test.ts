@@ -173,7 +173,7 @@ describe("background wiring", () => {
     chrome.click({ windowId: 2 });
     expect(chrome.open).toHaveBeenCalledWith({ windowId: 2 });
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalled());
-    await vi.waitFor(async () => expect(await area.get("kata.pending")).toEqual({ "kata.pending": [] }));
+    await vi.waitFor(async () => expect(await area.get("kata.markQueue")).toEqual({ "kata.markQueue": [] }));
   });
 
   it("opens the panel through sidebarAction when the browser has no sidePanel", async () => {
@@ -197,7 +197,9 @@ describe("background wiring", () => {
     wireBackground(chrome.api, createBackend(chrome.api, area, fetchImpl));
     const reply = (await chrome.send({ type: "panel:known", topicId: 9 })) as PanelReply;
     expect(reply).toEqual({ ok: true, data: "queued" });
-    expect(await area.get("kata.pending")).toEqual({ "kata.pending": [9] });
+    expect(await area.get("kata.markQueue")).toEqual({
+      "kata.markQueue": [{ kind: "topic", id: 9, state: "known" }],
+    });
   });
 
   it("scan message asks the active tab for blocks and polls each job", async () => {

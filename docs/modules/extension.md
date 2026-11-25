@@ -18,7 +18,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/content.ts:23` `handleContentMessage`, `:44` `registerContentScript`.
 - `extension/src/scanner.ts:96` `scanBlocks`; `extension/src/scanSession.ts:33` `runScan`.
 - `extension/src/coreClient.ts:202` `CoreClient`; `:313` `listConceptMarks`, `:318` `setConceptMark` (concept marks); error classes `CoreTimeoutError`, `CoreOfflineError`, `CoreAuthError`, `CoreHttpError`.
-- `extension/src/offlineQueue.ts:31` `OfflineQueue`.
+- `extension/src/offlineQueue.ts:64` `OfflineQueue`.
 - `extension/src/tokenStore.ts:21` `TokenStore`.
 - `extension/src/sidepanel.ts:420` `renderPanel`; `extension/src/sidepanelBoot.ts:33` `bootPanel`.
 - Needs-cloud text: `extension/src/coreClient.ts:144` `courseErrorText` maps a 409 `needs_cloud` to "This needs a cloud model. Add a cloud token to turn it on." (`:153-154`); the side panel create note shows it (`extension/src/sidepanel.ts:260`). The CLI, editor and MCP call no model-class endpoint (events and read-only tools only), so `needs_cloud` surfaces in core, worker and extension only.
