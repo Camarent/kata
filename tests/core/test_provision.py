@@ -63,6 +63,9 @@ SCHEMA_TABLES = {
     "track_item",
     "planning_budget",
     "decision_point",
+    "track_goal",
+    "track_goal_source",
+    "track_goal_concept",
 }
 
 
