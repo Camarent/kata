@@ -235,10 +235,28 @@ D35, D48, D49). Shipped:
 - Not built: reading PDF pages that hold images (D16), needs a vision model and a cost check; it
   waits for M23.
 
-## Milestone 22: quiz and exam results
+## Milestone 22: quiz and exam results (shipped)
 
-**Scope.** Quizzes in kata (quiz pool D45 to D47). Dojo course exams stay in dojo; kata imports
-their results with a confirm step (D58). Exam rules: D35, D51.
+**Scope.** Quizzes in kata (quiz pool D45 to D47, answers kept out of the stem D55 item e). Dojo
+course exams stay in dojo; kata imports their results with a confirm step (D35, D58). Exam domain
+mapping (D51) is deferred. Shipped:
+
+- Quiz source request `POST /quiz/sources` for an allowlisted URL; job kinds `quiz.fetch` and
+  `quiz.generate`, with a grounding check and strict JSON output.
+- Allowlist with tier 1 and tier 2 sources; each source records its licence.
+- Mini quiz `GET /quiz/mini` with at most 5 questions, no answer index, and source, tier and licence.
+- Answer check `POST /quiz/answer` in core: a correct answer moves New to Learning only; Known is
+  never set there.
+- Exam result import with a confirm step; a confirmed result marks Known and sends the dojo
+  placement answer (`placement_known`).
+
+Success criteria:
+
+- `check-all.sh --py` green.
+- An allowlist miss, a non-https URL, a private address or an over-long text is refused.
+- A question whose quote is not in the fetched text, or whose stem holds an answer word, is dropped.
+- The client never receives an answer index, and no exam result marks a concept Known without confirm.
+- Open for the owner: the licence rows in `decisions.md`, and the model setting wording.
 
 ## Milestone 23: jobs
 
