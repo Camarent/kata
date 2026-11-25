@@ -15,7 +15,7 @@ from __future__ import annotations
 import ipaddress
 import re
 import socket
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -75,10 +75,10 @@ def _is_public(text: str) -> bool:
     return addr.is_global and not blocked
 
 
-def _checked_target(url: str, resolver: Resolver) -> _Target:
-    """Validate `url`; return the connect URL built on the one checked IP."""
+def _checked_target(url: str, resolver: Resolver, schemes: Collection[str]) -> _Target:
+    """Validate `url` against `schemes`; return the connect URL built on the one checked IP."""
     parts = urlsplit(url)
-    if parts.scheme not in ALLOWED_SCHEMES:
+    if parts.scheme not in schemes:
         raise QuizFetchError(f"scheme not allowed: {parts.scheme or '(none)'}")
     hostname = parts.hostname
     if not hostname:
@@ -158,10 +158,17 @@ def fetch_text(
     timeout_seconds: float,
     resolver: Resolver = system_resolver,
     transport: httpx.BaseTransport | None = None,
+    allowed_schemes: Collection[str] = ALLOWED_SCHEMES,
+    allowed_content_types: Collection[str] = ALLOWED_CONTENT_TYPES,
+    headers: Mapping[str, str] = FIXED_HEADERS,
 ) -> str:
-    """Plain text of the source at `url`. Raises QuizFetchError for any refused or failed fetch."""
-    target = _checked_target(url, resolver)
-    headers = {**FIXED_HEADERS, "Host": target.host_header}
+    """Plain text of the source at `url`. Raises QuizFetchError for any refused or failed fetch.
+
+    `allowed_schemes`, `allowed_content_types` and `headers` default to the quiz rules; a
+    stricter caller (the joke fetch) passes its own.
+    """
+    target = _checked_target(url, resolver, allowed_schemes)
+    request_headers = {**headers, "Host": target.host_header}
     with httpx.Client(
         transport=transport,
         follow_redirects=False,
@@ -172,7 +179,7 @@ def fetch_text(
             with client.stream(
                 "GET",
                 target.url,
-                headers=headers,
+                headers=request_headers,
                 extensions={"sni_hostname": target.hostname},
             ) as response:
                 if response.status_code != httpx.codes.OK:
@@ -180,7 +187,7 @@ def fetch_text(
                         raise QuizFetchError("redirects are not followed")
                     raise QuizFetchError(f"unexpected status {response.status_code}")
                 media, options = _media_type(response.headers.get("content-type", ""))
-                if media not in ALLOWED_CONTENT_TYPES:
+                if media not in allowed_content_types:
                     raise QuizFetchError(f"content type not allowed: {media or '(none)'}")
                 body = _read_capped(response, max_bytes)
         except httpx.HTTPError as exc:
