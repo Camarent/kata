@@ -66,6 +66,10 @@ SCHEMA_TABLES = {
     "track_goal",
     "track_goal_source",
     "track_goal_concept",
+    "quiz_source",
+    "quiz_question",
+    "exam_result",
+    "exam_result_concept",
 }
 
 
