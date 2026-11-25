@@ -147,7 +147,8 @@ def report_output(
     """Store the output of a job the caller leased, then run its kind's output hook in the same tx.
 
     413 above `[jobs] max_output_bytes`. 404 when the job is not the caller's or not leased.
-    422 when its kind has no output hook (nothing is stored).
+    422 when its kind has no output hook (nothing is stored). 422 when the hook rejects the reply
+    (ValueError or TypeError): nothing is stored and the job is marked failed.
     """
     max_bytes = int(cfg.get("jobs", "max_output_bytes"))
     if len(json.dumps(body.output).encode()) > max_bytes:
@@ -159,7 +160,14 @@ def report_output(
     if job.kind not in registry.output_hooks:
         conn.rollback()
         raise HTTPException(status_code=422, detail=f"no output hook for job kind {job.kind}")
-    run_output_hook(conn, registry, job, body.output)
+    try:
+        run_output_hook(conn, registry, job, body.output)
+    except (ValueError, TypeError) as exc:
+        # Reject the reply: drop the stored output, mark the job failed, commit that, then 422.
+        conn.rollback()
+        fail(conn, job_id, ctx.user_id)
+        conn.commit()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return Response(status_code=204)
 
 

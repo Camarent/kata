@@ -285,6 +285,28 @@ def test_output_without_hook_is_422_and_stores_nothing(
     assert row[0] is None
 
 
+def test_output_hook_rejecting_reply_is_422_and_fails_the_job(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    def _reject(conn: psycopg.Connection[Any], job: Any, output: dict[str, Any]) -> None:
+        raise ValueError("reply rejected")
+
+    client.app.dependency_overrides[get_registry] = lambda: Registry(
+        output_hooks={"course.generate": _reject}
+    )
+    headers = _user_token(client, db, cfg, "ana")
+    job_id = _enqueue_kind(db, _user_id(client, headers), "course.generate")
+    assert client.get("/jobs/next", params={"kind": "course.generate"}, headers=headers).status_code == 200
+    resp = client.post(f"/jobs/{job_id}/output", json={"output": {"ok": True}}, headers=headers)
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "reply rejected"
+    with db.connect() as conn:
+        row = conn.execute("SELECT status, output FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    assert row[0] == "failed"
+    assert row[1] is None
+
+
 def _feature_client(enabled: bool) -> TestClient:
     app = FastAPI()
     app.state.cfg = Config(sections={"trainer": {"enabled": enabled}})
