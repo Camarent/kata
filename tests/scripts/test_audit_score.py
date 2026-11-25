@@ -119,8 +119,9 @@ def _entry(**overrides: object) -> dict[str, object]:
 
 def test_cases_file_covers_every_task_class() -> None:
     cases = load_audit_cases()
-    assert uncovered_classes(cases) == []
-    assert {case.task_class for case in cases.cases} >= set(TASK_CLASSES)
+    # vision is cloud-only (no local vision model is verified), so the local audit has no case for it.
+    assert uncovered_classes(cases) == ["vision"]
+    assert {case.task_class for case in cases.cases} >= set(TASK_CLASSES) - {"vision"}
 
 
 def test_cases_file_has_the_realistic_variants() -> None:

@@ -62,8 +62,15 @@ def test_example_has_required_sections() -> None:
         "modelhost",
         "exams",
         "quiz",
+        "summary",
+        "reader",
     }
-    assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd", "estimate_safety_percent"}
+    assert set(data["cost"]) == {
+        "cap_micro_usd",
+        "warn_micro_usd",
+        "estimate_safety_percent",
+        "image_input_tokens",
+    }
     assert set(data["smoke"]) == {"allowed_models", "budget_micro_usd"}
     assert set(data["smoke_local"]) == {
         "models",
@@ -92,12 +99,15 @@ def test_example_has_required_sections() -> None:
         "scan_classify",
         "scan_extract",
         "quiz_generate",
+        "vision",
     }
     assert set(data["routing"]) == task_classes
     assert set(data["local_capability"]) == task_classes
     for name in task_classes:
         assert data["routing"][name] == "local,anthropic"
+    for name in task_classes - {"vision"}:
         assert data["local_capability"][name] == "kata-l"
+    assert data["local_capability"]["vision"] == "cloud-only"
     assert set(data["core"]) == {"host", "port", "public_url"}
     assert set(data["database"]) == {"host", "port", "name", "user", "password_env"}
     assert set(data["auth"]) == {"token_ttl_seconds", "enrolment_ttl_seconds"}

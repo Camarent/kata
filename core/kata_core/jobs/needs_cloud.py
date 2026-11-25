@@ -31,6 +31,7 @@ TASK_CLASSES = frozenset(
         "scan_classify",
         "scan_extract",
         "quiz_generate",
+        "vision",
     }
 )
 
@@ -39,6 +40,10 @@ JOB_KIND_CLASS: dict[str, str] = {
     COURSE_GENERATE_KIND: "generate_course",
     SYLLABUS_EXTRACT_KIND: "extract_syllabus",
     QUIZ_GENERATE_KIND: "quiz_generate",
+    # Owned by core/kata_core/summary/job_kinds.py (page.summary) and
+    # core/kata_core/reader/job_kinds.py (reader.extract); those modules are made by later tasks.
+    "page.summary": "summary",
+    "reader.extract": "vision",
 }
 
 
