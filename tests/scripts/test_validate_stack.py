@@ -81,6 +81,20 @@ def _model() -> dict:
                 "mem_limit": 134217728,
                 "ports": [{"target": 443, "published": "443", "host_ip": "127.0.0.1"}],
             },
+            "reader": {
+                "image": "kata:validate",
+                "mem_limit": 536870912,
+                "environment": {"KATA_CONFIG": "/config/kata.toml"},
+                "network_mode": "none",
+                "read_only": True,
+                "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
+                "volumes": [
+                    {"type": "bind", "source": "/stack/kata.host.toml", "target": "/config/kata.toml", "read_only": True},
+                    {"type": "volume", "source": "reader-in", "target": "/spool/in", "read_only": True},
+                    {"type": "volume", "source": "reader-out", "target": "/spool/out"},
+                ],
+            },
         },
         "secrets": {
             "postgres_password": {"file": "/stack/secrets/postgres_password"},
@@ -157,6 +171,62 @@ def test_model_mutation_fails_with_rule_name(rule: str, mutate: Callable[[dict],
     assert {problem.split(":", 1)[0] for problem in problems} == {rule}
 
 
+def _reader(model: dict) -> dict:
+    return model["services"]["reader"]
+
+
+def _set_reader(key: str, value: object) -> Callable[[dict], None]:
+    def mutate(model: dict) -> None:
+        _reader(model)[key] = value
+
+    return mutate
+
+
+def _reader_mount_read_only(target: str, value: bool) -> Callable[[dict], None]:
+    def mutate(model: dict) -> None:
+        for mount in _reader(model)["volumes"]:
+            if mount["target"] == target:
+                mount["read_only"] = value
+
+    return mutate
+
+
+def _reader_env_secret(model: dict) -> None:
+    _reader(model)["environment"]["KATA_WORKER_TOKEN"] = "x"
+
+
+@pytest.mark.parametrize(
+    ("key", "mutate"),
+    [
+        ("network_mode", _set_reader("network_mode", "bridge")),
+        ("read_only", _set_reader("read_only", False)),
+        ("cap_drop", _set_reader("cap_drop", [])),
+        ("security_opt", _set_reader("security_opt", [])),
+        ("secrets", _set_reader("secrets", ["worker_token"])),
+        ("networks", _set_reader("networks", ["data"])),
+        ("ports", _set_reader("ports", [{"target": 8080, "published": "8080", "host_ip": "127.0.0.1"}])),
+        ("environment", _reader_env_secret),
+        ("config mount", _reader_mount_read_only("/config/kata.toml", False)),
+        ("reader-in mount", _reader_mount_read_only("/spool/in", False)),
+    ],
+)
+def test_reader_violation_fails_with_reader_hardened(key: str, mutate: Callable[[dict], None]):
+    problems = _mutate_model(mutate)
+    assert problems, "mutation passed every rule"
+    # A reader port also trips no-host-port; the reader rule itself must name the key.
+    assert any(problem.startswith(f"reader-hardened: {key}") for problem in problems), problems
+
+
+def test_reader_rule_ignores_other_services_and_absent_reader():
+    model = _model()
+    model["services"]["reader-extra"] = {"image": "kata:validate", "mem_limit": 1, "network_mode": "bridge"}
+    model["services"]["worker"]["networks"] = ["data", "egress"]
+    model["services"]["worker"]["read_only"] = False
+    assert vs.check_compose(model) == []
+    del model["services"]["reader"]
+    assert vs.check_compose(model) == []
+
+
 def test_config_keys_match_real_example_and_template():
     template = tomllib.loads(TEMPLATE.read_text(encoding="utf-8"))
     example = tomllib.loads(EXAMPLE.read_text(encoding="utf-8"))
@@ -205,6 +275,11 @@ def _mutate_latest(text: str) -> str:
     return _replace_once(text, caddy_pin, "    image: caddy:latest\n")
 
 
+def _mutate_reader_network(text: str) -> str:
+    # Dropping the key would also attach the reader to a network (a second reader-hardened line).
+    return _replace_once(text, "network_mode: none", "network_mode: bridge")
+
+
 # rule -> (compose mutation, template mutation); each case changes exactly one rule's input.
 COMPOSE_MUTATIONS: dict[str, Callable[[str], str]] = {
     "no-host-port": _mutate_public_port,
@@ -212,6 +287,7 @@ COMPOSE_MUTATIONS: dict[str, Callable[[str], str]] = {
     "secret-file": _mutate_secret_env,
     "migrate-first": _mutate_core_not_waiting,
     "no-latest": _mutate_latest,
+    "reader-hardened": _mutate_reader_network,
 }
 
 

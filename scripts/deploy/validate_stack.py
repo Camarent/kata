@@ -12,6 +12,9 @@ Rules, named at the start of each failure line:
   migrate-first    core does not wait for migrate to complete successfully
   no-latest        a service image has no digest and no tag other than latest
   config-keys      deploy/kata.host.toml does not have the same keys as config/kata.example.toml
+  reader-hardened  the reader service (when present) lacks network_mode none, read_only, cap_drop
+                   ALL, no-new-privileges, has secrets/networks/ports or a secret-like env name, or
+                   has a config or reader-in mount that is not read-only
 
 Exit 0 when every rule passes, 1 when a rule fails, 2 when an input cannot be read or the
 compose model cannot be produced.
@@ -58,6 +61,12 @@ CORE = "core"
 # The only service that publishes a host port (deploy/compose.yaml header).
 PUBLISHER = "caddy"
 MIGRATE_DONE = "service_completed_successfully"
+# The reader runs untrusted documents: it is checked only when a service of this name exists.
+READER = "reader"
+READER_CONFIG = "/config/kata.toml"
+READER_SPOOL_IN = "/spool/in"
+READER_NO_ACCESS_KEYS = ("secrets", "networks", "ports")
+SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD")
 
 Model = dict[str, Any]
 
@@ -135,6 +144,40 @@ def check_compose(model: Model) -> list[str]:
     migrate_dep = core_deps.get(MIGRATE, {})
     if migrate_dep.get("condition") != MIGRATE_DONE:
         problems.append(f"migrate-first: {CORE} does not wait for {MIGRATE} to complete successfully")
+    if READER in services:
+        problems += _reader_problems(services[READER])
+    return problems
+
+
+def _mount(service: Model, target: str) -> Model:
+    """The normalised volume entry mounted at target, or an empty dict."""
+    for mount in service.get("volumes", []):
+        if mount.get("target") == target:
+            return mount
+    return {}
+
+
+def _reader_problems(service: Model) -> list[str]:
+    """Hardening rule for the reader service: one 'reader-hardened: <key> ...' line per violation."""
+    problems: list[str] = []
+    if service.get("network_mode") != "none":
+        problems.append("reader-hardened: network_mode is not none")
+    if service.get("read_only") is not True:
+        problems.append("reader-hardened: read_only is not true")
+    if "ALL" not in service.get("cap_drop", []):
+        problems.append("reader-hardened: cap_drop lacks ALL")
+    if "no-new-privileges:true" not in service.get("security_opt", []):
+        problems.append("reader-hardened: security_opt lacks no-new-privileges:true")
+    for key in READER_NO_ACCESS_KEYS:
+        if key in service:
+            problems.append(f"reader-hardened: {key} is set; the reader takes none")
+    for name in service.get("environment", {}):
+        if any(word in name.upper() for word in SECRET_WORDS):
+            problems.append(f"reader-hardened: environment has secret-like name {name}")
+    if _mount(service, READER_CONFIG).get("read_only") is not True:
+        problems.append("reader-hardened: config mount is not read-only")
+    if _mount(service, READER_SPOOL_IN).get("read_only") is not True:
+        problems.append("reader-hardened: reader-in mount is not read-only")
     return problems
 
 
