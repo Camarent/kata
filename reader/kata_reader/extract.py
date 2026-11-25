@@ -217,7 +217,7 @@ def _encode_png(img: Image.Image, limits: Limits) -> bytes:
 
 
 def _store(out_dir: Path, n: int, png: bytes) -> str:
-    name = f"page-{n}.png"
+    name = f"p{n:04d}.png"
     (out_dir / name).write_bytes(png)
     return name
 
