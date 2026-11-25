@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.15] - 2026-11-25
+
+- feat(quiz): checked quiz source pool, mini quiz and exam result import
+
 ## [0.1.14] - 2026-11-25
 
 - feat(learn): concept lists, track goals with velocity, course regenerate and start rung
