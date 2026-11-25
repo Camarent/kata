@@ -206,6 +206,38 @@ def test_report_findings_lists_timeout_and_open() -> None:
     assert problems
 
 
+HOSTILE_ROWS = [
+    reader_probe.Row("empty.pdf", "application/pdf", "bad_type", 0),
+    reader_probe.Row("bad_magic.pdf", "application/pdf", "bad_type", 0),
+    reader_probe.Row("truncated.pdf", "application/pdf", "bad_file", 0),
+    reader_probe.Row("huge_declared.png", "image/png", "bad_file", 0),
+    reader_probe.Row("trailing_junk.png", "image/png", "bad_file", 0),
+]
+
+
+def test_expected_refusals_pass() -> None:
+    rows = [*HOSTILE_ROWS, reader_probe.Row("a.pdf", "application/pdf", "done", 1)]
+    report = reader_probe.build_report(rows, dict(BLOCKED_SANDBOX))
+    assert "- none" in report
+    assert "Status: done" in report
+    assert reader_probe.check_report(report) == []
+
+
+def test_hostile_row_marked_done_fails() -> None:
+    rows = [
+        reader_probe.Row("empty.pdf", "application/pdf", "done", 0),
+        reader_probe.Row("a.pdf", "application/pdf", "done", 1),
+    ]
+    report = reader_probe.build_report(rows, dict(BLOCKED_SANDBOX))
+    assert "file empty.pdf: done, must be bad_type" in reader_probe.check_report(report)
+
+
+def test_real_row_marked_refused_fails() -> None:
+    rows = [*HOSTILE_ROWS, reader_probe.Row("a.pdf", "application/pdf", "bad_file", 0)]
+    report = reader_probe.build_report(rows, dict(BLOCKED_SANDBOX))
+    assert "file a.pdf: bad_file, must be done" in reader_probe.check_report(report)
+
+
 def test_report_clean_run_has_none_finding() -> None:
     report = _good_report()
     assert "- none" in report

@@ -12,7 +12,8 @@ and writes the markdown report. Every docker call goes through an injected runne
 --check-report exits 0 only when the report passes the rules in check_report().
 
 Report sections: '## Files' (table), '## Sandbox checks' ('connect: blocked|OPEN', 'write: blocked|OPEN'),
-'## Findings' (one bullet per row not done or sandbox check not blocked, else 'none'), '## End to end' ('Status: done|pending').
+'## Findings' (one bullet per row not at its expected status or sandbox check not blocked, else 'none'), '## End to end' ('Status: done|pending').
+A hostile file (EXPECTED_REFUSAL) is expected to be refused with its own code; every other row must be done.
 Exit codes: 0 pass, 1 a check failed, 2 a missing file.
 """
 
@@ -48,6 +49,15 @@ ERROR = "error"  # a check whose exec failed: it did not run, so it is neither b
 DONE = "done"
 PENDING = "pending"
 MEDIA_BY_SUFFIX = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+# The reader's refusal status of each synthetic hostile file (make_corpus). A refusal is the expected
+# result for these rows; a real file must be done. Keep in step with the reader's extract() codes.
+EXPECTED_REFUSAL = {
+    "empty.pdf": "bad_type",
+    "bad_magic.pdf": "bad_type",
+    "truncated.pdf": "bad_file",
+    "huge_declared.png": "bad_file",
+    "trailing_junk.png": "bad_file",
+}
 
 SECTION_FILES = "Files"
 SECTION_SANDBOX = "Sandbox checks"
@@ -236,11 +246,16 @@ def _cells(line: str) -> list[str]:
     return re.split(r"(?<!\\)\|", line.strip())[1:-1]
 
 
+def expected_status(name: str) -> str:
+    """The status a row must have: its refusal code for a hostile file, else done."""
+    return EXPECTED_REFUSAL.get(name, DONE)
+
+
 def build_report(rows: list[Row], checks: dict[str, str]) -> str:
     """The markdown report for one run."""
-    findings = [f"- {row.name}: {row.status}" for row in rows if row.status != DONE]
+    findings = [f"- {row.name}: {row.status}" for row in rows if row.status != expected_status(row.name)]
     findings += [f"- sandbox {name}: {value}" for name, value in checks.items() if value != BLOCKED]
-    end_status = DONE if rows and all(row.status == DONE for row in rows) else PENDING
+    end_status = DONE if rows and all(row.status == expected_status(row.name) for row in rows) else PENDING
     lines = ["# Reader live probe", "", f"## {SECTION_FILES}", "", "| file | media type | status | pages |", "|---|---|---|---|"]
     lines += [f"| {_cell(r.name)} | {r.media} | {_cell(r.status)} | {r.pages} |" for r in rows]
     lines += ["", f"## {SECTION_SANDBOX}", ""]
@@ -277,8 +292,9 @@ def check_report(text: str) -> list[str]:
                 problems.append(f"Files: malformed row: {line.strip()}")
                 continue
             name, status = cells[0].strip(), cells[2].strip()
-            if status != DONE:
-                problems.append(f"file {name}: {status}, must be {DONE}")
+            expected = expected_status(name)
+            if status != expected:
+                problems.append(f"file {name}: {status}, must be {expected}")
     if SECTION_SANDBOX in sections:
         found = {}
         for line in sections[SECTION_SANDBOX]:
