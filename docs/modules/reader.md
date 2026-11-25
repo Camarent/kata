@@ -74,5 +74,5 @@ Core and worker never import `kata_reader`; the reader runs as its own process, 
 
 ## Depends on / used by
 - Depends on: `pypdfium2`, `Pillow` (`reader` extra), the Python standard library.
-- Used by: the worker's `reader.extract` handler (through the spool directories only, [worker](worker.md)); the compose stack ([deploy](deploy.md)); the core upload route `POST /reader/documents` ([api](../api.md)).
+- Used by: the worker's `reader.extract` handler (through the spool directories only, [worker](worker.md)); the live probe `scripts/dev/reader_probe.py` (through the same spool, via `docker compose exec`; [scripts](scripts.md)); the compose stack ([deploy](deploy.md)); the core upload route `POST /reader/documents` ([api](../api.md)).
 - Tests: `tests/reader/`, `tests/worker/test_reader_spool.py`, `tests/worker/test_handler_reader_extract.py`, `tests/scripts/test_validate_stack.py` (the `reader-hardened` rule).

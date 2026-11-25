@@ -5,12 +5,14 @@ summary: Operator DB CLI (create, migrate, drop) and the lesson-check benchmark 
 # scripts
 
 ## Purpose
-Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests); `check_research_note.py` checks the M23 research note's sections, decisions and source URLs. `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. `scripts/smoke/` runs the opt-in smokes: real model, local model and real dojo (see the smoke sections below). The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
+Five tools. `scripts/db/` provisions Postgres databases for kata: a thin wrapper over `kata_core.storage.provision`; config comes from `--config` or `KATA_CONFIG`. `scripts/bench/` runs the lesson-check benchmark (synthetic cases, fake embedder, scratch DB) and reports three-state accuracy and abstain rate. `scripts/dev/` holds the developer shell tools: `check-all.sh` (the gate; `--browser` runs the browser tier) and `install-browsers.sh` (user-level Firefox and geckodriver for the browser tests); `check_research_note.py` checks the M23 research note's sections, decisions and source URLs; `reader_probe.py` probes the live reader container by hand (see Public surface). `scripts/deploy/` holds the checks for the web VM stack (M6): image rules, compose and config template, tombstone replay and row counts for the restore drill. `scripts/smoke/` runs the opt-in smokes: real model, local model and real dojo (see the smoke sections below). The shell scripts they check live in `deploy/` (see [ARCHITECTURE](../ARCHITECTURE.md)); the runbook is `docs/deployment.md`.
 
 ## Public surface
 - `scripts/dev/install-browsers.sh:65` `main` - no argument installs; `--print-dir` prints the install directory (`:27` `browsers_dir`, `$KATA_BROWSERS_DIR` or `$HOME/.cache/kata-browsers`); `--status` exits 0 when `firefox/firefox` and `geckodriver` are there (`:59` `status_all`). `:17` `FIREFOX_VERSION` 140.0esr and `:21` `GECKODRIVER_VERSION` 0.36.0 with their sha256 pins (`:19`, `:23`); `:30` `verify_sha256` refuses an empty pin.
 - `scripts/dev/check-all.sh:47` mode flags (`--py`, `--ext`, `--editor`, `--browser`, ...), `:152` `run_browser` (`--browser`: prints a skip line and exits 0 when the install status fails, else runs `tests/browser -m browser`); every other mode excludes `browser` (`:134`, `:138`, `:174-180`).
 - `scripts/dev/check_research_note.py:67` `check_note(text)` -> list of failure messages (empty = pass); `:100` `main(argv)` - exit 0 pass, 1 a check failed, 2 file missing; failures on stderr. Checks `REQUIRED_SECTIONS` (`:18`), a table and a `Decision:` line in sections 1-3, the joke sources `jokeapi` and `icanhazdadjoke` in section 1 table rows, and an http(s) URL in every section 2 row.
+- `scripts/dev/reader_probe.py:298` `main(argv)` - exactly one mode: `--make-corpus DIR` (`:123` `make_corpus`, five hostile files), `--run --compose-file F --env-file E --project P --files DIR --report PATH` (feeds each file through the spool, `:203` `run_probe`; `:218` `run_sandbox_checks`; `:239` `build_report`), or `--check-report PATH` (`:266` `check_report(text)` -> list of problems). Exit 0 pass, 1 a check failed, 2 a missing file.
+- `scripts/dev/reader_probe.py:145` `make_compose_runner(compose_file, env_file, project)` - the only docker call: `docker compose ... exec -T <service> <argv>`.
 - `scripts/db/kata_db.py:35` `main(argv)` - subcommands `create NAME`, `migrate [--name NAME]`, `drop NAME`.
 - `scripts/db/kata_db.py:20` `_parser()` - argparse setup; `--config` at `:24`.
 - `scripts/db/kata_db.py:55` `if __name__ == "__main__"` - run as script.
@@ -40,6 +42,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
 - `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
 - `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
+- `scripts/dev/reader_probe.py` - live reader probe: writes `/spool/in` files for the worker, polls `/spool/out/<id>/result.json` via the `worker` and `reader` services, runs two sandbox checks, writes the report (`docs/research/reader-live.md` is its filled output); tested by `tests/scripts/test_reader_probe.py`.
 - `scripts/dev/check_research_note.py` - research note checker (`python3 scripts/dev/check_research_note.py NOTE.md`); tested by `tests/scripts/test_check_research_note.py`, which also checks `docs/research/m23-sources.md`.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
 - `scripts/deploy/check_image_rules.py` - Dockerfile and `.dockerignore` rules; tested by `tests/scripts/test_check_image_rules.py`.
@@ -102,10 +105,12 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `abstain_rate` is over all cases; `abstain_precision` is `None` when nothing was predicted abstain (`scripts/bench/scoring.py:121`).
 - Report never prints entry text (tested by `test_rendered_report_has_no_entry_text`).
 - `install-browsers.sh` fails closed: an empty sha256 pin refuses the install. Chromedriver is not pinned; Chrome is found on `PATH`.
+- `reader_probe.py` is not run by `check-all.sh` or CI; the lead runs it by hand against the live stack. Spool names and protocol version (`IN_DIR`, `OUT_DIR`, `RESULT_NAME`, `SPOOL_VERSION`) are copied from the reader side: `scripts/dev/reader_probe.py:36-41`.
 - `docs/research/benchmarks/RESULTS.md` holds a pasted block between `bench:lesson-check` markers; `tests/scripts/test_bench_results_note.py` fails when it differs from the bench output.
 
 ## Depends on / used by
 - Depends on: `core/kata_core/config.py` (`load_config`, `ConfigError`), `core/kata_core/storage/provision.py` (`connect`, `create_database`, `drop_database`, `migrate`), psycopg.
 - `scripts/smoke/dojo_real.py` depends on `kata_core.trainer.cli` (`TrainerError`) and `kata_core.trainer.dojo_cli` (`DojoTrainerCli`).
+- `scripts/dev/reader_probe.py` depends on the standard library only, and on `docker compose` at run time (`make_compose_runner`).
 - Bench also depends on `kata_core` lesson_check, retrieval, storage (`check_lesson`, `Retriever`, `add_entry`, `load_embedder`, concepts, taxonomy, users).
 - Used by: operators by hand; `tests/browser/conftest.py` calls `install-browsers.sh --print-dir`; `check-all.sh` runs every mode; `tests/core/test_provision.py` covers the CLI parser; `tests/scripts/test_bench_*.py` cover the bench; `docs/research/benchmarks/SUITE.md` line 3 points to `scripts/bench/`.
