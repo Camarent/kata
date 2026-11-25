@@ -1,5 +1,6 @@
 """Named concept lists (M21): create, list, rename and delete a user's lists; add and remove concepts;
-add a whole visible topic; and find which of the user's lists hold a concept.
+add a whole visible topic; find which of the user's lists hold a concept; and queue a course from a
+list (the list is kept).
 
 The user id always comes from `current_user`, never from the body or the path. A list the caller
 does not own gives 404, and so does a concept or topic the caller cannot see.
@@ -12,8 +13,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from kata_core.api.deps import Conn, current_user
+from kata_core.api.deps import Conn, current_user, get_cfg, require_feature
+from kata_core.api.routes.courses import CourseAcceptedOut, _course_out, queue_course
 from kata_core.auth.service import AuthContext
+from kata_core.config import Config
 from kata_core.lists.store import (
     ConceptList,
     DuplicateConceptList,
@@ -29,10 +32,12 @@ from kata_core.lists.store import (
 )
 from kata_core.storage.concepts import concept_visible
 from kata_core.storage.taxonomy import topic_visible
+from kata_core.trainer.rungs import START_RUNG_MAX, START_RUNG_MIN
 
 router = APIRouter(prefix="/v1/lists")
 
 Caller = Annotated[AuthContext, Depends(current_user)]
+Cfg = Annotated[Config, Depends(get_cfg)]
 
 
 class ListNameIn(BaseModel):
@@ -51,6 +56,11 @@ class ConceptIdsIn(BaseModel):
 
 class AddedOut(BaseModel):
     added: int
+
+
+class CourseFromListIn(BaseModel):
+    title: str
+    learning_rung: int | None = Field(default=None, ge=START_RUNG_MIN, le=START_RUNG_MAX)
 
 
 def _out(concept_list: ConceptList) -> ListOut:
@@ -131,6 +141,32 @@ def add_topic_route(list_id: int, topic_id: int, ctx: Caller, conn: Conn) -> Add
     if not topic_visible(conn, ctx.user_id, topic_id):
         raise HTTPException(status_code=404, detail="topic not found")
     return AddedOut(added=add_topic(conn, ctx.user_id, list_id, topic_id))
+
+
+@router.post(
+    "/{list_id}/course",
+    status_code=202,
+    response_model=CourseAcceptedOut,
+    dependencies=[Depends(require_feature("trainer"))],
+)
+def course_from_list_route(
+    list_id: int, body: CourseFromListIn, ctx: Caller, conn: Conn, cfg: Cfg
+) -> CourseAcceptedOut:
+    """Queue a course for the concepts of the caller's list. The list is kept. 404 when the list is not
+    owned; 422 when it has no concepts, a concept is not visible, or the title is empty. Other course
+    errors (409) are those of `POST /v1/courses`."""
+    if not owns_list(conn, ctx.user_id, list_id):
+        raise _not_found_list()
+    concept_list = next(c for c in list_all(conn, ctx.user_id) if c.id == list_id)
+    if not concept_list.concept_ids:
+        raise HTTPException(status_code=422, detail="list has no concepts")
+    for concept_id in concept_list.concept_ids:
+        if not concept_visible(conn, ctx.user_id, concept_id):
+            raise HTTPException(status_code=422, detail=f"concept {concept_id} is unknown or not visible")
+    course, job_id = queue_course(
+        conn, ctx.user_id, body.title, concept_list.concept_ids, body.learning_rung, cfg
+    )
+    return CourseAcceptedOut(**_course_out(course).model_dump(), job_id=job_id)
 
 
 @router.delete("/{list_id}/concepts/{concept_id}", status_code=204)
