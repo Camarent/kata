@@ -7,15 +7,22 @@ cannot see gives 404 for the whole request: nothing partial is returned.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Annotated, Literal
+from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from kata_core.api.deps import Conn, current_user
 from kata_core.auth.service import AuthContext
-from kata_core.storage.concept_rank import UNMARKED, block_state, concept_relevance
+from kata_core.storage.concept_rank import (
+    UNMARKED,
+    SortField,
+    SortOrder,
+    block_state,
+    concept_relevance,
+    sort_concepts,
+)
 from kata_core.storage.concepts import (
     VisibleConcept,
     concept_mark_states,
@@ -27,13 +34,6 @@ from kata_core.storage.concepts import (
 router = APIRouter(prefix="/concepts")
 
 Caller = Annotated[AuthContext, Depends(current_user)]
-
-SortField = Literal["name", "added", "viewed", "relevance"]
-SortOrder = Literal["asc", "desc"]
-
-# Concepts never viewed sort as the oldest possible time.
-_NEVER_VIEWED = datetime.min.replace(tzinfo=UTC)
-
 
 class ConceptListOut(BaseModel):
     concept_id: int
@@ -62,13 +62,7 @@ def sorted_concepts_route(
     """Visible concepts the caller does not ignore, sorted by `sort` in `order`. A bad sort or order gives 422."""
     concepts = list_visible_concepts(conn, ctx.user_id)
     relevance = concept_relevance(conn, ctx.user_id, [c.concept_id for c in concepts])
-    keys = {
-        "name": lambda c: (c.label.casefold(), c.concept_id),
-        "added": lambda c: (c.added_at, c.concept_id),
-        "viewed": lambda c: (c.last_viewed_at or _NEVER_VIEWED, c.concept_id),
-        "relevance": lambda c: (relevance[c.concept_id], c.concept_id),
-    }
-    ordered = sorted(concepts, key=keys[sort], reverse=order == "desc")
+    ordered = sort_concepts(concepts, relevance, sort, order)
     return [_list_out(c, relevance[c.concept_id]) for c in ordered]
 
 
