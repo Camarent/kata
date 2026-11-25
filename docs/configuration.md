@@ -88,6 +88,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `trainer.timeout_seconds` | 120 | `KATA_TRAINER_TIMEOUT_SECONDS` |
 | `trainer.max_concepts` | 10 | `KATA_TRAINER_MAX_CONCEPTS` |
 | `trainer.max_courses_per_user` | 10 | `KATA_TRAINER_MAX_COURSES_PER_USER` |
+| `trainer.learning_start_rung` | 2 | `KATA_TRAINER_LEARNING_START_RUNG` |
 | `trainer.min_items` | 5 | `KATA_TRAINER_MIN_ITEMS` |
 | `trainer.max_artifact_bytes` | 16777216 | `KATA_TRAINER_MAX_ARTIFACT_BYTES` |
 | `trainer.max_progress_bytes` | 4194304 | `KATA_TRAINER_MAX_PROGRESS_BYTES` |
@@ -111,6 +112,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `planning.minutes_skim` | 5 | `KATA_PLANNING_MINUTES_SKIM` |
 | `planning.minutes_practice` | 15 | `KATA_PLANNING_MINUTES_PRACTICE` |
 | `planning.minutes_learn` | 30 | `KATA_PLANNING_MINUTES_LEARN` |
+| `planning.velocity_window_days` | 14 | `KATA_PLANNING_VELOCITY_WINDOW_DAYS` |
 | `modelhost.control_enabled` | false | `KATA_MODELHOST_CONTROL_ENABLED` |
 | `modelhost.schedule` | false | `KATA_MODELHOST_SCHEDULE` |
 | `modelhost.info_url` | "http://127.0.0.1:11435" | `KATA_MODELHOST_INFO_URL` |

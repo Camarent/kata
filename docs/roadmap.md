@@ -219,9 +219,21 @@ rescan (D53, D54, D55). Shipped:
 - Classification evaluation set and pass bar.
 - Out of scope: uploaded-file filter.
 
-## Milestone 21: learn
+## Milestone 21: learn (shipped)
 
-**Scope.** Lists, tracks (D11 to D16) and courses in the redesigned UI and API.
+**Scope.** Lists, tracks (D11 to D16) and courses in the redesigned UI and API (D7, D8, D14, D34,
+D35, D48, D49). Shipped:
+
+- Named concept lists: create, rename, delete, add and remove concepts, add a topic, generate a
+  course from a list; the list is kept (migration 0019; routes under `/v1/lists`, D7, D8, D34).
+- Track goals with sources, progress, velocity and pace, and a list of the open concepts of a goal
+  (migration 0020; routes under `/v1/tracks/{id}/goals`, D11 to D15).
+- Course regenerate replaces the course in place with carry-over preview and version bump
+  (migration 0021; D35).
+- Course start rung as a dojo ladder stage: 0 for new, the course `learning_rung` for learning,
+  left out when known; stage 4 is learned (D48, D49).
+- Not built: reading PDF pages that hold images (D16), needs a vision model and a cost check; it
+  waits for M23.
 
 ## Milestone 22: quiz and exam results
 

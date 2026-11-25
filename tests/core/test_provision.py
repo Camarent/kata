@@ -41,6 +41,8 @@ SCHEMA_TABLES = {
     "concept_views",
     "page_classifications",
     "concept_choices",
+    "concept_list",
+    "concept_list_item",
     "retrieval_entries",
     "usage_daily",
     "journal_entry",
@@ -61,6 +63,9 @@ SCHEMA_TABLES = {
     "track_item",
     "planning_budget",
     "decision_point",
+    "track_goal",
+    "track_goal_source",
+    "track_goal_concept",
 }
 
 

@@ -27,6 +27,8 @@ class DuplicateCourseTitle(ValueError):
 # carries this text copied verbatim; tests/core/test_course_title_unique.py checks that.
 NORMAL_TITLE_SQL = r"lower(btrim(regexp_replace(title, '\s+', ' ', 'g')))"
 COURSE_TITLE_INDEX = "course_user_id_title_norm_uidx"
+# Dojo ladder stage a new course starts at (migration 0021 default); 0 to 3, never 4 (learned).
+DEFAULT_LEARNING_RUNG = 2
 
 
 @dataclass(frozen=True)
@@ -39,9 +41,14 @@ class Course:
     error: str | None
     created_at: datetime
     updated_at: datetime
+    version: int
+    learning_rung: int
 
 
-_COLUMNS = "id, user_id, title, status, concept_ids, error, created_at, updated_at"
+_COLUMNS = (
+    "id, user_id, title, status, concept_ids, error, created_at, updated_at, "
+    "version, learning_rung"
+)
 
 
 def _course(row: tuple[Any, ...]) -> Course:
@@ -54,6 +61,8 @@ def _course(row: tuple[Any, ...]) -> Course:
         error=row[5],
         created_at=row[6],
         updated_at=row[7],
+        version=int(row[8]),
+        learning_rung=int(row[9]),
     )
 
 
@@ -94,6 +103,7 @@ def create_course(
     user_id: int,
     title: str,
     concept_ids: list[int],
+    learning_rung: int = DEFAULT_LEARNING_RUNG,
 ) -> Course:
     """Insert a `queued` course for `user_id` and return it.
 
@@ -106,9 +116,9 @@ def create_course(
         # A savepoint (or transaction) keeps the connection usable after a violation.
         with conn.transaction():
             row = conn.execute(
-                "INSERT INTO course (user_id, title, status, concept_ids) "
-                f"VALUES (%s, %s, 'queued', %s::bigint[]) RETURNING {_COLUMNS}",
-                (user_id, title, concept_ids),
+                "INSERT INTO course (user_id, title, status, concept_ids, learning_rung) "
+                f"VALUES (%s, %s, 'queued', %s::bigint[], %s) RETURNING {_COLUMNS}",
+                (user_id, title, concept_ids, learning_rung),
             ).fetchone()
     except UniqueViolation as exc:
         if exc.diag.constraint_name != COURSE_TITLE_INDEX:
@@ -176,6 +186,37 @@ def set_status(
         (status, error, course_id, user_id),
     )
     return cur.rowcount == 1
+
+
+def replace_course(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    course_id: int,
+    concept_ids: list[int],
+    learning_rung: int,
+) -> Course | None:
+    """Regenerate a course of `user_id` in place: clear its built children and requeue it.
+
+    In one transaction: deletes its source files, artifacts and item map, sets the new
+    concept ids and learning rung, bumps `version`, and sets status `queued` with no
+    error. Returns the updated course, or None (nothing written) when it is missing or
+    foreign.
+    """
+    with conn.transaction():
+        if not _owned(conn, user_id, course_id):
+            return None
+        for table in ("course_file", "course_artifact", "course_item_map"):
+            # table names come from this tuple only
+            conn.execute(f"DELETE FROM {table} WHERE course_id = %s", (course_id,))
+        row = conn.execute(
+            "UPDATE course SET concept_ids = %s::bigint[], learning_rung = %s, "
+            "version = version + 1, status = 'queued', error = NULL, updated_at = now() "
+            f"WHERE id = %s AND user_id = %s RETURNING {_COLUMNS}",
+            (concept_ids, learning_rung, course_id, user_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return _course(row)
 
 
 def add_files(

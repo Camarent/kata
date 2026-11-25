@@ -101,6 +101,9 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/storage/concept_rank.py` - `concept_relevance` (sum of `priority + 1` over the caller's active tracks covering the concept) and `block_state` (derived from concept marks; a topic never decides it).
 - `core/kata_core/api/routes/concept_lists.py` - `GET /concepts/sorted`, `POST /concepts/block-state`, `POST /concepts/{id}/viewed`. Routes in `api/routes/concepts.py`: aliases, definition, ignore and hard delete.
 - `core/kata_core/planning/` - planning (see "Planning (M5)"): `syllabus_store.py`, `tracks_store.py` (every query filters by `user_id`), `triage.py` and `allocate.py` (pure), `plan.py` (`build_plan`), `decisions.py` (`open_point`, `decide`), `syllabus_flow.py`, `job_kinds.py`.
+- `core/kata_core/lists/store.py` - named concept lists (M21): create, rename, delete, add and remove concepts, add a topic; every call takes the acting user id. Routes in `api/routes/named_lists.py`.
+- `core/kata_core/planning/goals_store.py` - track goals, their sources and concept links (M21); `planning/velocity.py` - progress, velocity and pace (pure, clock injected); routes in `api/routes/track_goals.py`.
+- `core/kata_core/trainer/rungs.py` - course start rung (M21): pure mapping from concept state to dojo ladder stage.
 - `core/kata_core/importer/syllabus.py` - syllabus text to modules (`parse_modules`) and extracted-module check (`validate_extracted`); pure, no database.
 - `core/migrations/0001_init.sql` - schema.
 - `core/migrations/0002_concepts.sql` - concepts and concept marks.
@@ -322,3 +325,19 @@ Invariants:
 ### Depends on / used by
 - Depends on: `kata_core.jobs.runner` (`OutputHook`, `load_registry`), `kata_core.jobs.queue` (`Job`, `store_output`), `kata_core.storage.taxonomy`, `kata_core.storage.concepts`, `kata_core.storage.concept_aliases`.
 - Used by: the worker's `scan.classify` and `scan.extract` handlers ([worker](worker.md)); the extension scan and rescan ([extension](extension.md)); the routes above.
+
+## Learn (M21)
+
+Named lists, track goals and course regenerate and start rung (decisions D7, D8, D11 to D16, D34, D35, D48, D49). Migrations `0019_concept_lists.sql`, `0020_track_goals.sql` and `0021_course_version.sql`.
+
+- Lists: `core/kata_core/lists/store.py` owns `concept_list` and `concept_list_item` (one list per name and user, name normalised). Routes in `api/routes/named_lists.py` under `/v1/lists`; the list-to-course route queues the same `course.generate` job as `POST /v1/courses`. Deleting a list keeps the courses made from it.
+- Track goals: `core/kata_core/planning/goals_store.py` (goals, sources, concept links; every query filters by the track's `user_id`). `planning/velocity.py` is pure: progress is known over total, velocity is concepts gained per day over `planning.velocity_window_days`, and pace is `slow`, `ok`, `fast` or `no_deadline`. Routes in `api/routes/track_goals.py` under `/v1/tracks/{id}/goals`.
+- Regenerate: `api/routes/courses.py` `regenerate_course` replaces the course row in place (same id, `version` plus one) and queues `course.generate` again; the preview route writes nothing.
+- Start rung: `core/kata_core/trainer/rungs.py` maps new to stage 0, learning to the course `learning_rung` (0 to 3, default `trainer.learning_start_rung`), and known to no rung. Stage 4 is learned and is never a start rung. The job payload carries each concept's `start_rung`.
+
+Invariants and gotchas:
+- A list, goal or course that belongs to another user reads as not found (404); writes check ownership before they touch a row.
+- A list adds only concepts visible to the caller; a private concept of another user is refused (422) and nothing is added.
+- Regenerate is refused with 409 `course_busy` while the course is queued, generating or building.
+- Reading PDF pages with images is not built (D16). A goal source stores its body as text; no PDF is read.
+- Tests: `tests/core/test_lists_store.py`, `tests/core/test_api_named_lists.py`, `tests/core/test_api_list_course.py`, `tests/core/test_api_concept_lists.py`, `tests/core/test_goals_store.py`, `tests/core/test_api_track_goals.py`, `tests/core/test_velocity.py`, `tests/core/test_rungs.py`, `tests/core/test_api_course_regenerate.py`.

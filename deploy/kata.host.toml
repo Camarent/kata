@@ -145,6 +145,8 @@ timeout_seconds = 120
 max_concepts = 10
 # Cap on courses one user may hold; 0 means unlimited, negative values fail startup.
 max_courses_per_user = 10
+# Dojo ladder rung (0..3) a course starts at for its learning concepts; new concepts start at 0.
+learning_start_rung = 2
 # Minimum items a course must keep, else the job fails.
 min_items = 5
 # Cap on the trainer artifact size, in bytes.
@@ -189,6 +191,8 @@ minutes_skip = 1
 minutes_skim = 5
 minutes_practice = 15
 minutes_learn = 30
+# Days of known-mark history a goal's velocity is measured over (D15).
+velocity_window_days = 14
 
 # Model host: the GPU-PC model control and info service. Only the GPU-PC worker sets control_enabled = true.
 [modelhost]

@@ -71,7 +71,10 @@ def test_create_without_concepts_selects_gaps_and_queues_job(
     assert job[1] == "queued"
     assert json.loads(job[2]) == {
         "course_id": body["id"],
-        "concepts": [{"id": first, "label": "lists"}, {"id": second, "label": "dicts"}],
+        "concepts": [
+            {"id": first, "label": "lists", "start_rung": 0},
+            {"id": second, "label": "dicts", "start_rung": 0},
+        ],
     }
     assert course[0] == "queued"
     assert list(course[1]) == [first, second]
@@ -296,6 +299,82 @@ def test_feature_off_is_404(client: TestClient, db: ScratchDatabase, cfg: Config
     ):
         assert resp.status_code == 404
         assert resp.json() == {"detail": "feature disabled: trainer"}
+
+
+def _rung_job(db: ScratchDatabase, job_id: object) -> dict[str, object]:
+    with db.connect() as conn:
+        row = conn.execute("SELECT payload FROM jobs WHERE id = %s", (job_id,)).fetchone()
+    assert row is not None
+    payload: dict[str, object] = json.loads(row[0])
+    return payload
+
+
+def _mark(client: TestClient, headers: dict[str, str], concept: int, state: str) -> None:
+    resp = client.put(f"/concepts/{concept}/mark", json={"state": state}, headers=headers)
+    assert resp.status_code == 200
+
+
+def test_learning_concept_starts_at_requested_rung(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    learning = _concept(client, headers, topic, "lists")
+    new = _concept(client, headers, topic, "dicts")
+    known = _concept(client, headers, topic, "sets")
+    _mark(client, headers, learning, "learning")
+    _mark(client, headers, known, "known")
+
+    body = _create(
+        client, headers, {"title": "rungs", "concept_ids": [learning, new, known], "learning_rung": 1}
+    )
+
+    assert body["concept_ids"] == [learning, new, known]
+    with db.connect() as conn:
+        rung = conn.execute("SELECT learning_rung FROM course WHERE id = %s", (body["id"],)).fetchone()
+    assert rung is not None and rung[0] == 1
+    assert _rung_job(db, body["job_id"])["concepts"] == [
+        {"id": learning, "label": "lists", "start_rung": 1},
+        {"id": new, "label": "dicts", "start_rung": 0},
+        {"id": known, "label": "sets", "start_rung": None},
+    ]
+
+
+def test_omitted_learning_rung_takes_config_default(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    learning = _concept(client, headers, topic, "lists")
+    _mark(client, headers, learning, "learning")
+
+    body = _create(client, headers, {"title": "default", "concept_ids": [learning]})
+
+    default = int(cfg.get("trainer", "learning_start_rung"))
+    with db.connect() as conn:
+        rung = conn.execute("SELECT learning_rung FROM course WHERE id = %s", (body["id"],)).fetchone()
+    assert rung is not None and rung[0] == default
+    assert _rung_job(db, body["job_id"])["concepts"] == [
+        {"id": learning, "label": "lists", "start_rung": default}
+    ]
+
+
+@pytest.mark.parametrize("rung", [-1, 4])
+def test_learning_rung_out_of_range_is_422_and_queues_nothing(
+    client: TestClient, db: ScratchDatabase, cfg: Config, rung: int
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    topic = _shared_topic(client, headers, "Python")
+    concept = _concept(client, headers, topic, "lists")
+
+    resp = client.post(
+        "/v1/courses",
+        json={"title": "bad", "concept_ids": [concept], "learning_rung": rung},
+        headers=headers,
+    )
+
+    assert resp.status_code == 422
+    assert _job_count(db) == 0
 
 
 def test_routes_need_a_token(client: TestClient) -> None:
