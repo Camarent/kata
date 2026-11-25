@@ -97,6 +97,8 @@ generate_course = "local,anthropic"
 extract_syllabus = "local,anthropic"
 scan_classify = "local,anthropic"
 scan_extract = "local,anthropic"
+# Model for quiz questions: the routing chain of task class quiz_generate.
+quiz_generate = "local,anthropic"
 
 # Per task class: the local model that answers it, or "cloud-only" when no local model is good
 # enough. kata-l and kata-m are the local models (see docs/research/benchmarks/RESULTS.md).
@@ -109,12 +111,13 @@ generate_course = "kata-l"
 extract_syllabus = "kata-l"
 scan_classify = "kata-l"
 scan_extract = "kata-l"
+quiz_generate = "kata-l"
 
 [provider_local]
-task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate"
 
 [provider_anthropic]
-task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract"
+task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate"
 base_url = "https://api.anthropic.com"
 model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"
@@ -215,3 +218,13 @@ capabilities_timeout_seconds = 10
 capabilities_ttl_seconds = 300
 # Cap on the text the model host returns to the worker, in bytes.
 max_text_bytes = 262144
+
+[quiz]
+# Cap on the bytes one quiz source fetch reads.
+max_fetch_bytes = 262144
+# Cap on the characters of one quiz question.
+max_question_chars = 400
+# Cap on the questions kept from one quiz source.
+max_questions_per_source = 50
+# Questions in one mini quiz. At most 5.
+mini_quiz_size = 5

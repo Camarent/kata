@@ -29,6 +29,7 @@ TASK_CLASSES = frozenset(
         "extract_syllabus",
         "scan_classify",
         "scan_extract",
+        "quiz_generate",
     }
 )
 

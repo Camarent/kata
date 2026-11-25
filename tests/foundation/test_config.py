@@ -60,6 +60,7 @@ def test_example_has_required_sections() -> None:
         "smoke",
         "smoke_local",
         "modelhost",
+        "quiz",
     }
     assert set(data["cost"]) == {"cap_micro_usd", "warn_micro_usd", "estimate_safety_percent"}
     assert set(data["smoke"]) == {"allowed_models", "budget_micro_usd"}
@@ -89,6 +90,7 @@ def test_example_has_required_sections() -> None:
         "extract_syllabus",
         "scan_classify",
         "scan_extract",
+        "quiz_generate",
     }
     assert set(data["routing"]) == task_classes
     assert set(data["local_capability"]) == task_classes

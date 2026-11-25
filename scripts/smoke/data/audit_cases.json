@@ -159,6 +159,19 @@
       "max_seconds": 300,
       "model": "kata-l",
       "thinking": "unset"
+    },
+    {
+      "id": "quiz-generate-en",
+      "task_class": "quiz_generate",
+      "system": "You write one multiple-choice question about the text the user gives. Reply with the question, four options and the answer.",
+      "prompt": "Week 2 covers UDP, its header, and when a trainer should choose it over TCP for latency-sensitive traffic such as games and voice.",
+      "json": false,
+      "script": "latin",
+      "min_chars": 60,
+      "max_chars": 800,
+      "max_seconds": 120,
+      "model": "kata-l",
+      "thinking": "unset"
     }
   ]
 }
