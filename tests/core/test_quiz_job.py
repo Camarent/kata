@@ -154,9 +154,8 @@ def test_fetch_error_stores_nothing(
     assert row is not None and row[0] == 0
 
 
-def test_model_input_is_only_marked_source_text() -> None:
-    payload = service.generate_payload(7, SOURCE_TEXT)
-    job = Job(
+def _generate_job(payload: str) -> Job:
+    return Job(
         id=1,
         user_id=3,
         payload=payload,
@@ -167,12 +166,30 @@ def test_model_input_is_only_marked_source_text() -> None:
         kind=QUIZ_GENERATE_KIND,
         output=None,
     )
-    prompt = service.model_input(job)
-    assert prompt == build_prompt(SOURCE_TEXT)
-    assert SOURCE_TEXT in prompt
-    assert SOURCE_BEGIN in prompt
+
+
+def test_generate_payload_carries_only_marked_source_prompt() -> None:
+    payload = json.loads(service.generate_payload(7, SOURCE_TEXT))
+    assert payload["prompt"] == build_prompt(SOURCE_TEXT)
+    assert SOURCE_TEXT in payload["prompt"]
+    assert SOURCE_BEGIN in payload["prompt"]
     for leaked in ("source_id", "user_id", "concept", "keys"):
-        assert leaked not in prompt
+        assert leaked not in payload["prompt"]
+
+
+def test_generate_payload_reply_round_trip_caches_questions(
+    conn: psycopg.Connection[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_fetch(monkeypatch)
+    user_id = _user(conn, "quiz-round-trip")
+    fetch = _claimed(conn, user_id, QUIZ_FETCH_KIND, json.dumps({"url": TIER_ONE_URL}))
+    job_kinds.fetch_handler(conn, fetch)
+    source = conn.execute("SELECT id FROM quiz_source WHERE url = %s", (TIER_ONE_URL,)).fetchone()
+    assert source is not None
+    job = _generate_job(service.generate_payload(source[0], SOURCE_TEXT))
+    job_kinds.generate_output_hook(conn, job, {"raw": GOOD_REPLY})
+    row = conn.execute("SELECT count(*) FROM quiz_question").fetchone()
+    assert row is not None and row[0] == 1
 
 
 def test_good_reply_caches_questions(conn: psycopg.Connection[Any], monkeypatch: pytest.MonkeyPatch) -> None:

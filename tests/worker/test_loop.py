@@ -23,6 +23,7 @@ from kata_worker.handlers import (
     modelhost_up,
     modelhost_use,
 )
+from kata_worker.handlers import quiz as quiz_handler
 from kata_worker.handlers import scan_classify as scan_classify_handler
 from kata_worker.handlers import scan_extract as scan_extract_handler
 from kata_worker.handlers import syllabus as syllabus_handler
@@ -207,6 +208,7 @@ def test_handler_registry_discovers_tag_course_and_syllabus_handlers() -> None:
         tag_handler.KIND: tag_handler.handle,
         course_handler.KIND: course_handler.handle,
         syllabus_handler.KIND: syllabus_handler.handle,
+        quiz_handler.KIND: quiz_handler.handle,
         scan_classify_handler.KIND: scan_classify_handler.handle,
         scan_extract_handler.KIND: scan_extract_handler.handle,
         modelhost_up.KIND: modelhost_up.handle,

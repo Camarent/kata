@@ -60,14 +60,8 @@ def fetch_source(
 
 
 def generate_payload(source_id: int, text: str) -> str:
-    """The `quiz.generate` job payload: the source id and its fetched text."""
-    return json.dumps({"source_id": source_id, "text": text})
-
-
-def model_input(job: Job) -> str:
-    """The text the model reads for a `quiz.generate` job: the source text, marked as data."""
-    _, text = generate_payload_fields(job)
-    return build_prompt(text)
+    """The `quiz.generate` job payload: the source id, its fetched text and the marked model prompt."""
+    return json.dumps({"source_id": source_id, "text": text, "prompt": build_prompt(text)})
 
 
 def generate_payload_fields(job: Job) -> tuple[int, str]:
