@@ -282,3 +282,12 @@ poll_seconds = 1
 wait_seconds = 120
 # Directory the reader polls for jobs and writes results to.
 spool_dir = "/spool"
+
+[jokes]
+enabled = true
+sources = "jokeapi,icanhazdadjoke"
+timeout_seconds = 10
+max_response_bytes = 16384
+max_joke_chars = 300
+cache_size = 50
+refill_interval_seconds = 7200

@@ -148,5 +148,12 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `reader.poll_seconds` | 1 | `KATA_READER_POLL_SECONDS` |
 | `reader.wait_seconds` | 120 | `KATA_READER_WAIT_SECONDS` |
 | `reader.spool_dir` | "/spool" | `KATA_READER_SPOOL_DIR` |
+| `jokes.enabled` | true | `KATA_JOKES_ENABLED` |
+| `jokes.sources` | "jokeapi,icanhazdadjoke" | `KATA_JOKES_SOURCES` |
+| `jokes.timeout_seconds` | 10 | `KATA_JOKES_TIMEOUT_SECONDS` |
+| `jokes.max_response_bytes` | 16384 | `KATA_JOKES_MAX_RESPONSE_BYTES` |
+| `jokes.max_joke_chars` | 300 | `KATA_JOKES_MAX_JOKE_CHARS` |
+| `jokes.cache_size` | 50 | `KATA_JOKES_CACHE_SIZE` |
+| `jokes.refill_interval_seconds` | 7200 | `KATA_JOKES_REFILL_INTERVAL_SECONDS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.

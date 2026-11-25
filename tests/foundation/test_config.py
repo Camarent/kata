@@ -64,6 +64,7 @@ def test_example_has_required_sections() -> None:
         "quiz",
         "summary",
         "reader",
+        "jokes",
     }
     assert set(data["cost"]) == {
         "cap_micro_usd",

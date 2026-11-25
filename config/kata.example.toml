@@ -274,3 +274,19 @@ poll_seconds = 1
 wait_seconds = 120
 # Directory the reader polls for jobs and writes results to.
 spool_dir = "/spool"
+
+[jokes]
+# Set false to stop the joke job fetching from the sources.
+enabled = true
+# Comma list of source ids the joke job may fetch from, in order: jokeapi, icanhazdadjoke.
+sources = "jokeapi,icanhazdadjoke"
+# Seconds one joke source fetch may take.
+timeout_seconds = 10
+# Cap on the bytes one joke source response may have.
+max_response_bytes = 16384
+# Cap on the characters of one joke.
+max_joke_chars = 300
+# Jokes the cache keeps ready for the next request.
+cache_size = 50
+# Seconds between two refills of the joke cache.
+refill_interval_seconds = 7200
