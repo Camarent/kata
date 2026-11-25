@@ -70,14 +70,8 @@ def _concept(entry: Any, index: int) -> ExamConcept:
     return ExamConcept(concept=label, correct=correct)
 
 
-def parse_result(payload: str) -> ExamResult:
-    """Parse the JSON text of an exam result. Raise ExamParseError when it is not allowed."""
-    try:
-        data = json.loads(payload)
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise ExamParseError(f"exam result is not JSON: {exc}") from exc
-    if type(data) is not dict:
-        raise ExamParseError("exam result must be a JSON object")
+def _header(data: dict[str, Any]) -> str:
+    """Check the top-level keys and return the origin."""
     if "domains" in data:
         raise ExamParseError(
             "exam result must not carry domains: each concept is imported on its own"
@@ -88,28 +82,47 @@ def parse_result(payload: str) -> ExamResult:
         raise ExamParseError(
             f"exam result keys: missing {sorted(missing)}, unknown {sorted(extra)}"
         )
-
     origin = data["origin"]
     if type(origin) is not str or origin not in ORIGINS:
         raise ExamParseError(f"origin must be one of {sorted(ORIGINS)}")
+    return origin
 
-    taken = data["taken_at"]
-    if type(taken) is not str:
+
+def _taken_at(value: Any) -> datetime:
+    if type(value) is not str:
         raise ExamParseError("taken_at must be an ISO 8601 string")
     try:
-        taken_at = datetime.fromisoformat(taken)
+        taken_at = datetime.fromisoformat(value)
     except ValueError as exc:
         raise ExamParseError(f"taken_at is not ISO 8601: {exc}") from exc
     if taken_at.tzinfo is None:
         raise ExamParseError("taken_at needs a timezone offset")
+    return taken_at
+
+
+def _score(value: Any) -> float:
+    score = _number(value, "score")
+    if not 0 <= score <= 1:
+        raise ExamParseError("score must be between 0 and 1")
+    return score
+
+
+def parse_result(payload: str) -> ExamResult:
+    """Parse the JSON text of an exam result. Raise ExamParseError when it is not allowed."""
+    try:
+        data = json.loads(payload)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ExamParseError(f"exam result is not JSON: {exc}") from exc
+    if type(data) is not dict:
+        raise ExamParseError("exam result must be a JSON object")
+    origin = _header(data)
+    taken_at = _taken_at(data["taken_at"])
 
     passed = data["passed"]
     if type(passed) is not bool:
         raise ExamParseError("passed must be a boolean")
 
-    score = _number(data["score"], "score")
-    if not 0 <= score <= 1:
-        raise ExamParseError("score must be between 0 and 1")
+    score = _score(data["score"])
 
     raw = data["concepts"]
     if type(raw) is not list:
