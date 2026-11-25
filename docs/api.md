@@ -22,7 +22,7 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | POST | `/topics/{topic_id}/aliases` | bearer | `{"alias": str}` | 200 `{"id", "topic_id", "alias", "private": true}` | 404 topic not found |
 | POST | `/import` | bearer | raw UTF-8 text, skill list format (see below) | 200 `{"created_topics": int, "marked": int}` | 422 bad line or body not UTF-8; nothing changes |
 | POST | `/jobs` | bearer | `{"payload": str}` | 200 `{"id": int}` | 422 a `modelhost.*` kind whose payload its allow-list refuses (`core/kata_core/api/routes/jobs.py:96-100`); nothing queued |
-| GET | `/jobs/next?kind=` | bearer | query: repeated `kind`, optional | 200 `{"id": int, "payload": str}` | 204 nothing queued; no `kind` means `tag` only |
+| GET | `/jobs/next?kind=` | bearer | query: repeated `kind`, optional | 200 `{"id": int, "payload": str, "kind": str}` | 204 nothing queued; no `kind` means `tag` only |
 | POST | `/jobs/{job_id}/result` | bearer | `{"category": str, "topic": str}` | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/fail` | bearer | none | 204 | 404 job not found or not leased by the caller |
 | POST | `/jobs/{job_id}/output` | bearer | `{"output": {...}}` (JSON object) | 204; runs the kind's output hook in the same transaction | 404 job not found or not leased by the caller; 413 output above `[jobs] max_output_bytes`; 422 the job kind has no output hook (nothing stored) |

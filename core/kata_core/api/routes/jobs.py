@@ -48,6 +48,7 @@ class EnqueueResponse(BaseModel):
 class ClaimResponse(BaseModel):
     id: int
     payload: str
+    kind: str
 
 
 class ResultRequest(BaseModel):
@@ -117,7 +118,7 @@ def next_job(
     conn.commit()
     if job is None:
         return Response(status_code=204)
-    return ClaimResponse(id=job.id, payload=job.payload)
+    return ClaimResponse(id=job.id, payload=job.payload, kind=job.kind)
 
 
 @router.post("/{job_id}/result", status_code=204)

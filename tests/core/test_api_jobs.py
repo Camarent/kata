@@ -60,7 +60,7 @@ def test_enqueue_claim_result_then_status_shows_unknown(
 
     claimed = client.get("/jobs/next", headers=headers)
     assert claimed.status_code == 200
-    assert claimed.json() == {"id": job_id, "payload": "tag this"}
+    assert claimed.json() == {"id": job_id, "payload": "tag this", "kind": "tag"}
 
     assert _result(client, headers, job_id) == 204
 
@@ -225,6 +225,20 @@ def test_next_takes_kind_filter(client: TestClient, db: ScratchDatabase, cfg: Co
     resp = client.get("/jobs/next", params={"kind": ["tag", "course.generate"]}, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["id"] == job_id
+
+
+def test_next_returns_job_kind(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _user_token(client, db, cfg, "ana")
+    user_id = _user_id(client, headers)
+    _enqueue_kind(db, user_id, "reader.extract")
+    resp = client.get("/jobs/next", params={"kind": "reader.extract"}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["kind"] == "reader.extract"
+    tag_id = _enqueue(client, headers, "tag this")
+    resp = client.get("/jobs/next", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == tag_id
+    assert resp.json()["kind"] == "tag"
 
 
 def test_output_stores_and_runs_hook(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
