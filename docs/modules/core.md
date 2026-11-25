@@ -303,7 +303,7 @@ Invariants:
 - `core/kata_core/scan/teachable.py:44` `teachable(text, min_chars)` - pure check; rejects text shorter than `[scan] min_block_chars`, contact details, cookie notices, navigation lists (`:35` `_is_nav_list`), footers, legal text and boilerplate.
 - `core/kata_core/scan/reassign.py:28` `reassign_word` - moves the owner's word from one concept to another of the same topic: removes the owner's private alias on the old concept, adds it to the new one (unless it is that concept's label) and remembers the choice. Marks are never touched. `LookupError` when a concept is not visible (404), `ValueError` when a concept is not in the topic (422).
 - `core/kata_core/scan/overview.py:18` `topic_overview` - read only; the concepts of a visible topic with the owner's mark state (unmarked counts as `new`; `:15` `STATES`), ordered by label, plus counts per state. Ignored concepts are left out.
-- `core/kata_core/scan/evaluation.py:40` `load_fixture`, `:48` `resolve_reply`, `:66` `score` - scores the classifier against a fixture of recorded replies, using the same resolution as the hook.
+- `tests/core/scan_evaluation.py:40` `load_fixture`, `:48` `resolve_reply`, `:66` `score` - test-only helpers that score the classifier against a fixture of recorded replies, using the same resolution as the hook.
 - `core/kata_core/storage/page_scan.py` - `:15` `get_classification`, `:30` `put_classification`, `:47` `remember_choice`, `:63` `get_choice`.
 - `core/migrations/0018_page_scan.sql` - `page_classifications` `:5` (PK `user_id, page_key`; `topic_id`; `candidates` jsonb; cascade on user and topic delete) and `concept_choices` `:14` (PK `user_id, topic_id, word_key`; `concept_id`; cascade on user, topic and concept delete).
 

@@ -13,10 +13,10 @@ import pytest
 from kata_core.config import Config
 from kata_core.jobs.queue import Job, claim_next, enqueue, get_job
 from kata_core.scan import classify
-from kata_core.scan.classify import classify_output_hook, visible_taxonomy
+from kata_core.scan.classify import classify_output_hook
 from kata_core.scan.job_kinds import OUTPUT_HOOKS, SCAN_CLASSIFY_KIND
 from kata_core.storage.page_scan import get_classification
-from kata_core.storage.taxonomy import ensure_category, ensure_topic
+from kata_core.storage.taxonomy import ensure_category, ensure_topic, list_visible_topics
 from support.scratch_db import ScratchDatabase
 
 T0 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
@@ -65,14 +65,15 @@ def test_registry_maps_scan_classify_to_hook() -> None:
     assert OUTPUT_HOOKS[SCAN_CLASSIFY_KIND] is classify_output_hook
 
 
-def test_visible_taxonomy_lists_shared_and_own_topics_only(conn: psycopg.Connection[Any]) -> None:
+def test_visible_topics_lists_shared_and_own_topics_only(conn: psycopg.Connection[Any]) -> None:
     alice, bob = _user(conn, "alice-vis"), _user(conn, "bob-vis")
     _shared_topic(conn, "Biology", "Cells")
     category = ensure_category(conn, "Biology")
     ensure_topic(conn, category, "Alice notes", owner_user_id=alice)
     ensure_topic(conn, category, "Bob notes", owner_user_id=bob)
 
-    assert visible_taxonomy(conn, alice) == [("Biology", "Cells"), ("Biology", "Alice notes")]
+    visible = [(area, topic) for _, area, topic, _ in list_visible_topics(conn, alice)]
+    assert visible == [("Biology", "Cells"), ("Biology", "Alice notes")]
 
 
 def test_existing_area_and_topic_match(conn: psycopg.Connection[Any]) -> None:

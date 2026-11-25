@@ -20,11 +20,6 @@ from kata_core.storage.page_scan import put_classification
 from kata_core.storage.taxonomy import ensure_category, ensure_topic, list_visible_topics
 
 
-def visible_taxonomy(conn: psycopg.Connection[Any], user_id: int) -> list[tuple[str, str]]:
-    """Return (area, topic) for every topic visible to `user_id`, in id order."""
-    return [(area, topic) for _, area, topic, _ in list_visible_topics(conn, user_id)]
-
-
 def classify_output_hook(
     conn: psycopg.Connection[Any],
     job: Job,

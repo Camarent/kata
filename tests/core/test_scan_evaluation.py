@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from kata_core.config import EXAMPLE_PATH, load_config
-from kata_core.scan.evaluation import EvalCase, load_fixture, resolve_reply, score
+from scan_evaluation import EvalCase, load_fixture, resolve_reply, score
 
 FIXTURE = Path(__file__).resolve().parent / "data" / "scan_classify_eval.json"
 
@@ -42,6 +42,14 @@ def test_accuracy_meets_the_config_pass_bar() -> None:
     result = score(fixture.cases, fixture.taxonomy)
     assert result["total"] == len(fixture.cases)
     assert result["accuracy"] >= _bar()
+
+
+def test_accuracy_is_correct_over_total() -> None:
+    fixture = load_fixture(FIXTURE)
+    total = len(fixture.cases)
+    assert score(fixture.cases, fixture.taxonomy) == {"total": total, "correct": total, "accuracy": 1.0}
+    right, wrong = fixture.cases[0], dataclasses.replace(fixture.cases[1], reply="not json")
+    assert score([right, wrong], fixture.taxonomy) == {"total": 2, "correct": 1, "accuracy": 0.5}
 
 
 def test_wrong_replies_score_below_the_pass_bar() -> None:
