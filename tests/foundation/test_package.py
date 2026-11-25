@@ -32,7 +32,7 @@ def test_tool_sections_present() -> None:
     assert tool["mypy"]["strict"] is True
     pytest_cfg = tool["pytest"]["ini_options"]
     assert pytest_cfg["testpaths"] == ["tests"]
-    assert pytest_cfg["pythonpath"] == ["core"]
+    assert pytest_cfg["pythonpath"] == ["core", "reader"]
 
 
 def test_version_exposed() -> None:
