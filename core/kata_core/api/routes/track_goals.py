@@ -39,6 +39,8 @@ from kata_core.planning.velocity import pace, progress, velocity
 
 MAX_BIGINT = 2**63 - 1  # Postgres bigint ceiling: a larger id would raise a DB error
 NAME_LIMIT = 200
+BODY_LIMIT = 200_000  # characters of source text per source
+MAX_SOURCE_CONCEPTS = 500  # concept ids named by one source
 KNOWN = "known"
 
 router = APIRouter(
@@ -60,8 +62,10 @@ class GoalIn(BaseModel):
 class SourceIn(BaseModel):
     kind: Literal["text", "file", "page"]
     label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_LIMIT)]
-    body: str
-    concept_ids: list[Annotated[int, Field(ge=1, le=MAX_BIGINT)]] = Field(default_factory=list)
+    body: Annotated[str, StringConstraints(max_length=BODY_LIMIT)]
+    concept_ids: list[Annotated[int, Field(ge=1, le=MAX_BIGINT)]] = Field(
+        default_factory=list, max_length=MAX_SOURCE_CONCEPTS
+    )
 
 
 class ListIn(BaseModel):

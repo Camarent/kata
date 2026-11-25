@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
+from kata_core.api.routes.track_goals import BODY_LIMIT, MAX_SOURCE_CONCEPTS
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
 from kata_core.storage.users import create_user
@@ -117,6 +118,35 @@ def test_source_with_unknown_concept_is_422_and_links_nothing(
     resp = _add_source(client, headers, track_id, goal["id"], [2**40])
 
     assert resp.status_code == 422
+    assert _goal_view(client, headers, track_id)["total"] == 0
+
+
+def _source_body(body: str, concept_ids: list[int]) -> dict[str, Any]:
+    return {"kind": "text", "label": "notes", "body": body, "concept_ids": concept_ids}
+
+
+def test_source_body_over_limit_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    track_id = _track(client, headers)
+    goal = _goal(client, headers, track_id)
+    url = f"/v1/tracks/{track_id}/goals/{goal['id']}/sources"
+
+    too_long = client.post(url, json=_source_body("x" * (BODY_LIMIT + 1), []), headers=headers)
+    at_limit = client.post(url, json=_source_body("x" * BODY_LIMIT, []), headers=headers)
+
+    assert too_long.status_code == 422
+    assert at_limit.status_code == 201
+
+
+def test_source_concept_ids_over_limit_is_422(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    track_id = _track(client, headers)
+    goal = _goal(client, headers, track_id)
+    url = f"/v1/tracks/{track_id}/goals/{goal['id']}/sources"
+
+    too_many = client.post(url, json=_source_body("ec2", [1] * (MAX_SOURCE_CONCEPTS + 1)), headers=headers)
+
+    assert too_many.status_code == 422
     assert _goal_view(client, headers, track_id)["total"] == 0
 
 
