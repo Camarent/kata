@@ -676,7 +676,7 @@ Decided 2026-11-24. Migration `core/migrations/0016_topic_to_concept.sql` copies
 
 ## dojo-kit facts (verified 2026-11-24)
 
-Verified in the dojo-kit docs (audit, 2026-11-24). The default review ladder is 0, 1, 5, 10 and 30 days (5 stages; `DEFAULT_LADDER` in dojo-kit's `srs/mod.rs`, not in this repo; per-unit override via `srs.ladder`). Stages are numbered, not named. A unit counts as learned at stage 4 (dojo-kit's `docs/AUTHORING.md`, not in this repo). The known signal is the placement answer known or again (`ARCHITECTURE.md:37`, `applyPlacement`) and the session setting `knownDistinct`; there is no other known status. No separate exam question pool is documented: `examOnly` units and `poolAspects` topics are different features. Effect on D48 and D49: the starting rung at course generation is a dojo stage number, not "3 to 7 days". D35 exam support needs a dojo change or a kata-side exam flow.
+Verified in the dojo-kit docs (audit, 2026-11-24). The default review ladder is 0, 1, 5, 10 and 30 days (5 stages; `DEFAULT_LADDER` in dojo-kit's `srs/mod.rs`, not in this repo; per-unit override via `srs.ladder`). Stages are numbered, not named. A unit counts as learned at stage 4 (dojo-kit's `docs/AUTHORING.md`, not in this repo). The known signal is the placement answer known or again (dojo-kit `ARCHITECTURE.md`, line 37, `applyPlacement`) and the session setting `knownDistinct`; there is no other known status. No separate exam question pool is documented: `examOnly` units and `poolAspects` topics are different features. Effect on D48 and D49: the starting rung at course generation is a dojo stage number, not "3 to 7 days". D35 exam support needs a dojo change or a kata-side exam flow.
 
 ## Scan merges aliases into one concept
 
