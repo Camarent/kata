@@ -341,3 +341,23 @@ Invariants and gotchas:
 - Regenerate is refused with 409 `course_busy` while the course is queued, generating or building.
 - Reading PDF pages with images is not built (D16). A goal source stores its body as text; no PDF is read.
 - Tests: `tests/core/test_lists_store.py`, `tests/core/test_api_named_lists.py`, `tests/core/test_api_list_course.py`, `tests/core/test_api_concept_lists.py`, `tests/core/test_goals_store.py`, `tests/core/test_api_track_goals.py`, `tests/core/test_velocity.py`, `tests/core/test_rungs.py`, `tests/core/test_api_course_regenerate.py`.
+
+## Summary and reader (M23)
+
+Page summary cache and reader document jobs. Migration `core/migrations/0023_m23_jobs.sql` (additive only) creates two tables: `page_summary` (one summary per `(url, text_sha256)`, shared by all users) and `reader_document` (one uploaded document per row, owned by `user_id`; `content` is the raw bytes, nulled once the job is done; `status` `queued`, `done` or `failed`; `text`, `page_count`, `error`).
+
+- `core/kata_core/summary/service.py:41` `summary_payload(url, text_hash, text)` - builds the `page.summary` payload; `:34` `build_prompt` puts the page text between fixed markers and raises ValueError when the text holds a marker (route 422). `:56` `sanitise_summary` drops control characters, collapses whitespace and cuts to `[summary] max_summary_chars`. `:69` `store_summary` checks the worker reply and caches it.
+- `core/kata_core/summary/job_kinds.py:18` `PAGE_SUMMARY_KIND` = `page.summary`; `:21` `summary_output_hook` calls `store_summary`; registered in `OUTPUT_HOOKS`.
+- `core/kata_core/reader/service.py:26` `magic_matches(media_type, data)` - the upload bytes must match the declared type; `:53` `pages_text` checks the reply pages against `[reader] max_pages` and `max_text_chars_per_page`; `:83` `store_result` stores the text, or the failure code, and sets the row status; a bad reply stores only the failed status and raises ValueError so the job fails (`:115` `_reject`).
+- `core/kata_core/reader/job_kinds.py:18` `READER_EXTRACT_KIND` = `reader.extract`; `:21` `extract_output_hook` loads `[reader]` and calls `store_result`; registered in `OUTPUT_HOOKS`. The job payload is `{"document_id": n}` only.
+- `core/kata_core/storage/page_summary.py` - `:14` `get_summary(conn, url, text_sha256)`, `:23` `put_summary`.
+- `core/kata_core/storage/reader_documents.py` - `:14` `insert_document`, `:32` `get_document` (filters by `user_id`), `:45` `get_file` (filters by `user_id`), `:59` `set_done`, `:74` `set_failed`.
+- Routes: `core/kata_core/api/routes/summary.py` (`POST /summary`, `GET /summary`) and `core/kata_core/api/routes/reader.py` (`POST /reader/documents`, `GET /reader/documents/{id}`, `GET /reader/documents/{id}/file`); both are picked up by `include_routers`. Contracts in [api](../api.md).
+
+Invariants and gotchas:
+- A summary is cached per `(url, text_sha256)`; a changed page text is summarised again. The page text is hashed, never logged.
+- The reader upload is refused before anything is stored: `409 reader_disabled` while off, then 415, 413, 400 magic bytes, 409 `needs_cloud`. `needs_cloud` is checked with `refuse_needs_cloud` before the row is written (`core/kata_core/api/deps.py:61`).
+- A document that belongs to another user reads as not found (404), for the status route and the file route alike.
+- Core stores text only: the reader's page images are used by the worker and never reach core.
+- The worker's reply is untrusted: shape and caps are checked, and control characters are removed before storage.
+- Tests: `tests/core/test_api_summary.py`, `tests/core/test_summary_service.py`, `tests/core/test_api_reader.py`, `tests/core/test_reader_service.py`; worker side in `tests/worker/test_handler_summary.py` and `tests/worker/test_handler_reader_extract.py`.
