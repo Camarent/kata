@@ -11,7 +11,7 @@ from typing import Annotated, Any
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from kata_core.api.deps import Conn, current_user, get_cfg, refuse_needs_cloud, require_feature
 from kata_core.auth.service import AuthContext
@@ -20,6 +20,7 @@ from kata_core.jobs.queue import enqueue
 from kata_core.knowledge.mastery import base_score
 from kata_core.trainer.gaps import GapRuleError, select_gaps
 from kata_core.trainer.job_kinds import COURSE_GENERATE_KIND
+from kata_core.trainer.rungs import START_RUNG_MAX, START_RUNG_MIN, start_rung
 from kata_core.trainer.store import (
     Course,
     DuplicateCourseTitle,
@@ -47,6 +48,7 @@ Cfg = Annotated[Config, Depends(get_cfg)]
 class CourseIn(BaseModel):
     concept_ids: list[int] | None = None
     title: str = ""
+    learning_rung: int | None = Field(default=None, ge=START_RUNG_MIN, le=START_RUNG_MAX)
 
 
 class CourseOut(BaseModel):
@@ -134,29 +136,37 @@ def _gap_inputs(
     return states, scores, labels
 
 
-@router.post("", status_code=202, response_model=CourseAcceptedOut)
-def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> CourseAcceptedOut:
-    """Queue a course for the given concepts, or for the caller's gaps when none are named.
+def queue_course(
+    conn: psycopg.Connection[Any],
+    user_id: int,
+    title: str,
+    concept_ids: list[int] | None,
+    learning_rung: int | None,
+    cfg: Config,
+) -> tuple[Course, int]:
+    """Queue a course for `user_id` and its `course.generate` job; return the course and the job id.
 
-    The course row and its `course.generate` job are written in one transaction. 422 when the title
-    is empty, the rule finds nothing to study, or names a concept the caller cannot see. 409
-    `needs_cloud` when the generate task needs a cloud token that is not set. 409
-    `course_limit` when the caller is at the limit, 409 `course_name_taken` when the title is taken.
-    Errors return before the job is queued, so nothing is written.
+    `concept_ids` None or empty selects the user's gaps; otherwise the named concepts are used as given.
+    `learning_rung` None takes `trainer.learning_start_rung`. Each concept in the job payload carries its
+    `start_rung` (null for a known concept). Raises HTTPException (422, 409) before anything is written.
+    Used by the create route and by the course-from-list and regenerate routes.
     """
-    _check_title(body.title)
+    _check_title(title)
     refuse_needs_cloud(cfg, COURSE_GENERATE_KIND)
-    lock_user(conn, ctx.user_id)
+    lock_user(conn, user_id)
     limit = _course_limit(cfg)
-    if limit != MAX_COURSES_UNLIMITED and count_courses(conn, ctx.user_id) >= limit:
+    if limit != MAX_COURSES_UNLIMITED and count_courses(conn, user_id) >= limit:
         raise HTTPException(
             status_code=409,
             detail={"code": "course_limit", "message": f"course limit of {limit} reached"},
         )
-    if title_taken(conn, ctx.user_id, body.title):
-        raise _name_taken(body.title)
-    states, scores, labels = _gap_inputs(conn, ctx.user_id, cfg)
-    explicit = [str(cid) for cid in body.concept_ids or []]
+    if title_taken(conn, user_id, title):
+        raise _name_taken(title)
+    rung = (
+        int(cfg.get("trainer", "learning_start_rung")) if learning_rung is None else learning_rung
+    )
+    states, scores, labels = _gap_inputs(conn, user_id, cfg)
+    explicit = [str(cid) for cid in concept_ids or []]
     try:
         chosen = select_gaps(
             states,
@@ -168,18 +178,39 @@ def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> Co
     except GapRuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
-        course = create_course(conn, ctx.user_id, body.title, [int(cid) for cid in chosen])
+        course = create_course(
+            conn, user_id, title, [int(cid) for cid in chosen], learning_rung=rung
+        )
     except EmptyCourseTitle as exc:
         raise HTTPException(
             status_code=422, detail={"code": "course_title_empty", "message": str(exc)}
         ) from exc
     except DuplicateCourseTitle as exc:
-        raise _name_taken(body.title) from exc
+        raise _name_taken(title) from exc
     payload: dict[str, Any] = {
         "course_id": course.id,
-        "concepts": [{"id": int(cid), "label": labels[cid]} for cid in chosen],
+        "concepts": [
+            {"id": int(cid), "label": labels[cid], "start_rung": start_rung(states[cid], rung)}
+            for cid in chosen
+        ],
     }
-    job_id = enqueue(conn, ctx.user_id, json.dumps(payload), kind=COURSE_GENERATE_KIND)
+    job_id = enqueue(conn, user_id, json.dumps(payload), kind=COURSE_GENERATE_KIND)
+    return course, job_id
+
+
+@router.post("", status_code=202, response_model=CourseAcceptedOut)
+def create_course_route(body: CourseIn, ctx: Caller, conn: Conn, cfg: Cfg) -> CourseAcceptedOut:
+    """Queue a course for the given concepts, or for the caller's gaps when none are named.
+
+    The course row and its `course.generate` job are written in one transaction. 422 when the title
+    is empty, the rule finds nothing to study, or names a concept the caller cannot see. 409
+    `needs_cloud` when the generate task needs a cloud token that is not set. 409
+    `course_limit` when the caller is at the limit, 409 `course_name_taken` when the title is taken.
+    Errors return before the job is queued, so nothing is written.
+    """
+    course, job_id = queue_course(
+        conn, ctx.user_id, body.title, body.concept_ids, body.learning_rung, cfg
+    )
     return CourseAcceptedOut(**_course_out(course).model_dump(), job_id=job_id)
 
 
