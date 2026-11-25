@@ -13,13 +13,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from kata_core.api.deps import Conn, current_user, get_cfg
+from kata_core.api.deps import Conn, current_user, get_cfg, refuse_needs_cloud
 from kata_core.api.routes.jobs import EnqueueResponse
 from kata_core.auth.service import AuthContext
 from kata_core.config import Config
 from kata_core.jobs.queue import enqueue
 from kata_core.quiz.allowlist import classify
-from kata_core.quiz.job_kinds import QUIZ_FETCH_KIND
+from kata_core.quiz.job_kinds import QUIZ_FETCH_KIND, QUIZ_GENERATE_KIND
 from kata_core.storage.concepts import concept_mark_states, concept_visible, set_concept_mark
 from kata_core.storage.quiz import MINI_QUIZ_MAX, get_question, list_mini_questions
 
@@ -59,10 +59,14 @@ class AnswerOut(BaseModel):
 
 
 @router.post("/sources", status_code=202, response_model=EnqueueResponse)
-def request_source(body: SourceIn, ctx: Caller, conn: Conn) -> EnqueueResponse:
-    """Queue a fetch of an allowlisted source. 400 when the URL is not on the allowlist, before any fetch."""
+def request_source(body: SourceIn, ctx: Caller, conn: Conn, cfg: Cfg) -> EnqueueResponse:
+    """Queue a fetch of an allowlisted source. 400 when the URL is not on the allowlist, before any fetch.
+
+    409 `needs_cloud` when the quiz generate task needs a cloud token that is not set; nothing is queued.
+    """
     if classify(body.url) is None:
         raise HTTPException(status_code=400, detail="source is not on the allowlist")
+    refuse_needs_cloud(cfg, QUIZ_GENERATE_KIND)
     job_id = enqueue(conn, ctx.user_id, json.dumps({"url": body.url}), kind=QUIZ_FETCH_KIND)
     return EnqueueResponse(id=job_id)
 

@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 
+import psycopg
+import pytest
 from fastapi.testclient import TestClient
+from kata_core.api.app import create_app
+from kata_core.api.deps import get_conn
 from kata_core.auth.service import new_enrolment
 from kata_core.config import Config
 from kata_core.storage.concepts import set_concept_mark
@@ -114,6 +119,43 @@ def test_source_off_allowlist_is_400_and_enqueues_nothing(
 def test_source_request_needs_bearer(client: TestClient, db: ScratchDatabase, cfg: Config) -> None:
     resp = client.post("/quiz/sources", json={"url": ALLOWED_URL})
     assert resp.status_code == 401
+
+
+def _client_for_class(db: ScratchDatabase, cfg: Config, quiz_class: str) -> TestClient:
+    """A test client whose config copy sets the quiz generate task class to `quiz_class`."""
+    sections = {section: dict(values) for section, values in cfg.sections.items()}
+    sections["local_capability"]["quiz_generate"] = quiz_class
+    app = create_app(Config(sections=sections))
+
+    def _test_conn() -> Iterator[psycopg.Connection[Any]]:
+        with db.connect() as conn:
+            yield conn
+
+    app.dependency_overrides[get_conn] = _test_conn
+    return TestClient(app)
+
+
+def test_source_cloud_only_without_token_is_409_and_queues_nothing(
+    db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(str(cfg.get("provider_anthropic", "api_key_env")), raising=False)
+    client = _client_for_class(db, cfg, "cloud-only")
+    a = _token_for(client, db, cfg, "ana")
+    resp = client.post("/quiz/sources", json={"url": ALLOWED_URL}, headers=a)
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "needs_cloud"
+    assert _quiz_jobs(db) == []
+
+
+def test_source_local_class_without_token_is_202(
+    db: ScratchDatabase, cfg: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(str(cfg.get("provider_anthropic", "api_key_env")), raising=False)
+    client = _client_for_class(db, cfg, "kata-l")
+    a = _token_for(client, db, cfg, "ana")
+    resp = client.post("/quiz/sources", json={"url": ALLOWED_URL}, headers=a)
+    assert resp.status_code == 202
+    assert [kind for kind, _ in _quiz_jobs(db)] == ["quiz.fetch"]
 
 
 def test_mini_quiz_has_links_and_no_answer_index(
