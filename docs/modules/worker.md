@@ -62,6 +62,7 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
 - `worker/kata_worker/providers/local.py` - completion through the `[model]` OpenAI-compatible endpoint.
 - `worker/kata_worker/providers/anthropic.py` - completion through the Anthropic Messages API over httpx.
+- `worker/kata_worker/providers/scheduled.py` - `ScheduledLocalProvider`, used by `build_local` only when `[modelhost] schedule` is true; gates each local call on the capabilities document.
 - `worker/kata_worker/providers/policy.py` - which provider may run which task class.
 - `core/kata_core/egress/scanner.py` (core, not worker) - secret rules and `scan`; returns kind and offset only.
 - `worker/kata_worker/providers/guard.py` - `GuardedProvider`: scans system and user text of cloud calls before the inner provider runs.

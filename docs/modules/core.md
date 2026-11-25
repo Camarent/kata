@@ -111,6 +111,10 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/kata_core/lesson_check/checker.py` - per-concept known/learning/abstain rule (`check_lesson`); route in `api/routes/lesson_check.py`.
 - `core/kata_core/mcp/` and `core/kata_core/api/routes/mcp.py` - MCP server: raw JSON-RPC 2.0 (`rpc.py`), two read tools (`tools.py`), egress gate on every tool result (`gate.py`). Contract in `docs/api.md` (MCP).
 - `core/kata_core/retrieval/` - hybrid retrieval: `embedder.py` (embedder interface, fake and model embedders), `fusion.py` (RRF), `store.py` (entry writes and keyword search), `retriever.py` (keyword plus vector ranks fused).
+- `core/migrations/0023_m23_jobs.sql` - `page_summary` and `reader_document` (M23).
+- `core/migrations/0024_joke_cache.sql` - `joke_cache` (M23).
+- `core/kata_core/summary/`, `core/kata_core/reader/` and `core/kata_core/jokes/` - page summary, reader document and joke jobs (M23 sections below).
+- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set.
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.
