@@ -53,7 +53,7 @@ describe("renderPanel", () => {
     const server = root.querySelector<HTMLInputElement>('input[name="baseUrl"]')!;
     expect(server.value).toBe("");
     expect(server.placeholder).toBe("https://kata.example.org");
-    expect(root.querySelector("button[type='submit']")?.textContent).toBe("Connect");
+    expect(root.querySelector("button[type='submit']")?.textContent).toBe("Sign in");
     expect(root.querySelector("button")?.textContent).not.toBe("Cancel");
   });
 
@@ -175,12 +175,13 @@ describe("renderPanel", () => {
     form.dispatchEvent(new Event("submit", { cancelable: true }));
     expect(h.onSignIn).toHaveBeenCalledTimes(1);
     expect(h.onSignIn).toHaveBeenCalledWith({ baseUrl: "https://kata.example.org", code: "42", deviceLabel: "tab" });
-    expect(root.querySelector("p.error")?.textContent).toBe("");
+    expect(root.querySelector("p.error")?.textContent).toBe("Signing in...");
   });
 
-  it("signed out with error status shows the status line", () => {
+  it("signed out with error status shows the signed-out notice and the status line", () => {
     renderPanel(root, { session: null, rows: [], status: { kind: "error", reason: "auth" } }, handlers());
-    expect(root.querySelector("form.signin")).not.toBeNull();
+    expect(root.querySelector("div.signed-out")).not.toBeNull();
+    expect(root.querySelector("form.signin")).toBeNull();
     expect(root.querySelector("p.status")?.textContent).toBe("Sign-in failed or expired");
   });
 

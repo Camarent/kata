@@ -4,6 +4,10 @@ import type { MarkOutcome } from "./offlineQueue";
 import type { Session } from "./types";
 import { courseErrorText, type ModelhostEngine } from "./coreClient";
 import { renderReview, type ReviewRow, type ReviewState } from "./reviewScreen";
+import { el } from "./ui/dom";
+import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
+import type { QueuedMarkView } from "./ui/panel/offlineQueue";
+import { routeScreen } from "./ui/panel/router";
 
 /** Group heading for rows whose block has no topic. */
 const UNTAGGED = "untagged";
@@ -40,6 +44,10 @@ export interface PanelState {
   courseLimit?: number;
   /** Courses counted against the limit; defaults to the number of listed courses. */
   courseTotal?: number;
+  /** Server link and unsynced count; when set, the connection detail shows under the header. */
+  link?: ConnectionDetailProps;
+  /** Marks waiting in the offline queue; non-null means the Not synced marks screen. */
+  queue?: QueuedMarkView[] | null;
 }
 
 /** Values typed into the sign-in form: pairing code and device label. */
@@ -68,81 +76,12 @@ export interface PanelHandlers {
   onDeleteCourse: (courseId: number) => Promise<void>;
   onCreateCourse: (title: string) => Promise<void>;
   onModelhost: (request: ModelhostRequest) => Promise<ModelhostResult>;
-}
-
-/** Creates an element with text content; never parses markup. */
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  text?: string,
-  className?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (text !== undefined) node.textContent = text;
-  if (className !== undefined) node.className = className;
-  return node;
-}
-
-/** Sign-in form: server URL, pairing code and device label. `prefill` fills the URL; `canCancel` adds Cancel. */
-function renderSignIn(handlers: PanelHandlers, prefill: string, canCancel: boolean): HTMLElement {
-  const form = el("form", undefined, "signin");
-  const serverLabel = el("label", "Server URL");
-  const server = el("input");
-  server.name = "baseUrl";
-  server.type = "text";
-  server.placeholder = "https://kata.example.org";
-  server.value = prefill;
-  serverLabel.append(server);
-  const codeLabel = el("label", "Code");
-  const code = el("input");
-  code.name = "code";
-  code.type = "text";
-  codeLabel.append(code);
-  const deviceLabel = el("label", "Device label");
-  const device = el("input");
-  device.name = "deviceLabel";
-  device.type = "text";
-  deviceLabel.append(device);
-  const submit = el("button", "Connect");
-  submit.type = "submit";
-  const error = el("p", undefined, "error");
-  error.setAttribute("role", "alert");
-  form.append(serverLabel, codeLabel, deviceLabel, submit);
-  if (canCancel) {
-    const cancel = el("button", "Cancel");
-    cancel.type = "button";
-    cancel.addEventListener("click", () => handlers.onCancelChange());
-    form.append(cancel);
-  }
-  form.append(error);
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const input = { baseUrl: server.value.trim(), code: code.value.trim(), deviceLabel: device.value.trim() };
-    if (input.code === "" || input.deviceLabel === "") {
-      error.textContent = "Enter the code and a device label";
-      return;
-    }
-    if (input.baseUrl === "") {
-      error.textContent = "Enter the server URL";
-      return;
-    }
-    error.textContent = "";
-    void handlers.onSignIn(input);
-  });
-  return form;
-}
-
-/** Connected header: the session origin, with Change server and Disconnect. */
-function renderConnection(session: Session, handlers: PanelHandlers): HTMLElement {
-  const box = el("div", undefined, "connection");
-  box.append(el("p", session.baseUrl, "origin"));
-  const change = el("button", "Change server", "change-server");
-  change.type = "button";
-  change.addEventListener("click", () => handlers.onChangeServer());
-  const disconnect = el("button", "Disconnect", "disconnect");
-  disconnect.type = "button";
-  disconnect.addEventListener("click", () => void handlers.onDisconnect());
-  box.append(change, disconnect);
-  return box;
+  /** Retry now on the connection detail and the queue screen; the button is hidden without it. */
+  onRetry?: () => Promise<void>;
+  /** Show unsynced marks on the connection detail; the button is hidden without it. */
+  onShowQueue?: () => void;
+  /** Back on the Not synced marks screen; the button is hidden without it. */
+  onCloseQueue?: () => void;
 }
 
 /** User-facing text for each error reason. */
@@ -420,7 +359,13 @@ function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLEleme
 export function renderPanel(root: HTMLElement, state: PanelState, handlers: PanelHandlers): void {
   root.replaceChildren();
   if (state.session === null || state.changing) {
-    root.append(renderSignIn(handlers, state.session?.baseUrl ?? "", state.session !== null));
+    const prefill = state.session?.baseUrl ?? "";
+    // Signed out after an error shows the signed-out notice; a first run shows the sign-in form.
+    if (state.session === null && state.status.kind === "error") {
+      root.append(routeScreen("signed-out", { prefill }, handlers));
+    } else {
+      root.append(routeScreen("signin", { prefill, canCancel: state.session !== null }, handlers));
+    }
     if (state.status.kind === "error" || state.status.kind === "notice") {
       root.append(el("p", statusText(state.status), "status"));
     }
@@ -430,7 +375,12 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
     root.append(renderReviewView(state.review, handlers));
     return;
   }
+  if (state.queue != null) {
+    root.append(routeScreen("offline-queue", { marks: state.queue }, handlers));
+    return;
+  }
   root.append(renderConnection(state.session, handlers));
+  if (state.link !== undefined) root.append(routeScreen("conn-detail", state.link, handlers));
   const review = el("button", "Review concepts", "review-open");
   review.type = "button";
   review.addEventListener("click", () => void handlers.onReview());
