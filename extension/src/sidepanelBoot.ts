@@ -2,10 +2,21 @@ import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, Panel
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
-import type { DecisionPoint, ExamResult, IgnoredConcept, Track, TrackPage } from "./coreClientTypes";
+import type {
+  ConceptAlias,
+  DecisionPoint,
+  ExamResult,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
+  Track,
+  TrackPage,
+} from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
+import { ignoredClientHandlers, type IgnoredClient } from "./ui/panel/ignoredList";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
 
@@ -81,6 +92,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       throw new Error(reply.error);
     }
     return reply.data as T;
+  };
+
+  /** The two ignored calls the ignored list makes, each as one panel message. */
+  const ignoredClient: IgnoredClient = {
+    ignoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
+    unignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
   };
 
   const handlers: PanelHandlers = {
@@ -248,6 +265,15 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
+    // The ignored list keeps no rows in the panel state, so its redraw is left to the list screen.
+    ignoredList: ignoredClientHandlers(ignoredClient, () => undefined),
+    onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
+    onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
+    onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),
+    onRequestSummary: (url, text) => send<SummaryReply>({ type: "panel:requestSummary", url, text }),
+    onCachedSummary: (url, textSha256) => send<string | null>({ type: "panel:cachedSummary", url, textSha256 }),
+    onNextJoke: () => send<Joke | null>({ type: "panel:nextJoke" }),
+    onListJokeSources: () => send<JokeSource[]>({ type: "panel:listJokeSources" }),
   };
 
   // The origin permission was removed (here or in the browser UI): fall back to first-run.

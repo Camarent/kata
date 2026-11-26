@@ -3,16 +3,21 @@ import type { PanelOpenApi } from "./browser";
 import type { ContentMessage, RuntimeLike } from "./content";
 import type { ModelhostEngine, ModelhostOutput } from "./coreClient";
 import type {
+  ConceptAlias,
   DecisionPoint,
   ExamResult,
   IgnoredConcept,
+  Joke,
+  JokeSource,
   PointIn,
+  SummaryReply,
   Track,
   TrackIn,
   TrackPage,
   TrackPatch,
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
+import type { IgnoredListHandlers } from "./ui/panel/ignoredList";
 
 /** A readable block of page text, optionally bound to its DOM element. */
 export interface Block {
@@ -107,6 +112,16 @@ export interface PanelHandlers {
   onLoadIgnored?: () => Promise<IgnoredConcept[]>;
   onIgnoreConcept?: (conceptId: number) => Promise<void>;
   onUnignoreConcept?: (conceptId: number) => Promise<void>;
+  /** Restore and Undo of the ignored list; each calls the panel messages for ignore and unignore. */
+  ignoredList?: IgnoredListHandlers;
+  /** Feed tabs: aliases, page summary, jokes and concept views; each sends one panel message. */
+  onListConceptAliases?: (conceptId: number) => Promise<ConceptAlias[]>;
+  onAddConceptAlias?: (conceptId: number, alias: string) => Promise<ConceptAlias>;
+  onMarkConceptViewed?: (conceptId: number) => Promise<void>;
+  onRequestSummary?: (url: string, text: string) => Promise<SummaryReply>;
+  onCachedSummary?: (url: string, textSha256: string) => Promise<string | null>;
+  onNextJoke?: () => Promise<Joke | null>;
+  onListJokeSources?: () => Promise<JokeSource[]>;
 }
 
 /** Reply to a panel message: the result, or the error text; `status` and `code` are set when the core refused it (CoreHttpError). */

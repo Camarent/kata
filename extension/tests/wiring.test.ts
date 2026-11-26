@@ -658,6 +658,133 @@ describe("background tracks, exam results and ignored list wiring", () => {
   });
 });
 
+describe("background feed tabs wiring: aliases, summary and jokes", () => {
+  /** Fake core that answers every call with one status and body; the request is kept for inspection. */
+  const coreReply = (status: number, body: unknown) =>
+    vi.fn(async () => new Response(status === 204 ? null : JSON.stringify(body), { status }));
+  const signedInArea = () => memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+  const sentTo = (fetchImpl: unknown, index = 0) => vi.mocked(fetchImpl as ReturnType<typeof vi.fn>).mock.calls[index] as [RequestInfo | URL, RequestInit | undefined];
+
+  it("markConceptViewed stamps the concept and replies ok on 204", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(204, null);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:markConceptViewed", conceptId: 3 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl)[1]?.method).toBe("POST");
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/concepts/3/viewed");
+  });
+
+  it("listConceptAliases gets the aliases of one concept", async () => {
+    const chrome = fakeChrome();
+    const rows = [{ alias: "parts", shared: false }];
+    const fetchImpl = coreReply(200, rows);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:listConceptAliases", conceptId: 3 })).toEqual({ ok: true, data: rows });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/concepts/3/aliases");
+  });
+
+  it("addConceptAlias posts the alias and replies with the new alias", async () => {
+    const chrome = fakeChrome();
+    const row = { alias: "parts", shared: false };
+    const fetchImpl = coreReply(201, row);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:addConceptAlias", conceptId: 3, alias: "parts" })).toEqual({ ok: true, data: row });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/concepts/3/aliases");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({ alias: "parts" });
+  });
+
+  it("addConceptAlias replies with the core 409 status and code when the alias exists", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(409, { detail: { code: "alias_exists", message: "taken" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = await chrome.send({ type: "panel:addConceptAlias", conceptId: 3, alias: "parts" });
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "alias_exists" });
+  });
+
+  it("requestSummary posts the url and text and replies with the summary or the job id", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { status: "done", summary: "short" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:requestSummary", url: "https://p", text: "page" })).toEqual({
+      ok: true,
+      data: { status: "done", summary: "short" },
+    });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/summary");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({ url: "https://p", text: "page" });
+  });
+
+  it("cachedSummary gets the cached summary by url and text hash, null when nothing is cached", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { summary: "short" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:cachedSummary", url: "https://p", textSha256: "abc" })).toEqual({ ok: true, data: "short" });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/summary?url=https%3A%2F%2Fp&text_sha256=abc");
+    const missingChrome = fakeChrome();
+    const missing = coreReply(404, { detail: "summary not found" });
+    wireBackground(missingChrome.api, createBackend(missingChrome.api, signedInArea(), missing as unknown as typeof fetch));
+    expect(await missingChrome.send({ type: "panel:cachedSummary", url: "https://p", textSha256: "abc" })).toEqual({ ok: true, data: null });
+  });
+
+  it("nextJoke replies with the joke, or null when jokes are off", async () => {
+    const chrome = fakeChrome();
+    const joke = { id: 1, text: "Why?", source: "local" };
+    const fetchImpl = coreReply(200, joke);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:nextJoke" })).toEqual({ ok: true, data: joke });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/jokes/next");
+    const offChrome = fakeChrome();
+    const off = coreReply(404, { detail: "jokes disabled" });
+    wireBackground(offChrome.api, createBackend(offChrome.api, signedInArea(), off as unknown as typeof fetch));
+    expect(await offChrome.send({ type: "panel:nextJoke" })).toEqual({ ok: true, data: null });
+  });
+
+  it("listJokeSources lists the enabled sources in order", async () => {
+    const chrome = fakeChrome();
+    const sources = [{ id: 2, name: "dad jokes", enabled: true }];
+    const fetchImpl = coreReply(200, sources);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:listJokeSources" })).toEqual({ ok: true, data: sources });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/jokes/sources");
+  });
+
+  it("ignored list round trip: Restore unignores and Undo ignores again, on the ignore route", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(204, null);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:unignoreConcept", conceptId: 5 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl)[1]?.method).toBe("DELETE");
+    expect(await chrome.send({ type: "panel:ignoreConcept", conceptId: 5 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl, 1)[1]?.method).toBe("PUT");
+    expect(String(sentTo(fetchImpl, 1)[0])).toBe("http://127.0.0.1:8080/concepts/5/ignore");
+  });
+
+  it("settings local model status queues a modelhost.status job and replies with its output", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).endsWith("/jobs")
+        ? new Response(JSON.stringify({ id: 7 }), { status: 200 })
+        : new Response(JSON.stringify({ status: "done", output: { ok: true, text: "up" } }), { status: 200 }),
+    );
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = await chrome.send({ type: "panel:modelhost", request: { action: "status" } });
+    expect(reply).toEqual({ ok: true, data: { ok: true, text: "up" } });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/jobs");
+    expect(JSON.parse(String(sentTo(fetchImpl)[1]?.body))).toEqual({ payload: "{}", kind: "modelhost.status" });
+    expect(String(sentTo(fetchImpl, 1)[0])).toBe("http://127.0.0.1:8080/jobs/7");
+  });
+
+  it("feed tab messages without a session reply with the auth error", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
+    expect(await chrome.send({ type: "panel:nextJoke" })).toEqual({ ok: false, error: "not signed in" });
+    expect(await chrome.send({ type: "panel:requestSummary", url: "https://p", text: "page" })).toEqual({ ok: false, error: "not signed in" });
+  });
+});
+
 describe("sign-in, server change and disconnect", () => {
   afterEach(() => {
     vi.restoreAllMocks();

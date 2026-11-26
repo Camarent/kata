@@ -15,8 +15,12 @@ import * as trackApi from "./coreClientTracks";
 import type {
   DecisionPoint,
   ExamResult,
+  ConceptAlias,
   IgnoredConcept,
+  Joke,
+  JokeSource,
   PointIn,
+  SummaryReply,
   Track,
   TrackIn,
   TrackPage,
@@ -73,7 +77,14 @@ export type PanelMessage =
   | { type: "panel:dismissExamResult"; resultId: number }
   | { type: "panel:ignored" }
   | { type: "panel:ignoreConcept"; conceptId: number }
-  | { type: "panel:unignoreConcept"; conceptId: number };
+  | { type: "panel:unignoreConcept"; conceptId: number }
+  | { type: "panel:markConceptViewed"; conceptId: number }
+  | { type: "panel:listConceptAliases"; conceptId: number }
+  | { type: "panel:addConceptAlias"; conceptId: number; alias: string }
+  | { type: "panel:requestSummary"; url: string; text: string }
+  | { type: "panel:cachedSummary"; url: string; textSha256: string }
+  | { type: "panel:nextJoke" }
+  | { type: "panel:listJokeSources" };
 
 export type { PanelReply } from "./types";
 
@@ -154,6 +165,20 @@ export interface Backend {
   ignored(): Promise<IgnoredConcept[]>;
   ignoreConcept(conceptId: number): Promise<void>;
   unignoreConcept(conceptId: number): Promise<void>;
+  /** Stamps the last-viewed time of a concept. */
+  markConceptViewed(conceptId: number): Promise<void>;
+  /** Shared and own aliases of a concept. */
+  listConceptAliases(conceptId: number): Promise<ConceptAlias[]>;
+  /** Adds a private alias to a concept; refuses an alias that exists. */
+  addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias>;
+  /** Summary of a page: the cached one or a queued job id. */
+  requestSummary(url: string, text: string): Promise<SummaryReply>;
+  /** The cached summary of a page text, or null when none is cached. */
+  cachedSummary(url: string, textSha256: string): Promise<string | null>;
+  /** The next cached joke, or null when jokes are off or none is cached. */
+  nextJoke(): Promise<Joke | null>;
+  /** The enabled joke sources, in list order. */
+  listJokeSources(): Promise<JokeSource[]>;
   /** Queues a modelhost job and waits up to MAX_WAIT_MS; "pending" when the worker has not answered by then. */
   modelhost(request: ModelhostRequest): Promise<ModelhostResult>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
@@ -397,6 +422,34 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       await clientFor(await requireSession()).unignoreConcept(conceptId);
     },
 
+    async markConceptViewed(conceptId) {
+      await clientFor(await requireSession()).markConceptViewed(conceptId);
+    },
+
+    async listConceptAliases(conceptId) {
+      return clientFor(await requireSession()).listConceptAliases(conceptId);
+    },
+
+    async addConceptAlias(conceptId, alias) {
+      return clientFor(await requireSession()).addConceptAlias(conceptId, alias);
+    },
+
+    async requestSummary(url, text) {
+      return clientFor(await requireSession()).requestSummary(url, text);
+    },
+
+    async cachedSummary(url, textSha256) {
+      return clientFor(await requireSession()).cachedSummary(url, textSha256);
+    },
+
+    async nextJoke() {
+      return clientFor(await requireSession()).nextJoke();
+    },
+
+    async listJokeSources() {
+      return clientFor(await requireSession()).listJokeSources();
+    },
+
     async modelhost(request) {
       const session = await requireSession();
       const client = clientFor(session);
@@ -510,6 +563,14 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:ignored": (backend) => refusable(() => backend.ignored()),
   "panel:ignoreConcept": (backend, message) => refusable(() => backend.ignoreConcept(message.conceptId)),
   "panel:unignoreConcept": (backend, message) => refusable(() => backend.unignoreConcept(message.conceptId)),
+  "panel:markConceptViewed": (backend, message) => refusable(() => backend.markConceptViewed(message.conceptId)),
+  "panel:listConceptAliases": (backend, message) => refusable(() => backend.listConceptAliases(message.conceptId)),
+  "panel:addConceptAlias": (backend, message) =>
+    refusable(() => backend.addConceptAlias(message.conceptId, message.alias)),
+  "panel:requestSummary": (backend, message) => refusable(() => backend.requestSummary(message.url, message.text)),
+  "panel:cachedSummary": (backend, message) => refusable(() => backend.cachedSummary(message.url, message.textSha256)),
+  "panel:nextJoke": (backend) => refusable(() => backend.nextJoke()),
+  "panel:listJokeSources": (backend) => refusable(() => backend.listJokeSources()),
 };
 
 /** Routes one panel message to the backend and returns its reply. */

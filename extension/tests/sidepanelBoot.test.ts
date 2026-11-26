@@ -569,6 +569,13 @@ describe("bootPanel tracks, exam and ignored handlers", () => {
     ["onLoadIgnored", (h) => h.onLoadIgnored!(), { type: "panel:ignored" }],
     ["onIgnoreConcept", (h) => h.onIgnoreConcept!(8), { type: "panel:ignoreConcept", conceptId: 8 }],
     ["onUnignoreConcept", (h) => h.onUnignoreConcept!(8), { type: "panel:unignoreConcept", conceptId: 8 }],
+    ["onListConceptAliases", (h) => h.onListConceptAliases!(3), { type: "panel:listConceptAliases", conceptId: 3 }],
+    ["onAddConceptAlias", (h) => h.onAddConceptAlias!(3, "parts"), { type: "panel:addConceptAlias", conceptId: 3, alias: "parts" }],
+    ["onMarkConceptViewed", (h) => h.onMarkConceptViewed!(3), { type: "panel:markConceptViewed", conceptId: 3 }],
+    ["onRequestSummary", (h) => h.onRequestSummary!("https://p", "page"), { type: "panel:requestSummary", url: "https://p", text: "page" }],
+    ["onCachedSummary", (h) => h.onCachedSummary!("https://p", "abc"), { type: "panel:cachedSummary", url: "https://p", textSha256: "abc" }],
+    ["onNextJoke", (h) => h.onNextJoke!(), { type: "panel:nextJoke" }],
+    ["onListJokeSources", (h) => h.onListJokeSources!(), { type: "panel:listJokeSources" }],
   ];
 
   it.each(cases)("%s sends its panel message and returns the reply data", async (_name, call, message) => {
@@ -576,6 +583,15 @@ describe("bootPanel tracks, exam and ignored handlers", () => {
     await bootPanel(document.createElement("div"), api);
     await expect(call(captured.handlers!)).resolves.toEqual({ marker: 1 });
     expect(sendMessage).toHaveBeenCalledWith(message);
+  });
+
+  it("the ignored list Restore and Undo send the unignore and ignore panel messages", async () => {
+    const { api, sendMessage } = fakeChrome({ ok: true });
+    await bootPanel(document.createElement("div"), api);
+    await captured.handlers!.ignoredList!.onRestore(8);
+    expect(sendMessage).toHaveBeenLastCalledWith({ type: "panel:unignoreConcept", conceptId: 8 });
+    await captured.handlers!.ignoredList!.onUndo(8);
+    expect(sendMessage).toHaveBeenLastCalledWith({ type: "panel:ignoreConcept", conceptId: 8 });
   });
 
   it("a refused call rejects with the core status and code", async () => {
