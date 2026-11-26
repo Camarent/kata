@@ -11,6 +11,17 @@ import {
   type ProgressDoc,
   type TopicOverview,
 } from "./coreClient";
+import * as trackApi from "./coreClientTracks";
+import type {
+  DecisionPoint,
+  ExamResult,
+  IgnoredConcept,
+  PointIn,
+  Track,
+  TrackIn,
+  TrackPage,
+  TrackPatch,
+} from "./coreClientTypes";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
 import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
@@ -49,7 +60,20 @@ export type PanelMessage =
   | { type: "panel:deleteCourse"; courseId: number }
   | { type: "panel:createCourse"; title: string }
   | { type: "panel:regenerateCourse"; courseId: number }
-  | { type: "panel:modelhost"; request: ModelhostRequest };
+  | { type: "panel:modelhost"; request: ModelhostRequest }
+  | { type: "panel:tracks"; limit?: number; beforeId?: number }
+  | { type: "panel:getTrack"; trackId: number }
+  | { type: "panel:createTrack"; input: TrackIn }
+  | { type: "panel:patchTrack"; trackId: number; patch: TrackPatch }
+  | { type: "panel:deleteTrack"; trackId: number }
+  | { type: "panel:addDecisionPoint"; trackId: number; input: PointIn }
+  | { type: "panel:addQuizSource"; url: string }
+  | { type: "panel:importExamResult"; payload: string }
+  | { type: "panel:confirmExamResult"; resultId: number; conceptIds: number[] }
+  | { type: "panel:dismissExamResult"; resultId: number }
+  | { type: "panel:ignored" }
+  | { type: "panel:ignoreConcept"; conceptId: number }
+  | { type: "panel:unignoreConcept"; conceptId: number };
 
 export type { PanelReply } from "./types";
 
@@ -113,6 +137,23 @@ export interface Backend {
   /** Queues a new course with the given title; a refusal from the core rejects with CoreHttpError. */
   createCourse(title: string): Promise<void>;
   regenerateCourse(courseId: number): Promise<void>;
+  /** One page of the caller's tracks, newest first; `beforeId` asks for the page before that track. */
+  tracks(opts: { limit?: number; beforeId?: number }): Promise<TrackPage>;
+  getTrack(trackId: number): Promise<Track>;
+  createTrack(input: TrackIn): Promise<Track>;
+  patchTrack(trackId: number, patch: TrackPatch): Promise<Track>;
+  deleteTrack(trackId: number): Promise<void>;
+  addDecisionPoint(trackId: number, input: PointIn): Promise<DecisionPoint>;
+  /** Queues a quiz source from a URL; returns the job id. */
+  addQuizSource(url: string): Promise<number>;
+  /** Stores an exam result JSON as pending; changes no mark. */
+  importExamResult(payload: string): Promise<ExamResult>;
+  confirmExamResult(resultId: number, conceptIds: number[]): Promise<ExamResult>;
+  dismissExamResult(resultId: number): Promise<ExamResult>;
+  /** Concepts the caller ignores, for the ignored list. */
+  ignored(): Promise<IgnoredConcept[]>;
+  ignoreConcept(conceptId: number): Promise<void>;
+  unignoreConcept(conceptId: number): Promise<void>;
   /** Queues a modelhost job and waits up to MAX_WAIT_MS; "pending" when the worker has not answered by then. */
   modelhost(request: ModelhostRequest): Promise<ModelhostResult>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
@@ -304,6 +345,58 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       await clientFor(session).regenerateCourse(courseId);
     },
 
+    async tracks(opts) {
+      return trackApi.listTracks(clientFor(await requireSession()), opts);
+    },
+
+    async getTrack(trackId) {
+      return trackApi.getTrack(clientFor(await requireSession()), trackId);
+    },
+
+    async createTrack(input) {
+      return trackApi.createTrack(clientFor(await requireSession()), input);
+    },
+
+    async patchTrack(trackId, patch) {
+      return trackApi.patchTrack(clientFor(await requireSession()), trackId, patch);
+    },
+
+    async deleteTrack(trackId) {
+      await trackApi.deleteTrack(clientFor(await requireSession()), trackId);
+    },
+
+    async addDecisionPoint(trackId, input) {
+      return trackApi.addDecisionPoint(clientFor(await requireSession()), trackId, input);
+    },
+
+    async addQuizSource(url) {
+      return trackApi.addQuizSource(clientFor(await requireSession()), url);
+    },
+
+    async importExamResult(payload) {
+      return trackApi.importExamResult(clientFor(await requireSession()), payload);
+    },
+
+    async confirmExamResult(resultId, conceptIds) {
+      return trackApi.confirmExamResult(clientFor(await requireSession()), resultId, conceptIds);
+    },
+
+    async dismissExamResult(resultId) {
+      return trackApi.dismissExamResult(clientFor(await requireSession()), resultId);
+    },
+
+    async ignored() {
+      return clientFor(await requireSession()).listIgnored();
+    },
+
+    async ignoreConcept(conceptId) {
+      await clientFor(await requireSession()).ignoreConcept(conceptId);
+    },
+
+    async unignoreConcept(conceptId) {
+      await clientFor(await requireSession()).unignoreConcept(conceptId);
+    },
+
     async modelhost(request) {
       const session = await requireSession();
       const client = clientFor(session);
@@ -347,11 +440,14 @@ type PanelHandler<T extends PanelMessage["type"]> = (
   message: Extract<PanelMessage, { type: T }>,
 ) => Promise<PanelReply>;
 
-/** Runs a backend call that may refuse with a Core HTTP error; the refusal becomes the reply. */
+/**
+ * Runs a backend call that may refuse with a Core HTTP error; the refusal becomes the reply with
+ * its status and code. A call that returns a value puts it in the reply as `data`.
+ */
 async function refusable(call: () => Promise<unknown>): Promise<PanelReply> {
   try {
-    await call();
-    return { ok: true };
+    const data = await call();
+    return data === undefined ? { ok: true } : { ok: true, data };
   } catch (err) {
     if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
     throw err;
@@ -398,6 +494,22 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:createCourse": (backend, message) => refusable(() => backend.createCourse(message.title)),
   "panel:regenerateCourse": (backend, message) => refusable(() => backend.regenerateCourse(message.courseId)),
   "panel:modelhost": async (backend, message) => ({ ok: true, data: await backend.modelhost(message.request) }),
+  "panel:tracks": (backend, message) =>
+    refusable(() => backend.tracks({ limit: message.limit, beforeId: message.beforeId })),
+  "panel:getTrack": (backend, message) => refusable(() => backend.getTrack(message.trackId)),
+  "panel:createTrack": (backend, message) => refusable(() => backend.createTrack(message.input)),
+  "panel:patchTrack": (backend, message) => refusable(() => backend.patchTrack(message.trackId, message.patch)),
+  "panel:deleteTrack": (backend, message) => refusable(() => backend.deleteTrack(message.trackId)),
+  "panel:addDecisionPoint": (backend, message) =>
+    refusable(() => backend.addDecisionPoint(message.trackId, message.input)),
+  "panel:addQuizSource": (backend, message) => refusable(() => backend.addQuizSource(message.url)),
+  "panel:importExamResult": (backend, message) => refusable(() => backend.importExamResult(message.payload)),
+  "panel:confirmExamResult": (backend, message) =>
+    refusable(() => backend.confirmExamResult(message.resultId, message.conceptIds)),
+  "panel:dismissExamResult": (backend, message) => refusable(() => backend.dismissExamResult(message.resultId)),
+  "panel:ignored": (backend) => refusable(() => backend.ignored()),
+  "panel:ignoreConcept": (backend, message) => refusable(() => backend.ignoreConcept(message.conceptId)),
+  "panel:unignoreConcept": (backend, message) => refusable(() => backend.unignoreConcept(message.conceptId)),
 };
 
 /** Routes one panel message to the backend and returns its reply. */

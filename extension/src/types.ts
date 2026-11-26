@@ -2,6 +2,16 @@ import type { ScriptingLike } from "./bridgeRegister";
 import type { PanelOpenApi } from "./browser";
 import type { ContentMessage, RuntimeLike } from "./content";
 import type { ModelhostEngine, ModelhostOutput } from "./coreClient";
+import type {
+  DecisionPoint,
+  ExamResult,
+  IgnoredConcept,
+  PointIn,
+  Track,
+  TrackIn,
+  TrackPage,
+  TrackPatch,
+} from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 
 /** A readable block of page text, optionally bound to its DOM element. */
@@ -83,6 +93,20 @@ export interface PanelHandlers {
   onShowQueue?: () => void;
   /** Back on the Not synced marks screen; the button is hidden without it. */
   onCloseQueue?: () => void;
+  /** Tracks, exam results and ignored concepts: each sends one panel message and returns the reply data. */
+  onLoadTracks?: (opts?: { limit?: number; beforeId?: number }) => Promise<TrackPage>;
+  onGetTrack?: (trackId: number) => Promise<Track>;
+  onCreateTrack?: (input: TrackIn) => Promise<Track>;
+  onPatchTrack?: (trackId: number, patch: TrackPatch) => Promise<Track>;
+  onDeleteTrack?: (trackId: number) => Promise<void>;
+  onAddDecisionPoint?: (trackId: number, input: PointIn) => Promise<DecisionPoint>;
+  onAddQuizSource?: (url: string) => Promise<number>;
+  onImportExamResult?: (payload: string) => Promise<ExamResult>;
+  onConfirmExamResult?: (resultId: number, conceptIds: number[]) => Promise<ExamResult>;
+  onDismissExamResult?: (resultId: number) => Promise<ExamResult>;
+  onLoadIgnored?: () => Promise<IgnoredConcept[]>;
+  onIgnoreConcept?: (conceptId: number) => Promise<void>;
+  onUnignoreConcept?: (conceptId: number) => Promise<void>;
 }
 
 /** Reply to a panel message: the result, or the error text; `status` and `code` are set when the core refused it (CoreHttpError). */

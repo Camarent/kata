@@ -556,3 +556,31 @@ describe("bootPanel", () => {
     expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(1);
   });
 });
+
+describe("bootPanel tracks, exam and ignored handlers", () => {
+  const cases: Array<[string, (h: PanelHandlers) => Promise<unknown> | undefined, PanelMessage]> = [
+    ["onLoadTracks", (h) => h.onLoadTracks!({ limit: 5, beforeId: 9 }), { type: "panel:tracks", limit: 5, beforeId: 9 }],
+    ["onGetTrack", (h) => h.onGetTrack!(3), { type: "panel:getTrack", trackId: 3 }],
+    ["onDeleteTrack", (h) => h.onDeleteTrack!(3), { type: "panel:deleteTrack", trackId: 3 }],
+    ["onAddQuizSource", (h) => h.onAddQuizSource!("https://q.example/x"), { type: "panel:addQuizSource", url: "https://q.example/x" }],
+    ["onImportExamResult", (h) => h.onImportExamResult!("{}"), { type: "panel:importExamResult", payload: "{}" }],
+    ["onConfirmExamResult", (h) => h.onConfirmExamResult!(4, [1, 2]), { type: "panel:confirmExamResult", resultId: 4, conceptIds: [1, 2] }],
+    ["onDismissExamResult", (h) => h.onDismissExamResult!(4), { type: "panel:dismissExamResult", resultId: 4 }],
+    ["onLoadIgnored", (h) => h.onLoadIgnored!(), { type: "panel:ignored" }],
+    ["onIgnoreConcept", (h) => h.onIgnoreConcept!(8), { type: "panel:ignoreConcept", conceptId: 8 }],
+    ["onUnignoreConcept", (h) => h.onUnignoreConcept!(8), { type: "panel:unignoreConcept", conceptId: 8 }],
+  ];
+
+  it.each(cases)("%s sends its panel message and returns the reply data", async (_name, call, message) => {
+    const { api, sendMessage } = fakeChrome({ ok: true, data: { marker: 1 } });
+    await bootPanel(document.createElement("div"), api);
+    await expect(call(captured.handlers!)).resolves.toEqual({ marker: 1 });
+    expect(sendMessage).toHaveBeenCalledWith(message);
+  });
+
+  it("a refused call rejects with the core status and code", async () => {
+    const { api } = fakeChrome({ ok: false, error: "gone", status: 404, code: "not_found" });
+    await bootPanel(document.createElement("div"), api);
+    await expect(captured.handlers!.onGetTrack!(3)).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+});

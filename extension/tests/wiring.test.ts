@@ -521,6 +521,143 @@ function signInFetch(
   }) as unknown as typeof fetch;
 }
 
+describe("background tracks, exam results and ignored list wiring", () => {
+  /** Fake core that answers every call with one status and body; the request is kept for inspection. */
+  const coreReply = (status: number, body: unknown) =>
+    vi.fn(async () => new Response(status === 204 ? null : JSON.stringify(body), { status }));
+  const signedInArea = () => memoryArea({ "kata.session": { baseUrl: "http://127.0.0.1:8080", token: "t" } });
+  const track = { id: 3, name: "Rust", deadline: "2026-12-01", priority: 1, status: "active", items: [], created_at: "", updated_at: "" };
+  const sentTo = (fetchImpl: unknown, index = 0) => vi.mocked(fetchImpl as ReturnType<typeof vi.fn>).mock.calls[index] as [RequestInfo | URL, RequestInit | undefined];
+
+  it("tracks lists one page with the limit and the before_id query", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { items: [track], next_before_id: null });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const result = (await chrome.send({ type: "panel:tracks", limit: 5, beforeId: 12 })) as PanelReply;
+    expect(result).toEqual({ ok: true, data: { items: [track], next_before_id: null } });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/v1/tracks?limit=5&before_id=12");
+  });
+
+  it("getTrack reads one track by id", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, track);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:getTrack", trackId: 3 })).toEqual({ ok: true, data: track });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/v1/tracks/3");
+  });
+
+  it("createTrack posts the track input and replies with the new track", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(201, track);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const input = { name: "Rust", deadline: "2026-12-01" };
+    expect(await chrome.send({ type: "panel:createTrack", input })).toEqual({ ok: true, data: track });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/tracks");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual(input);
+  });
+
+  it("patchTrack sends only the patch fields to the track", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { ...track, status: "paused" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:patchTrack", trackId: 3, patch: { status: "paused" } })) as PanelReply;
+    expect(reply).toEqual({ ok: true, data: { ...track, status: "paused" } });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/tracks/3");
+    expect(init?.method).toBe("PATCH");
+    expect(JSON.parse(String(init?.body))).toEqual({ status: "paused" });
+  });
+
+  it("deleteTrack deletes the track and replies ok on 204", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(204, null);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:deleteTrack", trackId: 3 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl)[1]?.method).toBe("DELETE");
+  });
+
+  it("addDecisionPoint posts the point after a plan position", async () => {
+    const chrome = fakeChrome();
+    const point = { id: 8, track_id: 3, after_position: 2, due_on: "2026-12-05" };
+    const fetchImpl = coreReply(201, point);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const input = { after_position: 2, due_on: "2026-12-05" };
+    expect(await chrome.send({ type: "panel:addDecisionPoint", trackId: 3, input })).toEqual({ ok: true, data: point });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/tracks/3/decision-points");
+    expect(JSON.parse(String(init?.body))).toEqual(input);
+  });
+
+  it("addQuizSource queues the URL and replies with the job id", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(202, { id: 9 });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:addQuizSource", url: "https://example.org/q" })).toEqual({ ok: true, data: 9 });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/quiz/sources");
+    expect(JSON.parse(String(init?.body))).toEqual({ url: "https://example.org/q" });
+  });
+
+  it("importExamResult posts the raw payload and replies with the stored result", async () => {
+    const chrome = fakeChrome();
+    const result = { id: 2, origin: "exam", taken_at: "", passed: null, score: null, status: "pending", concepts: [] };
+    const fetchImpl = coreReply(200, result);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:importExamResult", payload: '{"score":7}' })).toEqual({ ok: true, data: result });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/exams/import");
+    expect(String(init?.body)).toBe('{"score":7}');
+  });
+
+  it("confirmExamResult posts the confirmed concept ids", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { id: 2, status: "confirmed", concepts: [] });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    await chrome.send({ type: "panel:confirmExamResult", resultId: 2, conceptIds: [4, 5] });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/exams/2/confirm");
+    expect(JSON.parse(String(init?.body))).toEqual({ concept_ids: [4, 5] });
+  });
+
+  it("dismissExamResult posts to the dismiss route", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, { id: 2, status: "dismissed", concepts: [] });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    await chrome.send({ type: "panel:dismissExamResult", resultId: 2 });
+    expect(String(sentTo(fetchImpl)[0])).toBe("http://127.0.0.1:8080/exams/2/dismiss");
+  });
+
+  it("ignored lists the ignored concepts; ignoreConcept and unignoreConcept use the ignore route", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(200, [{ concept_id: 4, label: "Borrow" }]);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:ignored" })).toEqual({ ok: true, data: [{ concept_id: 4, label: "Borrow" }] });
+    expect(await chrome.send({ type: "panel:ignoreConcept", conceptId: 4 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl, 1)[1]?.method).toBe("PUT");
+    expect(await chrome.send({ type: "panel:unignoreConcept", conceptId: 4 })).toEqual({ ok: true });
+    expect(sentTo(fetchImpl, 2)[1]?.method).toBe("DELETE");
+    expect(String(sentTo(fetchImpl, 2)[0])).toBe("http://127.0.0.1:8080/concepts/4/ignore");
+  });
+
+  it("a refused track write replies with the core status and code", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = coreReply(409, { detail: { code: "track_name_taken", message: "taken" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = await chrome.send({ type: "panel:createTrack", input: { name: "Rust", deadline: "2026-12-01" } });
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "track_name_taken" });
+  });
+
+  it("track, exam and ignored messages without a session reply with the auth error", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea()));
+    expect(await chrome.send({ type: "panel:tracks" })).toEqual({ ok: false, error: "not signed in" });
+    expect(await chrome.send({ type: "panel:ignored" })).toEqual({ ok: false, error: "not signed in" });
+    expect(await chrome.send({ type: "panel:dismissExamResult", resultId: 2 })).toEqual({ ok: false, error: "not signed in" });
+  });
+});
+
 describe("sign-in, server change and disconnect", () => {
   afterEach(() => {
     vi.restoreAllMocks();

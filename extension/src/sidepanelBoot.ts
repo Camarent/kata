@@ -2,6 +2,7 @@ import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, Panel
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
+import type { DecisionPoint, ExamResult, IgnoredConcept, Track, TrackPage } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
@@ -70,6 +71,16 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.coursesFailed = false;
     state.tab = "scan";
     state.status = { kind: "idle" };
+  };
+
+  /** Sends one panel message and returns its data; a core refusal keeps its status and code. */
+  const send = async <T>(message: PanelMessage): Promise<T> => {
+    const reply = await api.runtime.sendMessage(message);
+    if (!reply.ok) {
+      if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
+      throw new Error(reply.error);
+    }
+    return reply.data as T;
   };
 
   const handlers: PanelHandlers = {
@@ -222,6 +233,21 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       if (!reply.ok) throw new Error(reply.error);
       return reply.data as ModelhostResult;
     },
+
+    onLoadTracks: (opts) => send<TrackPage>({ type: "panel:tracks", limit: opts?.limit, beforeId: opts?.beforeId }),
+    onGetTrack: (trackId) => send<Track>({ type: "panel:getTrack", trackId }),
+    onCreateTrack: (input) => send<Track>({ type: "panel:createTrack", input }),
+    onPatchTrack: (trackId, patch) => send<Track>({ type: "panel:patchTrack", trackId, patch }),
+    onDeleteTrack: (trackId) => send<void>({ type: "panel:deleteTrack", trackId }),
+    onAddDecisionPoint: (trackId, input) => send<DecisionPoint>({ type: "panel:addDecisionPoint", trackId, input }),
+    onAddQuizSource: (url) => send<number>({ type: "panel:addQuizSource", url }),
+    onImportExamResult: (payload) => send<ExamResult>({ type: "panel:importExamResult", payload }),
+    onConfirmExamResult: (resultId, conceptIds) =>
+      send<ExamResult>({ type: "panel:confirmExamResult", resultId, conceptIds }),
+    onDismissExamResult: (resultId) => send<ExamResult>({ type: "panel:dismissExamResult", resultId }),
+    onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
+    onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
+    onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
   };
 
   // The origin permission was removed (here or in the browser UI): fall back to first-run.
