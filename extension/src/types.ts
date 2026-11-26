@@ -1,6 +1,3 @@
-import type { ScriptingLike } from "./bridgeRegister";
-import type { PanelOpenApi } from "./browser";
-import type { ContentMessage, RuntimeLike } from "./content";
 import type { ModelhostEngine, ModelhostOutput } from "./coreClient";
 import type {
   ConceptAlias,
@@ -132,22 +129,4 @@ export interface PanelHandlers {
   onCachedSummary?: (url: string, textSha256: string) => Promise<string | null>;
   onNextJoke?: () => Promise<Joke | null>;
   onListJokeSources?: () => Promise<JokeSource[]>;
-}
-
-/** Reply to a panel message: the result, or the error text; `status` and `code` are set when the core refused it (CoreHttpError). */
-export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string; status?: number; code?: string };
-
-/** The part of `chrome` the background script uses; tests pass a fake with these members. */
-export interface ChromeLike extends PanelOpenApi {
-  action: {
-    onClicked: { addListener(listener: (tab: { windowId?: number }) => void): void };
-  };
-  tabs: {
-    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]>;
-    sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
-    create(properties: { url: string }): Promise<unknown>;
-    onUpdated: { addListener(listener: (tabId: number, changes: { url?: string }) => void): void };
-  };
-  runtime: RuntimeLike;
-  scripting: ScriptingLike;
 }

@@ -1,36 +1,13 @@
-import { applyHighlights, clearHighlights, type HighlightResult } from "./highlight";
+import { applyHighlights, clearHighlights } from "./highlight";
 import { scanBlocks } from "./scanner";
 import type { StorageArea } from "./tokenStore";
 import { CARD_CSS } from "./ui/cardCss";
 import { mountCardHost, type CardHost, type CardRuntime } from "./cardHost";
 import { mountPin, type Pin } from "./ui/card/pin";
 import { PinPositionStore } from "./ui/card/pinPosition";
+import type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./messages";
 
-/** Message the side panel sends to the page through the background script. */
-export type ContentMessage =
-  | { type: "scan" }
-  | { type: "highlight"; results: HighlightResult[] }
-  | { type: "clear" }
-  | { type: "watch" }
-  | { type: "unwatch" };
-
-/** Sent by the page to the background script after a DOM change while watched. */
-export interface PageMutatedMessage {
-  type: "page:mutated";
-}
-
-/** Answer to `scan`: the page blocks, id and text only (no DOM references). */
-export interface ScanResponse {
-  blocks: { id: string; text: string }[];
-}
-
-/** Minimal shape of the `chrome.runtime` messaging API used here. */
-export interface RuntimeLike {
-  onMessage: {
-    addListener(listener: (message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | void): void;
-  };
-  sendMessage(message: PageMutatedMessage): Promise<unknown>;
-}
+export type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./messages";
 
 /**
  * Starts a mutation observer on the page body; `onChange` runs on each batch of changes. Changes

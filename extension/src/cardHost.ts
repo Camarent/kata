@@ -7,7 +7,7 @@ import { renderPageChanged } from "./ui/overlay/pageChanged";
 import { scanBlocks } from "./scanner";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
 import type { Joke, SummaryReply } from "./coreClientTypes";
-import type { PanelReply } from "./background";
+import type { PanelReply } from "./messages";
 
 /** The part of `chrome.runtime` the card needs: send one message to the background script. */
 export interface CardRuntime {

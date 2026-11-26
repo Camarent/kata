@@ -1,5 +1,4 @@
-import type { ChromeLike } from "./background";
-import type { ScanResponse } from "./content";
+import type { ChromeLike, ScanResponse } from "./messages";
 import type { CoreClient } from "./coreClient";
 import { runConceptScan, type ConceptScanError, type ConceptScanResult } from "./conceptScan";
 import { createRescanner, mergeMarks, type Rescanner } from "./rescan";
