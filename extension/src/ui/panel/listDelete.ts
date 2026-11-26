@@ -1,10 +1,10 @@
 import { askConfirm } from "../confirm";
 import { button, el } from "../dom";
-import { TEXT_LIST_DELETE, TEXT_PIN } from "../strings";
+import { LIST_DELETE_TEXT, PIN_TEXT } from "../strings";
 import { type Clock, deferCommit, type DeferredCommit } from "../undo";
 
-const [QUESTION, NOTE, DELETE, CANCEL, ERROR] = TEXT_LIST_DELETE;
-const UNDO = TEXT_PIN[6];
+const { question: QUESTION, note: NOTE, delete: DELETE, cancel: CANCEL, error: ERROR } = LIST_DELETE_TEXT;
+const UNDO = PIN_TEXT.undo;
 
 /** Props of the delete-list screen: whether the last delete failed. */
 export interface ListDeleteProps {

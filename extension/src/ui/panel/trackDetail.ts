@@ -1,25 +1,25 @@
 import { el } from "../dom";
-import { TEXT_SIGNIN, TEXT_TRACK_DETAIL } from "../strings";
+import { SIGNIN_TEXT, TRACK_DETAIL_TEXT } from "../strings";
 import type { TrackScreenState } from "./tracksTab";
 
-// Indexes into TEXT_TRACK_DETAIL (strings.ts); the sort and exam labels are not used on this screen.
-const [
-  TITLE,
-  GOAL_LABEL,
-  DEADLINE_LABEL,
-  PROGRESS_LABEL,
-  VELOCITY_LABEL,
-  FINISH_EARLY,
-  TOO_SLOW,
-  DROP_REASON,
-  SOURCES,
-  ADD_SOURCE,
-] = TEXT_TRACK_DETAIL;
-const QUIZ = TEXT_TRACK_DETAIL[11];
-const BACK = TEXT_TRACK_DETAIL[27];
-const NO_SOURCES = TEXT_TRACK_DETAIL[28];
-const LOAD_FAILED = TEXT_TRACK_DETAIL[29];
-const UNREACHABLE = TEXT_SIGNIN[8];
+// The sort and exam labels of TRACK_DETAIL_TEXT are not used on this screen.
+const {
+  title: TITLE,
+  goal: GOAL_LABEL,
+  deadline: DEADLINE_LABEL,
+  progress: PROGRESS_LABEL,
+  velocity: VELOCITY_LABEL,
+  finishEarly: FINISH_EARLY,
+  tooSlow: TOO_SLOW,
+  dropReason: DROP_REASON,
+  sources: SOURCES,
+  addSource: ADD_SOURCE,
+  quiz: QUIZ,
+  back: BACK,
+  noSources: NO_SOURCES,
+  loadFailed: LOAD_FAILED,
+} = TRACK_DETAIL_TEXT;
+const UNREACHABLE = SIGNIN_TEXT.unreachable;
 
 /** The track as the detail screen shows it. Progress and velocity are display text from the core. */
 export interface TrackDetailView {

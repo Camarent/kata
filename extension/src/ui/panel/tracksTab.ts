@@ -1,12 +1,21 @@
 import { el } from "../dom";
-import { TEXT_SIGNIN, TEXT_TRACKS_TAB } from "../strings";
+import { SIGNIN_TEXT, TRACKS_TAB_TEXT } from "../strings";
 
-const [TITLE, EMPTY, OPEN, NEW_TRACK, SORT_BY, NAME_SORT, ADDED_SORT, VIEWED_SORT, RELEVANCE_SORT] = TEXT_TRACKS_TAB;
-// Indexes into TEXT_TRACKS_TAB: the A to Z ... Least relevant labels are not used here.
-const PROGRESS = TEXT_TRACKS_TAB[17];
-const TOO_SLOW = TEXT_TRACKS_TAB[19];
-const LOAD_FAILED = TEXT_TRACKS_TAB[20];
-const UNREACHABLE = TEXT_SIGNIN[8];
+const {
+  title: TITLE,
+  empty: EMPTY,
+  open: OPEN,
+  newTrack: NEW_TRACK,
+  sortBy: SORT_BY,
+  nameSort: NAME_SORT,
+  addedSort: ADDED_SORT,
+  viewedSort: VIEWED_SORT,
+  relevanceSort: RELEVANCE_SORT,
+  progress: PROGRESS,
+  tooSlow: TOO_SLOW,
+  loadFailed: LOAD_FAILED,
+} = TRACKS_TAB_TEXT;
+const UNREACHABLE = SIGNIN_TEXT.unreachable;
 
 /** What the tracks tab shows: a list, or one of the states from the inventory. */
 export type TrackScreenState = "ready" | "empty" | "loading" | "error" | "offline";

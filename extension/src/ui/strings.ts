@@ -664,3 +664,98 @@ export const TEXT_PAGE_CHANGED = [
   "Back",
 ] as const;
 
+/** Named panel strings: the panel files read these by key, not by TEXT_<ID> position. Each value is one entry of the named TEXT_ array. */
+export const IGNORED_LIST_TEXT = {
+  title: TEXT_IGNORED_LIST[0],
+  note: TEXT_IGNORED_LIST[1],
+  empty: TEXT_IGNORED_LIST[2],
+  restore: TEXT_IGNORED_LIST[3],
+  back: TEXT_IGNORED_LIST[4],
+  topic: TEXT_IGNORED_LIST[5],
+  word: TEXT_IGNORED_LIST[6],
+  restored: TEXT_IGNORED_LIST[7],
+} as const;
+
+export const COURSE_DETAIL_TEXT = {
+  preview: TEXT_COURSE_DETAIL[0],
+  startNote: TEXT_COURSE_DETAIL[1],
+  changeStart: TEXT_COURSE_DETAIL[2],
+  openPage: TEXT_COURSE_DETAIL[3],
+  regenerate: TEXT_COURSE_DETAIL[4],
+  startExam: TEXT_COURSE_DETAIL[5],
+  back: TEXT_COURSE_DETAIL[6],
+  loadFailed: TEXT_COURSE_DETAIL[8],
+} as const;
+
+export const COURSE_GENERATE_TEXT = {
+  serverDown: TEXT_COURSE_GENERATE[10],
+} as const;
+
+export const COURSE_REGENERATE_TEXT = {
+  heading: TEXT_COURSE_REGENERATE[0],
+  warning: TEXT_COURSE_REGENERATE[1],
+  carried: TEXT_COURSE_REGENERATE[2],
+  carriedNote: TEXT_COURSE_REGENERATE[3],
+  new: TEXT_COURSE_REGENERATE[4],
+  newNote: TEXT_COURSE_REGENERATE[5],
+  start: TEXT_COURSE_REGENERATE[6],
+  submit: TEXT_COURSE_REGENERATE[7],
+  cancel: TEXT_COURSE_REGENERATE[8],
+  failed: TEXT_COURSE_REGENERATE[9],
+} as const;
+
+export const SIGNIN_TEXT = {
+  unreachable: TEXT_SIGNIN[8],
+} as const;
+
+export const TRACK_DETAIL_TEXT = {
+  title: TEXT_TRACK_DETAIL[0],
+  goal: TEXT_TRACK_DETAIL[1],
+  deadline: TEXT_TRACK_DETAIL[2],
+  progress: TEXT_TRACK_DETAIL[3],
+  velocity: TEXT_TRACK_DETAIL[4],
+  finishEarly: TEXT_TRACK_DETAIL[5],
+  tooSlow: TEXT_TRACK_DETAIL[6],
+  dropReason: TEXT_TRACK_DETAIL[7],
+  sources: TEXT_TRACK_DETAIL[8],
+  addSource: TEXT_TRACK_DETAIL[9],
+  quiz: TEXT_TRACK_DETAIL[11],
+  back: TEXT_TRACK_DETAIL[27],
+  noSources: TEXT_TRACK_DETAIL[28],
+  loadFailed: TEXT_TRACK_DETAIL[29],
+} as const;
+
+export const TRACKS_TAB_TEXT = {
+  title: TEXT_TRACKS_TAB[0],
+  empty: TEXT_TRACKS_TAB[1],
+  open: TEXT_TRACKS_TAB[2],
+  newTrack: TEXT_TRACKS_TAB[3],
+  sortBy: TEXT_TRACKS_TAB[4],
+  nameSort: TEXT_TRACKS_TAB[5],
+  addedSort: TEXT_TRACKS_TAB[6],
+  viewedSort: TEXT_TRACKS_TAB[7],
+  relevanceSort: TEXT_TRACKS_TAB[8],
+  progress: TEXT_TRACKS_TAB[17],
+  tooSlow: TEXT_TRACKS_TAB[19],
+  loadFailed: TEXT_TRACKS_TAB[20],
+} as const;
+
+export const TRACK_CREATE_TEXT = {
+  title: TEXT_TRACK_CREATE[0],
+  nameLabel: TEXT_TRACK_CREATE[1],
+  goalLabel: TEXT_TRACK_CREATE[2],
+  deadlineLabel: TEXT_TRACK_CREATE[3],
+  budgetLabel: TEXT_TRACK_CREATE[4],
+  create: TEXT_TRACK_CREATE[5],
+  cancel: TEXT_TRACK_CREATE[6],
+  failed: TEXT_TRACK_CREATE[7],
+} as const;
+
+export const LIST_DELETE_TEXT = {
+  question: TEXT_LIST_DELETE[0],
+  note: TEXT_LIST_DELETE[1],
+  delete: TEXT_LIST_DELETE[2],
+  cancel: TEXT_LIST_DELETE[3],
+  error: TEXT_LIST_DELETE[4],
+} as const;
+

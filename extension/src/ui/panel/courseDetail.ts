@@ -2,23 +2,31 @@ import type { PanelHandlers } from "../../types";
 import type { CourseSummary } from "../../coreClient";
 import { CoreOfflineError } from "../../coreClient";
 import { el } from "../dom";
-import { TEXT_COURSE_DETAIL, TEXT_COURSE_GENERATE, TEXT_COURSE_REGENERATE } from "../strings";
+import { COURSE_DETAIL_TEXT, COURSE_GENERATE_TEXT, COURSE_REGENERATE_TEXT } from "../strings";
 
-const [PREVIEW, START_NOTE, CHANGE_START, OPEN_PAGE, REGENERATE, START_EXAM, BACK, , LOAD_FAILED] =
-  TEXT_COURSE_DETAIL;
-const [
-  REGEN_HEADING,
-  REGEN_WARNING,
-  CARRIED,
-  CARRIED_NOTE,
-  NEW,
-  NEW_NOTE,
-  REGEN_START,
-  REGEN_SUBMIT,
-  REGEN_CANCEL,
-  REGEN_FAILED,
-] = TEXT_COURSE_REGENERATE;
-const SERVER_DOWN_LABEL = TEXT_COURSE_GENERATE[10];
+const {
+  preview: PREVIEW,
+  startNote: START_NOTE,
+  changeStart: CHANGE_START,
+  openPage: OPEN_PAGE,
+  regenerate: REGENERATE,
+  startExam: START_EXAM,
+  back: BACK,
+  loadFailed: LOAD_FAILED,
+} = COURSE_DETAIL_TEXT;
+const {
+  heading: REGEN_HEADING,
+  warning: REGEN_WARNING,
+  carried: CARRIED,
+  carriedNote: CARRIED_NOTE,
+  new: NEW,
+  newNote: NEW_NOTE,
+  start: REGEN_START,
+  submit: REGEN_SUBMIT,
+  cancel: REGEN_CANCEL,
+  failed: REGEN_FAILED,
+} = COURSE_REGENERATE_TEXT;
+const SERVER_DOWN_LABEL = COURSE_GENERATE_TEXT.serverDown;
 
 /** Props of the course preview: the course and the two screen exits. */
 export interface CourseDetailProps {

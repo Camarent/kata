@@ -1,9 +1,18 @@
 import { CoreOfflineError, CoreTimeoutError } from "../../coreClient";
 import { el } from "../dom";
-import { TEXT_SIGNIN, TEXT_TRACK_CREATE } from "../strings";
+import { SIGNIN_TEXT, TRACK_CREATE_TEXT } from "../strings";
 
-const [TITLE, NAME_LABEL, GOAL_LABEL, DEADLINE_LABEL, BUDGET_LABEL, CREATE, CANCEL, FAILED] = TEXT_TRACK_CREATE;
-const UNREACHABLE = TEXT_SIGNIN[8];
+const {
+  title: TITLE,
+  nameLabel: NAME_LABEL,
+  goalLabel: GOAL_LABEL,
+  deadlineLabel: DEADLINE_LABEL,
+  budgetLabel: BUDGET_LABEL,
+  create: CREATE,
+  cancel: CANCEL,
+  failed: FAILED,
+} = TRACK_CREATE_TEXT;
+const UNREACHABLE = SIGNIN_TEXT.unreachable;
 
 /** What the create form shows: the form itself, a failed save, or an offline core. */
 export type TrackCreateState = "form" | "error" | "offline";

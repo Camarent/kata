@@ -1,10 +1,19 @@
 import type { CoreClient } from "../../coreClient";
 import { button, el } from "../dom";
-import { TEXT_IGNORED_LIST, TEXT_PIN } from "../strings";
+import { IGNORED_LIST_TEXT, PIN_TEXT } from "../strings";
 
-const [TITLE, NOTE, EMPTY, RESTORE, BACK, TOPIC, WORD, RESTORED] = TEXT_IGNORED_LIST;
-// strings.ts is generated from the inventory, so the shared "Undo" is named once here, not read by index at use.
-const TEXT_UNDO = TEXT_PIN[6];
+const {
+  title: TITLE,
+  note: NOTE,
+  empty: EMPTY,
+  restore: RESTORE,
+  back: BACK,
+  topic: TOPIC,
+  word: WORD,
+  restored: RESTORED,
+} = IGNORED_LIST_TEXT;
+// The shared "Undo" is read by key from PIN_TEXT, not by index.
+const TEXT_UNDO = PIN_TEXT.undo;
 
 /** The two ignored calls of the core client that Restore and Undo use. */
 export type IgnoredClient = Pick<CoreClient, "ignoreConcept" | "unignoreConcept">;
