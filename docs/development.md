@@ -72,7 +72,7 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
 - `--ext`: extension build and tests, then editor build and tests.
 - `--editor`: editor build and tests only.
 - `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
-  without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md`.
+  without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md` (a11y, contrast and layout checks).
 
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
 `-m 'not flaky'`, extension build, extension test), each as a plain command. On a clean clone, run `scripts/dev/check-all.sh`.

@@ -42,13 +42,13 @@ export function renderSignIn(handlers: PanelHandlers, props: SignInScreenProps):
   device.name = "deviceLabel";
   device.type = "text";
   deviceLabel.append(device);
-  const submit = el("button", SUBMIT);
+  const submit = el("button", SUBMIT, "btn");
   submit.type = "submit";
   const error = el("p", undefined, "error");
   error.setAttribute("role", "alert");
   form.append(serverLabel, codeLabel, deviceLabel, submit);
   if (props.canCancel) {
-    const cancel = el("button", "Cancel");
+    const cancel = el("button", "Cancel", "btn");
     cancel.type = "button";
     cancel.addEventListener("click", () => handlers.onCancelChange());
     form.append(cancel);
@@ -87,7 +87,7 @@ export function renderSignIn(handlers: PanelHandlers, props: SignInScreenProps):
 export function renderSignedOut(props: SignedOutScreenProps, handlers: PanelHandlers): HTMLElement {
   const box = el("div", undefined, "signed-out");
   box.append(el("p", SIGNED_OUT, "signed-out-text"));
-  const signIn = el("button", SIGN_IN_BUTTON, "signed-out-sign-in");
+  const signIn = el("button", SIGN_IN_BUTTON, "btn signed-out-sign-in");
   signIn.type = "button";
   signIn.addEventListener("click", () => box.replaceWith(renderSignIn(handlers, { prefill: props.prefill, canCancel: false })));
   box.append(signIn, el("p", NEEDS_DEVICE, "signed-out-note"));

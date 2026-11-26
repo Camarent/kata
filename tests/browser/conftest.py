@@ -36,6 +36,8 @@ FIREFOX_EXTENSION_UUID = "6f1c3d2e-8a4b-4c5d-9e7f-0a1b2c3d4e5f"
 # long TMPDIR (a scratch dir) makes Chrome exit at start. Chrome gets its own short temp dir here.
 CHROME_TMP_ROOT = "/tmp"
 BROWSER_NAMES = ["firefox", "chrome"]
+# Firefox content-override value per colour scheme: 0 forces dark, 1 forces light.
+FIREFOX_SCHEME_OVERRIDE = {"dark": 0, "light": 1}
 
 
 class _QuietHandler(SimpleHTTPRequestHandler):
@@ -48,6 +50,13 @@ def browser_name(request: pytest.FixtureRequest) -> str:
     """The browser this case runs in: one case per entry of BROWSER_NAMES."""
     name: str = request.param
     return name
+
+
+@pytest.fixture
+def color_scheme(request: pytest.FixtureRequest) -> str:
+    """The prefers-color-scheme the driver forces: 'dark' unless a test parametrizes it indirectly."""
+    scheme: str = getattr(request, "param", "dark")
+    return scheme
 
 
 @pytest.fixture
@@ -113,11 +122,17 @@ def _load_chrome_extension(driver: Any, path: Path) -> None:
     import websocket
 
     debugger = driver.capabilities["goog:chromeOptions"]["debuggerAddress"]
-    with urllib.request.urlopen(f"http://{debugger}/json/version", timeout=CDP_TIMEOUT_SECONDS) as resp:
+    with urllib.request.urlopen(
+        f"http://{debugger}/json/version", timeout=CDP_TIMEOUT_SECONDS
+    ) as resp:
         ws_url = json.load(resp)["webSocketDebuggerUrl"]
     conn = websocket.create_connection(ws_url, timeout=CDP_TIMEOUT_SECONDS)
     try:
-        conn.send(json.dumps({"id": 1, "method": "Extensions.loadUnpacked", "params": {"path": str(path)}}))
+        conn.send(
+            json.dumps(
+                {"id": 1, "method": "Extensions.loadUnpacked", "params": {"path": str(path)}}
+            )
+        )
         while True:
             reply = json.loads(conn.recv())
             if reply.get("id") == 1:
@@ -129,7 +144,7 @@ def _load_chrome_extension(driver: Any, path: Path) -> None:
 
 
 @pytest.fixture
-def driver(browser_name: str) -> Iterator[Any]:
+def driver(browser_name: str, color_scheme: str) -> Iterator[Any]:
     """A headless selenium driver with the built extension loaded. Quit at teardown."""
     webdriver = pytest.importorskip("selenium.webdriver")
     if browser_name == "firefox":
@@ -145,8 +160,11 @@ def driver(browser_name: str) -> Iterator[Any]:
             "extensions.webextensions.uuids",
             json.dumps({FIREFOX_GECKO_ID: FIREFOX_EXTENSION_UUID}),
         )
-        # 0 = dark: every page this driver opens reports prefers-color-scheme: dark (see panel_page.py).
-        options.set_preference("layout.css.prefers-color-scheme.content-override", 0)
+        # 0 = dark, 1 = light: every page this driver opens reports the scheme (see panel_page.py).
+        options.set_preference(
+            "layout.css.prefers-color-scheme.content-override",
+            FIREFOX_SCHEME_OVERRIDE[color_scheme],
+        )
         service = FirefoxService(executable_path=str(geckodriver))
         drv = webdriver.Firefox(service=service, options=options)
         try:

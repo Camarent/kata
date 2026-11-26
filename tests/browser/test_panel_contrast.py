@@ -1,9 +1,9 @@
 """Browser a11y: WCAG 2.x contrast of the side panel sign-in view in dark mode.
 
-The panel is opened with prefers-color-scheme forced to dark. For each text element (labels, input
-text, button text, error text) the effective background is the first non-transparent background up
-the ancestor chain, or the canvas colour when none is set. A case skips, with the cause, when the
-browser does not report dark mode.
+The panel is opened with prefers-color-scheme forced to each scheme under test (dark and light). For
+each text element (labels, input text, button text, error text) the effective background is the
+first non-transparent background up the ancestor chain, or the canvas colour when none is set. A
+case skips, with the cause, when the browser does not report the forced scheme.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from browser.panel_page import force_dark_scheme, open_panel
+from browser.panel_page import force_scheme, open_panel
 
 # WCAG 2.x AA minimum contrast ratio for normal text.
 MIN_RATIO = 4.5
@@ -54,7 +54,8 @@ for (const [name, selector] of Object.entries(targets)) {
     background: effectiveBackground(el),
   }));
 }
-return { scheme: matchMedia('(prefers-color-scheme: dark)').matches, targets: out };
+const scheme = arguments[1];
+return { scheme: matchMedia('(prefers-color-scheme: ' + scheme + ')').matches, targets: out };
 """
 
 
@@ -87,24 +88,35 @@ def test_contrast_ratio_known_pairs() -> None:
     assert contrast_ratio((0x77, 0x77, 0x77), (255, 255, 255)) == pytest.approx(4.48, abs=0.01)
 
 
-def test_panel_signin_dark_theme_contrast(browser_name: str, driver: Any) -> None:
+@pytest.mark.parametrize("color_scheme", ["dark", "light"], indirect=True)
+def test_panel_signin_theme_contrast(browser_name: str, color_scheme: str, driver: Any) -> None:
     webdriver_support = pytest.importorskip("selenium.webdriver.support.ui")
-    force_dark_scheme(driver, browser_name)
+    force_scheme(driver, browser_name, color_scheme)
     open_panel(driver, browser_name)
-    observed = driver.execute_script(COLOURS, TEXT_TARGETS)
+    observed = driver.execute_script(COLOURS, TEXT_TARGETS, color_scheme)
     if not observed["scheme"]:
-        pytest.skip(f"{browser_name} did not force prefers-color-scheme: dark (matchMedia is false)")
+        pytest.skip(
+            f"{browser_name} did not force prefers-color-scheme: {color_scheme} (matchMedia is false)"
+        )
 
     driver.execute_script(f"document.querySelector('{SUBMIT_SELECTOR}').click()")
     wait = webdriver_support.WebDriverWait(driver, PANEL_WAIT_SECONDS)
-    wait.until(lambda d: d.execute_script(f"return !!document.querySelector('{ERROR_SELECTOR}').textContent"))
-    observed = driver.execute_script(COLOURS, TEXT_TARGETS)
+    wait.until(
+        lambda d: d.execute_script(
+            f"return !!document.querySelector('{ERROR_SELECTOR}').textContent"
+        )
+    )
+    observed = driver.execute_script(COLOURS, TEXT_TARGETS, color_scheme)
 
     failures = []
     for name, elements in observed["targets"].items():
         assert elements, f"no element matches {name}"
         for element in elements:
-            ratio = contrast_ratio(_parse_css_rgb(element["text"]), _parse_css_rgb(element["background"]))
+            ratio = contrast_ratio(
+                _parse_css_rgb(element["text"]), _parse_css_rgb(element["background"])
+            )
             if ratio < MIN_RATIO:
-                failures.append(f"{name}: {element['text']} on {element['background']} = {ratio:.2f}")
+                failures.append(
+                    f"{name}: {element['text']} on {element['background']} = {ratio:.2f}"
+                )
     assert not failures, failures
