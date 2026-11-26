@@ -625,3 +625,58 @@ describe("CoreClient scan calls", () => {
     });
   });
 });
+
+describe("CoreClient review calls", () => {
+  it("reviewTree gets /v1/review/tree with q, repeated states and ids, and returns the tree", async () => {
+    const tree = [
+      {
+        area: "Maths",
+        counts: { new: 1, learning: 0, known: 2 },
+        topics: [{ topicId: 3, topic: "Algebra", counts: { new: 1, learning: 0, known: 2 } }],
+      },
+    ];
+    const { fn, calls } = fakeFetch(200, tree);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    const result = await client.reviewTree({ q: "sum", states: ["new", "known"], ids: [4, 9] });
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/v1/review/tree?q=sum&state=new&state=known&ids=4%2C9`);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+    expect(result).toEqual(tree);
+  });
+
+  it("reviewTree with an empty ids set sends ids= and no filter when none is given", async () => {
+    const { fn, calls } = fakeFetch(200, []);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.reviewTree({ ids: [] })).toEqual([]);
+    expect(calls[0].url).toBe(`${BASE}/v1/review/tree?ids=`);
+    await client.reviewTree();
+    expect(calls[1].url).toBe(`${BASE}/v1/review/tree?`);
+  });
+
+  it("reviewConcepts gets /v1/review/concepts with filters, sort and order, and returns the rows", async () => {
+    const rows = [
+      {
+        concept_id: 7,
+        label: "sum",
+        state: "learning",
+        added_at: "2026-11-01T00:00:00",
+        last_viewed_at: null,
+        relevance: 2,
+      },
+    ];
+    const { fn, calls } = fakeFetch(200, rows);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    const result = await client.reviewConcepts({
+      q: "su",
+      states: ["learning"],
+      ids: [7],
+      sort: "relevance",
+      order: "desc",
+    });
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(
+      `${BASE}/v1/review/concepts?q=su&state=learning&ids=7&sort=relevance&order=desc`,
+    );
+    expect(result).toEqual(rows);
+  });
+});
