@@ -1,0 +1,13 @@
+# knip --production unused files, known debt (A1 unmounted modules). One path per line, relative to extension/.
+# The gate fails on any unused file not listed here. Remove a line when its module is mounted or deleted.
+src/ui/card/focus.ts
+src/ui/card/jokeCloud.ts
+src/ui/overlay/blockMenu.ts
+src/ui/overlay/hlMenu.ts
+src/ui/overlay/imageMenu.ts
+src/ui/overlay/listPicker.ts
+src/ui/overlay/quizPin.ts
+src/ui/overlay/whichOne.ts
+src/ui/panel/coursePage.ts
+src/ui/panel/examResult.ts
+src/ui/panel/examRun.ts

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "build/build.mjs!",
+    "tools-js/baseline-gate.mjs!",
+    "src/background.ts!",
+    "src/content.ts!",
+    "src/bridge.ts!",
+    "src/sidepanelBoot.ts!"
+  ]
+}

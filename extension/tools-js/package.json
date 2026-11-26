@@ -1,0 +1,12 @@
+{
+  "name": "kata-extension-tools",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Isolated JS audit tools (madge, knip). Own tree: typescript 5 here, not the extension typescript 7.",
+  "devDependencies": {
+    "knip": "^6",
+    "madge": "^8",
+    "typescript": "^5"
+  }
+}
