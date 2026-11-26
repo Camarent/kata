@@ -150,3 +150,34 @@ describe("createRescanner", () => {
     expect(observer.stopped).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("createRescanner with a DOM observer", () => {
+  it("a DOM mutation after load triggers one debounced rescan", async () => {
+    const clock = fakeClock();
+    const onRescan = vi.fn();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const rescanner = createRescanner({
+      observe(onMutation) {
+        const mo = new MutationObserver(() => onMutation());
+        mo.observe(host, { childList: true, subtree: true, characterData: true });
+        return () => mo.disconnect();
+      },
+      debounceMs: 100,
+      setTimer: clock.setTimer,
+      clearTimer: clock.clearTimer,
+      onRescan,
+    });
+    try {
+      host.appendChild(document.createElement("span"));
+      await Promise.resolve();
+      clock.advance(50);
+      expect(onRescan).not.toHaveBeenCalled();
+      clock.advance(50);
+      expect(onRescan).toHaveBeenCalledTimes(1);
+    } finally {
+      rescanner.stop();
+      host.remove();
+    }
+  });
+});
