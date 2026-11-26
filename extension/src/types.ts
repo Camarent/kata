@@ -56,8 +56,13 @@ export interface ServerFormInput extends SignInInput {
   baseUrl: string;
 }
 
+/** Tabs of the signed-in panel. Lists is a section inside the Courses tab (design note D10). */
+export type PanelTab = "scan" | "review" | "courses" | "tracks" | "settings";
+
 /** User actions the panel reports back to the caller. */
 export interface PanelHandlers {
+  /** The user chose a tab. */
+  onTab: (tab: PanelTab) => void | Promise<void>;
   onSignIn: (input: ServerFormInput) => void | Promise<void>;
   onDisconnect: () => void | Promise<void>;
   onChangeServer: () => void;

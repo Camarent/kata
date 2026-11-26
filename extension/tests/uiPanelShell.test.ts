@@ -9,6 +9,7 @@ const session = { baseUrl: "http://localhost:8000", token: "t" };
 
 function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
   return {
+    onTab: vi.fn(),
     onSignIn: vi.fn(),
     onDisconnect: vi.fn(),
     onChangeServer: vi.fn(),

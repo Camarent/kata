@@ -1,5 +1,5 @@
 import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply } from "./background";
-import { renderPanel, type PanelHandlers, type PanelRow, type PanelState, type ServerFormInput } from "./sidepanel";
+import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
 import type { MarkOutcome } from "./offlineQueue";
@@ -38,15 +38,17 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     rows: [],
     status: { kind: "idle" },
     review: null,
+    tab: "scan",
     courses: [],
   };
   const draw = (): void => renderPanel(root, state, handlers);
 
-  /** Ready courses, limit and total for the Courses section; a refused list leaves the section out. */
+  /** Ready courses for the Courses tab; a refused list leaves it empty and marks the load as failed. */
   const loadCourses = async (): Promise<void> => {
     const reply = await api.runtime.sendMessage({ type: "panel:courses" });
     const list = reply.ok ? (reply.data as CourseList | undefined) : undefined;
     state.courses = list && Array.isArray(list.items) ? list.items : [];
+    state.coursesFailed = !reply.ok;
     state.courseLimit = list?.limit;
     state.courseTotal = list?.total;
   };
@@ -65,8 +67,8 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.rows = [];
     state.review = null;
     state.courses = [];
-    state.courseLimit = undefined;
-    state.courseTotal = undefined;
+    state.coursesFailed = false;
+    state.tab = "scan";
     state.status = { kind: "idle" };
   };
 
@@ -152,10 +154,21 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       return reply.data as MarkOutcome;
     },
 
+    async onTab(tab: PanelTab) {
+      if (tab === "review") {
+        await handlers.onReview();
+        return;
+      }
+      state.review = null;
+      state.tab = tab;
+      draw();
+    },
+
     async onReview() {
       const reply = await api.runtime.sendMessage({ type: "panel:review" });
       if (reply.ok) {
         state.review = reply.data as ReviewRow[];
+        state.tab = "review";
       } else {
         state.status = { kind: "error", reason: "failed" };
       }
@@ -169,6 +182,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
 
     onCloseReview() {
       state.review = null;
+      state.tab = "scan";
       draw();
     },
 

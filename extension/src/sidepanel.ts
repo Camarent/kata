@@ -1,13 +1,15 @@
 import type { CourseLink, ModelhostRequest, ModelhostResult } from "./background";
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
-import type { Session } from "./types";
-import { courseErrorText, type ModelhostEngine } from "./coreClient";
-import { renderReview, type ReviewRow, type ReviewState } from "./reviewScreen";
-import { el } from "./ui/dom";
+import type { ModelhostEngine } from "./coreClient";
+import type { ReviewRow, Session } from "./types";
+import { button, el } from "./ui/dom";
+import { TEXT_SCAN_RESULTS } from "./ui/strings";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
 import { routeScreen } from "./ui/panel/router";
+import type { ScanResultsStatus } from "./ui/panel/scanResults";
+import { ERROR_TEXT, SCANNING_TEXT, partialText } from "./ui/panel/statusText";
 
 /** Group heading for rows whose block has no topic. */
 const UNTAGGED = "untagged";
@@ -30,17 +32,20 @@ type PanelStatus =
 
 /**
  * Everything the panel draws. `session` null means signed out. `changing` true shows the
- * sign-in form over a live session (change server). `review` non-null means the review screen.
- * `courses` empty means no Courses section.
+ * sign-in form over a live session (change server). `tab` is the current tab (default scan);
+ * `review` non-null shows the Review tab with those rows.
  */
 export interface PanelState {
   session: Session | null;
   rows: PanelRow[];
   status: PanelStatus;
   changing?: boolean;
+  tab?: PanelTab;
   review?: ReviewRow[] | null;
   courses?: CourseLink[];
-  /** Course limit of the server; the Courses section shows "n of limit" when it is above 0. */
+  /** True when the courses could not be loaded; the Courses tab then shows its could-not-load text. */
+  coursesFailed?: boolean;
+  /** Course limit of the server; the Courses tab shows "n of limit" when it is above 0. */
   courseLimit?: number;
   /** Courses counted against the limit; defaults to the number of listed courses. */
   courseTotal?: number;
@@ -50,15 +55,8 @@ export interface PanelState {
   queue?: QueuedMarkView[] | null;
 }
 
-import type { PanelHandlers, ServerFormInput, SignInInput } from "./types";
-export type { PanelHandlers, ServerFormInput, SignInInput } from "./types";
-
-/** User-facing text for each error reason. */
-const ERROR_TEXT: Record<"timeout" | "auth" | "failed", string> = {
-  timeout: "Core did not answer in time",
-  auth: "Sign-in failed or expired",
-  failed: "Something went wrong",
-};
+import type { PanelHandlers, PanelTab, ServerFormInput, SignInInput } from "./types";
+export type { PanelHandlers, PanelTab, ServerFormInput, SignInInput } from "./types";
 
 /** Status line text; errors name the cause in plain words. */
 function statusText(status: PanelStatus): string {
@@ -66,9 +64,9 @@ function statusText(status: PanelStatus): string {
     case "idle":
       return "";
     case "scanning":
-      return "scanning";
+      return SCANNING_TEXT;
     case "partial":
-      return `partial: ${status.done} of ${status.total}`;
+      return partialText(status.done, status.total);
     case "error":
       return ERROR_TEXT[status.reason];
     case "notice":
@@ -128,110 +126,6 @@ function renderGroups(rows: PanelRow[], handlers: PanelHandlers): HTMLElement {
     root.append(section);
   }
   return root;
-}
-
-/** Native button with an accessible label that names the course. */
-function courseButton(text: string, label: string, hidden = false): HTMLButtonElement {
-  const button = el("button", text);
-  button.type = "button";
-  button.setAttribute("aria-label", label);
-  button.hidden = hidden;
-  return button;
-}
-
-/**
- * Create-course form: a title input and a Create button. A blank title is not sent. The input clears
- * on click; a failed create shows its text (courseErrorText) in the note and the button is disabled while it runs.
- */
-function renderCreateCourse(handlers: PanelHandlers): HTMLFormElement {
-  const form = el("form", undefined, "create-course");
-  const titleLabel = el("label", "New course title");
-  const title = el("input");
-  title.name = "courseTitle";
-  title.type = "text";
-  titleLabel.append(title);
-  const submit = el("button", "Create course");
-  submit.type = "submit";
-  const note = el("p", undefined, "course-note");
-  note.setAttribute("role", "alert");
-  form.append(titleLabel, submit, note);
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const text = title.value.trim();
-    if (text === "") return;
-    title.value = "";
-    note.textContent = "";
-    submit.disabled = true;
-    try {
-      await handlers.onCreateCourse(text);
-    } catch (err) {
-      note.textContent = courseErrorText(err);
-    } finally {
-      submit.disabled = false;
-    }
-  });
-  return form;
-}
-
-/**
- * Courses section: per course an "Open course" button and a Delete button, then the create-course form.
- * Delete asks first: "Confirm delete" and "Cancel" replace it. A failed open or delete shows its error text in the note.
- */
-function renderCourses(state: PanelState, handlers: PanelHandlers): HTMLElement {
-  const courses = state.courses ?? [];
-  const section = el("section", undefined, "courses");
-  section.append(el("h2", "Courses"));
-  if ((state.courseLimit ?? 0) > 0) {
-    const total = state.courseTotal ?? courses.length;
-    section.append(el("p", `${total} of ${state.courseLimit}`, "course-limit"));
-  }
-  const ul = el("ul");
-  for (const course of courses) {
-    const item = el("li", undefined, "course");
-    const open = courseButton("Open course", `Open ${course.title}`);
-    const remove = courseButton("Delete", `Delete ${course.title}`);
-    const confirm = courseButton("Confirm delete", `Confirm delete of ${course.title}`, true);
-    const cancel = courseButton("Cancel", `Cancel delete of ${course.title}`, true);
-    const note = el("span", undefined, "note");
-    const showDelete = (): void => {
-      remove.hidden = false;
-      confirm.hidden = true;
-      cancel.hidden = true;
-      confirm.disabled = false;
-      cancel.disabled = false;
-    };
-    open.addEventListener("click", async () => {
-      open.disabled = true;
-      try {
-        await handlers.onOpenCourse(course.id);
-        note.textContent = "opened";
-      } catch (err) {
-        note.textContent = err instanceof Error ? err.message : String(err);
-        open.disabled = false;
-      }
-    });
-    remove.addEventListener("click", () => {
-      note.textContent = "";
-      remove.hidden = true;
-      confirm.hidden = false;
-      cancel.hidden = false;
-    });
-    cancel.addEventListener("click", showDelete);
-    confirm.addEventListener("click", async () => {
-      confirm.disabled = true;
-      cancel.disabled = true;
-      try {
-        await handlers.onDeleteCourse(course.id);
-      } catch (err) {
-        note.textContent = err instanceof Error ? err.message : String(err);
-        showDelete();
-      }
-    });
-    item.append(el("span", course.title, "course-title"), open, remove, confirm, cancel, note);
-    ul.append(item);
-  }
-  section.append(ul, renderCreateCourse(handlers));
-  return section;
 }
 
 /** Engines the "Use engine" choice offers, in menu order. */
@@ -312,19 +206,73 @@ function renderLocalModel(handlers: PanelHandlers): HTMLElement {
   return section;
 }
 
-/** Review screen: a Back button to the scan view, then one row per concept. */
-function renderReviewView(rows: ReviewRow[], handlers: PanelHandlers): HTMLElement {
-  const view = el("div", undefined, "review-view");
-  const back = el("button", "Back", "back");
-  back.type = "button";
-  back.addEventListener("click", () => handlers.onCloseReview());
-  const list = el("div");
-  renderReview(list, rows, { onSet: handlers.onSetConcept });
-  view.append(back, list);
-  return view;
+/** Tabs in bar order, with the label each shows (labels come from the Scan results inventory text). */
+const TABS: [PanelTab, string][] = [
+  ["scan", TEXT_SCAN_RESULTS[0]],
+  ["review", TEXT_SCAN_RESULTS[23]],
+  ["courses", TEXT_SCAN_RESULTS[24]],
+  ["tracks", TEXT_SCAN_RESULTS[25]],
+  ["settings", TEXT_SCAN_RESULTS[26]],
+];
+
+/** Tab bar: one button per tab; the current one carries aria-current. */
+function renderTabBar(current: PanelTab, handlers: PanelHandlers): HTMLElement {
+  const bar = el("nav", undefined, "tabs");
+  for (const [tab, label] of TABS) {
+    const item = button(label, () => void handlers.onTab(tab), `tab tab-${tab}`);
+    if (tab === current) item.setAttribute("aria-current", "page");
+    bar.append(item);
+  }
+  return bar;
 }
 
-/** Draws the panel into root: sign-in form when signed out, else status and grouped results. */
+/** Scan tab: the scan-results screen, the status line, then the grouped rows with "I know this". */
+function renderScanTab(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  const tab = el("div", undefined, "scan-tab");
+  const scanning = state.status.kind === "scanning";
+  const empty = state.rows.length === 0 && state.status.kind === "idle";
+  const status: ScanResultsStatus = scanning ? "loading" : empty ? "empty" : "ready";
+  const screen = routeScreen("scan-results", { status, rows: [] }, handlers);
+  // A scan in flight disables the button; the boot script also ignores a second call.
+  const scanButton = screen.querySelector<HTMLButtonElement>("button.scan-page");
+  if (scanButton !== null) scanButton.disabled = scanning;
+  tab.append(screen, el("p", statusText(state.status), "status"));
+  if (!empty) tab.append(renderGroups(state.rows, handlers));
+  return tab;
+}
+
+/** Courses tab: the ready courses with Open course and Delete; Generate course is fed by the courses task. */
+function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  const props = {
+    courses: state.courses ?? [],
+    courseLimit: state.courseLimit,
+    courseTotal: state.courseTotal,
+    loadFailed: state.coursesFailed === true,
+    serverDown: state.link?.serverUp === false,
+    onGenerate: () => {},
+  };
+  return routeScreen("courses-tab", props, handlers);
+}
+
+/** Tracks tab: loading until the tracks task feeds rows and actions. */
+function renderTracksView(): HTMLElement {
+  const actions = { onOpen: () => {}, onNew: () => {}, onSort: () => {} };
+  return routeScreen("tracks-tab", { state: "loading", rows: [], sort: "name" }, actions);
+}
+
+/** Settings tab: the settings home, then the local model section. */
+function renderSettingsView(handlers: PanelHandlers): HTMLElement {
+  const tab = el("div", undefined, "settings-tab");
+  tab.append(routeScreen("settings-home", undefined, { onOpen: () => {} }), renderLocalModel(handlers));
+  return tab;
+}
+
+/** Tab the panel shows: the review rows win over the stored tab. */
+function currentTab(state: PanelState): PanelTab {
+  return state.review != null ? "review" : (state.tab ?? "scan");
+}
+
+/** Draws the panel into root: sign-in form when signed out, else the tab bar and the current tab's screen. */
 export function renderPanel(root: HTMLElement, state: PanelState, handlers: PanelHandlers): void {
   root.replaceChildren();
   if (state.session === null || state.changing) {
@@ -340,32 +288,23 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
     }
     return;
   }
-  if (state.review != null) {
-    root.append(renderReviewView(state.review, handlers));
-    return;
-  }
   if (state.queue != null) {
     root.append(routeScreen("offline-queue", { marks: state.queue }, handlers));
     return;
   }
+  const tab = currentTab(state);
   root.append(renderConnection(state.session, handlers));
   if (state.link !== undefined) root.append(routeScreen("conn-detail", state.link, handlers));
-  const review = el("button", "Review concepts", "review-open");
-  review.type = "button";
-  review.addEventListener("click", () => void handlers.onReview());
-  root.append(review);
-  const scan = el("button", "Scan this page", "scan");
-  scan.type = "button";
-  // A scan in flight disables the button; the boot script also ignores a second call.
-  scan.disabled = state.status.kind === "scanning";
-  scan.addEventListener("click", () => void handlers.onScan());
-  root.append(scan);
-  root.append(el("p", statusText(state.status), "status"));
-  root.append(renderCourses(state, handlers));
-  root.append(renderLocalModel(handlers));
-  if (state.rows.length === 0 && state.status.kind === "idle") {
-    root.append(el("p", "Nothing scanned yet", "empty"));
-    return;
+  root.append(renderTabBar(tab, handlers));
+  if (tab === "review") {
+    root.append(routeScreen("review", state.review ?? [], { onSet: handlers.onSetConcept }));
+  } else if (tab === "courses") {
+    root.append(renderCoursesView(state, handlers));
+  } else if (tab === "tracks") {
+    root.append(renderTracksView());
+  } else if (tab === "settings") {
+    root.append(renderSettingsView(handlers));
+  } else {
+    root.append(renderScanTab(state, handlers));
   }
-  root.append(renderGroups(state.rows, handlers));
 }
