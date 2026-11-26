@@ -60,6 +60,12 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
   - `extension/src/ui/overlay/` page overlay (`whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`, `hlMenu.ts`, `listPicker.ts`, `quizPin.ts`, `pageChanged.ts`).
   - Screen inventory: 48 screens on five surfaces (panel tab 22, floating card 9, settings page 8, page overlay 6, course page 3).
   - Tests: vitest per component state under `extension/tests/`; browser tests in `tests/browser/`.
+  - Mount status (M25 partial): the panel tab screens, `router.ts`, and the settings screens
+    (`settingsHome`, `settingsPages`, `ignoredList`) are mounted in `sidepanel.ts` with stub handlers
+    and placeholder data (courses, tracks, settings home, scan results): they render, but their
+    actions do nothing yet. Not imported by the running extension: page overlays under `overlay/`
+    except `pageChanged.ts` (the only overlay `cardHost.ts` mounts), `card/focus.ts`, and the jokes
+    screen `card/jokeCloud.ts`. Wiring the rest is a follow-up before M26 (see `.notes/later.md`).
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
