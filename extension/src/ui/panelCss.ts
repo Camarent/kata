@@ -162,6 +162,7 @@ select { width: auto; min-height: 36px; min-width: 36px; }
 .rrow.sel .rname { background: var(--color-surface); border-color: var(--color-border); }
 .rrow .rname[aria-pressed="true"] { color: var(--color-text); background: var(--color-surface); border-color: var(--color-border); }
 .seg { display: inline-flex; gap: 2px; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .card-item { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-2); }
 .card-item.flash { border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent); }
 .bar { height: 8px; border-radius: 4px; background: var(--color-surface); border: 1px solid var(--color-border); overflow: hidden; min-width: 80px; }
