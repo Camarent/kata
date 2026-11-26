@@ -64,7 +64,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
 - `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page; static mockups in `docs/design/extension-ui/` (`panel-states.html`, `lesson-page.html`, `tokens.css`). Not shipped in the extension build; checked by `tests/scripts/test_extension_ui_design.py` and `tests/scripts/test_lesson_page_mockup.py`.
-- `extension/src/offlineQueue.ts` - queues mark presses while the core is unreachable.
+- `extension/src/offlineQueue.ts` - queues mark presses (topic and concept marks) while the core is unreachable, in order, under `kata.markQueue`; the legacy `kata.pending` topic list is converted on first read (`:185-197`).
+- Review client (M24): `extension/src/coreClient.ts:314` `reviewTree(filter)` and `:319` `reviewConcepts(filter)` call `GET /v1/review/tree` and `GET /v1/review/concepts`; the query string comes from `reviewQuery` (`:503`).
 
 ## Invariants and gotchas
 - Clients talk to the core only over HTTP; the extension must fall back to cache with a short timeout (see `docs/design/overview.md`).

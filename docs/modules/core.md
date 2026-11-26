@@ -384,3 +384,11 @@ Invariants and gotchas:
 - `GET /jokes/next` refills even when it answers 404 `no joke cached`: the 404 is a response, not an exception, so the queued refill commits.
 - `[jokes] enabled` false turns the route into 404 `jokes disabled` and the sources list into `[]`.
 - Tests: `tests/core/test_api_jokes.py`, `tests/core/test_jokes_job.py`, `tests/core/test_jokes_hostile.py`, `tests/core/test_jokes_sanitise.py`, `tests/core/test_jokes_sources.py`, `tests/core/test_jokes_config.py`, `tests/core/test_joke_cache_schema.py`, `tests/core/test_jokes_isolation.py`.
+
+## Review and OpenAPI (M24)
+
+- `core/kata_core/api/routes/review.py:24` router `/v1/review`: `:70` `GET /v1/review/tree` (`review_tree_route`), `:82` `GET /v1/review/concepts` (`review_concepts_route`); `ids` parsed by `_ids` (`:57`), 422 when not integers.
+- `core/kata_core/review/tree.py:80` `review_tree(conn, user_id, q, states, concept_ids)` builds the area > topic counts; `:112` `review_concepts(...)` returns the sorted rows; `:32` `_filtered` applies the shared filters.
+- `core/kata_core/storage/concept_rank.py:17` `UNMARKED` (`"new"`), `:19` `SortField`, `:20` `SortOrder`: the sort fields shared with `GET /concepts/sorted`.
+- `core/kata_core/api/openapi_export.py:20` `schema_text()` renders the app schema as sorted-key JSON; `:29` `main` writes `docs/openapi.json`. `tests/core/test_openapi_export.py` fails when the committed file drifts.
+- Tests: `tests/core/test_api_review.py`, `tests/core/test_review_tree.py`, `tests/core/test_openapi_export.py`.

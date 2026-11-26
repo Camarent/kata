@@ -268,9 +268,17 @@ Success criteria:
 
 Not in M23: the offline fallback list and the joke UI are M25.
 
-## Milestone 24: review and sync
+## Milestone 24: review and sync (shipped)
 
-**Scope.** Review API, search, filters and an offline queue.
+**Scope.** Review tree, name search, state filters, "Only this page", shared concept sort, concept list,
+the offline mark queue, and the OpenAPI export. Shipped:
+
+- Review tree `GET /v1/review/tree` (areas > topics with new, learning and known counts) and concept list
+  `GET /v1/review/concepts`, both filtered by name, state and `ids`; the list also sorts (see
+  [`decisions.md`](decisions.md), "Review API and offline mark queue").
+- Offline mark queue in the extension: marks made while the core is unreachable wait under `kata.markQueue`
+  and flush in order; the panel reads the pending count.
+- OpenAPI export of the core schema to `docs/openapi.json`, with a test that fails when it drifts.
 
 ## Milestone 25: UI implementation
 
