@@ -1,5 +1,5 @@
 import type { Session } from "../../types";
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import { el } from "../dom";
 import { TEXT_CONN_DETAIL } from "../strings";
 

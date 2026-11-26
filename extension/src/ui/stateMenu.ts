@@ -1,4 +1,4 @@
-import type { ReviewState } from "../reviewScreen";
+import type { ReviewState } from "../types";
 import { el } from "./dom";
 
 /** Menu order: New, Learning, Known. */

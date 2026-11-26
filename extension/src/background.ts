@@ -1,15 +1,13 @@
-import type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./content";
+import type { PageMutatedMessage, ScanResponse } from "./content";
 import type { BridgeMessage } from "./bridge";
-import { originOf, syncBridge, wireBridgeRegistration, type ScriptingLike } from "./bridgeRegister";
-import { openPanel, type PanelOpenApi } from "./browser";
+import { originOf, syncBridge, wireBridgeRegistration } from "./bridgeRegister";
+import { openPanel } from "./browser";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import {
   CoreAuthError,
   CoreClient,
   CoreHttpError,
   type ConceptMark,
-  type ModelhostEngine,
-  type ModelhostOutput,
   type ProgressDoc,
   type TopicOverview,
 } from "./coreClient";
@@ -18,25 +16,12 @@ import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
-import type { SignInInput } from "./sidepanel";
+import type { ChromeLike, ModelhostRequest, ModelhostResult, PanelReply, SignInInput } from "./types";
 import { validateServerUrl } from "./serverUrl";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import type { Session } from "./types";
 
-/** The part of `chrome` the background script uses; tests pass a fake with these members. */
-export interface ChromeLike extends PanelOpenApi {
-  action: {
-    onClicked: { addListener(listener: (tab: { windowId?: number }) => void): void };
-  };
-  tabs: {
-    query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]>;
-    sendMessage(tabId: number, message: ContentMessage): Promise<unknown>;
-    create(properties: { url: string }): Promise<unknown>;
-    onUpdated: { addListener(listener: (tabId: number, changes: { url?: string }) => void): void };
-  };
-  runtime: RuntimeLike;
-  scripting: ScriptingLike;
-}
+export type { ChromeLike, ModelhostRequest, ModelhostResult } from "./types";
 
 /**
  * Sign-in values from the panel: the enrolment code, the device label and the typed server URL.
@@ -65,16 +50,8 @@ export type PanelMessage =
   | { type: "panel:createCourse"; title: string }
   | { type: "panel:regenerateCourse"; courseId: number }
   | { type: "panel:modelhost"; request: ModelhostRequest };
-/** One local model host action from the panel: start, measure, status, or choose the engine. */
-export type ModelhostRequest =
-  | { action: "start" | "measure" | "status" }
-  | { action: "use"; engine: ModelhostEngine };
-/** Finished output of a modelhost job, or "pending" when the PC worker has not answered in time. */
-export type ModelhostResult = ModelhostOutput | "pending";
 
-/** Reply to a panel message: the result, or the error text. */
-/** A refused panel message; `status` and `code` are set when the core refused it (CoreHttpError). */
-export type PanelReply = { ok: true; data?: unknown } | { ok: false; error: string; status?: number; code?: string };
+export type { PanelReply } from "./types";
 
 /** A ready course the panel can open: its id and title only. */
 export interface CourseLink {

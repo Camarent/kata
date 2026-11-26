@@ -50,40 +50,8 @@ export interface PanelState {
   queue?: QueuedMarkView[] | null;
 }
 
-/** Values typed into the sign-in form: pairing code and device label. */
-export interface SignInInput {
-  code: string;
-  deviceLabel: string;
-}
-
-/** Sign-in form values with the typed server URL. */
-export interface ServerFormInput extends SignInInput {
-  baseUrl: string;
-}
-
-/** User actions the panel reports back to the caller. */
-export interface PanelHandlers {
-  onSignIn: (input: ServerFormInput) => void | Promise<void>;
-  onDisconnect: () => void | Promise<void>;
-  onChangeServer: () => void;
-  onCancelChange: () => void;
-  onKnown: (topicId: number) => Promise<MarkOutcome>;
-  onScan: () => Promise<void>;
-  onReview: () => Promise<void>;
-  onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
-  onCloseReview: () => void;
-  onOpenCourse: (courseId: number) => Promise<void>;
-  onDeleteCourse: (courseId: number) => Promise<void>;
-  onCreateCourse: (title: string) => Promise<void>;
-  onRegenerateCourse: (courseId: number) => Promise<void>;
-  onModelhost: (request: ModelhostRequest) => Promise<ModelhostResult>;
-  /** Retry now on the connection detail and the queue screen; the button is hidden without it. */
-  onRetry?: () => Promise<void>;
-  /** Show unsynced marks on the connection detail; the button is hidden without it. */
-  onShowQueue?: () => void;
-  /** Back on the Not synced marks screen; the button is hidden without it. */
-  onCloseQueue?: () => void;
-}
+import type { PanelHandlers, ServerFormInput, SignInInput } from "./types";
+export type { PanelHandlers, ServerFormInput, SignInInput } from "./types";
 
 /** User-facing text for each error reason. */
 const ERROR_TEXT: Record<"timeout" | "auth" | "failed", string> = {

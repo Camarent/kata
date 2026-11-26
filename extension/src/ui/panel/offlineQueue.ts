@@ -1,5 +1,5 @@
 import type { ConceptMark } from "../../coreClientTypes";
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import { el } from "../dom";
 import { TEXT_OFFLINE_QUEUE } from "../strings";
 

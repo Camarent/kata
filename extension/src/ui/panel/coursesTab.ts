@@ -1,4 +1,4 @@
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import type { CourseSummary } from "../../coreClient";
 import { askConfirm } from "../confirm";
 import { el } from "../dom";

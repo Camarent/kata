@@ -1,4 +1,4 @@
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import { CoreOfflineError, CoreTimeoutError } from "../../coreClient";
 import { el } from "../dom";
 import { TEXT_SIGNED_OUT, TEXT_SIGNIN } from "../strings";

@@ -1,4 +1,4 @@
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import { CoreOfflineError } from "../../coreClient";
 import { el } from "../dom";
 import { TEXT_COURSE_GENERATE } from "../strings";

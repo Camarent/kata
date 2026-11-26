@@ -1,4 +1,4 @@
-import type { PanelHandlers } from "../../sidepanel";
+import type { PanelHandlers } from "../../types";
 import { el } from "../dom";
 import { TEXT_SCAN_RESULTS } from "../strings";
 
