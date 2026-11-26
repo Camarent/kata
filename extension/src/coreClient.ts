@@ -499,6 +499,16 @@ export class CoreClient {
     return this.request<IgnoredConcept[]>("GET", "/concepts/ignored");
   }
 
+  /** Hide a concept from the caller's lists; its marks stay (`PUT /concepts/{id}/ignore`). */
+  async ignoreConcept(conceptId: number): Promise<void> {
+    await this.request("PUT", `/concepts/${conceptId}/ignore`);
+  }
+
+  /** Show an ignored concept in the caller's lists again (`DELETE /concepts/{id}/ignore`). */
+  async unignoreConcept(conceptId: number): Promise<void> {
+    await this.request("DELETE", `/concepts/${conceptId}/ignore`);
+  }
+
   /** Shared and own aliases of a concept (`GET /concepts/{id}/aliases`). */
   listConceptAliases(conceptId: number): Promise<ConceptAlias[]> {
     return this.request<ConceptAlias[]>("GET", `/concepts/${conceptId}/aliases`);
