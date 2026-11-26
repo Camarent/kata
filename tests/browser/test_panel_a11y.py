@@ -8,8 +8,13 @@ import pytest
 
 from browser.panel_page import open_panel
 
-# Expected Tab order from the page start.
-FOCUS_ORDER = ["input[name=code]", "input[name=deviceLabel]", "button[type=submit]"]
+# Expected Tab order from the page start: the form fields in DOM order (signin.ts renderSignIn).
+FOCUS_ORDER = [
+    "input[name=baseUrl]",
+    "input[name=code]",
+    "input[name=deviceLabel]",
+    "button[type=submit]",
+]
 ACTIVE_MATCHES = "return document.activeElement.matches(arguments[0])"
 IN_FORM = "return !!document.activeElement.closest('form.signin')"
 FOCUS_INDICATOR = """

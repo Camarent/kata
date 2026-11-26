@@ -33,19 +33,21 @@ def open_panel(driver: Any, browser_name: str) -> None:
     webdriver_support = pytest.importorskip("selenium.webdriver.support.ui")
     driver.get(panel_url(browser_name))
     wait = webdriver_support.WebDriverWait(driver, PANEL_WAIT_SECONDS)
-    wait.until(lambda d: d.execute_script(f"return !!document.querySelector('{PANEL_INPUT_SELECTOR}')"))
+    wait.until(
+        lambda d: d.execute_script(f"return !!document.querySelector('{PANEL_INPUT_SELECTOR}')")
+    )
 
 
-def force_dark_scheme(driver: Any, browser_name: str) -> None:
-    """Make the page report prefers-color-scheme: dark for every page this driver opens next.
+def force_scheme(driver: Any, browser_name: str, scheme: str) -> None:
+    """Make the page report prefers-color-scheme: <scheme> (light or dark) for every page opened next.
 
     Firefox: the layout.css.prefers-color-scheme.content-override pref is set at launch by the driver
-    fixture (conftest.py); chrome context is refused by geckodriver, so it is not set from script.
+    fixture (conftest.py) from the same scheme; chrome context is refused by geckodriver, so it is not set from script.
     Chrome: CDP Emulation.setEmulatedMedia. Callers check matchMedia after opening the page.
     """
     if browser_name == "firefox":
         return
     driver.execute_cdp_cmd(
         "Emulation.setEmulatedMedia",
-        {"features": [{"name": "prefers-color-scheme", "value": "dark"}]},
+        {"features": [{"name": "prefers-color-scheme", "value": scheme}]},
     )

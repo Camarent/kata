@@ -19,6 +19,8 @@ TIER_MARKS = {
     "browser": pytest.mark.browser,
 }
 REAL_DOJO_ENV = "KATA_TEST_DOJO"
+# Browser tests are opt-in: they run only when the marker expression is exactly this (-m browser).
+BROWSER_OPT_IN_EXPR = "browser"
 
 
 def _real_dojo_available() -> bool:
@@ -27,20 +29,23 @@ def _real_dojo_available() -> bool:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    browser_opted_in = str(config.getoption("markexpr")).strip() == BROWSER_OPT_IN_EXPR
     kept: list[pytest.Item] = []
     deselected: list[pytest.Item] = []
     for item in items:
         if item.get_closest_marker("real_dojo") is not None and not _real_dojo_available():
             deselected.append(item)
             continue
-        kept.append(item)
         path = Path(item.path).resolve()
-        if not path.is_relative_to(TESTS_DIR):
+        if path.is_relative_to(TESTS_DIR):
+            tier = path.relative_to(TESTS_DIR).parts[0]
+            mark = TIER_MARKS.get(tier)
+            if mark is not None:
+                item.add_marker(mark)
+        if item.get_closest_marker("browser") is not None and not browser_opted_in:
+            deselected.append(item)
             continue
-        tier = path.relative_to(TESTS_DIR).parts[0]
-        mark = TIER_MARKS.get(tier)
-        if mark is not None:
-            item.add_marker(mark)
+        kept.append(item)
     if deselected:
         items[:] = kept
         config.hook.pytest_deselected(items=deselected)

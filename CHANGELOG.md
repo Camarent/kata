@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.18] - 2026-11-26
+
+- feat(extension): approved UI for panel, card and page overlays
+
 ## [0.1.17] - 2026-11-26
 
 - feat(review): review tree API, search filters, persistent mark queue, OpenAPI doc

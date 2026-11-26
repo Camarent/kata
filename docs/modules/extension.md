@@ -20,10 +20,10 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/coreClient.ts:202` `CoreClient`; `:313` `listConceptMarks`, `:318` `setConceptMark` (concept marks); error classes `CoreTimeoutError`, `CoreOfflineError`, `CoreAuthError`, `CoreHttpError`.
 - `extension/src/offlineQueue.ts:64` `OfflineQueue`.
 - `extension/src/tokenStore.ts:21` `TokenStore`.
-- `extension/src/sidepanel.ts:420` `renderPanel`; `extension/src/sidepanelBoot.ts:33` `bootPanel`.
+- `extension/src/sidepanel.ts:360` `renderPanel`; `extension/src/sidepanelBoot.ts:34` `bootPanel`.
 - Needs-cloud text: `extension/src/coreClient.ts:144` `courseErrorText` maps a 409 `needs_cloud` to "This needs a cloud model. Add a cloud token to turn it on." (`:153-154`); the side panel create note shows it (`extension/src/sidepanel.ts:260`). The CLI, editor and MCP call no model-class endpoint (events and read-only tools only), so `needs_cloud` surfaces in core, worker and extension only.
-- Side panel "Open course": `extension/src/sidepanel.ts` `renderCourses` (`:272`) shows one `Open course` button per ready course; a failed open shows its error text. `extension/src/sidepanelBoot.ts` `onOpenCourse` (`:174`) sends `panel:openCourse`; `extension/src/background.ts` message type `panel:openCourse` (`:54`), handler `openCourse` (`:213`) checks the course is ready, gets the link, refuses a link outside the core (`isCoreUrl`, `:253`) and opens it in a new tab; `extension/src/coreClient.ts:359` `openCourse` calls `POST /v1/courses/{id}/open`.
-- Side panel course list, create and delete: `extension/src/sidepanel.ts:272` `renderCourses` lists the courses and shows "n of limit" (only when the limit is above 0). Each course has a Delete button; the second click, "Confirm delete", sends the delete, and "Cancel" goes back. `extension/src/sidepanel.ts:238` `renderCreateCourse` is the create form: a blank title is not sent, and a failed create shows `courseErrorText` (`extension/src/coreClient.ts:144`). `extension/src/sidepanelBoot.ts:45` `loadCourses` reads `limit` and `total` from `listCoursesMeta` (`extension/src/coreClient.ts:337`); `extension/src/background.ts:224` `deleteCourse` and `:230` `createCourse` answer `panel:deleteCourse` and `panel:createCourse`; `extension/src/coreClient.ts:343` `createCourse` and `:348` `deleteCourse` call `POST /v1/courses` and `DELETE /v1/courses/{id}`.
+- Side panel "Open course": `extension/src/ui/panel/coursesTab.ts` `renderCoursesTab` shows one `Open course` button per ready course; a failed open shows its error text. `extension/src/sidepanelBoot.ts` `onOpenCourse` (`:174`) sends `panel:openCourse`; `extension/src/background.ts` message type `panel:openCourse` (`:54`), handler `openCourse` (`:213`) checks the course is ready, gets the link, refuses a link outside the core (`isCoreUrl`, `:253`) and opens it in a new tab; `extension/src/coreClient.ts:359` `openCourse` calls `POST /v1/courses/{id}/open`.
+- Side panel course list, create and delete: `extension/src/ui/panel/coursesTab.ts` `renderCoursesTab` lists the courses and shows "n of limit" (only when the limit is above 0). Each course has a Delete button; it asks first (`askConfirm`), and a failed delete shows an error line. The create form (`renderCreateCourse`) left the panel with the tab shell; `courseErrorText` is in `extension/src/coreClient.ts`. `extension/src/sidepanelBoot.ts:45` `loadCourses` reads `limit` and `total` from `listCoursesMeta` (`extension/src/coreClient.ts:337`); `extension/src/background.ts:224` `deleteCourse` and `:230` `createCourse` answer `panel:deleteCourse` and `panel:createCourse`; `extension/src/coreClient.ts:343` `createCourse` and `:348` `deleteCourse` call `POST /v1/courses` and `DELETE /v1/courses/{id}`.
 - Bridge stub and registration: `extension/src/bridge.ts:37` `injectStub` puts the page stub at document_start; `extension/src/bridgeRegister.ts:46` `bridgeMatchPatterns` builds `<core scheme>//*/c/*`, `:60` `registerBridge` re-registers `bridge.js` as `kata-bridge` on every install and startup (`:106` `wireBridgeRegistration`).
 - `extension/src/reviewScreen.ts:32` `renderReview` (one row per concept, three-state control); types `ReviewRow`, `ReviewState`.
 - `extension/src/background.ts:51` message `panel:review` (`review()` at `:176` merges marks with lesson-check); `:52` message `panel:setConcept` (`setConcept` at `:198`).
@@ -50,6 +50,24 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `topicOverview` reads snake_case keys (`topic_id`, `concept_id`), but `GET /scan/overview` answers camelCase (`topicId`, `conceptId`), so those mapped fields come out undefined until the two agree.
 - `extension/src/background.ts:194` runs `runConceptScan` with `POLL_MS` and `MAX_WAIT_MS`; `:208` starts the rescanner.
 - `extension/src/rescan.ts:53` `createRescanner(deps)` - observes page mutations; every mutation restarts one `debounceMs` timer, so a burst fires `onRescan` once; `stop()` cancels the timer and the observer. `:17` `mergeMarks(prev, next)` keeps the previous state of a concept seen before, so a rescan does not blank marks.
+- UI (M25, approved design in `docs/design/extension-ui.md`, section 9): plain DOM TypeScript under `extension/src/ui/`, no framework.
+  - `extension/src/ui/strings.ts` every user-facing string (one owner, pinned to the screen inventory).
+  - `extension/src/ui/dom.ts`, `confirm.ts`, `undo.ts`, `popover.ts`, `stateMenu.ts` shared primitives (DOM helper, confirm, undo, popover, state menu).
+  - `extension/src/ui/panelCss.ts`, `cardCss.ts` stylesheets ported from the prototype.
+  - `extension/src/ui/panel/` panel tab screens (one `render*` function per screen), the tab router `router.ts`, and `screens.ts`.
+  - `extension/src/ui/panel/screens.ts` `SCREENS`: the only registry of panel and settings screens; `drawScreen` draws one screen by its inventory id. Add a screen here, not in the router.
+  - `extension/src/ui/card/` floating card screens (`cardMain.ts`, `cardScan.ts`, `cardSummary.ts`, `jokeCloud.ts`), the pin (`pin.ts`, `pinPosition.ts`) and `focus.ts`.
+  - `extension/src/ui/overlay/` page overlay (`whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`, `hlMenu.ts`, `listPicker.ts`, `quizPin.ts`, `pageChanged.ts`).
+  - Screen inventory: 48 screens on five surfaces (panel tab 22, floating card 9, settings page 8, page overlay 6, course page 3).
+  - Tests: vitest per component state under `extension/tests/`; browser tests in `tests/browser/`.
+  - Mount status (M25 partial): the panel tab screens, `router.ts`, and the settings screens
+    (`settingsHome`, `settingsPages`, `ignoredList`) are mounted in `sidepanel.ts` with stub handlers
+    and placeholder data (courses, tracks, settings home, scan results): they render, but their
+    actions do nothing yet. Not imported by the running extension: page overlays under `overlay/`
+    except `pageChanged.ts` (the only overlay `cardHost.ts` mounts), the exam screens
+    `panel/examRun.ts` and `panel/examResult.ts`, the course page `panel/coursePage.ts`,
+    `card/focus.ts`, and the jokes screen `card/jokeCloud.ts`. Wiring the rest is a follow-up before
+    M26 (see `.notes/later.md`).
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
@@ -63,7 +81,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`<scheme>://*/c/*` of the saved origin; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
-- `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page; static mockups in `docs/design/extension-ui/` (`panel-states.html`, `lesson-page.html`, `tokens.css`). Not shipped in the extension build; checked by `tests/scripts/test_extension_ui_design.py` and `tests/scripts/test_lesson_page_mockup.py`.
+- `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page. The static mockups, their CSS tokens and their checker tests were removed; the spec is the only design file. Not shipped in the extension build.
 - `extension/src/offlineQueue.ts` - queues mark presses (topic and concept marks) while the core is unreachable, in order, under `kata.markQueue`; the legacy `kata.pending` topic list is converted on first read (`:185-197`).
 - Review client (M24): `extension/src/coreClient.ts:314` `reviewTree(filter)` and `:319` `reviewConcepts(filter)` call `GET /v1/review/tree` and `GET /v1/review/concepts`; the query string comes from `reviewQuery` (`:503`).
 
@@ -82,4 +100,4 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 
 ## Depends on / used by
 - Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` field in any `package.json`; root `.nvmrc` pins Node 26); talks to `core` HTTP API (`docs/api.md`).
-- Used by: `tests/browser/conftest.py` loads `dist/<browser>/` in Firefox and Chrome (`docs/e2e.md`, "Browser tests"); `tests/e2e/driver.ts` imports `extension/src/scanner`, `scanSession`, `coreClient`, `offlineQueue`, `tokenStore`; `tests/foundation/test_extension_scaffold.py` checks manifest and package.json.
+- Used by: `tests/browser/conftest.py` loads `dist/<browser>/` in Firefox and Chrome (`docs/e2e.md`, "Browser tests"), and the layout and contrast checks in `tests/browser/test_ui_layout.py` and `test_panel_contrast.py` open the same built panel page; `tests/e2e/driver.ts` imports `extension/src/scanner`, `scanSession`, `coreClient`, `offlineQueue`, `tokenStore`; `tests/foundation/test_extension_scaffold.py` checks manifest and package.json.

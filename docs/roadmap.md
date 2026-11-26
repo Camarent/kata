@@ -280,12 +280,24 @@ the offline mark queue, and the OpenAPI export. Shipped:
   and flush in order; the panel reads the pending count.
 - OpenAPI export of the core schema to `docs/openapi.json`, with a test that fails when it drifts.
 
-## Milestone 25: UI implementation
+## Milestone 25: UI implementation (partial)
 
-**Scope.** Build the extension UI on the backend from M19 to M24. The approved design is linked in
-[`decisions.md`](decisions.md) (D1 to D55); D56 to D58 are round 2 design feedback, not yet in
-`decisions.md`. The design sketch is in
-[`design/extension-ui.md`](design/extension-ui.md).
+**Scope.** Build the extension UI on the backend from M19 to M24: 48 approved screens (D1 to D58) on
+the panel tab, floating card, settings, page overlay and course page. The approved design notes
+(decisions, glossary, inventory summary) are in [`design/extension-ui.md`](design/extension-ui.md),
+section 9; the decision record is in [`decisions.md`](decisions.md). The UI modules are listed in
+[`modules/extension.md`](modules/extension.md). The old mockups were removed.
+
+Partial: the UI modules are built and unit-tested, but not all are mounted in the running extension.
+- Mounted: the page-changed overlay (`cardHost.ts`), the pin (`ui/card/pin.ts`), the panel CSS and
+  the card CSS. The panel tab screens, their router (`ui/panel/router.ts`) and the settings screens
+  are mounted in `sidepanel.ts` with stub handlers and placeholder data (courses, tracks, settings
+  home, scan results): they render, but their actions do nothing yet.
+- Not mounted: the page overlays (`hlMenu.ts` hover menu, `whichOne.ts`, `blockMenu.ts`,
+  `imageMenu.ts`, `listPicker.ts`, `quizPin.ts`), the exam screens (`ui/panel/examRun.ts`,
+  `ui/panel/examResult.ts`), the course page (`ui/panel/coursePage.ts`), the focus module
+  (`ui/card/focus.ts`), and the jokes screens (`jokeCloud.ts`). None of these has an importer.
+- Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
 
 ## Later
 

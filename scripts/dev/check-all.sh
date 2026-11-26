@@ -141,6 +141,17 @@ run_smoke() {
 run_extension() {
   step extension-build npm --prefix extension run build
   step extension-test npm --prefix extension run test:cov
+  run_js_audit
+}
+
+# madge (cycles) and knip (unused files) run from extension/tools-js, an isolated tree with its own
+# typescript 5: madge 8 cannot load the extension's typescript 7. knip reads extension/knip.json.
+# baseline-gate.mjs runs each tool and fails only on a finding missing from its tracked baseline file
+# (extension/tools-js/madge-baseline.txt, knip-baseline.txt).
+run_js_audit() {
+  [ -d extension/tools-js/node_modules ] || npm --prefix extension/tools-js ci --no-audit --no-fund
+  step madge-circular node extension/tools-js/baseline-gate.mjs madge
+  step knip-files node extension/tools-js/baseline-gate.mjs knip
 }
 
 run_editor() {
@@ -157,6 +168,8 @@ run_browser() {
     exit 0
   fi
   step browser-deps uv pip install -q --python .venv/bin/python -r requirements-browser.txt
+  # The browser cases load extension/dist/<browser>: build it first so a stale or missing build cannot fail them.
+  step extension-build npm --prefix extension run build
   step browser .venv/bin/python -m pytest tests/browser -m browser
 }
 

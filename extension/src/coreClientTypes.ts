@@ -159,3 +159,142 @@ export interface ReviewConcept {
   last_viewed_at: string | null;
   relevance: number;
 }
+
+/** Sort fields of `GET /concepts/sorted`. */
+export type ConceptSortField = "name" | "added" | "viewed" | "relevance";
+
+/** Sort order of `GET /concepts/sorted`. */
+export type ConceptSortOrder = "asc" | "desc";
+
+/** One concept of `GET /concepts/sorted`: the caller's visible concepts that are not ignored. */
+export interface ConceptListRow {
+  concept_id: number;
+  label: string;
+  state: string;
+  added_at: string;
+  last_viewed_at: string | null;
+  relevance: number;
+}
+
+/** Derived state of a block of concepts (`POST /concepts/block-state`). */
+export type BlockState = "new" | "learning" | "known" | "mixed";
+
+/** One ignored concept of `GET /concepts/ignored`. */
+export interface IgnoredConcept {
+  concept_id: number;
+  label: string;
+}
+
+/** One alias of a concept (`GET`/`POST /concepts/{id}/aliases`); `private` when the caller owns it. */
+export interface ConceptAlias {
+  id: number;
+  concept_id: number;
+  alias: string;
+  private: boolean;
+}
+
+/** Answer of `POST /summary`: a cached summary (200), or a queued job id (202). */
+export type SummaryReply = { status: "done"; summary: string } | { id: number };
+
+/** One joke of `GET /jokes/next`, with its source attribution and licence. */
+export interface Joke {
+  text: string;
+  source_id: string;
+  attribution: string;
+  licence_name: string;
+  licence_url: string;
+}
+
+/** One enabled joke source of `GET /jokes/sources`. */
+export interface JokeSource {
+  id: string;
+  attribution: string;
+  licence_name: string;
+  licence_url: string;
+}
+
+/** One step of a track's plan (`ItemOut` in docs/openapi.json). */
+export interface TrackItem {
+  position: number;
+  label: string;
+  action: string;
+  minutes: number;
+  module_id: number | null;
+}
+
+/** A learning track (`TrackOut`). `status` is "active", "paused" or "dropped". */
+export interface Track {
+  id: number;
+  name: string;
+  deadline: string;
+  priority: number;
+  status: string;
+  items: TrackItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** One page of `GET /v1/tracks`; `next_before_id` is null on the last page. */
+export interface TrackPage {
+  items: Track[];
+  next_before_id: number | null;
+}
+
+/** Body of `POST /v1/tracks` (`TrackIn`). */
+export interface TrackIn {
+  name: string;
+  deadline: string;
+  priority?: number;
+  items?: TrackItem[];
+}
+
+/** Body of `PATCH /v1/tracks/{id}` (`TrackPatch`): only the sent fields change. */
+export interface TrackPatch {
+  name?: string | null;
+  deadline?: string | null;
+  priority?: number | null;
+  items?: TrackItem[] | null;
+  status?: string | null;
+}
+
+/** Body of `POST /v1/tracks/{id}/decision-points` (`PointIn`). */
+export interface PointIn {
+  after_position: number;
+  due_on: string;
+}
+
+/** A decision point of a track (`PointOut`). `choice` is null until decided. */
+export interface DecisionPoint {
+  id: number;
+  track_id: number;
+  after_position: number;
+  due_on: string;
+  status: string;
+  choice: string | null;
+  target_track_id: number | null;
+  decided_at: string | null;
+  created_at: string;
+}
+
+/** Reply of `POST /quiz/sources` (202): the id of the queued job. */
+export interface EnqueueResponse {
+  id: number;
+}
+
+/** One concept checked in an exam result (`ExamConceptOut`). */
+export interface ExamConcept {
+  concept_id: number;
+  correct: boolean;
+  confirmed: boolean;
+}
+
+/** A stored exam result (`ExamOut`). `passed` and `score` are null when the result has none. */
+export interface ExamResult {
+  id: number;
+  origin: string;
+  taken_at: string;
+  passed: boolean | null;
+  score: number | null;
+  status: string;
+  concepts: ExamConcept[];
+}

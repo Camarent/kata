@@ -1,15 +1,40 @@
 import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply } from "./background";
-import { renderPanel, type PanelHandlers, type PanelRow, type PanelState, type ServerFormInput } from "./sidepanel";
+import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
+import type {
+  ConceptAlias,
+  DecisionPoint,
+  ExamResult,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
+  Track,
+  TrackPage,
+} from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
+import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
+import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackRowView, TrackSortKey } from "./ui/panel/tracksTab";
+import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
 export interface OriginsRequest {
   origins: string[];
+}
+
+/** One track as the Tracks tab draws it. The core sends no progress or pace, so the status stands in for progress. */
+function trackRowView(track: Track): TrackRowView {
+  return { id: track.id, name: track.name, progress: track.status, tooSlow: false };
+}
+
+/** Rows in the order the sort key asks for; only the name sort reorders, the others keep the core order. */
+function sortTrackRows(rows: TrackRowView[], sort: TrackSortKey): TrackRowView[] {
+  return sort === "name" ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
 }
 
 /** The part of `chrome` the side panel page uses; tests pass a fake with these members. */
@@ -37,15 +62,17 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     rows: [],
     status: { kind: "idle" },
     review: null,
+    tab: "scan",
     courses: [],
   };
   const draw = (): void => renderPanel(root, state, handlers);
 
-  /** Ready courses, limit and total for the Courses section; a refused list leaves the section out. */
+  /** Ready courses for the Courses tab; a refused list leaves it empty and marks the load as failed. */
   const loadCourses = async (): Promise<void> => {
     const reply = await api.runtime.sendMessage({ type: "panel:courses" });
     const list = reply.ok ? (reply.data as CourseList | undefined) : undefined;
     state.courses = list && Array.isArray(list.items) ? list.items : [];
+    state.coursesFailed = !reply.ok;
     state.courseLimit = list?.limit;
     state.courseTotal = list?.total;
   };
@@ -64,9 +91,60 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.rows = [];
     state.review = null;
     state.courses = [];
-    state.courseLimit = undefined;
-    state.courseTotal = undefined;
+    state.coursesFailed = false;
+    state.tracks = undefined;
+    state.settingsPage = null;
+    state.tab = "scan";
     state.status = { kind: "idle" };
+  };
+
+  /** Sends one panel message and returns its data; a core refusal keeps its status and code. */
+  const send = async <T>(message: PanelMessage): Promise<T> => {
+    const reply = await api.runtime.sendMessage(message);
+    if (!reply.ok) {
+      if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
+      throw new Error(reply.error);
+    }
+    return reply.data as T;
+  };
+
+  /** Tracks for the Tracks tab from the panel:tracks reply; a refused list shows the could-not-load state. */
+  const loadTracks = async (): Promise<void> => {
+    const sort = state.tracks?.sort ?? "name";
+    state.tracks = { state: "loading", rows: [], sort };
+    draw();
+    try {
+      const page = await send<TrackPage>({ type: "panel:tracks" });
+      const rows = page.items.map(trackRowView);
+      state.tracks = { state: rows.length === 0 ? "empty" : "ready", rows: sortTrackRows(rows, sort), sort };
+    } catch {
+      state.tracks = { state: "error", rows: [], sort };
+    }
+    draw();
+  };
+
+  /** Ignored concepts for the ignored list page, from the panel:ignored reply. */
+  const loadIgnored = async (): Promise<void> => {
+    const list = await send<IgnoredConcept[]>({ type: "panel:ignored" });
+    state.ignored = list.map((concept): IgnoredRowView => ({ conceptId: concept.concept_id, label: concept.label }));
+  };
+
+  /** The two ignored calls the ignored list makes, each as one panel message. */
+  const ignoredClient: IgnoredClient = {
+    ignoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
+    unignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
+  };
+
+  /** After Restore or Undo the ignored list page reloads its rows from the core. */
+  const refreshIgnored = async (): Promise<void> => {
+    await loadIgnored();
+    draw();
+  };
+
+  /** Back from the ignored list page to the settings home. */
+  const backToSettings = (): void => {
+    state.settingsPage = null;
+    draw();
   };
 
   const handlers: PanelHandlers = {
@@ -151,10 +229,53 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       return reply.data as MarkOutcome;
     },
 
+    async onTab(tab: PanelTab) {
+      if (tab === "review") {
+        await handlers.onReview();
+        return;
+      }
+      state.review = null;
+      state.tab = tab;
+      state.settingsPage = null;
+      if (tab === "tracks") {
+        await loadTracks();
+        return;
+      }
+      draw();
+    },
+
+    onSortTracks(sort: TrackSortKey) {
+      if (state.tracks === undefined) return;
+      state.tracks = { ...state.tracks, sort, rows: sortTrackRows(state.tracks.rows, sort) };
+      draw();
+    },
+
+    async onOpenSettingsPage(page: SettingsPage) {
+      // Only the ignored list page has a screen so far; the other settings pages keep the home.
+      if (page !== "ignored") return;
+      try {
+        await loadIgnored();
+      } catch {
+        // The list did not load: the settings home stays drawn.
+        return;
+      }
+      state.settingsPage = "ignored";
+      draw();
+    },
+
+    onOpenTrack() {
+      // The track detail screen is not drawn yet: the Tracks tab stays as it is.
+    },
+
+    onNewTrack() {
+      // The create screen is not drawn yet: the Tracks tab stays as it is.
+    },
+
     async onReview() {
       const reply = await api.runtime.sendMessage({ type: "panel:review" });
       if (reply.ok) {
         state.review = reply.data as ReviewRow[];
+        state.tab = "review";
       } else {
         state.status = { kind: "error", reason: "failed" };
       }
@@ -168,6 +289,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
 
     onCloseReview() {
       state.review = null;
+      state.tab = "scan";
       draw();
     },
 
@@ -178,6 +300,15 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onCreateCourse(title: string) {
       const reply = await api.runtime.sendMessage({ type: "panel:createCourse", title });
       // A core refusal keeps its status and code so the panel can show the matching text.
+      if (!reply.ok) {
+        if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
+        throw new Error(reply.error);
+      }
+      await loadCourses();
+      draw();
+    },
+    async onRegenerateCourse(courseId: number) {
+      const reply = await api.runtime.sendMessage({ type: "panel:regenerateCourse", courseId });
       if (!reply.ok) {
         if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
         throw new Error(reply.error);
@@ -198,6 +329,29 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       if (!reply.ok) throw new Error(reply.error);
       return reply.data as ModelhostResult;
     },
+
+    onLoadTracks: (opts) => send<TrackPage>({ type: "panel:tracks", limit: opts?.limit, beforeId: opts?.beforeId }),
+    onGetTrack: (trackId) => send<Track>({ type: "panel:getTrack", trackId }),
+    onCreateTrack: (input) => send<Track>({ type: "panel:createTrack", input }),
+    onPatchTrack: (trackId, patch) => send<Track>({ type: "panel:patchTrack", trackId, patch }),
+    onDeleteTrack: (trackId) => send<void>({ type: "panel:deleteTrack", trackId }),
+    onAddDecisionPoint: (trackId, input) => send<DecisionPoint>({ type: "panel:addDecisionPoint", trackId, input }),
+    onAddQuizSource: (url) => send<number>({ type: "panel:addQuizSource", url }),
+    onImportExamResult: (payload) => send<ExamResult>({ type: "panel:importExamResult", payload }),
+    onConfirmExamResult: (resultId, conceptIds) =>
+      send<ExamResult>({ type: "panel:confirmExamResult", resultId, conceptIds }),
+    onDismissExamResult: (resultId) => send<ExamResult>({ type: "panel:dismissExamResult", resultId }),
+    onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
+    onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
+    onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
+    ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
+    onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
+    onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
+    onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),
+    onRequestSummary: (url, text) => send<SummaryReply>({ type: "panel:requestSummary", url, text }),
+    onCachedSummary: (url, textSha256) => send<string | null>({ type: "panel:cachedSummary", url, textSha256 }),
+    onNextJoke: () => send<Joke | null>({ type: "panel:nextJoke" }),
+    onListJokeSources: () => send<JokeSource[]>({ type: "panel:listJokeSources" }),
   };
 
   // The origin permission was removed (here or in the browser UI): fall back to first-run.
@@ -228,10 +382,19 @@ function originPattern(session: Session | null): string | null {
   return parsed.ok ? parsed.pattern : null;
 }
 
+/** Injects the panel stylesheet (panelCss.ts, the same tokens the card stylesheet uses) into `doc`. */
+export function mountPanelStyle(doc: Document): HTMLStyleElement {
+  const style = doc.createElement("style");
+  style.textContent = PANEL_CSS;
+  doc.head.append(style);
+  return style;
+}
+
 // Side panel page entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.runtime) {
   const root = document.getElementById("panel");
   if (root) {
+    mountPanelStyle(document);
     void bootPanel(root, {
       runtime: { sendMessage: (message) => chrome.runtime.sendMessage<PanelMessage, PanelReply>(message) },
       storage: { local: chrome.storage.local },

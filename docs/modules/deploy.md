@@ -5,7 +5,7 @@ summary: Container stack for the VM (one image, compose with postgres, migrate, 
 # deploy
 
 ## Purpose
-Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image (`kata:<git short sha>`, `deploy/Dockerfile`, built with `deploy/compose.build.yaml` on dev) serves `core`, `worker` and `migrate`; `deploy/ship.sh` ships it and the deploy files over SSH. postgres and caddy are stock images. Runbook: `docs/deployment.md`. Checks for these files: `scripts/deploy/` (see `docs/modules/scripts.md`).
+Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image (`kata:<git short sha>`, `deploy/Dockerfile`, built with `deploy/compose.build.yaml` on dev) serves `core`, `worker` and `migrate`; `deploy/ship.sh` ships it and the deploy files over SSH. postgres and caddy are stock images. Runbook: `docs/deployment.md`. Checks for these files: `scripts/deploy/` (see `docs/modules/scripts.md`; browser test fixtures there use `install-browsers.sh --print-dir`).
 
 ## Public surface
 - `deploy/Dockerfile:11` `FROM ${PY_BASE_IMAGE}@${PY_BASE_DIGEST}` (base stage); `:47` runtime stage; `:66` `USER kata`; `:71` `CMD ["python", "-m", "kata_core"]`.

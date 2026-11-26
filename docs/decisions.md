@@ -210,7 +210,7 @@ Decided 2026-11-21. `tests/browser/test_panel_a11y.py` opens the side panel sign
 
 ## Dark-theme contrast of the sign-in view is at least 4.5 to 1 in Firefox and Chrome
 
-Decided 2026-11-21. `tests/browser/test_panel_contrast.py` opens the sign-in view with dark mode forced. For each text element (labels, input text, button text, error text) it takes the first non-transparent background up the ancestor chain, or the canvas colour, and computes the WCAG 2.x contrast ratio. It asserts every ratio is at least 4.5 (`MIN_RATIO`). How dark is forced: Firefox sets `layout.css.prefers-color-scheme.content-override` to 0 at launch (`tests/browser/conftest.py`); Chrome uses CDP `Emulation.setEmulatedMedia` from `force_dark_scheme` (`tests/browser/panel_page.py`). The case skips with a reason when `matchMedia('(prefers-color-scheme: dark)')` is false, so a browser that ignores the override does not pass silently. Outcome: Firefox and Chrome both passed on 2026-11-21, not skipped. Limit: the sign-in view only; the review screen and light theme are not covered. Reason: WCAG AA is the bar the backlog names; the threshold is a fixed constant, not tuned to the result.
+Decided 2026-11-21. `tests/browser/test_panel_contrast.py` opens the sign-in view with dark mode forced. For each text element (labels, input text, button text, error text) it takes the first non-transparent background up the ancestor chain, or the canvas colour, and computes the WCAG 2.x contrast ratio. It asserts every ratio is at least 4.5 (`MIN_RATIO`). How dark is forced: Firefox sets `layout.css.prefers-color-scheme.content-override` to 0 at launch (`tests/browser/conftest.py`); Chrome uses CDP `Emulation.setEmulatedMedia` from `force_scheme` (`tests/browser/panel_page.py`; renamed from `force_dark_scheme`). The case skips with a reason when `matchMedia('(prefers-color-scheme: dark)')` is false, so a browser that ignores the override does not pass silently. Outcome: Firefox and Chrome both passed on 2026-11-21, not skipped. Limit: the sign-in view only; the review screen is not covered. Light theme is covered too since task-23 (the test runs for both schemes). Reason: WCAG AA is the bar the backlog names; the threshold is a fixed constant, not tuned to the result.
 
 ## Cost cap is per user per day in integer micro-USD
 
@@ -792,3 +792,7 @@ The sign-in code the extension asks for is an enrolment code. The admin CLI `enr
 Focus mode auto-end default is 3 hours (D50). Design only; built in M25.
 
 The OpenAPI schema is committed to `docs/openapi.json`. It is exported by `core/kata_core/api/openapi_export.py:20` (`schema_text`), and a test fails when the file drifts from the app.
+
+## Extension UI is plain DOM TypeScript built to the approved design (M25)
+
+The extension UI (48 screens, decisions D1 to D58) is built as plain DOM TypeScript under `extension/src/ui/`, with no framework. Every user-facing string comes from `extension/src/ui/strings.ts`, pinned to the screen inventory. Panel screens are drawn only through the registry `SCREENS` in `extension/src/ui/panel/screens.ts`. The approved design notes are kept in `docs/design/extension-ui.md` (section 9). The old static mockups, their CSS tokens and their checker tests were removed. Module map: [modules/extension.md](modules/extension.md).

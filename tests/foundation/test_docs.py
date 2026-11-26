@@ -16,6 +16,9 @@ FORBIDDEN = (
     "RTX", "GeForce", "Radeon", "Nvidia", "AMD", "Intel", "Apple",
 )
 
+# Absolute home-directory prefixes: they expose a local user name and point outside the repo.
+HOME_PATH = re.compile(r"/(?:home|root|Users)/")
+
 
 def _load_toml(path: Path) -> dict:
     return tomllib.loads(path.read_text(encoding="utf-8"))
@@ -119,3 +122,11 @@ def test_no_personal_or_provider_names_in_docs():
             assert not re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE), (
                 f"{path.name} contains {word!r}"
             )
+
+
+def test_no_home_directory_paths_in_docs():
+    for path in sorted((ROOT / "docs").rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        assert not HOME_PATH.search(text), (
+            f"{path.relative_to(ROOT)} has a home-directory path"
+        )

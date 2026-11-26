@@ -15,7 +15,30 @@ import type {
   ScanClassification,
   ScanExtractInput,
   TopicOverview,
+  BlockState,
+  ConceptAlias,
+  ConceptListRow,
+  ConceptSortField,
+  ConceptSortOrder,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
 } from "./coreClientTypes";
+import {
+  CoreAuthError,
+  CoreConflictError,
+  CoreHttpError,
+  CoreOfflineError,
+  CoreTimeoutError,
+  CoreUnreachableError,
+  NotKataServerError,
+} from "./coreClientErrors";
+import { deleteCourse } from "./coreClientCourses";
+import { getClassification, topicOverview } from "./coreClientConcepts";
+import { reviewQuery } from "./coreClientReview";
+export * from "./coreClientErrors";
+export { courseErrorText } from "./coreClientCourses";
 export type {
   MarkRow,
   ConceptMark,
@@ -39,71 +62,17 @@ export type {
   ReviewOrder,
   ReviewSort,
   ReviewTopic,
+  BlockState,
+  ConceptAlias,
+  ConceptListRow,
+  ConceptSortField,
+  ConceptSortOrder,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
 } from "./coreClientTypes";
 
-
-/** The core did not answer within `timeoutMs`. */
-export class CoreTimeoutError extends Error {
-  constructor(message = "core did not answer in time") {
-    super(message);
-    this.name = "CoreTimeoutError";
-  }
-}
-
-/** The core could not be reached (network failure). */
-export class CoreOfflineError extends Error {
-  constructor(message = "core is offline") {
-    super(message);
-    this.name = "CoreOfflineError";
-  }
-}
-
-/** The core rejected the token or the enrolment code (HTTP 401). */
-export class CoreAuthError extends Error {
-  constructor(message = "core rejected the credentials") {
-    super(message);
-    this.name = "CoreAuthError";
-  }
-}
-
-/** Any other non-2xx answer from the core. `code` is the stable `detail.code` of the body, when it has one. */
-export class CoreHttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code?: string,
-  ) {
-    super(`core answered HTTP ${status}`);
-    this.name = "CoreHttpError";
-  }
-}
-
-/** A progress save lost the revision race (HTTP 412). Carries the stored revision and document. */
-export class CoreConflictError extends Error {
-  readonly status = 412;
-  constructor(
-    readonly revision: number,
-    readonly doc: ProgressDoc | null,
-  ) {
-    super("progress revision moved; reload before saving");
-    this.name = "CoreConflictError";
-  }
-}
-
-/** The health probe got no answer from the address (network failure or timeout). */
-export class CoreUnreachableError extends Error {
-  constructor(message = "core is unreachable") {
-    super(message);
-    this.name = "CoreUnreachableError";
-  }
-}
-
-/** The health probe got an answer that is not the kata health document. */
-export class NotKataServerError extends Error {
-  constructor(message = "address does not answer as a kata core") {
-    super(message);
-    this.name = "NotKataServerError";
-  }
-}
 
 export interface CoreClientOptions {
   baseUrl: string;
@@ -130,23 +99,6 @@ export interface ModelhostOutput {
 
 /** Engine named by a `modelhost.use` job. */
 export type ModelhostEngine = "ollama" | "strata" | "none";
-
-/** Short, user-facing text for a failed course create or delete. */
-export function courseErrorText(err: unknown): string {
-  const code = err instanceof CoreHttpError ? err.code : undefined;
-  switch (code) {
-    case "course_limit":
-      return "You have reached your course limit. Delete a course to add another.";
-    case "course_name_taken":
-      return "A course with this name already exists. Choose another title.";
-    case "course_title_empty":
-      return "Enter a course title.";
-    case "needs_cloud":
-      return "This needs a cloud model. Add a cloud token to turn it on.";
-    default:
-      return "Could not save the course. Try again.";
-  }
-}
 
 /** Answer of `GET /v1/courses/{id}/progress`. `revision` is 0 and `doc` null when never saved. */
 export interface CourseProgress {
@@ -350,26 +302,8 @@ export class CoreClient {
   }
 
   /** The stored classification of a page, or null when the core has none (404). */
-  async getClassification(pageKey: string): Promise<ScanClassification | null> {
-    try {
-      const res = await this.request<{
-        area_id?: number;
-        topic_id: number;
-        area: string;
-        topic: string;
-        candidates: { topic_id: number; area: string; topic: string }[];
-      }>("GET", `/scan/classification?page_key=${encodeURIComponent(pageKey)}`);
-      return {
-        areaId: res.area_id,
-        topicId: res.topic_id,
-        area: res.area,
-        topic: res.topic,
-        candidates: res.candidates.map((c) => ({ topicId: c.topic_id, area: c.area, topic: c.topic })),
-      };
-    } catch (err) {
-      if (err instanceof CoreHttpError && err.status === 404) return null;
-      throw err;
-    }
+  getClassification(pageKey: string): Promise<ScanClassification | null> {
+    return getClassification(this, pageKey);
   }
 
   /** Remember the concept the caller picked for a written word in a topic. */
@@ -388,21 +322,8 @@ export class CoreClient {
   }
 
   /** Concept counts and concept list of one topic. */
-  async topicOverview(topicId: number): Promise<TopicOverview> {
-    const res = await this.request<{
-      topic_id: number;
-      area: string;
-      topic: string;
-      counts: { new: number; learning: number; known: number };
-      concepts: { concept_id: number; label: string; state: ConceptMark["state"] }[];
-    }>("GET", `/scan/overview?topic_id=${topicId}`);
-    return {
-      topicId: res.topic_id,
-      area: res.area,
-      topic: res.topic,
-      counts: res.counts,
-      concepts: res.concepts.map((c) => ({ conceptId: c.concept_id, label: c.label, state: c.state })),
-    };
+  topicOverview(topicId: number): Promise<TopicOverview> {
+    return topicOverview(this, topicId);
   }
 
   /** The caller's ready courses, newest first (first page of `GET /v1/courses`). */
@@ -422,15 +343,14 @@ export class CoreClient {
     return this.request<CourseAccepted>("POST", "/v1/courses", { title });
   }
 
+  /** Queue a rebuild of a course (`POST /v1/courses/{id}/regenerate`). Throws CoreHttpError with `code` on 409/404. */
+  regenerateCourse(courseId: number): Promise<CourseAccepted> {
+    return this.request<CourseAccepted>("POST", `/v1/courses/${courseId}/regenerate`);
+  }
+
   /** Delete a course. Resolves true when deleted, false when it was already gone (404). */
-  async deleteCourse(courseId: number): Promise<boolean> {
-    try {
-      await this.request<void>("DELETE", `/v1/courses/${courseId}`);
-      return true;
-    } catch (err) {
-      if (err instanceof CoreHttpError && err.status === 404) return false;
-      throw err;
-    }
+  deleteCourse(courseId: number): Promise<boolean> {
+    return deleteCourse(this, courseId);
   }
 
   /** Open a ready course; returns the URL the panel should show it at. */
@@ -455,7 +375,83 @@ export class CoreClient {
     });
   }
 
-  private async request<T>(
+  /** Visible concepts the caller does not ignore, sorted (`GET /concepts/sorted`). */
+  sortedConcepts(sort: ConceptSortField = "name", order: ConceptSortOrder = "asc"): Promise<ConceptListRow[]> {
+    return this.request<ConceptListRow[]>("GET", `/concepts/sorted?${new URLSearchParams({ sort, order }).toString()}`);
+  }
+
+  /** Derived state of a block of concepts from the caller's marks (`POST /concepts/block-state`). */
+  async blockState(conceptIds: number[]): Promise<BlockState> {
+    const res = await this.request<{ state: BlockState }>("POST", "/concepts/block-state", { concept_ids: conceptIds });
+    return res.state;
+  }
+
+  /** Stamp the last-viewed time of a concept (`POST /concepts/{id}/viewed`). */
+  async markConceptViewed(conceptId: number): Promise<void> {
+    await this.request("POST", `/concepts/${conceptId}/viewed`);
+  }
+
+  /** Concepts the caller ignores (`GET /concepts/ignored`). */
+  listIgnored(): Promise<IgnoredConcept[]> {
+    return this.request<IgnoredConcept[]>("GET", "/concepts/ignored");
+  }
+
+  /** Hide a concept from the caller's lists; its marks stay (`PUT /concepts/{id}/ignore`). */
+  async ignoreConcept(conceptId: number): Promise<void> {
+    await this.request("PUT", `/concepts/${conceptId}/ignore`);
+  }
+
+  /** Show an ignored concept in the caller's lists again (`DELETE /concepts/{id}/ignore`). */
+  async unignoreConcept(conceptId: number): Promise<void> {
+    await this.request("DELETE", `/concepts/${conceptId}/ignore`);
+  }
+
+  /** Shared and own aliases of a concept (`GET /concepts/{id}/aliases`). */
+  listConceptAliases(conceptId: number): Promise<ConceptAlias[]> {
+    return this.request<ConceptAlias[]>("GET", `/concepts/${conceptId}/aliases`);
+  }
+
+  /** Add a private alias to a concept (`POST /concepts/{id}/aliases`). Throws CoreHttpError 409 when it exists. */
+  addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias> {
+    return this.request<ConceptAlias>("POST", `/concepts/${conceptId}/aliases`, { alias });
+  }
+
+  /** Summary of a page: the cached one (200) or a queued job id (202) (`POST /summary`). */
+  requestSummary(url: string, text: string): Promise<SummaryReply> {
+    return this.request<SummaryReply>("POST", "/summary", { url, text });
+  }
+
+  /** The cached summary of a page text, or null when none is cached (`GET /summary`, 404). */
+  async cachedSummary(url: string, textSha256: string): Promise<string | null> {
+    try {
+      const res = await this.request<{ summary: string }>(
+        "GET",
+        `/summary?${new URLSearchParams({ url, text_sha256: textSha256 }).toString()}`,
+      );
+      return res.summary;
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** The next cached joke (`GET /jokes/next`). Null when jokes are off or none is cached (404). */
+  async nextJoke(): Promise<Joke | null> {
+    try {
+      return await this.request<Joke>("GET", "/jokes/next");
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** The enabled joke sources, in list order (`GET /jokes/sources`). */
+  listJokeSources(): Promise<JokeSource[]> {
+    return this.request<JokeSource[]>("GET", "/jokes/sources");
+  }
+
+  /** The one request path; public so coreClientTracks.ts can call it. */
+  async request<T>(
     method: string,
     path: string,
     body?: unknown,
@@ -497,13 +493,4 @@ export class CoreClient {
       clearTimeout(timer);
     }
   }
-}
-
-/** Query string of the review filters: `q`, a repeated `state`, and `ids` (an empty set sends `ids=`). */
-function reviewQuery(filter: ReviewFilter): URLSearchParams {
-  const query = new URLSearchParams();
-  if (filter.q !== undefined) query.set("q", filter.q);
-  for (const state of filter.states ?? []) query.append("state", state);
-  if (filter.ids !== undefined) query.set("ids", filter.ids.join(","));
-  return query;
 }

@@ -14,7 +14,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 - [tools](modules/tools.md) - quality gate definitions in `tools/gates.json`.
 - [worker](modules/worker.md) - Python pull loop: takes jobs of the kinds it has handlers for (`tag`, `course.generate`, `syllabus.extract`, `scan.classify`, `scan.extract`, `quiz.generate`, `page.summary`, `reader.extract`; `worker/kata_worker/handlers/`, plus four `modelhost.*` control kinds claimed only when `[modelhost] control_enabled` is set, `worker/kata_worker/loop.py:31`), runs them through the provider router (`worker/kata_worker/providers/router.py`), which walks the `[routing]` chain per task class over the local and Anthropic providers; cloud calls pass the policy, the secret guard and the daily cost cap; reports result, output or fail.
 
-Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/design/extension-ui.md` (side panel and lesson page UI design, static mockups in `docs/design/extension-ui/`), `docs/INDEX.md` (generated file and symbol list).
+Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/design/extension-ui.md` (side panel and lesson page UI design), `docs/INDEX.md` (generated file and symbol list).
 
 ## Data and control flow
 1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:111`).
@@ -54,7 +54,7 @@ Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py -
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
-E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests").
+E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests": sign-in a11y, light and dark contrast, panel layout).
 
 ## Releases
 How a tag becomes a GitHub release and how the VM takes it: `docs/release.md`.

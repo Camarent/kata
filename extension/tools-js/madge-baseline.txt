@@ -1,0 +1,3 @@
+# madge --circular known cycles, one per line, smallest node first, " > " between nodes.
+# madge runs with extension/tools-js/.madgerc (skipTypeImports): the 6 cycles found without it are all
+# closed by type-only imports, so none remains. The gate fails on any cycle not listed here.

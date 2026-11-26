@@ -302,6 +302,16 @@ describe("CoreClient course create, delete and limits", () => {
     expect(calls[0].headers["Authorization"]).toBe("Bearer t");
   });
 
+  it("regenerateCourse posts to /v1/courses/{id}/regenerate and returns the accepted course", async () => {
+    const accepted = { ...ready, id: 7, status: "building", job_id: 78 };
+    const { fn, calls } = fakeFetch(202, accepted);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.regenerateCourse(7)).toEqual(accepted);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/7/regenerate`);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+  });
+
   it("createCourse throws CoreHttpError carrying course_limit from a 409 body", async () => {
     const { fn } = fakeFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
     const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
@@ -678,5 +688,157 @@ describe("CoreClient review calls", () => {
       `${BASE}/v1/review/concepts?q=su&state=learning&ids=7&sort=relevance&order=desc`,
     );
     expect(result).toEqual(rows);
+  });
+});
+
+describe("CoreClient concept lists, ignored, aliases, summary and jokes", () => {
+  const rowsOf = {
+    sorted: [{ concept_id: 3, label: "fractions", state: "new", added_at: "t0", last_viewed_at: null, relevance: 2 }],
+    ignored: [{ concept_id: 4, label: "decimals" }],
+    alias: [{ id: 9, concept_id: 3, alias: "parts", private: true }],
+    joke: { text: "ha", source_id: "s1", attribution: "A", licence_name: "CC0", licence_url: "https://x" },
+    sources: [{ id: "s1", attribution: "A", licence_name: "CC0", licence_url: "https://x" }],
+  };
+
+  it("sortedConcepts gets /concepts/sorted with sort and order and returns the rows", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.sorted);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.sortedConcepts("added", "desc")).toEqual(rowsOf.sorted);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/concepts/sorted?sort=added&order=desc`);
+  });
+
+  it("sortedConcepts defaults to name ascending", async () => {
+    const { fn, calls } = fakeFetch(200, []);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    await client.sortedConcepts();
+    expect(calls[0].url).toBe(`${BASE}/concepts/sorted?sort=name&order=asc`);
+  });
+
+  it("blockState posts concept_ids to /concepts/block-state and returns the state", async () => {
+    const { fn, calls } = fakeFetch(200, { state: "mixed" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.blockState([3, 4])).toBe("mixed");
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/concepts/block-state`);
+    expect(calls[0].body).toEqual({ concept_ids: [3, 4] });
+  });
+
+  it("markConceptViewed posts to /concepts/{id}/viewed and accepts the 204", async () => {
+    const { fn, calls } = fakeFetch(204);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    await expect(client.markConceptViewed(3)).resolves.toBeUndefined();
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/concepts/3/viewed`);
+  });
+
+  it("listIgnored gets /concepts/ignored and returns the rows", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.ignored);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.listIgnored()).toEqual(rowsOf.ignored);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/concepts/ignored`);
+  });
+
+  it("listConceptAliases gets /concepts/{id}/aliases and returns the rows", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.alias);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.listConceptAliases(3)).toEqual(rowsOf.alias);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/concepts/3/aliases`);
+  });
+
+  it("addConceptAlias posts the alias to /concepts/{id}/aliases and returns the new alias", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.alias[0]);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.addConceptAlias(3, "parts")).toEqual(rowsOf.alias[0]);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/concepts/3/aliases`);
+    expect(calls[0].body).toEqual({ alias: "parts" });
+  });
+
+  it("addConceptAlias throws CoreHttpError with 409 when the alias exists", async () => {
+    const { fn } = fakeFetch(409, { detail: "alias already exists" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    const err = await client.addConceptAlias(3, "parts").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoreHttpError);
+    expect((err as CoreHttpError).status).toBe(409);
+  });
+
+  it("requestSummary posts url and text to /summary and returns the cached summary", async () => {
+    const { fn, calls } = fakeFetch(200, { status: "done", summary: "short" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.requestSummary("https://p", "page")).toEqual({ status: "done", summary: "short" });
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/summary`);
+    expect(calls[0].body).toEqual({ url: "https://p", text: "page" });
+  });
+
+  it("requestSummary returns the queued job id on 202", async () => {
+    const { fn } = fakeFetch(202, { id: 12 });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.requestSummary("https://p", "page")).toEqual({ id: 12 });
+  });
+
+  it("cachedSummary gets /summary with url and text_sha256 and returns the summary", async () => {
+    const { fn, calls } = fakeFetch(200, { summary: "short" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.cachedSummary("https://p", "abc")).toBe("short");
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/summary?url=https%3A%2F%2Fp&text_sha256=abc`);
+  });
+
+  it("cachedSummary resolves null on 404 (nothing cached)", async () => {
+    const { fn } = fakeFetch(404, { detail: "summary not found" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    await expect(client.cachedSummary("https://p", "abc")).resolves.toBeNull();
+  });
+
+  it("nextJoke gets /jokes/next and returns the joke with its attribution", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.joke);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.nextJoke()).toEqual(rowsOf.joke);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toBe(`${BASE}/jokes/next`);
+  });
+
+  it("nextJoke resolves null on 404 (jokes disabled or cache empty)", async () => {
+    const { fn } = fakeFetch(404, { detail: "no joke cached" });
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    await expect(client.nextJoke()).resolves.toBeNull();
+  });
+
+  it("listJokeSources gets /jokes/sources and returns the sources", async () => {
+    const { fn, calls } = fakeFetch(200, rowsOf.sources);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 1000, fetchImpl: fn });
+    expect(await client.listJokeSources()).toEqual(rowsOf.sources);
+    expect(calls[0].url).toBe(`${BASE}/jokes/sources`);
+  });
+
+  const calls401: [string, (c: CoreClient) => Promise<unknown>][] = [
+    ["sortedConcepts", (c) => c.sortedConcepts()],
+    ["blockState", (c) => c.blockState([3])],
+    ["markConceptViewed", (c) => c.markConceptViewed(3)],
+    ["listIgnored", (c) => c.listIgnored()],
+    ["listConceptAliases", (c) => c.listConceptAliases(3)],
+    ["addConceptAlias", (c) => c.addConceptAlias(3, "parts")],
+    ["requestSummary", (c) => c.requestSummary("https://p", "page")],
+    ["cachedSummary", (c) => c.cachedSummary("https://p", "abc")],
+    ["nextJoke", (c) => c.nextJoke()],
+    ["listJokeSources", (c) => c.listJokeSources()],
+  ];
+
+  it.each(calls401)("%s throws CoreAuthError on 401", async (_name, call) => {
+    const { fn } = fakeFetch(401, { detail: "nope" });
+    const client = new CoreClient({ baseUrl: BASE, token: "bad", timeoutMs: 500, fetchImpl: fn });
+    await expect(call(client)).rejects.toBeInstanceOf(CoreAuthError);
+  });
+
+  it.each(calls401)("%s throws CoreOfflineError when the network fails", async (_name, call) => {
+    const failing = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: failing });
+    await expect(call(client)).rejects.toBeInstanceOf(CoreOfflineError);
   });
 });
