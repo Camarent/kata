@@ -157,6 +157,8 @@ run_browser() {
     exit 0
   fi
   step browser-deps uv pip install -q --python .venv/bin/python -r requirements-browser.txt
+  # The browser cases load extension/dist/<browser>: build it first so a stale or missing build cannot fail them.
+  step extension-build npm --prefix extension run build
   step browser .venv/bin/python -m pytest tests/browser -m browser
 }
 

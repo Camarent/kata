@@ -38,6 +38,7 @@ const CARD_RULES_CSS = `
 .menu li { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; padding: var(--space-1) 0; border-top: 1px solid var(--color-surface); }
 .menu li .name { flex: 1; min-width: 80px; }
 .popover { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: var(--gap); width: min(260px, calc(100% - 16px)); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: var(--shadow); padding: var(--gap-lg); font-size: 14px; }
+.popover[hidden] { display: none; }
 .popover > *, .popover .row, .popover p { margin: 0; }
 .popover h2 { font-size: 15px; margin: 0; }
 .modal-back { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; padding: var(--space-4); }
