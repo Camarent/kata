@@ -294,8 +294,9 @@ Partial: the UI modules are built and unit-tested, but not all are mounted in th
   are mounted in `sidepanel.ts` with stub handlers and placeholder data (courses, tracks, settings
   home, scan results): they render, but their actions do nothing yet.
 - Not mounted: the page overlays (`hlMenu.ts` hover menu, `whichOne.ts`, `blockMenu.ts`,
-  `imageMenu.ts`, `listPicker.ts`, `quizPin.ts`), the focus module (`ui/card/focus.ts`), and the
-  jokes screens (`jokeCloud.ts`). None of these has an importer.
+  `imageMenu.ts`, `listPicker.ts`, `quizPin.ts`), the exam screens (`ui/panel/examRun.ts`,
+  `ui/panel/examResult.ts`), the course page (`ui/panel/coursePage.ts`), the focus module
+  (`ui/card/focus.ts`), and the jokes screens (`jokeCloud.ts`). None of these has an importer.
 - Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
 
 ## Later

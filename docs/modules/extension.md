@@ -64,8 +64,10 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
     (`settingsHome`, `settingsPages`, `ignoredList`) are mounted in `sidepanel.ts` with stub handlers
     and placeholder data (courses, tracks, settings home, scan results): they render, but their
     actions do nothing yet. Not imported by the running extension: page overlays under `overlay/`
-    except `pageChanged.ts` (the only overlay `cardHost.ts` mounts), `card/focus.ts`, and the jokes
-    screen `card/jokeCloud.ts`. Wiring the rest is a follow-up before M26 (see `.notes/later.md`).
+    except `pageChanged.ts` (the only overlay `cardHost.ts` mounts), the exam screens
+    `panel/examRun.ts` and `panel/examResult.ts`, the course page `panel/coursePage.ts`,
+    `card/focus.ts`, and the jokes screen `card/jokeCloud.ts`. Wiring the rest is a follow-up before
+    M26 (see `.notes/later.md`).
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.
