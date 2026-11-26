@@ -3,7 +3,7 @@ Superseded by the redesign decisions 39-55 in decisions.md; replaced after the p
 
 Status: design for owner review. No extension code changes yet; the implementation follows owner approval.
 
-The static HTML mockups, their shared CSS tokens and the screenshot script were removed. This document is the design spec; the section numbers below (for example 2.15, 2.16 and 3.1) still refer to it. The old screenshots remain in [`extension-ui/shots/`](extension-ui/shots/README.md) and are not regenerated.
+The static HTML mockups, their shared CSS tokens and the screenshot script were removed. This document is the design spec; the section numbers below (for example 2.15, 2.16 and 3.1) still refer to it. The old screenshots were removed too.
 
 ## 1. Principles for the UI
 
