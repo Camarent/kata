@@ -159,3 +159,56 @@ export interface ReviewConcept {
   last_viewed_at: string | null;
   relevance: number;
 }
+
+/** Sort fields of `GET /concepts/sorted`. */
+export type ConceptSortField = "name" | "added" | "viewed" | "relevance";
+
+/** Sort order of `GET /concepts/sorted`. */
+export type ConceptSortOrder = "asc" | "desc";
+
+/** One concept of `GET /concepts/sorted`: the caller's visible concepts that are not ignored. */
+export interface ConceptListRow {
+  concept_id: number;
+  label: string;
+  state: string;
+  added_at: string;
+  last_viewed_at: string | null;
+  relevance: number;
+}
+
+/** Derived state of a block of concepts (`POST /concepts/block-state`). */
+export type BlockState = "new" | "learning" | "known" | "mixed";
+
+/** One ignored concept of `GET /concepts/ignored`. */
+export interface IgnoredConcept {
+  concept_id: number;
+  label: string;
+}
+
+/** One alias of a concept (`GET`/`POST /concepts/{id}/aliases`); `private` when the caller owns it. */
+export interface ConceptAlias {
+  id: number;
+  concept_id: number;
+  alias: string;
+  private: boolean;
+}
+
+/** Answer of `POST /summary`: a cached summary (200), or a queued job id (202). */
+export type SummaryReply = { status: "done"; summary: string } | { id: number };
+
+/** One joke of `GET /jokes/next`, with its source attribution and licence. */
+export interface Joke {
+  text: string;
+  source_id: string;
+  attribution: string;
+  licence_name: string;
+  licence_url: string;
+}
+
+/** One enabled joke source of `GET /jokes/sources`. */
+export interface JokeSource {
+  id: string;
+  attribution: string;
+  licence_name: string;
+  licence_url: string;
+}

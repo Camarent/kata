@@ -15,6 +15,15 @@ import type {
   ScanClassification,
   ScanExtractInput,
   TopicOverview,
+  BlockState,
+  ConceptAlias,
+  ConceptListRow,
+  ConceptSortField,
+  ConceptSortOrder,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
 } from "./coreClientTypes";
 export type {
   MarkRow,
@@ -39,6 +48,15 @@ export type {
   ReviewOrder,
   ReviewSort,
   ReviewTopic,
+  BlockState,
+  ConceptAlias,
+  ConceptListRow,
+  ConceptSortField,
+  ConceptSortOrder,
+  IgnoredConcept,
+  Joke,
+  JokeSource,
+  SummaryReply,
 } from "./coreClientTypes";
 
 
@@ -453,6 +471,71 @@ export class CoreClient {
       rawBody: docJson,
       ifMatch: revision,
     });
+  }
+
+  /** Visible concepts the caller does not ignore, sorted (`GET /concepts/sorted`). */
+  sortedConcepts(sort: ConceptSortField = "name", order: ConceptSortOrder = "asc"): Promise<ConceptListRow[]> {
+    return this.request<ConceptListRow[]>("GET", `/concepts/sorted?${new URLSearchParams({ sort, order }).toString()}`);
+  }
+
+  /** Derived state of a block of concepts from the caller's marks (`POST /concepts/block-state`). */
+  async blockState(conceptIds: number[]): Promise<BlockState> {
+    const res = await this.request<{ state: BlockState }>("POST", "/concepts/block-state", { concept_ids: conceptIds });
+    return res.state;
+  }
+
+  /** Stamp the last-viewed time of a concept (`POST /concepts/{id}/viewed`). */
+  async markConceptViewed(conceptId: number): Promise<void> {
+    await this.request("POST", `/concepts/${conceptId}/viewed`);
+  }
+
+  /** Concepts the caller ignores (`GET /concepts/ignored`). */
+  listIgnored(): Promise<IgnoredConcept[]> {
+    return this.request<IgnoredConcept[]>("GET", "/concepts/ignored");
+  }
+
+  /** Shared and own aliases of a concept (`GET /concepts/{id}/aliases`). */
+  listConceptAliases(conceptId: number): Promise<ConceptAlias[]> {
+    return this.request<ConceptAlias[]>("GET", `/concepts/${conceptId}/aliases`);
+  }
+
+  /** Add a private alias to a concept (`POST /concepts/{id}/aliases`). Throws CoreHttpError 409 when it exists. */
+  addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias> {
+    return this.request<ConceptAlias>("POST", `/concepts/${conceptId}/aliases`, { alias });
+  }
+
+  /** Summary of a page: the cached one (200) or a queued job id (202) (`POST /summary`). */
+  requestSummary(url: string, text: string): Promise<SummaryReply> {
+    return this.request<SummaryReply>("POST", "/summary", { url, text });
+  }
+
+  /** The cached summary of a page text, or null when none is cached (`GET /summary`, 404). */
+  async cachedSummary(url: string, textSha256: string): Promise<string | null> {
+    try {
+      const res = await this.request<{ summary: string }>(
+        "GET",
+        `/summary?${new URLSearchParams({ url, text_sha256: textSha256 }).toString()}`,
+      );
+      return res.summary;
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** The next cached joke (`GET /jokes/next`). Null when jokes are off or none is cached (404). */
+  async nextJoke(): Promise<Joke | null> {
+    try {
+      return await this.request<Joke>("GET", "/jokes/next");
+    } catch (err) {
+      if (err instanceof CoreHttpError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /** The enabled joke sources, in list order (`GET /jokes/sources`). */
+  listJokeSources(): Promise<JokeSource[]> {
+    return this.request<JokeSource[]>("GET", "/jokes/sources");
   }
 
   private async request<T>(
