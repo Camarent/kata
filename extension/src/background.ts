@@ -341,88 +341,76 @@ async function handleBridgeMessage(progress: ProgressBridge, message: BridgeMess
   return { ok: true, data: await progress.save(message.courseId, message.doc as ProgressDoc) };
 }
 
+/** One panel message handler: the backend call for one message type, with its reply. */
+type PanelHandler<T extends PanelMessage["type"]> = (
+  backend: Backend,
+  message: Extract<PanelMessage, { type: T }>,
+) => Promise<PanelReply>;
+
+/** Runs a backend call that may refuse with a Core HTTP error; the refusal becomes the reply. */
+async function refusable(call: () => Promise<unknown>): Promise<PanelReply> {
+  try {
+    await call();
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
+    throw err;
+  }
+}
+
+/** One handler per panel message type; its keys are the message types `isPanelMessage` accepts. */
+const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
+  "panel:signIn": async (backend, message) => {
+    await backend.signIn(message.input);
+    return { ok: true };
+  },
+  "panel:disconnect": async (backend) => {
+    await backend.disconnect();
+    return { ok: true };
+  },
+  "panel:scan": async (backend) => ({ ok: true, data: await backend.scan() }),
+  "panel:scanConcepts": async (backend) => ({ ok: true, data: await backend.scanConcepts() }),
+  "panel:chooseConcept": async (backend, message) => {
+    await backend.chooseConcept(message.topicId, message.word, message.conceptId);
+    return { ok: true };
+  },
+  "panel:reassignConcept": async (backend, message) => {
+    await backend.reassignConcept(message.topicId, message.word, message.fromConceptId, message.toConceptId);
+    return { ok: true };
+  },
+  "panel:topicOverview": async (backend, message) => ({ ok: true, data: await backend.topicOverview(message.topicId) }),
+  "panel:known": async (backend, message) => ({ ok: true, data: await backend.markKnown(message.topicId) }),
+  "panel:review": async (backend) => ({ ok: true, data: await backend.review() }),
+  "panel:setConcept": async (backend, message) => {
+    await backend.setConcept(message.conceptId, message.state);
+    return { ok: true };
+  },
+  "panel:pending": async (backend) => ({ ok: true, data: await backend.pendingCount() }),
+  "panel:courses": async (backend) => ({ ok: true, data: await backend.courses() }),
+  "panel:openCourse": async (backend, message) => {
+    await backend.openCourse(message.courseId);
+    return { ok: true };
+  },
+  "panel:deleteCourse": async (backend, message) => {
+    await backend.deleteCourse(message.courseId);
+    return { ok: true };
+  },
+  "panel:createCourse": (backend, message) => refusable(() => backend.createCourse(message.title)),
+  "panel:regenerateCourse": (backend, message) => refusable(() => backend.regenerateCourse(message.courseId)),
+  "panel:modelhost": async (backend, message) => ({ ok: true, data: await backend.modelhost(message.request) }),
+};
+
 /** Routes one panel message to the backend and returns its reply. */
 async function handlePanelMessage(backend: Backend, message: PanelMessage): Promise<PanelReply> {
-  switch (message.type) {
-    case "panel:signIn":
-      await backend.signIn(message.input);
-      return { ok: true };
-    case "panel:disconnect":
-      await backend.disconnect();
-      return { ok: true };
-    case "panel:scan":
-      return { ok: true, data: await backend.scan() };
-    case "panel:scanConcepts":
-      return { ok: true, data: await backend.scanConcepts() };
-    case "panel:chooseConcept":
-      await backend.chooseConcept(message.topicId, message.word, message.conceptId);
-      return { ok: true };
-    case "panel:reassignConcept":
-      await backend.reassignConcept(message.topicId, message.word, message.fromConceptId, message.toConceptId);
-      return { ok: true };
-    case "panel:topicOverview":
-      return { ok: true, data: await backend.topicOverview(message.topicId) };
-    case "panel:known":
-      return { ok: true, data: await backend.markKnown(message.topicId) };
-    case "panel:review":
-      return { ok: true, data: await backend.review() };
-    case "panel:setConcept":
-      await backend.setConcept(message.conceptId, message.state);
-      return { ok: true };
-    case "panel:pending":
-      return { ok: true, data: await backend.pendingCount() };
-    case "panel:courses":
-      return { ok: true, data: await backend.courses() };
-    case "panel:openCourse":
-      await backend.openCourse(message.courseId);
-      return { ok: true };
-    case "panel:deleteCourse":
-      await backend.deleteCourse(message.courseId);
-      return { ok: true };
-    case "panel:createCourse":
-      try {
-        await backend.createCourse(message.title);
-        return { ok: true };
-      } catch (err) {
-        if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
-        throw err;
-      }
-    case "panel:regenerateCourse":
-      try {
-        await backend.regenerateCourse(message.courseId);
-        return { ok: true };
-      } catch (err) {
-        if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
-        throw err;
-      }
-    case "panel:modelhost":
-      return { ok: true, data: await backend.modelhost(message.request) };
-  }
+  const handler = PANEL_HANDLERS[message.type] as PanelHandler<PanelMessage["type"]>;
+  return handler(backend, message);
 }
 
 /** True when `message` has one of the panel message shapes. */
 function isPanelMessage(message: unknown): message is PanelMessage {
   if (typeof message !== "object" || message === null) return false;
   const type = (message as { type?: unknown }).type;
-  return (
-    type === "panel:signIn" ||
-    type === "panel:disconnect" ||
-    type === "panel:scan" ||
-    type === "panel:scanConcepts" ||
-    type === "panel:chooseConcept" ||
-    type === "panel:reassignConcept" ||
-    type === "panel:topicOverview" ||
-    type === "panel:known" ||
-    type === "panel:review" ||
-    type === "panel:setConcept" ||
-    type === "panel:pending" ||
-    type === "panel:courses" ||
-    type === "panel:openCourse" ||
-    type === "panel:deleteCourse" ||
-    type === "panel:createCourse" ||
-    type === "panel:regenerateCourse" ||
-    type === "panel:modelhost"
-  );
+  return typeof type === "string" && Object.keys(PANEL_HANDLERS).includes(type);
 }
 
 /** True when `message` is the content script's report of a DOM change on a watched page. */
