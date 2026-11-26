@@ -322,7 +322,7 @@ describe("bootPanel", () => {
     root.querySelector<HTMLButtonElement>("button.review-open")!.click();
     await vi.waitFor(() => expect(root.querySelector("li.review-row")).not.toBeNull());
     const known = [...root.querySelectorAll<HTMLButtonElement>("button.state-button")].find(
-      (b) => b.textContent === "known",
+      (b) => b.textContent === "Known",
     )!;
     known.click();
     await vi.waitFor(() =>

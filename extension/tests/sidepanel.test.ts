@@ -293,7 +293,7 @@ describe("renderPanel", () => {
     };
     renderPanel(root, state, h);
     const learning = [...root.querySelectorAll<HTMLButtonElement>("button.state-button")].find(
-      (b) => b.textContent === "learning",
+      (b) => b.textContent === "Learning",
     )!;
     learning.click();
     await vi.waitFor(() => expect(h.onSetConcept).toHaveBeenCalledTimes(1));

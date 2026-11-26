@@ -1,4 +1,7 @@
-// Review screen: one row per concept with a three-state control (known / learning / new).
+// Review screen: concepts grouped by area (collapsed, with counts), searchable and filterable,
+// one row per concept with a local state menu (ui/stateMenu.ts).
+import { STATE_ORDER, renderStateMenu } from "./ui/stateMenu";
+import { TEXT_REVIEW } from "./ui/strings";
 
 export type ReviewState = "known" | "learning" | "new";
 
@@ -8,13 +11,23 @@ export interface ReviewRow {
   /** null = abstain / not set yet. */
   state: ReviewState | null;
   evidence: string;
+  /** Area the concept belongs to; rows without one go to a shared group. */
+  area?: string;
+  /** True when the concept is on the scanned page ("Only this page"). */
+  onPage?: boolean;
 }
 
 export interface ReviewHandlers {
   onSet(conceptId: number, state: ReviewState): Promise<void>;
 }
 
-const STATES: ReviewState[] = ["known", "learning", "new"];
+const [SEARCH_LABEL, COUNT_LABEL, ONLY_PAGE_LABEL, COLLAPSE_LABEL, EXPAND_LABEL] = TEXT_REVIEW.slice(22, 27);
+const STATE_TEXT: Record<ReviewState, string> = {
+  new: TEXT_REVIEW[14],
+  learning: TEXT_REVIEW[15],
+  known: TEXT_REVIEW[16],
+};
+const OTHER_AREA = "Other concepts";
 const KEY_STATE: Record<string, ReviewState> = { "1": "known", "2": "learning", "3": "new" };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -28,16 +41,106 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** Render the review list into `root`, replacing its content. */
+/** Render the review tree into `root`, replacing its content: areas start collapsed with counts. */
 export function renderReview(root: HTMLElement, rows: ReviewRow[], handlers: ReviewHandlers): void {
   root.replaceChildren();
   if (rows.length === 0) {
     root.append(el("p", "No concepts to review"));
     return;
   }
-  const list = el("ul", undefined, "review");
-  for (const row of rows) list.append(renderRow(row, handlers));
-  root.append(list);
+  const filter = { query: "", states: new Set<ReviewState>(), onlyPage: false };
+  const tree = el("div", undefined, "review-tree");
+  const total = el("p", undefined, "review-total");
+  const areas = new Map<string, HTMLDetailsElement>();
+
+  // Current states live here, so a redraw keeps saved changes without mutating the caller's rows.
+  const states = new Map(rows.map((row) => [row.conceptId, row.state]));
+  const stateOf = (row: ReviewRow): ReviewState | null => states.get(row.conceptId) ?? null;
+  const saved: ReviewHandlers = {
+    async onSet(conceptId, state) {
+      await handlers.onSet(conceptId, state);
+      states.set(conceptId, state);
+    },
+  };
+
+  const matches = (row: ReviewRow): boolean => {
+    const state = stateOf(row);
+    if (filter.onlyPage && row.onPage !== true) return false;
+    if (filter.states.size > 0 && (state === null || !filter.states.has(state))) return false;
+    return row.label.toLowerCase().includes(filter.query.trim().toLowerCase());
+  };
+
+  const draw = (): void => {
+    const visible = rows.filter(matches);
+    const open = new Set([...areas].filter(([, details]) => details.open).map(([name]) => name));
+    areas.clear();
+    tree.replaceChildren();
+    total.textContent = COUNT_LABEL.replace("N", String(visible.length)).replace("M", String(rows.length));
+    const byArea = new Map<string, ReviewRow[]>();
+    for (const row of visible) {
+      const name = row.area ?? OTHER_AREA;
+      byArea.set(name, [...(byArea.get(name) ?? []), row]);
+    }
+    for (const [name, areaRows] of byArea) {
+      const details = el("details", undefined, "review-area");
+      details.open = open.has(name);
+      const counts = STATE_ORDER.map(
+        (state) => `${STATE_TEXT[state]} ${areaRows.filter((r) => stateOf(r) === state).length}`,
+      ).join(", ");
+      details.append(el("summary", `${name} (${areaRows.length}) ${counts}`));
+      const list = el("ul", undefined, "review");
+      for (const row of areaRows) list.append(renderRow(row, stateOf(row), saved));
+      details.append(list);
+      areas.set(name, details);
+      tree.append(details);
+    }
+  };
+
+  const setAll = (open: boolean): void => {
+    for (const details of areas.values()) details.open = open;
+  };
+  const collapse = el("button", COLLAPSE_LABEL, "collapse-all");
+  collapse.type = "button";
+  collapse.addEventListener("click", () => setAll(false));
+  const expand = el("button", EXPAND_LABEL, "expand-all");
+  expand.type = "button";
+  expand.addEventListener("click", () => setAll(true));
+
+  const search = el("input", undefined, "review-search");
+  search.type = "search";
+  search.placeholder = SEARCH_LABEL;
+  search.setAttribute("aria-label", SEARCH_LABEL);
+  search.addEventListener("input", () => {
+    filter.query = search.value;
+    draw();
+  });
+
+  const toolbar = el("div", undefined, "review-toolbar");
+  toolbar.append(search, collapse, expand);
+  for (const state of STATE_ORDER) {
+    const button = el("button", STATE_TEXT[state], `filter-button filter-${state}`);
+    button.type = "button";
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => {
+      if (filter.states.has(state)) filter.states.delete(state);
+      else filter.states.add(state);
+      button.setAttribute("aria-pressed", String(filter.states.has(state)));
+      draw();
+    });
+    toolbar.append(button);
+  }
+  const pageLabel = el("label", undefined, "only-page");
+  const pageBox = el("input");
+  pageBox.type = "checkbox";
+  pageBox.addEventListener("change", () => {
+    filter.onlyPage = pageBox.checked;
+    draw();
+  });
+  pageLabel.append(pageBox, ONLY_PAGE_LABEL);
+  toolbar.append(pageLabel);
+
+  draw();
+  root.append(toolbar, total, tree);
 }
 
 /** Move focus to the first button of the neighbouring row. */
@@ -46,50 +149,32 @@ function focusNeighbour(item: HTMLElement, step: -1 | 1): void {
   sibling?.querySelector("button")?.focus();
 }
 
-function renderRow(row: ReviewRow, handlers: ReviewHandlers): HTMLElement {
+function renderRow(row: ReviewRow, state: ReviewState | null, handlers: ReviewHandlers): HTMLElement {
   const item = el("li", undefined, "review-row");
   item.append(el("span", row.label, "label"));
-  const group = el("div", undefined, "states");
-  group.setAttribute("role", "group");
-  group.setAttribute("aria-label", `State of ${row.label}`);
-  const note = el("span", undefined, "note");
-  const buttons = new Map<ReviewState, HTMLButtonElement>();
-  let current = row.state;
+  let current = state;
   let saving = false;
 
-  const paint = (): void => {
-    for (const [state, button] of buttons) {
-      button.setAttribute("aria-pressed", String(state === current));
-    }
-  };
-
-  const choose = async (state: ReviewState): Promise<void> => {
+  const choose = async (next: ReviewState): Promise<void> => {
     if (saving) return;
     saving = true;
-    for (const button of buttons.values()) button.disabled = true;
-    note.textContent = "";
+    const buttons = [...item.querySelectorAll("button")];
+    for (const button of buttons) button.disabled = true;
     try {
-      await handlers.onSet(row.conceptId, state);
-      current = state;
-      note.textContent = "saved";
-    } catch {
-      note.textContent = "failed";
+      await handlers.onSet(row.conceptId, next);
+      current = next;
     } finally {
       saving = false;
-      for (const button of buttons.values()) button.disabled = false;
-      paint();
+      for (const button of buttons) {
+        button.disabled = false;
+        button.setAttribute("aria-pressed", String(button.classList.contains(`state-${current}`)));
+      }
     }
   };
 
-  for (const state of STATES) {
-    const button = el("button", state, "state-button");
-    button.type = "button";
-    button.addEventListener("click", () => void choose(state));
-    buttons.set(state, button);
-    group.append(button);
-  }
-  paint();
-  item.append(group, note);
+  const menu = renderStateMenu(current, choose);
+  menu.setAttribute("aria-label", `State of ${row.label}`);
+  item.append(menu);
 
   item.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -100,7 +185,10 @@ function renderRow(row: ReviewRow, handlers: ReviewHandlers): HTMLElement {
     const state = KEY_STATE[event.key];
     if (state !== undefined) {
       event.preventDefault();
-      void choose(state);
+      choose(state).catch((err: unknown) => {
+        const note = item.querySelector(".note");
+        if (note) note.textContent = err instanceof Error ? err.message : String(err);
+      });
     }
   });
   return item;

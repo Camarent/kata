@@ -47,6 +47,8 @@ export interface ConceptScanner {
   startRescan(tabId: number, pageKey: string, first: ConceptScanResult): void;
   /** Stops the rescan in progress, if any. */
   stopRescan(): void;
+  /** The watched page and its last merged result (scan plus rescans), or undefined when nothing is watched. */
+  current(): { pageKey: string; result: ConceptScanResult } | undefined;
   /** A watched page changed in the DOM: restarts the rescan debounce for that tab. */
   pageMutated(tabId: number): void;
   /** Stops the rescan when the watched tab navigates away. */
@@ -107,6 +109,7 @@ export function createConceptScanner(deps: ConceptScannerDeps): ConceptScanner {
     scanPage,
     startRescan,
     stopRescan,
+    current: () => (watched ? { pageKey: watched.pageKey, result: watched.last } : undefined),
     pageMutated(tabId) {
       mutationHandlers.get(tabId)?.();
     },

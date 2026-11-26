@@ -94,6 +94,10 @@ export interface ReviewRow {
   label: string;
   state: ConceptMark["state"] | null;
   evidence: string;
+  /** Area of the page scan the concept came from; absent for concepts not on the scanned page. */
+  area?: string;
+  /** True when the concept is on the last scanned page ("Only this page"). */
+  onPage?: boolean;
 }
 
 /** Business logic behind the side panel; each call talks to the core. */
@@ -198,7 +202,9 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       if (tab.url === undefined) throw new Error("page has no URL");
       const pageKey = pageKeyOf(tab.url);
       const result = await scanner.scanPage(session, tab.id, pageKey);
-      if (!("error" in result)) scanner.startRescan(tab.id, pageKey, result);
+      if (!("error" in result)) {
+        scanner.startRescan(tab.id, pageKey, result);
+      }
       return result;
     },
 
@@ -243,8 +249,19 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       if (marks.length === 0) return [];
       const checks = await client.lessonCheck(marks.map((mark) => mark.concept_id));
       const markById = new Map(marks.map((mark) => [mark.concept_id, mark]));
+      const pageIds = new Set<number>();
+      // The watched page (last scan merged with rescans) counts only while the active tab still shows it.
+      // Limit: areas come from that scan only; off-page concepts fall in "Other concepts" because
+      // the core review tree carries no concept ids per area.
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      const watched = scanner.current();
+      const scan = tab?.url !== undefined && watched?.pageKey === pageKeyOf(tab.url) ? watched.result : null;
+      for (const block of scan?.blocks ?? []) {
+        for (const item of block.concepts) if (item.conceptId !== null) pageIds.add(item.conceptId);
+      }
       return checks.map((check): ReviewRow => {
         const mark = markById.get(check.concept_id);
+        const onPage = pageIds.has(check.concept_id);
         // A stored mark wins; with no mark, an abstaining check leaves the state null.
         let state: ReviewRow["state"] = null;
         if (mark) state = mark.state;
@@ -254,6 +271,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
           label: mark?.label ?? check.label,
           state,
           evidence: mark?.evidence ?? check.evidence,
+          area: onPage && scan ? scan.area : undefined,
+          onPage,
         };
       });
     },

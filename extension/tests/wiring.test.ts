@@ -267,8 +267,8 @@ describe("background wiring", () => {
     expect(reply).toEqual({
       ok: true,
       data: [
-        { conceptId: 1, label: "A", state: "known", evidence: "marked" },
-        { conceptId: 2, label: "B", state: "new", evidence: "" },
+        { conceptId: 1, label: "A", state: "known", evidence: "marked", onPage: false },
+        { conceptId: 2, label: "B", state: "new", evidence: "", onPage: false },
       ],
     });
     const checkCall = vi.mocked(fetchImpl).mock.calls.find(([input]) => String(input).endsWith("/lesson-check"));
@@ -684,6 +684,31 @@ describe("background concept scan and rescan", () => {
       String(url).includes(`page_key=${encodeURIComponent("https://ex.test/page?x=1")}`),
     );
     expect(keyed).toBe(true);
+  });
+
+  it("review marks concepts on the page only while the active tab shows the scanned page", async () => {
+    const scanFetch = conceptFetch(CONCEPT_OUTPUT);
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/lesson-check")) {
+        const results = [{ concept_id: 10, label: "alpha", state: "known", source: "", evidence: "" }];
+        return new Response(JSON.stringify({ results }), { status: 200 });
+      }
+      if (url.includes("/concept-marks") || url.includes("/marks")) {
+        const marks = [{ concept_id: 10, label: "alpha", state: "known", evidence: "", created_at: "", updated_at: "" }];
+        return new Response(JSON.stringify(marks), { status: 200 });
+      }
+      return scanFetch(input, init);
+    }) as unknown as typeof fetch;
+    let tabs = PAGE;
+    const chrome = fakeChrome({ query: vi.fn(async () => tabs), sendMessage: vi.fn(pageBlocks) });
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(SESSION), fetchImpl));
+    await chrome.send({ type: "panel:scanConcepts" });
+    const same = (await chrome.send({ type: "panel:review" })) as PanelReply;
+    expect(same).toMatchObject({ ok: true, data: [{ conceptId: 10, onPage: true, area: "a" }] });
+    tabs = [{ id: 7, url: "https://ex.test/other" }];
+    const other = (await chrome.send({ type: "panel:review" })) as PanelReply;
+    expect(other).toMatchObject({ ok: true, data: [{ conceptId: 10, onPage: false }] });
   });
 
   it("scanConcepts reports a page without blocks as an error reply", async () => {
