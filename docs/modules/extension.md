@@ -50,6 +50,16 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `topicOverview` reads snake_case keys (`topic_id`, `concept_id`), but `GET /scan/overview` answers camelCase (`topicId`, `conceptId`), so those mapped fields come out undefined until the two agree.
 - `extension/src/background.ts:194` runs `runConceptScan` with `POLL_MS` and `MAX_WAIT_MS`; `:208` starts the rescanner.
 - `extension/src/rescan.ts:53` `createRescanner(deps)` - observes page mutations; every mutation restarts one `debounceMs` timer, so a burst fires `onRescan` once; `stop()` cancels the timer and the observer. `:17` `mergeMarks(prev, next)` keeps the previous state of a concept seen before, so a rescan does not blank marks.
+- UI (M25, approved design in `docs/design/extension-ui.md`, section 9): plain DOM TypeScript under `extension/src/ui/`, no framework.
+  - `extension/src/ui/strings.ts` every user-facing string (one owner, pinned to the screen inventory).
+  - `extension/src/ui/dom.ts`, `confirm.ts`, `undo.ts`, `popover.ts`, `stateMenu.ts` shared primitives (DOM helper, confirm, undo, popover, state menu).
+  - `extension/src/ui/panelCss.ts`, `cardCss.ts` stylesheets ported from the prototype.
+  - `extension/src/ui/panel/` panel tab screens (one `render*` function per screen), the tab router `router.ts`, and `screens.ts`.
+  - `extension/src/ui/panel/screens.ts` `SCREENS`: the only registry of panel and settings screens; `drawScreen` draws one screen by its inventory id. Add a screen here, not in the router.
+  - `extension/src/ui/card/` floating card screens (`cardMain.ts`, `cardScan.ts`, `cardSummary.ts`, `jokeCloud.ts`), the pin (`pin.ts`, `pinPosition.ts`) and `focus.ts`.
+  - `extension/src/ui/overlay/` page overlay (`whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`, `hlMenu.ts`, `listPicker.ts`, `quizPin.ts`, `pageChanged.ts`).
+  - Screen inventory: 48 screens on five surfaces (panel tab 22, floating card 9, settings page 8, page overlay 6, course page 3).
+  - Tests: vitest per component state under `extension/tests/`; browser tests in `tests/browser/`.
 
 ## Key files
 - `extension/manifest.base.json` - shared manifest fields and permissions; change only with the feature that needs them.

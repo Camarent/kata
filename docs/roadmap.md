@@ -280,12 +280,13 @@ the offline mark queue, and the OpenAPI export. Shipped:
   and flush in order; the panel reads the pending count.
 - OpenAPI export of the core schema to `docs/openapi.json`, with a test that fails when it drifts.
 
-## Milestone 25: UI implementation
+## Milestone 25: UI implementation (done)
 
-**Scope.** Build the extension UI on the backend from M19 to M24. The approved design is linked in
-[`decisions.md`](decisions.md) (D1 to D55); D56 to D58 are round 2 design feedback, not yet in
-`decisions.md`. The design sketch is in
-[`design/extension-ui.md`](design/extension-ui.md).
+**Scope.** Build the extension UI on the backend from M19 to M24: 48 approved screens (D1 to D58) on
+the panel tab, floating card, settings, page overlay and course page. The approved design notes
+(decisions, glossary, inventory summary) are in [`design/extension-ui.md`](design/extension-ui.md),
+section 9; the decision record is in [`decisions.md`](decisions.md). The UI modules are listed in
+[`modules/extension.md`](modules/extension.md). The old mockups were removed.
 
 ## Later
 

@@ -792,3 +792,7 @@ The sign-in code the extension asks for is an enrolment code. The admin CLI `enr
 Focus mode auto-end default is 3 hours (D50). Design only; built in M25.
 
 The OpenAPI schema is committed to `docs/openapi.json`. It is exported by `core/kata_core/api/openapi_export.py:20` (`schema_text`), and a test fails when the file drifts from the app.
+
+## Extension UI is plain DOM TypeScript built to the approved design (M25)
+
+The extension UI (48 screens, decisions D1 to D58) is built as plain DOM TypeScript under `extension/src/ui/`, with no framework. Every user-facing string comes from `extension/src/ui/strings.ts`, pinned to the screen inventory. Panel screens are drawn only through the registry `SCREENS` in `extension/src/ui/panel/screens.ts`. The approved design notes are kept in `docs/design/extension-ui.md` (section 9). The old static mockups, their CSS tokens and their checker tests were removed. Module map: [modules/extension.md](modules/extension.md).
