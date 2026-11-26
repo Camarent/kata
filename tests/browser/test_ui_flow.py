@@ -1,9 +1,10 @@
-"""Browser flows of the page overlay pieces on a sample page: hover menu, Delete/Undo, pin, review tree.
+"""Component tests of the page overlay pieces on a sample page: hover menu, Delete/Undo, pin, review tree.
 
-The content script does not wire the hover menu or the concept actions on a page yet, so the page
-loads a harness bundle (tests/browser/harness/entry.ts, built here with esbuild) that mounts the real
-overlay modules. Runs once per browser (browser_name param, see conftest.py); a missing browser skips
-that case. Nothing here reaches beyond 127.0.0.1.
+These are component tests, not production tests: the content script does not wire the hover menu or
+the concept actions on a page yet, so the page loads a harness bundle (tests/browser/harness/entry.ts,
+built here with esbuild) that mounts the real overlay modules. The built content.js is covered by
+test_prod_content.py. Runs once per browser (browser_name param, see conftest.py); a missing browser
+skips that case. Nothing here reaches beyond 127.0.0.1.
 """
 
 from __future__ import annotations
@@ -92,7 +93,7 @@ def _actions(driver: Any) -> Any:
     return ActionChains(driver)
 
 
-def test_hover_menu_opens_without_shift_and_changes_state(driver: Any, sample_site: str) -> None:
+def test_component_hover_menu_opens_without_shift_and_changes_state(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     popover = "body > .popover:has(.hl-hover-menu)"
     assert not _find(driver, popover).is_displayed()
@@ -103,7 +104,7 @@ def test_hover_menu_opens_without_shift_and_changes_state(driver: Any, sample_si
     assert driver.execute_script("return window.harnessLog.states") == ["learning"]
 
 
-def test_delete_confirm_then_undo_then_commit(driver: Any, sample_site: str) -> None:
+def test_component_delete_confirm_then_undo_then_commit(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     _find(driver, ".concept-delete").click()
     assert driver.execute_script("return !!document.querySelector('.confirm')")
@@ -119,7 +120,7 @@ def test_delete_confirm_then_undo_then_commit(driver: Any, sample_site: str) -> 
     assert driver.execute_script("return window.harnessLog.commits") == ["delete"]
 
 
-def test_pin_drag_is_kept_after_reload(driver: Any, sample_site: str) -> None:
+def test_component_pin_drag_is_kept_after_reload(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     before = _pin_box(driver)
     grip = _find(driver, f"{PIN} .drag")
@@ -134,7 +135,7 @@ def test_pin_drag_is_kept_after_reload(driver: Any, sample_site: str) -> None:
     assert abs(again["top"] - moved["top"]) <= POSITION_TOLERANCE
 
 
-def test_pin_position_is_clamped_to_the_viewport(driver: Any, sample_site: str) -> None:
+def test_component_pin_position_is_clamped_to_the_viewport(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     far = {POSITION_KEY: {"x": 99999, "y": 99999}}
     driver.execute_script("localStorage.setItem(arguments[0], arguments[1])", STORAGE_KEY, json.dumps(far))
@@ -147,7 +148,7 @@ def test_pin_position_is_clamped_to_the_viewport(driver: Any, sample_site: str) 
     assert box["left"] >= 0 and box["top"] >= 0
 
 
-def test_pin_collapse_and_expand(driver: Any, sample_site: str) -> None:
+def test_component_pin_collapse_and_expand(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     assert _find(driver, PIN).get_attribute("data-screen") == "pin"
     _find(driver, f"{PIN} .x").click()
@@ -156,7 +157,7 @@ def test_pin_collapse_and_expand(driver: Any, sample_site: str) -> None:
     assert _find(driver, PIN).get_attribute("data-screen") == "pin"
 
 
-def test_escape_closes_the_pin_menu(driver: Any, sample_site: str) -> None:
+def test_component_escape_closes_the_pin_menu(driver: Any, sample_site: str) -> None:
     from selenium.webdriver.common.keys import Keys
 
     _open(driver, sample_site)
@@ -168,7 +169,7 @@ def test_escape_closes_the_pin_menu(driver: Any, sample_site: str) -> None:
     assert driver.execute_script(f"return document.querySelector('{menu}').getClientRects().length") == 0
 
 
-def test_review_tree_is_collapsed_by_default(driver: Any, sample_site: str) -> None:
+def test_component_review_tree_is_collapsed_by_default(driver: Any, sample_site: str) -> None:
     _open(driver, sample_site)
     areas = driver.execute_script("return document.querySelectorAll('#review details.review-area').length")
     assert areas > 0

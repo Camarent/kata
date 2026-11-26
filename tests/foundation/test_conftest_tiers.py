@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CORE = "tests/core/"
 E2E = "tests/e2e/"
+BROWSER = "tests/browser/"
 OTHER = ("tests/foundation/", "tests/worker/")
 
 
@@ -74,3 +75,12 @@ def test_tier_selection_matches_directories():
 def test_smoke_selection_yields_exactly_two_items():
     smoke = _collect("-m", "smoke")
     assert len(smoke) == 2, smoke
+
+
+def test_browser_tests_are_opt_in():
+    # Without -m browser the conftest deselects every tests/browser item; with it, they are collected.
+    default = _collect("tests/browser")
+    opted_in = _collect("-m", "browser", "tests/browser")
+    assert default == [], default
+    assert opted_in, "no tests/browser items collected with -m browser"
+    assert all(item.startswith(BROWSER) for item in opted_in), opted_in
