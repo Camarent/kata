@@ -302,6 +302,16 @@ describe("CoreClient course create, delete and limits", () => {
     expect(calls[0].headers["Authorization"]).toBe("Bearer t");
   });
 
+  it("regenerateCourse posts to /v1/courses/{id}/regenerate and returns the accepted course", async () => {
+    const accepted = { ...ready, id: 7, status: "building", job_id: 78 };
+    const { fn, calls } = fakeFetch(202, accepted);
+    const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });
+    expect(await client.regenerateCourse(7)).toEqual(accepted);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toBe(`${BASE}/v1/courses/7/regenerate`);
+    expect(calls[0].headers["Authorization"]).toBe("Bearer t");
+  });
+
   it("createCourse throws CoreHttpError carrying course_limit from a 409 body", async () => {
     const { fn } = fakeFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
     const client = new CoreClient({ baseUrl: BASE, token: "t", timeoutMs: 500, fetchImpl: fn });

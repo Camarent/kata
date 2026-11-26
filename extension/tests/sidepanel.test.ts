@@ -18,6 +18,7 @@ function handlers(overrides: Partial<PanelHandlers> = {}): PanelHandlers {
     onOpenCourse: vi.fn(async () => {}),
     onDeleteCourse: vi.fn(async () => {}),
     onCreateCourse: vi.fn(async () => {}),
+    onRegenerateCourse: vi.fn(async () => {}),
     onModelhost: vi.fn(async () => ({ ok: true, text: "done" })),
     ...overrides,
   };

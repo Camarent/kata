@@ -281,6 +281,10 @@ export const TEXT_COURSES_TAB = [
   "Version 2",
   "Could not load courses.",
   "Server down. Generate course is off.",
+  "Delete course",
+  "Delete this course?",
+  "Yes, delete",
+  "Could not delete the course.",
 ] as const;
 
 export const TEXT_LIST_DETAIL = [
@@ -324,6 +328,7 @@ export const TEXT_COURSE_GENERATE = [
   "Generating...",
   "Could not generate the course.",
   "Server down. Generate course is off.",
+  "Give the course a title.",
 ] as const;
 
 export const TEXT_COURSE_DETAIL = [

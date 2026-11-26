@@ -4,7 +4,21 @@ import { execSync } from "node:child_process";
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { bootPanel, type OriginsRequest, type PanelChromeLike } from "../src/sidepanelBoot";
 import type { PanelMessage, PanelReply } from "../src/background";
+import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
+
+/** The handlers bootPanel hands to renderPanel; the courses regenerate action has no other DOM entry point yet. */
+const captured = vi.hoisted(() => ({ handlers: undefined as PanelHandlers | undefined }));
+vi.mock("../src/sidepanel", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../src/sidepanel")>();
+  return {
+    ...original,
+    renderPanel: (root: HTMLElement, state: PanelState, handlers: PanelHandlers) => {
+      captured.handlers = handlers;
+      original.renderPanel(root, state, handlers);
+    },
+  };
+});
 
 /** `npm --prefix extension test` runs with the extension folder as cwd. */
 const EXTENSION_DIR = process.cwd();
@@ -458,6 +472,21 @@ describe("bootPanel", () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: "panel:createCourse", title: "Rust basics" });
     expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(2);
     expect(root.querySelector("section.courses p.course-note")?.textContent).toBe("");
+  });
+
+  it("onRegenerateCourse sends panel:regenerateCourse with the course id and reloads the list", async () => {
+    const sendMessage = vi.fn(async (message: PanelMessage): Promise<PanelReply> =>
+      message.type === "panel:courses" ? { ok: true, data: courseList } : { ok: true },
+    );
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": signedIn }) },
+      permissions: fakePermissions(),
+    };
+    await bootPanel(mountPoint(), api);
+    await captured.handlers!.onRegenerateCourse(7);
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:regenerateCourse", courseId: 7 });
+    expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:courses")).toHaveLength(2);
   });
 
   it("a refused create shows the course error text and does not reload the list", async () => {

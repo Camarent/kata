@@ -440,6 +440,11 @@ export class CoreClient {
     return this.request<CourseAccepted>("POST", "/v1/courses", { title });
   }
 
+  /** Queue a rebuild of a course (`POST /v1/courses/{id}/regenerate`). Throws CoreHttpError with `code` on 409/404. */
+  regenerateCourse(courseId: number): Promise<CourseAccepted> {
+    return this.request<CourseAccepted>("POST", `/v1/courses/${courseId}/regenerate`);
+  }
+
   /** Delete a course. Resolves true when deleted, false when it was already gone (404). */
   async deleteCourse(courseId: number): Promise<boolean> {
     try {

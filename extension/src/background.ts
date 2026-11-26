@@ -63,6 +63,7 @@ export type PanelMessage =
   | { type: "panel:openCourse"; courseId: number }
   | { type: "panel:deleteCourse"; courseId: number }
   | { type: "panel:createCourse"; title: string }
+  | { type: "panel:regenerateCourse"; courseId: number }
   | { type: "panel:modelhost"; request: ModelhostRequest };
 /** One local model host action from the panel: start, measure, status, or choose the engine. */
 export type ModelhostRequest =
@@ -134,6 +135,7 @@ export interface Backend {
   deleteCourse(courseId: number): Promise<void>;
   /** Queues a new course with the given title; a refusal from the core rejects with CoreHttpError. */
   createCourse(title: string): Promise<void>;
+  regenerateCourse(courseId: number): Promise<void>;
   /** Queues a modelhost job and waits up to MAX_WAIT_MS; "pending" when the worker has not answered by then. */
   modelhost(request: ModelhostRequest): Promise<ModelhostResult>;
   /** Whole-document progress load and save for the course pages (see bridge.ts). */
@@ -320,6 +322,11 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       await clientFor(session).createCourse(title);
     },
 
+    async regenerateCourse(courseId) {
+      const session = await requireSession();
+      await clientFor(session).regenerateCourse(courseId);
+    },
+
     async modelhost(request) {
       const session = await requireSession();
       const client = clientFor(session);
@@ -403,6 +410,14 @@ async function handlePanelMessage(backend: Backend, message: PanelMessage): Prom
         if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
         throw err;
       }
+    case "panel:regenerateCourse":
+      try {
+        await backend.regenerateCourse(message.courseId);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof CoreHttpError) return { ok: false, error: err.message, status: err.status, code: err.code };
+        throw err;
+      }
     case "panel:modelhost":
       return { ok: true, data: await backend.modelhost(message.request) };
   }
@@ -428,6 +443,7 @@ function isPanelMessage(message: unknown): message is PanelMessage {
     type === "panel:openCourse" ||
     type === "panel:deleteCourse" ||
     type === "panel:createCourse" ||
+    type === "panel:regenerateCourse" ||
     type === "panel:modelhost"
   );
 }

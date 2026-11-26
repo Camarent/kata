@@ -185,6 +185,15 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       await loadCourses();
       draw();
     },
+    async onRegenerateCourse(courseId: number) {
+      const reply = await api.runtime.sendMessage({ type: "panel:regenerateCourse", courseId });
+      if (!reply.ok) {
+        if (reply.status !== undefined) throw new CoreHttpError(reply.status, reply.code);
+        throw new Error(reply.error);
+      }
+      await loadCourses();
+      draw();
+    },
     async onDeleteCourse(courseId: number) {
       const reply = await api.runtime.sendMessage({ type: "panel:deleteCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);

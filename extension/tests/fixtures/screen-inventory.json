@@ -1555,7 +1555,11 @@
       "Least relevant first",
       "Version 2",
       "Could not load courses.",
-      "Server down. Generate course is off."
+      "Server down. Generate course is off.",
+      "Delete course",
+      "Delete this course?",
+      "Yes, delete",
+      "Could not delete the course."
     ]
   },
   {
@@ -1802,7 +1806,8 @@
       "Cancel",
       "Generating...",
       "Could not generate the course.",
-      "Server down. Generate course is off."
+      "Server down. Generate course is off.",
+      "Give the course a title."
     ]
   },
   {

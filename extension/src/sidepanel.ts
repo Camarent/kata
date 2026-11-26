@@ -75,6 +75,7 @@ export interface PanelHandlers {
   onOpenCourse: (courseId: number) => Promise<void>;
   onDeleteCourse: (courseId: number) => Promise<void>;
   onCreateCourse: (title: string) => Promise<void>;
+  onRegenerateCourse: (courseId: number) => Promise<void>;
   onModelhost: (request: ModelhostRequest) => Promise<ModelhostResult>;
   /** Retry now on the connection detail and the queue screen; the button is hidden without it. */
   onRetry?: () => Promise<void>;

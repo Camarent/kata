@@ -437,6 +437,25 @@ describe("background wiring", () => {
     expect(reply).toMatchObject({ ok: false, status: 409, code: "course_name_taken" });
   });
 
+  it("regenerateCourse posts to the core regenerate route and replies ok on 202", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(202, { id: 7, title: "Rust basics", status: "processing" });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:regenerateCourse", courseId: 7 })) as PanelReply;
+    expect(reply).toEqual({ ok: true });
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(String(url)).toBe("http://127.0.0.1:8080/v1/courses/7/regenerate");
+    expect(init.method).toBe("POST");
+  });
+
+  it("regenerateCourse replies with the core status and code on 409", async () => {
+    const chrome = fakeChrome();
+    const fetchImpl = createFetch(409, { detail: { code: "course_limit", message: "course limit of 3 reached" } });
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    const reply = (await chrome.send({ type: "panel:regenerateCourse", courseId: 7 })) as PanelReply;
+    expect(reply).toMatchObject({ ok: false, status: 409, code: "course_limit" });
+  });
+
   it("openCourse opens the core URL in a new tab", async () => {
     const chrome = fakeChrome();
     wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), courseFetch("http://127.0.0.1:8080/c/4/")));
