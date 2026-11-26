@@ -95,9 +95,9 @@ function fakeChrome(overrides: Partial<ChromeLike["tabs"]> = {}) {
     /** Sends the content script's page-changed report from tab `tabId`. */
     mutate: (tabId: number) => messageListener?.({ type: "page:mutated" }, { tab: { id: tabId } }, () => undefined),
     /** Sends a runtime message and resolves with what `sendResponse` got. */
-    send: (message: unknown) =>
+    send: (message: unknown, sender: unknown = {}) =>
       new Promise<unknown>((resolve) => {
-        const handled = messageListener?.(message, {}, resolve);
+        const handled = messageListener?.(message, sender, resolve);
         if (handled !== true) resolve(undefined);
       }),
   };
@@ -200,6 +200,16 @@ describe("background wiring", () => {
     wireBackground(api, createBackend(api, area, fetchImpl));
     chrome.click({ windowId: 2 });
     expect(sidebarOpen).toHaveBeenCalledOnce();
+    expect(chrome.open).not.toHaveBeenCalled();
+  });
+
+  it("opens the side panel for a card:openPanel message from a page tab", async () => {
+    const chrome = fakeChrome();
+    wireBackground(chrome.api, createBackend(chrome.api, memoryArea(), vi.fn() as unknown as typeof fetch));
+    expect(await chrome.send({ type: "card:openPanel" }, { tab: { id: 7, windowId: 4 } })).toBeUndefined();
+    expect(chrome.open).toHaveBeenCalledWith({ windowId: 4 });
+    chrome.open.mockClear();
+    await chrome.send({ type: "card:openPanel" }, {});
     expect(chrome.open).not.toHaveBeenCalled();
   });
 
@@ -1146,7 +1156,8 @@ describe("content script floating UI mount", () => {
       // Scan asks the background and shows the counts.
       document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
       await vi.waitFor(() => expect(document.querySelector(".card-scan .status.done")).not.toBeNull());
-      expect(sent).toEqual([{ type: "panel:scanConcepts" }]);
+      // The scan also asks for a joke to show while it runs.
+      expect(sent).toEqual([{ type: "panel:nextJoke" }, { type: "panel:scanConcepts" }]);
       expect(document.querySelector(".card-scan .status")?.textContent).toContain("2");
 
       // A page change after the scan shows the page-changed prompt.
@@ -1165,6 +1176,241 @@ describe("content script floating UI mount", () => {
       }
     }
     expect(document.querySelector(".card-host")).toBeNull();
+  });
+
+  it("summary button sends the page text to the background and shows the summary", async () => {
+    document.body.innerHTML = "";
+    const sent: unknown[] = [];
+    const runtime = {
+      async sendMessage(message: unknown) {
+        sent.push(message);
+        if ((message as { type: string }).type === "panel:requestSummary") {
+          return { ok: true, data: { status: "done", summary: "A page about TCP." } };
+        }
+        return {
+          ok: true,
+          data: {
+            blocks: [
+              {
+                blockId: "b1",
+                concepts: [{ word: "x", conceptId: 1, label: "X", definition: "", state: "new", candidates: [] }],
+              },
+            ],
+          },
+        };
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      ui.pin.collapse();
+      Array.from(ui.pin.element.querySelectorAll<HTMLButtonElement>(".pinbtn"))
+        .find((button) => !button.closest(".pinwrap"))
+        ?.click();
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      await vi.waitFor(() => expect(document.querySelector(".card-scan .status.done")).not.toBeNull());
+      document.querySelector<HTMLButtonElement>(".card-scan .back")?.click();
+      document.querySelector<HTMLButtonElement>(".card-main .summary")?.click();
+      await vi.waitFor(() => expect(document.querySelector(".card-summary")?.textContent).toContain("A page about TCP."));
+      const request = sent.find((message) => (message as { type: string }).type === "panel:requestSummary");
+      expect(request).toEqual(expect.objectContaining({ type: "panel:requestSummary", url: document.location.href }));
+    } finally {
+      ui.dispose();
+    }
+    expect(document.querySelector(".card-host")).toBeNull();
+  });
+
+  /** Mounts a card with a finished scan, so the summary button is enabled. */
+  async function mountScannedCard(summaryReply: () => Promise<unknown>) {
+    document.body.innerHTML = "";
+    const runtime = {
+      async sendMessage(message: unknown) {
+        if ((message as { type: string }).type === "panel:requestSummary") return summaryReply();
+        if ((message as { type: string }).type === "panel:nextJoke") return { ok: true, data: null };
+        return {
+          ok: true,
+          data: {
+            blocks: [
+              {
+                blockId: "b1",
+                concepts: [{ word: "x", conceptId: 1, label: "X", definition: "", state: "new", candidates: [] }],
+              },
+            ],
+          },
+        };
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    ui.pin.collapse();
+    Array.from(ui.pin.element.querySelectorAll<HTMLButtonElement>(".pinbtn"))
+      .find((button) => !button.closest(".pinwrap"))
+      ?.click();
+    document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+    await vi.waitFor(() => expect(document.querySelector(".card-scan .status.done")).not.toBeNull());
+    document.querySelector<HTMLButtonElement>(".card-scan .back")?.click();
+    return ui;
+  }
+
+  it("a summary reply that arrives after the card was closed is dropped", async () => {
+    let release: () => void = () => undefined;
+    const summaryGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ui = await mountScannedCard(async () => {
+      await summaryGate;
+      return { ok: true, data: { status: "done", summary: "Late summary." } };
+    });
+    try {
+      document.querySelector<HTMLButtonElement>(".card-main .summary")?.click();
+      await vi.waitFor(() => expect(document.querySelector(".card-summary .loading")).not.toBeNull());
+      ui.cards.close();
+      expect(document.querySelector(".card-host .card")).toBeNull();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(document.querySelector(".card-summary")).toBeNull();
+    } finally {
+      ui.dispose();
+    }
+  });
+
+  it("a queued summary job shows the queued text, not the loading text", async () => {
+    const ui = await mountScannedCard(async () => ({ ok: true, data: { id: 3 } }));
+    try {
+      document.querySelector<HTMLButtonElement>(".card-main .summary")?.click();
+      await vi.waitFor(() => expect(document.querySelector(".card-summary .queued")).not.toBeNull());
+      expect(document.querySelector(".card-summary .loading")).toBeNull();
+    } finally {
+      ui.dispose();
+    }
+  });
+
+  it("open panel and quiz message the background, focus is undoable from the pin, a scan shows a joke", async () => {
+    document.body.innerHTML = "";
+    const sent: unknown[] = [];
+    const runtime = {
+      async sendMessage(message: unknown) {
+        sent.push(message);
+        const type = (message as { type: string }).type;
+        if (type === "panel:nextJoke") return { ok: true, data: { text: "A joke." } };
+        // The scan reply waits until the test has seen the joke cloud.
+        await scanGate;
+        return { ok: true, data: { blocks: [] } };
+      },
+    };
+    let openGate: () => void = () => undefined;
+    const scanGate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      ui.pin.collapse();
+      Array.from(ui.pin.element.querySelectorAll<HTMLButtonElement>(".pinbtn"))
+        .find((button) => !button.closest(".pinwrap"))
+        ?.click();
+      document.querySelector<HTMLButtonElement>(".card-main .open-panel")?.click();
+      document.querySelector<HTMLButtonElement>(".card-main .quiz")?.click();
+      expect(sent.filter((m) => (m as { type: string }).type === "card:openPanel")).toHaveLength(2);
+
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      await vi.waitFor(() => expect(sent).toContainEqual({ type: "panel:nextJoke" }));
+      await vi.waitFor(() => expect(document.querySelector(".joke-cloud .joke")?.textContent).toBe("A joke."));
+      openGate();
+      // The scan result replaces the card and the cloud.
+      await vi.waitFor(() => expect(document.querySelector(".joke-cloud")).toBeNull());
+
+      // Focus on is undoable from the pin mini-menu; nothing to undo before.
+      document.querySelector<HTMLButtonElement>(".card-scan .back")?.click();
+      const undo = () => ui.pin.element.querySelector<HTMLButtonElement>(".menu-undo");
+      expect(undo()?.disabled).toBe(true);
+      document.querySelector<HTMLButtonElement>(".card-main .focus")?.click();
+      document.querySelector<HTMLButtonElement>(".focus-confirm .turn-on")?.click();
+      expect(document.querySelector(".card-main .focus.on")).not.toBeNull();
+      ui.pin.element.querySelector<HTMLButtonElement>(".pinwrap .pinbtn")?.click();
+      expect(undo()?.disabled).toBe(false);
+      undo()?.click();
+      expect(document.querySelector(".card-main .focus.on")).toBeNull();
+    } finally {
+      ui.dispose();
+    }
+  });
+
+  it("a joke that arrives after the card was closed mid-scan is dropped", async () => {
+    document.body.innerHTML = "";
+    let release: () => void = () => undefined;
+    const jokeGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const runtime = {
+      async sendMessage(message: unknown) {
+        if ((message as { type: string }).type === "panel:nextJoke") {
+          await jokeGate;
+          return { ok: true, data: { text: "Late joke." } };
+        }
+        return new Promise(() => undefined);
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      ui.cards.open();
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      ui.cards.close();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(document.querySelector(".joke-cloud")).toBeNull();
+    } finally {
+      ui.dispose();
+    }
+  });
+
+  it("a joke that arrives after the user moved on to Summary mid-scan is dropped", async () => {
+    document.body.innerHTML = "";
+    let release: () => void = () => undefined;
+    const jokeGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const runtime = {
+      async sendMessage(message: unknown) {
+        if ((message as { type: string }).type === "panel:nextJoke") {
+          await jokeGate;
+          return { ok: true, data: { text: "Late joke." } };
+        }
+        return new Promise(() => undefined);
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      ui.cards.open();
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      ui.cards.open();
+      document.querySelector<HTMLButtonElement>(".card-main .summary")?.click();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(document.querySelector(".card-summary")).not.toBeNull();
+      expect(document.querySelector(".joke-cloud")).toBeNull();
+    } finally {
+      ui.dispose();
+    }
+  });
+
+  it("asks for no joke while focus mode is on", async () => {
+    document.body.innerHTML = "";
+    const sent: unknown[] = [];
+    const runtime = {
+      async sendMessage(message: unknown) {
+        sent.push(message);
+        return { ok: true, data: { blocks: [] } };
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      ui.cards.open();
+      document.querySelector<HTMLButtonElement>(".card-main .focus")?.click();
+      document.querySelector<HTMLButtonElement>(".focus-confirm .turn-on")?.click();
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      await vi.waitFor(() => expect(sent).toContainEqual({ type: "panel:scanConcepts" }));
+      expect(sent).not.toContainEqual({ type: "panel:nextJoke" });
+    } finally {
+      ui.dispose();
+    }
   });
 
   it("removes what it added and rejects when the pin position cannot be read", async () => {

@@ -621,6 +621,11 @@ export function wireBackground(api: ChromeLike, backend: Backend): void {
       if (tabId !== undefined) backend.pageMutated(tabId);
       return false;
     }
+    if ((message as { type?: unknown } | null)?.type === "card:openPanel") {
+      const windowId = (sender as { tab?: { windowId?: number } }).tab?.windowId;
+      if (windowId !== undefined) openPanel(api, windowId).catch((err: unknown) => console.error(err));
+      return false;
+    }
     const route = isPanelMessage(message)
       ? handlePanelMessage(backend, message)
       : isBridgeMessage(message)

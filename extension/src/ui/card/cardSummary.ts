@@ -14,12 +14,14 @@ const [
   ERROR,
   OPEN_IN_PANEL,
   BACK,
+  QUEUED,
 ] = TEXT_CARD_SUMMARY;
 
 /** Where the summary stands. `ready` carries the page text summary and the topics found. */
 export type SummaryStatus =
   | { kind: "needsScan" }
   | { kind: "loading" }
+  | { kind: "queued" }
   | { kind: "error" }
   | { kind: "ready"; text: string; topics: string[] };
 
@@ -37,6 +39,8 @@ export function renderCardSummary(status: SummaryStatus, actions: CardSummaryAct
     card.append(el("p", NEEDS_SCAN, "needs-scan"));
   } else if (status.kind === "loading") {
     card.append(el("p", LOADING, "loading"));
+  } else if (status.kind === "queued") {
+    card.append(el("p", QUEUED, "queued"));
   } else if (status.kind === "error") {
     card.append(el("p", ERROR, "error"));
   } else {

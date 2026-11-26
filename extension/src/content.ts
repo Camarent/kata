@@ -113,16 +113,31 @@ export async function mountFloatingUi(doc: Document, storage: StorageArea, runti
   const host = doc.createElement("div");
   doc.body.append(host);
   let stopWatching: (() => void) | undefined;
+  let undoLast: (() => void) | null = null;
+  // The side panel holds the full views and the quiz, so both card buttons ask the background to open it.
+  const openPanel = (): void => void runtime.sendMessage({ type: "card:openPanel" }).catch(() => undefined);
   const cards = mountCardHost(doc, host, runtime, {
+    onOpenPanel: openPanel,
+    onQuiz: openPanel,
+    onUndoable: (undo) => {
+      undoLast = undo;
+    },
     onScanned: () => {
       stopWatching?.();
       stopWatching = watchPage(doc, () => cards.pageChanged(), host);
     },
   });
-  // Undo is not wired on the page yet: the pin's mini-menu shows nothing to undo.
+  // The pin's Undo reverts the last undoable card action (turning focus on).
   let pin: Pin;
   try {
-    pin = await mountPin(host, new PinPositionStore(storage), { canUndo: () => false, onUndo: () => undefined });
+    pin = await mountPin(host, new PinPositionStore(storage), {
+      canUndo: () => undoLast !== null,
+      onUndo: () => {
+        const undo = undoLast;
+        undoLast = null;
+        undo?.();
+      },
+    });
   } catch (error) {
     // A failed position read must not leave a half-mounted page: undo what was added.
     stopWatching?.();

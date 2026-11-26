@@ -1,8 +1,12 @@
 import { renderCardMain, type PageCounts } from "./ui/card/cardMain";
 import { renderCardScan, type ScanStatus } from "./ui/card/cardScan";
 import { renderCardSummary, type SummaryStatus } from "./ui/card/cardSummary";
+import { renderFocusConfirm, isFocusOn } from "./ui/card/focus";
+import { renderJokeCloud } from "./ui/card/jokeCloud";
 import { renderPageChanged } from "./ui/overlay/pageChanged";
+import { scanBlocks } from "./scanner";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
+import type { Joke, SummaryReply } from "./coreClientTypes";
 import type { PanelReply } from "./background";
 
 /** The part of `chrome.runtime` the card needs: send one message to the background script. */
@@ -14,9 +18,10 @@ export interface CardRuntime {
 export interface CardHostOptions {
   onOpenPanel?: () => void;
   onQuiz?: () => void;
-  onFocus?: () => void;
   /** Runs after each scan that found concepts; the page script starts watching for page changes. */
   onScanned?: () => void;
+  /** Called when an undoable action happens (`undo` reverts it) or is gone (`null`). */
+  onUndoable?: (undo: (() => void) | null) => void;
 }
 
 export interface CardHost {
@@ -59,6 +64,24 @@ export async function requestScan(runtime: CardRuntime): Promise<ScanStatus & { 
 }
 
 /**
+ * Asks the background script for the page summary (`panel:requestSummary`) and maps the reply to a
+ * card status. A queued job (`{ id }`) shows the queued text: the card does not poll the job, so the
+ * user opens the summary again to get the result.
+ */
+export async function requestSummary(runtime: CardRuntime, url: string, text: string): Promise<SummaryStatus> {
+  let reply: PanelReply;
+  try {
+    reply = (await runtime.sendMessage({ type: "panel:requestSummary", url, text })) as PanelReply;
+  } catch {
+    return { kind: "error" };
+  }
+  if (!reply || !reply.ok || reply.data == null) return { kind: "error" };
+  const data = reply.data as SummaryReply;
+  if ("id" in data) return { kind: "queued" };
+  return { kind: "ready", text: data.summary, topics: [] };
+}
+
+/**
  * Mounts the page cards (main, scan, summary) and the page-changed prompt into `parent`.
  * Scan data comes from the background script (`panel:scanConcepts`); the cards redraw on each step.
  */
@@ -73,9 +96,11 @@ export function mountCardHost(
   parent.append(root);
   const onOpenPanel = options.onOpenPanel ?? ((): void => undefined);
   const onQuiz = options.onQuiz ?? ((): void => undefined);
-  const onFocus = options.onFocus ?? ((): void => undefined);
 
   let counts: PageCounts | null = null;
+  let serverDown = false;
+  /** End time of focus mode (epoch ms), null when focus was never turned on. */
+  let focusEnds: number | null = null;
   let prompt: HTMLElement | null = null;
   let current: HTMLElement | null = null;
 
@@ -86,9 +111,32 @@ export function mountCardHost(
   const showMain = (): void => {
     draw(
       renderCardMain(
-        { counts, serverDown: false, focusOn: false },
-        { onScan: () => void scan(), onSummary: showSummary, onQuiz, onFocus, onOpenPanel, onCollapse: host.close },
+        { counts, serverDown, focusOn: isFocusOn(focusEnds, Date.now) },
+        { onScan: () => void scan(), onSummary: showSummary, onQuiz, onFocus: showFocus, onOpenPanel, onCollapse: host.close },
       ),
+    );
+  };
+  const showFocus = (): void => {
+    draw(
+      renderFocusConfirm(focusEnds, Date.now, {
+        onTurnOn: (endsAt) => {
+          const before = focusEnds;
+          focusEnds = endsAt;
+          // Turning focus on can be undone from the pin's mini-menu.
+          options.onUndoable?.(() => {
+            focusEnds = before;
+            options.onUndoable?.(null);
+            if (current) showMain();
+          });
+          showMain();
+        },
+        onTurnOff: () => {
+          focusEnds = null;
+          options.onUndoable?.(null);
+          showMain();
+        },
+        onCancel: showMain,
+      }),
     );
   };
   const showScan = (status: ScanStatus): void => {
@@ -100,13 +148,40 @@ export function mountCardHost(
     );
   };
   const showSummary = (): void => {
-    // The page summary has no backend call yet: before a scan the card asks for one, after it reports an error.
-    const status: SummaryStatus = counts === null ? { kind: "needsScan" } : { kind: "error" };
-    draw(renderCardSummary(status, { onOpenInPanel: onOpenPanel, onBack: showMain }));
+    const actions = { onOpenInPanel: onOpenPanel, onBack: showMain };
+    // The summary needs a scan first; the page text is the scanned blocks.
+    if (counts === null) {
+      draw(renderCardSummary({ kind: "needsScan" }, actions));
+      return;
+    }
+    const loading = renderCardSummary({ kind: "loading" }, actions);
+    draw(loading);
+    const text = scanBlocks(doc).map((block) => block.text).join("\n");
+    void requestSummary(runtime, doc.location.href, text).then((status) => {
+      // The user closed the card or went back while waiting: drop the reply.
+      if (current === loading) draw(renderCardSummary(status, actions));
+    });
+  };
+  /** Adds a joke cloud beside the card; a refused or empty joke shows nothing. */
+  const showJoke = async (stillScanning: () => boolean): Promise<void> => {
+    try {
+      const reply = (await runtime.sendMessage({ type: "panel:nextJoke" })) as PanelReply;
+      const joke = reply && reply.ok ? (reply.data as Joke | null) : null;
+      // A late joke must not land on the result card.
+      if (!joke || !stillScanning()) return;
+      const cloud = renderJokeCloud(joke.text, () => cloud.remove());
+      root.append(cloud);
+    } catch {
+      // No joke is fine: the scan goes on.
+    }
   };
   const scan = async (): Promise<void> => {
     showScan({ kind: "scanning" });
+    const card = current;
+    // A joke keeps the wait short, but never while focus mode is on.
+    if (!isFocusOn(focusEnds, Date.now)) void showJoke(() => current === card);
     const status = await requestScan(runtime);
+    serverDown = status.kind === "serverDown";
     if (status.kind === "done") {
       counts = status.counts;
       options.onScanned?.();
