@@ -8,6 +8,10 @@ import type {
   LessonCheckResult,
   MarkRow,
   ProgressDoc,
+  ReviewArea,
+  ReviewConcept,
+  ReviewConceptFilter,
+  ReviewFilter,
   ScanClassification,
   ScanExtractInput,
   TopicOverview,
@@ -27,6 +31,14 @@ export type {
   CourseSummary,
   CourseListMeta,
   CourseAccepted,
+  ReviewArea,
+  ReviewConcept,
+  ReviewConceptFilter,
+  ReviewCounts,
+  ReviewFilter,
+  ReviewOrder,
+  ReviewSort,
+  ReviewTopic,
 } from "./coreClientTypes";
 
 
@@ -298,6 +310,19 @@ export class CoreClient {
     return this.request<ConceptMark>("PUT", `/concepts/${conceptId}/mark`, { state, evidence });
   }
 
+  /** Area > topic tree of the caller's concepts that match the filter, with state counts (`GET /v1/review/tree`). */
+  reviewTree(filter: ReviewFilter = {}): Promise<ReviewArea[]> {
+    return this.request<ReviewArea[]>("GET", `/v1/review/tree?${reviewQuery(filter).toString()}`);
+  }
+
+  /** The caller's concepts that match the filter, in the given sort and order (`GET /v1/review/concepts`). */
+  reviewConcepts(filter: ReviewConceptFilter = {}): Promise<ReviewConcept[]> {
+    const query = reviewQuery(filter);
+    if (filter.sort !== undefined) query.set("sort", filter.sort);
+    if (filter.order !== undefined) query.set("order", filter.order);
+    return this.request<ReviewConcept[]>("GET", `/v1/review/concepts?${query.toString()}`);
+  }
+
   /** Check which of the given concepts the caller knows; results come in input order. */
   async lessonCheck(conceptIds: number[]): Promise<LessonCheckResult[]> {
     const res = await this.request<{ results: LessonCheckResult[] }>("POST", "/lesson-check", {
@@ -472,4 +497,13 @@ export class CoreClient {
       clearTimeout(timer);
     }
   }
+}
+
+/** Query string of the review filters: `q`, a repeated `state`, and `ids` (an empty set sends `ids=`). */
+function reviewQuery(filter: ReviewFilter): URLSearchParams {
+  const query = new URLSearchParams();
+  if (filter.q !== undefined) query.set("q", filter.q);
+  for (const state of filter.states ?? []) query.append("state", state);
+  if (filter.ids !== undefined) query.set("ids", filter.ids.join(","));
+  return query;
 }

@@ -6,14 +6,21 @@ Relevance counts each active track once per concept: a track whose items cover t
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 import psycopg
 
-from kata_core.storage.concepts import CONCEPT_STATES
+from kata_core.storage.concepts import CONCEPT_STATES, VisibleConcept
 
 UNMARKED = "new"
+
+SortField = Literal["name", "added", "viewed", "relevance"]
+SortOrder = Literal["asc", "desc"]
+
+# Concepts never viewed sort as the oldest possible time.
+_NEVER_VIEWED = datetime.min.replace(tzinfo=UTC)
 
 
 def concept_relevance(
@@ -58,3 +65,19 @@ def block_state(states: Iterable[str | None]) -> str:
     if all(value == "known" for value in resolved):
         return "known"
     return "mixed"
+
+
+def sort_concepts(
+    concepts: Sequence[VisibleConcept],
+    relevance: Mapping[int, int],
+    sort: SortField,
+    order: SortOrder,
+) -> list[VisibleConcept]:
+    """`concepts` sorted by `sort` in `order`; ties broken by concept id. `relevance` maps concept id to score."""
+    keys = {
+        "name": lambda c: (c.label.casefold(), c.concept_id),
+        "added": lambda c: (c.added_at, c.concept_id),
+        "viewed": lambda c: (c.last_viewed_at or _NEVER_VIEWED, c.concept_id),
+        "relevance": lambda c: (relevance[c.concept_id], c.concept_id),
+    }
+    return sorted(concepts, key=keys[sort], reverse=order == "desc")

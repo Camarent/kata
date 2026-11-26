@@ -109,3 +109,53 @@ export interface CourseListMeta {
 
 /** Answer of `POST /v1/courses` (HTTP 202): the new course and the job building it. */
 export type CourseAccepted = CourseSummary & { job_id: number };
+
+/** Review filters shared by `GET /v1/review/tree` and `GET /v1/review/concepts`. `ids` is the "Only this page" set. */
+export interface ReviewFilter {
+  q?: string;
+  states?: ConceptMark["state"][];
+  ids?: number[];
+}
+
+/** Sort of the review concept list (`GET /v1/review/concepts`). */
+export type ReviewSort = "name" | "added" | "viewed" | "relevance";
+
+/** Sort order of the review concept list. */
+export type ReviewOrder = "asc" | "desc";
+
+/** New, learning and known counts of a review tree node. */
+export interface ReviewCounts {
+  new: number;
+  learning: number;
+  known: number;
+}
+
+/** One topic of `GET /v1/review/tree`. */
+export interface ReviewTopic {
+  topicId: number;
+  topic: string;
+  counts: ReviewCounts;
+}
+
+/** One area of `GET /v1/review/tree`. */
+export interface ReviewArea {
+  area: string;
+  counts: ReviewCounts;
+  topics: ReviewTopic[];
+}
+
+/** Input of `reviewConcepts`: the shared filters plus the list sort. */
+export interface ReviewConceptFilter extends ReviewFilter {
+  sort?: ReviewSort;
+  order?: ReviewOrder;
+}
+
+/** One concept of `GET /v1/review/concepts`. Dates are ISO strings; `last_viewed_at` is null when never viewed. */
+export interface ReviewConcept {
+  concept_id: number;
+  label: string;
+  state: string;
+  added_at: string;
+  last_viewed_at: string | null;
+  relevance: number;
+}
