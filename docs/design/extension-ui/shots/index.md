@@ -1,9 +1,9 @@
-# Mockup screenshots index
+# Mockup screenshots index (retired)
 
-Each row lists the source mockup in `docs/design/extension-ui/` and its two screenshots made by
-`scripts/dev/render_design_shots.py`. Regenerate with `python3 scripts/dev/render_design_shots.py docs/design/extension-ui`.
+The source mockups and the script that made these screenshots were removed. The PNG files are kept
+as a record, with no regeneration command. Each former source mockup and its screenshots:
 
-| Source mockup | Light | Dark |
+| Former source mockup | Light | Dark |
 | --- | --- | --- |
 | `block-states.html` | `block-states-light.png` | `block-states-dark.png` |
 | `lesson-page.html` | `lesson-page-light.png` | `lesson-page-dark.png` |

@@ -63,7 +63,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`<scheme>://*/c/*` of the saved origin; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.
 - `extension/src/reviewScreen.ts` - review screen: one row per concept, buttons 1/2/3 (known, learning, new); arrow keys move between rows.
-- `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page; static mockups in `docs/design/extension-ui/` (`panel-states.html`, `lesson-page.html`, `tokens.css`). Not shipped in the extension build; checked by `tests/scripts/test_extension_ui_design.py` and `tests/scripts/test_lesson_page_mockup.py`.
+- `docs/design/extension-ui.md` - UI design spec for the side panel and lesson page. The static mockups, their CSS tokens and their checker tests were removed; the spec is the only design file. Not shipped in the extension build.
 - `extension/src/offlineQueue.ts` - queues mark presses (topic and concept marks) while the core is unreachable, in order, under `kata.markQueue`; the legacy `kata.pending` topic list is converted on first read (`:185-197`).
 - Review client (M24): `extension/src/coreClient.ts:314` `reviewTree(filter)` and `:319` `reviewConcepts(filter)` call `GET /v1/review/tree` and `GET /v1/review/concepts`; the query string comes from `reviewQuery` (`:503`).
 

@@ -3,26 +3,7 @@ Superseded by the redesign decisions 39-55 in decisions.md; replaced after the p
 
 Status: design for owner review. No extension code changes yet; the implementation follows owner approval.
 
-Visual mockups (static HTML and CSS, open from disk, no network):
-
-- [Navigation map](extension-ui/nav-map.html): every panel screen, the settings page and the course screen, and how a person moves between them (section 2.15).
-- [Settings page, light and dark](extension-ui/settings.html): connection, auto-scan site list, appearance and about (section 2.16).
-- [Side panel, all states](extension-ui/panel-states.html): every panel state side by side, light and dark.
-- [Sample lesson page, highlights](extension-ui/lesson-page.html): the page highlights in each state, light and dark, at narrow panel width.
-- [Block states](extension-ui/block-states.html): the four block states, their buttons, transitions and undo, with the panel rows that match the page (section 3).
-- [Long lesson](extension-ui/long-lesson.html): a long text split into sub-blocks, with the panel grouped by topic (section 3.1).
-- Shared tokens: `extension-ui/tokens.css`.
-
-The mockups use generic sample text only. They show no real site and no personal data.
-
-Reference screenshots of the mockups, light and dark, are in [`extension-ui/shots/`](extension-ui/shots/README.md). They are rendered from the mockups by `scripts/dev/render_design_shots.py` with a local headless Chrome; do not edit them by hand:
-
-- [Navigation map](extension-ui/shots/nav-map-light.png) ([dark](extension-ui/shots/nav-map-dark.png)).
-- [Settings page](extension-ui/shots/settings-light.png) ([dark](extension-ui/shots/settings-dark.png)).
-- [Side panel, all states](extension-ui/shots/panel-states-light.png) ([dark](extension-ui/shots/panel-states-dark.png)).
-- [Sample lesson page](extension-ui/shots/lesson-page-light.png) ([dark](extension-ui/shots/lesson-page-dark.png)).
-- [Block states](extension-ui/shots/block-states-light.png) ([dark](extension-ui/shots/block-states-dark.png)).
-- [Long lesson](extension-ui/shots/long-lesson-light.png) ([dark](extension-ui/shots/long-lesson-dark.png)).
+The static HTML mockups, their shared CSS tokens and the screenshot script were removed. This document is the design spec; the section numbers below (for example 2.15, 2.16 and 3.1) still refer to it. The old screenshots remain in [`extension-ui/shots/`](extension-ui/shots/README.md) and are not regenerated.
 
 ## 1. Principles for the UI
 
@@ -33,7 +14,7 @@ Reference screenshots of the mockups, light and dark, are in [`extension-ui/shot
 
 ## 2. Side panel: screens and states
 
-The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome (`side_panel`). The layout works from a narrow width (about 280 px) to a wide one. Every state below has a heading in the mockup `panel-states.html`.
+The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome (`side_panel`). The layout works from a narrow width (about 280 px) to a wide one. Every state below is described in this document.
 
 ### 2.1 First run and sign-in
 
@@ -70,7 +51,7 @@ The panel is a sidebar in Firefox (`sidebar_action`) and a side panel in Chrome 
 
 ### 2.6 Known and new marks
 
-Block states. Three knowledge states and one scan result. The state key and the sample page are in [`extension-ui/block-states.html`](extension-ui/block-states.html).
+Block states. Three knowledge states and one scan result. The state key is listed in this section.
 
 | State | Mark (icon and label) | Meaning | Buttons |
 |---|---|---|---|
@@ -139,7 +120,7 @@ Block states. Three knowledge states and one scan result. The state key and the 
 
 ### 2.15 Navigation map
 
-The map in [`extension-ui/nav-map.html`](extension-ui/nav-map.html) shows every screen and how a person moves between them. The text below is the same map.
+The map below shows every screen and how a person moves between them.
 
 - **Home (Connected idle).** The main screen. Every other screen is one step away from here.
 - **Header.** Always visible on every screen. It holds the course picker (left), the settings entry (right, a gear icon with the text label "Settings") and the auto-scan toggle for the current site (below the header, on Home and Results only).
@@ -157,11 +138,11 @@ Control placement, in the order a person sees them:
 | Settings entry | Header, right, gear icon with the text "Settings" | Every screen |
 | Review entry | Second tab, "Review" | Every screen with tabs |
 
-Screens: Home, Scanning, Results, Detail (one block, from a result row), Review, Courses (list, create, delete, open), Course (one course), Settings. Each one is shown in `nav-map.html` with its id.
+Screens: Home, Scanning, Results, Detail (one block, from a result row), Review, Courses (list, create, delete, open), Course (one course), Settings. Each one is listed in section 2.15 with its id.
 
 ### 2.16 Settings page
 
-The settings page is opened from the header entry (section 2.15). Mockups in light and dark: [`extension-ui/settings.html`](extension-ui/settings.html).
+The settings page is opened from the header entry (section 2.15). The settings page is described in this section.
 
 - **Connection.** Server URL (text field, validated when saved), device label (text field), and "Sign out" (a button that asks for confirmation and removes the device login from this browser).
 - **Auto-scan sites.** A list of the sites the user allowed (section 2.17). Each row shows the site pattern and a "Remove" button. Remove deletes the site from the list and stops automatic scans there. Empty state: the text "No sites yet. Turn on Auto-scan this site in the panel on a page you want kata to scan when it opens."
@@ -189,7 +170,7 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 | Known | Muted dotted outline, no tint, with a "Known" tag | "Known: <topic>." |
 | Not tagged | No outline; a small neutral dash tag, or a neutral dot in the margin | "Not tagged: scan result only." |
 
-- **Panel rows match the page.** A panel row uses the same outline, tint and tag as its block (`tokens.css` shares the colours). Hovering or focusing a block highlights its row, and selecting a row scrolls the page to its block and focuses it. Mockup: [`extension-ui/block-states.html`](extension-ui/block-states.html).
+- **Panel rows match the page.** A panel row uses the same outline, tint and tag as its block (the shared colours are defined once). Hovering or focusing a block highlights its row, and selecting a row scrolls the page to its block and focuses it.
 - **Exam pages.** No marks and no highlights on exam pages, from page open until the person has finished answering. Exam page detection is an open question in [`docs/backlog.md`](../backlog.md) under "Exam pages (experimental)".
 
 - **Hover or focus detail.** Hovering a marked block, or moving keyboard focus onto it, shows a small detail card with the topic, the mark, and the buttons of its state (section 2.6). The card appears after a short delay and stays while the pointer or focus is on the card. It does not appear when the user is selecting text.
@@ -200,8 +181,7 @@ The page itself shows marks only on blocks that the scan tagged. The lesson text
 
 ### 3.1 Long text split
 
-A long block is split into sub-blocks, so a single highlight does not cover a whole page of text. A sub-block is a span inside its paragraph: the text is unchanged, and only the mark is per sub-block. The panel groups the sub-blocks by topic, with one heading per topic and the same row style as in section 3. Mockup: [`extension-ui/long-lesson.html`](extension-ui/long-lesson.html), a split TCP lesson with the panel grouped by topic.
-
+A long block is split into sub-blocks, so a single highlight does not cover a whole page of text. A sub-block is a span inside its paragraph: the text is unchanged, and only the mark is per sub-block. The panel groups the sub-blocks by topic, with one heading per topic and the same row style as in section 3.
 ## 4. Scan trigger
 
 - The scan starts from the "Scan this page" button in the panel. It is the only trigger on pages that are not allowed sites.
@@ -230,7 +210,7 @@ A long block is split into sub-blocks, so a single highlight does not cover a wh
 
 ## 7. Themes
 
-- Light and dark themes use the same tokens (`extension-ui/tokens.css`). The panel follows the browser's colour scheme by default.
+- Light and dark themes use the same tokens. The panel follows the browser's colour scheme by default.
 - Both themes are checked against the contrast rule in section 6.
 
 ## 8. Open points for the owner
