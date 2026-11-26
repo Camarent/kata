@@ -188,6 +188,9 @@ select { width: auto; min-height: 36px; min-width: 36px; }
 .sec { border-top: 1px solid var(--color-border); padding-top: var(--space-3); margin-top: var(--space-3); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--color-surface); vertical-align: middle; }
+.label { overflow-wrap: anywhere; }
+.back, .review-open { min-height: 36px; min-width: 36px; }
+.review-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); min-height: 36px; }
 `;
 
 /** Panel styles: tokens followed by the panel rules. */

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreOfflineError } from "../src/coreClient";
 import { renderPanel, type PanelHandlers, type PanelState } from "../src/sidepanel";
 import { routeScreen } from "../src/ui/panel/router";
+import { SCREENS } from "../src/ui/panel/screens";
 import { TEXT_CONN_DETAIL, TEXT_OFFLINE_QUEUE, TEXT_SIGNED_OUT, TEXT_SIGNIN } from "../src/ui/strings";
 
 const session = { baseUrl: "http://localhost:8000", token: "t" };
@@ -176,5 +177,12 @@ describe("panel shell screens, one test per inventory state", () => {
   it("routeScreen draws the screen named by its id", () => {
     const screen = routeScreen("conn-detail", { serverUp: true, unsynced: 0 }, handlers());
     expect(screen.className).toBe("conn-detail");
+  });
+
+  it("the panel router draws through the full screen registry", () => {
+    const screen = routeScreen("offline-queue", { marks: [] }, handlers());
+    expect(screen.className).toBe("offline-queue");
+    expect(screen.querySelector("p.empty")?.textContent).toBe(TEXT_OFFLINE_QUEUE[1]);
+    expect(typeof SCREENS["conn-detail"]).toBe("function");
   });
 });

@@ -1,8 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBackend, wireBackground, type ChromeLike, type PanelReply } from "../src/background";
-import { handleContentMessage, registerContentScript, type ContentMessage, type RuntimeLike } from "../src/content";
+import {
+  handleContentMessage,
+  mountFloatingUi,
+  registerContentScript,
+  type ContentMessage,
+  type RuntimeLike,
+} from "../src/content";
 import type { ScriptingLike } from "../src/bridgeRegister";
 import type { StorageArea } from "../src/tokenStore";
+import { PinPositionStore } from "../src/ui/card/pinPosition";
+import { SCREENS } from "../src/ui/panel/screens";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/** The approved screen inventory: every id here must have a registry entry. */
+const INVENTORY: { id: string; surface: string }[] = JSON.parse(
+  readFileSync(join(process.cwd(), "tests/fixtures/screen-inventory.json"), "utf-8"),
+);
 
 const LONG = "This paragraph is long enough to count as a readable block of page text.";
 
@@ -817,5 +832,101 @@ describe("background concept scan and rescan", () => {
     chrome.mutate(7);
     await vi.advanceTimersByTimeAsync(2000);
     expect(sendMessage.mock.calls.filter(([, message]) => message.type === "scan")).toHaveLength(2);
+  });
+});
+
+describe("content script floating UI mount", () => {
+  it("injects the card stylesheet and mounts the pin and cards into the page, then removes them", async () => {
+    document.body.innerHTML = "";
+    const styleCount = document.head.querySelectorAll("style").length;
+    const sent: unknown[] = [];
+    const runtime = {
+      async sendMessage(message: unknown) {
+        sent.push(message);
+        return {
+          ok: true,
+          data: {
+            areaId: 1,
+            topicId: 1,
+            area: "a",
+            topic: "t",
+            blocks: [
+              {
+                blockId: "b1",
+                concepts: [
+                  { word: "x", conceptId: 1, label: "X", definition: "", state: "new", candidates: [] },
+                  { word: "y", conceptId: 2, label: "Y", definition: "", state: "known", candidates: [] },
+                ],
+              },
+            ],
+          },
+        };
+      },
+    };
+    const ui = await mountFloatingUi(document, memoryArea(), runtime);
+    try {
+      expect(document.head.querySelectorAll("style")).toHaveLength(styleCount + 1);
+      expect(Array.from(document.head.querySelectorAll("style")).at(-1)?.textContent).toContain(".pinwrap");
+      expect(document.body.contains(ui.pin.element)).toBe(true);
+      expect(ui.pin.element.classList.contains("float")).toBe(true);
+
+      // The expanded mascot only opens its undo menu; the collapsed icon opens the main card.
+      expect(document.querySelector(".card-main")).toBeNull();
+      ui.pin.element.querySelector<HTMLButtonElement>(".pinwrap .pinbtn")?.click();
+      expect(document.querySelector(".card-main")).toBeNull();
+      ui.pin.collapse();
+      Array.from(ui.pin.element.querySelectorAll<HTMLButtonElement>(".pinbtn"))
+        .find((button) => !button.closest(".pinwrap"))
+        ?.click();
+      expect(document.querySelector(".card-main")).not.toBeNull();
+      // Scan asks the background and shows the counts.
+      document.querySelector<HTMLButtonElement>(".card-main .scan")?.click();
+      await vi.waitFor(() => expect(document.querySelector(".card-scan .status.done")).not.toBeNull());
+      expect(sent).toEqual([{ type: "panel:scanConcepts" }]);
+      expect(document.querySelector(".card-scan .status")?.textContent).toContain("2");
+
+      // A page change after the scan shows the page-changed prompt.
+      document.body.append(document.createElement("p"));
+      await vi.waitFor(() => expect(document.querySelector(".page-changed")).not.toBeNull());
+    } finally {
+      ui.dispose();
+      try {
+        // dispose must take down the pin, the injected stylesheet and the host by itself.
+        expect(document.body.contains(ui.pin.element)).toBe(false);
+        expect(document.head.querySelectorAll("style")).toHaveLength(styleCount);
+      } finally {
+        document.head.querySelectorAll("style").forEach((style, index) => {
+          if (index >= styleCount) style.remove();
+        });
+      }
+    }
+    expect(document.querySelector(".card-host")).toBeNull();
+  });
+
+  it("removes what it added and rejects when the pin position cannot be read", async () => {
+    document.body.innerHTML = "";
+    const styleCount = document.head.querySelectorAll("style").length;
+    const load = vi.spyOn(PinPositionStore.prototype, "load").mockRejectedValue(new Error("storage down"));
+    try {
+      await expect(
+        mountFloatingUi(document, memoryArea(), { async sendMessage() { return undefined; } } as never),
+      ).rejects.toThrow("storage down");
+    } finally {
+      load.mockRestore();
+    }
+    expect(document.head.querySelectorAll("style")).toHaveLength(styleCount);
+    expect(document.body.children).toHaveLength(0);
+  });
+});
+
+describe("screen registry", () => {
+  it("has an entry for every panel tab and settings page id in the inventory", () => {
+    const pageIds = INVENTORY.filter((s) => s.surface === "panel tab" || s.surface === "settings page").map(
+      (s) => s.id,
+    );
+    expect(pageIds).toHaveLength(30);
+    for (const id of pageIds) {
+      expect(typeof SCREENS[id as keyof typeof SCREENS], `no registry entry for ${id}`).toBe("function");
+    }
   });
 });

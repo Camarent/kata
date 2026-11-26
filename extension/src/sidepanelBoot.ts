@@ -5,6 +5,7 @@ import { CoreHttpError } from "./coreClient";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
+import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
@@ -237,10 +238,19 @@ function originPattern(session: Session | null): string | null {
   return parsed.ok ? parsed.pattern : null;
 }
 
+/** Injects the panel stylesheet (panelCss.ts, the same tokens the card stylesheet uses) into `doc`. */
+export function mountPanelStyle(doc: Document): HTMLStyleElement {
+  const style = doc.createElement("style");
+  style.textContent = PANEL_CSS;
+  doc.head.append(style);
+  return style;
+}
+
 // Side panel page entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.runtime) {
   const root = document.getElementById("panel");
   if (root) {
+    mountPanelStyle(document);
     void bootPanel(root, {
       runtime: { sendMessage: (message) => chrome.runtime.sendMessage<PanelMessage, PanelReply>(message) },
       storage: { local: chrome.storage.local },

@@ -16,6 +16,10 @@ describe("composeManifest", () => {
     expect(base.content_scripts[0].matches).toEqual(["http://*/*", "https://*/*"]);
   });
 
+  it("base asks only for the permissions in use; storage is the one the pin position needs", () => {
+    expect(base.permissions).toEqual(["storage", "activeTab", "scripting", "permissions"]);
+  });
+
   it("base declares the permissions API; chrome keeps it, firefox drops it (invalid there)", () => {
     expect(base.permissions).toContain("permissions");
     expect(composeManifest(base, "chrome", VERSION).permissions).toContain("permissions");

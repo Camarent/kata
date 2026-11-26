@@ -1,5 +1,10 @@
 import { applyHighlights, clearHighlights, type HighlightResult } from "./highlight";
 import { scanBlocks } from "./scanner";
+import type { StorageArea } from "./tokenStore";
+import { CARD_CSS } from "./ui/cardCss";
+import { mountCardHost, type CardHost, type CardRuntime } from "./cardHost";
+import { mountPin, type Pin } from "./ui/card/pin";
+import { PinPositionStore } from "./ui/card/pinPosition";
 
 /** Message the side panel sends to the page through the background script. */
 export type ContentMessage =
@@ -27,9 +32,15 @@ export interface RuntimeLike {
   sendMessage(message: PageMutatedMessage): Promise<unknown>;
 }
 
-/** Starts a mutation observer on the page body; `onChange` runs on each batch of changes. Returns the stop function. */
-export function watchPage(doc: Document, onChange: () => void): () => void {
-  const observer = new MutationObserver(() => onChange());
+/**
+ * Starts a mutation observer on the page body; `onChange` runs on each batch of changes. Changes
+ * inside `ignore` (the extension's own UI) do not count. Returns the stop function.
+ */
+export function watchPage(doc: Document, onChange: () => void, ignore?: Node): () => void {
+  const observer = new MutationObserver((records) => {
+    if (ignore && records.every((record) => ignore.contains(record.target))) return;
+    onChange();
+  });
   observer.observe(doc.body, { subtree: true, childList: true, characterData: true });
   return () => observer.disconnect();
 }
@@ -80,7 +91,66 @@ export function registerContentScript(runtime: RuntimeLike, doc: Document): void
   });
 }
 
+/** The floating UI mounted in a page. */
+export interface FloatingUi {
+  pin: Pin;
+  cards: CardHost;
+  /** Removes the pin, the cards and the page watcher. */
+  dispose(): void;
+}
+
+/**
+ * Injects the card stylesheet into `doc`, mounts the floating pin at its stored position and the
+ * page cards beside it. A pin button press opens the main card; after a scan the page is watched
+ * and a change shows the page-changed prompt. The hover and block menus, image menu and list picker
+ * need per-concept data and backend actions that are not wired on the page yet, so only the
+ * page-changed overlay is mounted here.
+ */
+export async function mountFloatingUi(doc: Document, storage: StorageArea, runtime: CardRuntime): Promise<FloatingUi> {
+  const style = doc.createElement("style");
+  style.textContent = CARD_CSS;
+  doc.head.append(style);
+  const host = doc.createElement("div");
+  doc.body.append(host);
+  let stopWatching: (() => void) | undefined;
+  const cards = mountCardHost(doc, host, runtime, {
+    onScanned: () => {
+      stopWatching?.();
+      stopWatching = watchPage(doc, () => cards.pageChanged(), host);
+    },
+  });
+  // Undo is not wired on the page yet: the pin's mini-menu shows nothing to undo.
+  let pin: Pin;
+  try {
+    pin = await mountPin(host, new PinPositionStore(storage), { canUndo: () => false, onUndo: () => undefined });
+  } catch (error) {
+    // A failed position read must not leave a half-mounted page: undo what was added.
+    stopWatching?.();
+    cards.dispose();
+    host.remove();
+    style.remove();
+    throw error;
+  }
+  // Only the collapsed icon opens the main card; the expanded mascot keeps its undo mini-menu.
+  pin.element.querySelectorAll(".pinbtn").forEach((button) => {
+    if (!button.closest(".pinwrap")) button.addEventListener("click", () => cards.open());
+  });
+  return {
+    pin,
+    cards,
+    dispose(): void {
+      stopWatching?.();
+      cards.dispose();
+      pin.dispose();
+      host.remove();
+      style.remove();
+    },
+  };
+}
+
 // Content script entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.runtime) {
   registerContentScript(chrome.runtime, document);
+  // A failed mount is already cleaned up; the page works without the floating UI.
+  mountFloatingUi(document, chrome.storage.local, chrome.runtime).catch(() => undefined);
 }

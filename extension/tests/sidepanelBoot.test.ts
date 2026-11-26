@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
-import { bootPanel, type OriginsRequest, type PanelChromeLike } from "../src/sidepanelBoot";
+import { PANEL_CSS } from "../src/ui/panelCss";
+import { bootPanel, mountPanelStyle, type OriginsRequest, type PanelChromeLike } from "../src/sidepanelBoot";
 import type { PanelMessage, PanelReply } from "../src/background";
 import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
@@ -82,6 +83,21 @@ function submitSignIn(panel: HTMLElement, baseUrl: string, code: string, deviceL
   form.dispatchEvent(new Event("submit", { cancelable: true }));
 }
 
+describe("mountPanelStyle", () => {
+  it("appends one style element with the panel CSS to the document head", () => {
+    const before = document.head.querySelectorAll("style").length;
+    const style = mountPanelStyle(document);
+    try {
+      expect(document.head.querySelectorAll("style")).toHaveLength(before + 1);
+      expect(style.parentElement).toBe(document.head);
+      expect(PANEL_CSS.length).toBeGreaterThan(0);
+      expect(style.textContent).toBe(PANEL_CSS);
+    } finally {
+      style.remove();
+    }
+  });
+});
+
 describe("sidepanel.html", () => {
   it("has no inline script: every script element has a src", () => {
     const scripts = Array.from(parsedPage().querySelectorAll("script"));
@@ -90,6 +106,10 @@ describe("sidepanel.html", () => {
       expect(script.getAttribute("src")).toBeTruthy();
       expect(script.textContent?.trim()).toBe("");
     }
+  });
+
+  it("has no inline style: panel CSS comes from panelCss.ts via the boot script", () => {
+    expect(parsedPage().querySelectorAll("style")).toHaveLength(0);
   });
 
   it("loads the boot script as an external module", () => {
