@@ -1,0 +1,3310 @@
+[
+  {
+    "id": "signin",
+    "surface": "panel tab",
+    "title": "Sign in",
+    "journeys": [
+      1
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "server_url",
+        "source": "user input; stored in extension storage.local"
+      },
+      {
+        "field": "code",
+        "source": "user input; one-time code, origin unknown (open question 1, D31)"
+      },
+      {
+        "field": "device_label",
+        "source": "user input"
+      },
+      {
+        "field": "enrol_result",
+        "source": "POST /auth/enrol"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Sign in",
+        "action": "enrol device with Server URL, Code, Device label",
+        "target": "scan-results"
+      },
+      {
+        "label": "Where do I get a code?",
+        "action": "show hint text",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "scan-results"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Device",
+      "Connection indicator",
+      "Sign in"
+    ],
+    "text": [
+      "Sign in to kata",
+      "Server URL",
+      "Code",
+      "Device label",
+      "Sign in",
+      "Where do I get a code?",
+      "Signing in...",
+      "Could not sign in. Check the Server URL and the Code.",
+      "Server not reachable."
+    ]
+  },
+  {
+    "id": "signed-out",
+    "surface": "panel tab",
+    "title": "Signed out",
+    "journeys": [
+      7
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "auth_state",
+        "source": "extension storage.local device token; 401 from any API call"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Sign in",
+        "action": "open the sign-in form",
+        "target": "signin"
+      }
+    ],
+    "exits": [
+      "signin"
+    ],
+    "states": [
+      "error"
+    ],
+    "terms": [
+      "Device",
+      "Sign in"
+    ],
+    "text": [
+      "You are signed out.",
+      "Sign in",
+      "Scan, Review, Courses and Tracks need a signed-in device."
+    ]
+  },
+  {
+    "id": "conn-detail",
+    "surface": "floating card",
+    "title": "Connection",
+    "journeys": [
+      1,
+      7
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "server_up",
+        "source": "GET /health poll from extension background"
+      },
+      {
+        "field": "unsynced_count",
+        "source": "extension outbox in storage.local (verify outbox exists, open question 7, D43)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Retry now",
+        "action": "ping server and flush queue",
+        "target": "none"
+      },
+      {
+        "label": "Show unsynced marks",
+        "action": "open queue list",
+        "target": "offline-queue"
+      },
+      {
+        "label": "Open settings",
+        "action": "open connection settings",
+        "target": "settings-connection"
+      }
+    ],
+    "exits": [
+      "offline-queue",
+      "settings-connection"
+    ],
+    "states": [
+      "offline",
+      "error"
+    ],
+    "terms": [
+      "Connection indicator",
+      "Offline queue",
+      "Settings"
+    ],
+    "text": [
+      "Connected",
+      "Server down, 3 not synced",
+      "Server down",
+      "Retry now",
+      "Show unsynced marks",
+      "Open settings",
+      "Scan, Quiz and Generate course are off until the server answers."
+    ]
+  },
+  {
+    "id": "offline-queue",
+    "surface": "panel tab",
+    "title": "Not synced marks",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "queued_marks (concept, state, time)",
+        "source": "extension outbox in storage.local (verify, D43)"
+      },
+      {
+        "field": "sync_result",
+        "source": "PUT concept mark endpoint used by setConcept (extension/src/background.ts:52)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Retry now",
+        "action": "flush queue in order",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "conn-detail"
+      }
+    ],
+    "exits": [
+      "conn-detail"
+    ],
+    "states": [
+      "empty",
+      "offline"
+    ],
+    "terms": [
+      "Offline queue",
+      "Concept",
+      "Connection indicator",
+      "Not synced (dot)"
+    ],
+    "text": [
+      "Not synced marks",
+      "Nothing waiting to sync.",
+      "Not synced",
+      "Synced",
+      "Marks are kept in this browser and sent in order when the server answers.",
+      "Your mark wins over a trainer update.",
+      "Retry now",
+      "Back"
+    ]
+  },
+  {
+    "id": "pin",
+    "surface": "floating card",
+    "title": "Safety pin",
+    "journeys": [
+      1,
+      2
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "new_concept_count",
+        "source": "scan result concept states (needs backend D4)"
+      },
+      {
+        "field": "connection state",
+        "source": "conn-detail"
+      },
+      {
+        "field": "focus_on",
+        "source": "extension storage.local (D50)"
+      },
+      {
+        "field": "pin position",
+        "source": "kept on this device (localStorage), memory only when storage is blocked; clamped inside the viewport on load and resize (D57b)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Open card",
+        "action": "click pin opens floating card",
+        "target": "card-main"
+      },
+      {
+        "label": "Undo",
+        "action": "revert the last action; title shows it (\"Undo: marked Known\"); disabled and dimmed when nothing to undo (D57a)",
+        "target": "none"
+      },
+      {
+        "label": "Drag",
+        "action": "move pin",
+        "target": "none"
+      },
+      {
+        "label": "Collapse pin",
+        "action": "collapse the pin to its small icon button; an open card collapses with it (D57c)",
+        "target": "none"
+      },
+      {
+        "label": "Connection dot",
+        "action": "click opens connection",
+        "target": "conn-detail"
+      }
+    ],
+    "exits": [
+      "card-main",
+      "conn-detail",
+      "pin-collapsed"
+    ],
+    "states": [
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Pin (mascot)",
+      "Floating card",
+      "Connection indicator",
+      "Focus mode"
+    ],
+    "text": [
+      "kata",
+      "Open card",
+      "Collapse pin",
+      "12 new",
+      "Server down",
+      "Focus mode is on.",
+      "Undo",
+      "Nothing to undo"
+    ]
+  },
+  {
+    "id": "pin-collapsed",
+    "surface": "floating card",
+    "title": "Safety pin (collapsed)",
+    "journeys": [
+      1,
+      2
+    ],
+    "root": false,
+    "data": [],
+    "controls": [
+      {
+        "label": "Open pin",
+        "action": "expand the pin; the card that was open comes back, focus moves to the pin (D57c, d); Enter or Space on the icon",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "pin"
+    ],
+    "states": [],
+    "text": [
+      "Open pin"
+    ],
+    "terms": [
+      "Pin (mascot)",
+      "Floating card"
+    ]
+  },
+  {
+    "id": "card-main",
+    "surface": "floating card",
+    "title": "kata card",
+    "journeys": [
+      1,
+      2,
+      6,
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "counts New/Learning/Known on page",
+        "source": "scan result with concept states (needs backend D4)"
+      },
+      {
+        "field": "top_gaps",
+        "source": "scan result concepts in state New (needs backend D4)"
+      },
+      {
+        "field": "focus_on, focus_ends_at",
+        "source": "extension storage.local (D50)"
+      },
+      {
+        "field": "server_up",
+        "source": "conn-detail"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Scan page",
+        "action": "start scan of current page",
+        "target": "card-scan"
+      },
+      {
+        "label": "Summary",
+        "action": "open the summary view (knowledge summary and page text summary)",
+        "target": "card-summary"
+      },
+      {
+        "label": "Quiz this page",
+        "action": "start a mini quiz on the page",
+        "target": "quiz-run"
+      },
+      {
+        "label": "Focus mode",
+        "action": "toggle focus mode",
+        "target": "focus-confirm"
+      },
+      {
+        "label": "Open panel",
+        "action": "open panel",
+        "target": "scan-results"
+      },
+      {
+        "label": "Collapse card",
+        "action": "collapse the card to the small pin icon; Esc does the same (D57d)",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "card-scan",
+      "card-summary",
+      "quiz-run",
+      "focus-confirm",
+      "scan-results",
+      "pin-collapsed"
+    ],
+    "states": [
+      "empty",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Floating card",
+      "Scan",
+      "Summary",
+      "Quiz (mini)",
+      "Focus mode",
+      "Concept",
+      "Connection indicator",
+      "Panel"
+    ],
+    "text": [
+      "New",
+      "Learning",
+      "Known",
+      "Top gaps",
+      "No scan yet. Scan this page to see concepts.",
+      "Scan page",
+      "Summary",
+      "Quiz this page",
+      "Focus mode",
+      "Open panel",
+      "Collapse card",
+      "Server down. Scan and Quiz are off.",
+      "Edits are made in the panel."
+    ]
+  },
+  {
+    "id": "card-scan",
+    "surface": "floating card",
+    "title": "Scan page",
+    "journeys": [
+      2
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "blockId, topic, known, reason per block",
+        "source": "extension/src/scanSession.ts:9-13"
+      },
+      {
+        "field": "concepts per block with state",
+        "source": "needs backend (D4)"
+      },
+      {
+        "field": "teachable-content check result",
+        "source": "needs backend (D38)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Show in panel",
+        "action": "open results tree",
+        "target": "scan-results"
+      },
+      {
+        "label": "Scan again",
+        "action": "rescan page",
+        "target": "card-scan"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "card-main"
+      }
+    ],
+    "exits": [
+      "scan-results",
+      "card-main",
+      "page-changed"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Scan",
+      "Concept",
+      "Floating card",
+      "Focus mode",
+      "Panel"
+    ],
+    "text": [
+      "Scanning...",
+      "Found 24 concepts: 12 New, 7 Learning, 5 Known.",
+      "This page has no teaching content.",
+      "Could not scan this page.",
+      "Show in panel",
+      "Scan again",
+      "Back",
+      "Focus mode is on. Results show only in the panel.",
+      "Server down. Scan is off."
+    ]
+  },
+  {
+    "id": "card-summary",
+    "surface": "floating card",
+    "title": "Summaries",
+    "journeys": [
+      2
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "topic overview (topics found, counts)",
+        "source": "derived from concept scan; needs backend (D4, D23)"
+      },
+      {
+        "field": "page text summary",
+        "source": "needs backend: new job kind, no handler for a summary task today (D25)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Open in panel",
+        "action": "open summary in panel",
+        "target": "summary-panel"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "card-main"
+      }
+    ],
+    "exits": [
+      "summary-panel",
+      "card-main"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Summary",
+      "Topic",
+      "Floating card",
+      "Panel"
+    ],
+    "text": [
+      "Knowledge summary",
+      "Page text summary",
+      "Topics found on this page",
+      "Scan the page first.",
+      "Writing the page text summary...",
+      "Could not write the page text summary.",
+      "Open in panel",
+      "Back"
+    ]
+  },
+  {
+    "id": "focus-confirm",
+    "surface": "floating card",
+    "title": "Focus mode",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "auto_end_hours (default 3)",
+        "source": "extension storage.local; default from configuration (D50)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Turn on",
+        "action": "start focus mode with the chosen time",
+        "target": "card-main"
+      },
+      {
+        "label": "Turn off",
+        "action": "end focus mode",
+        "target": "card-main"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "card-main"
+      }
+    ],
+    "exits": [
+      "card-main"
+    ],
+    "states": [
+      "focus"
+    ],
+    "terms": [
+      "Focus mode",
+      "Floating card",
+      "Panel"
+    ],
+    "text": [
+      "Focus mode",
+      "Ends after",
+      "3 hours",
+      "While on: no jokes, no pin nudges, no inline quiz offers, no page highlights, no inline mark buttons. Scan still works; results show only in the panel.",
+      "Turn on",
+      "Turn off",
+      "Cancel",
+      "Focus mode ends at 14:30."
+    ]
+  },
+  {
+    "id": "joke-cloud",
+    "surface": "floating card",
+    "title": "Joke cloud",
+    "journeys": [
+      7
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "joke text",
+        "source": "needs backend: core fetches from a server-side list of sources, plain text only (D26, D28, D30)"
+      },
+      {
+        "field": "jokes_on, interval, source",
+        "source": "extension storage.local and settings-jokes"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Close joke",
+        "action": "close at once",
+        "target": "none"
+      }
+    ],
+    "exits": [],
+    "states": [
+      "focus"
+    ],
+    "terms": [
+      "Joke cloud",
+      "Pin (mascot)",
+      "Focus mode"
+    ],
+    "text": [
+      "Close joke"
+    ]
+  },
+  {
+    "id": "hl-hover-menu",
+    "surface": "page overlay",
+    "title": "Concept highlight menu",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "concept name and state",
+        "source": "scan result (needs backend D4)"
+      },
+      {
+        "field": "aliases of the concept (word hovered, merged into one concept, D53)",
+        "source": "extraction merges aliases (needs backend D4, D53)"
+      },
+      {
+        "field": "lists holding the concept",
+        "source": "needs backend (D7, D10)"
+      },
+      {
+        "field": "mark write",
+        "source": "setConcept (extension/src/background.ts:52)"
+      },
+      {
+        "field": "definition, one line",
+        "source": "needs backend (D55)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "New",
+        "action": "reset concept to New (D56): icon, tooltip and label; toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "Learning",
+        "action": "mark concept Learning (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Known",
+        "action": "mark concept Known, source user (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Add to list",
+        "action": "choose a list (icon, tooltip and label)",
+        "target": "list-picker"
+      },
+      {
+        "label": "Not this meaning",
+        "action": "move this highlight to another concept with the same word; opens the candidate list, or shows a note when none is known (icon, tooltip and label)",
+        "target": "hl-which-one"
+      },
+      {
+        "label": "Delete",
+        "action": "delete concept, inline confirm, toast, Undo in the pin (D57) (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Ignore from now on",
+        "action": "hide concept, add to Ignored list, inline confirm, toast, Undo in the pin (D57) (icon, tooltip and label)",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "list-picker",
+      "hl-which-one"
+    ],
+    "states": [
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Concept",
+      "Alias",
+      "Area",
+      "Topic",
+      "List",
+      "Offline queue",
+      "Focus mode",
+      "Undo",
+      "Not synced (dot)",
+      "Which one?",
+      "Ignore",
+      "Delete",
+      "Definition",
+      "New (reset)"
+    ],
+    "text": [
+      "New",
+      "Known",
+      "Learning",
+      "Add to list",
+      "Not this meaning",
+      "No other meaning known",
+      "Not synced",
+      "In lists: Networking basics",
+      "Also written: SYN-ACK",
+      "Networking > TCP",
+      "Delete",
+      "Ignore from now on"
+    ]
+  },
+  {
+    "id": "hl-which-one",
+    "surface": "page overlay",
+    "title": "Which one?",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "candidate concepts for the word (name, area, topic)",
+        "source": "extraction lists every concept the word can mean (needs backend D4, D54)"
+      },
+      {
+        "field": "choice remembered per page topic",
+        "source": "needs backend (D54)"
+      },
+      {
+        "field": "alias taught by Not this meaning",
+        "source": "extraction merges aliases (needs backend D4, D53, D54)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "This one",
+        "action": "pick the meaning; remember it for this page topic; apply the mark target; show the concept menu",
+        "target": "hl-hover-menu"
+      }
+    ],
+    "exits": [
+      "hl-hover-menu"
+    ],
+    "states": [
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Concept",
+      "Alias",
+      "Area",
+      "Topic",
+      "Which one?",
+      "Offline queue",
+      "Focus mode"
+    ],
+    "text": [
+      "Which one?",
+      "Window",
+      "Networking > TCP",
+      "Software > UI",
+      "Word on the page: window"
+    ]
+  },
+  {
+    "id": "block-menu",
+    "surface": "page overlay",
+    "title": "Block menu",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "concepts in block with states",
+        "source": "needs backend (D4, D32)"
+      },
+      {
+        "field": "block state (derived: all Known = Known, else mixed)",
+        "source": "derived in extension from concept states (D32)"
+      },
+      {
+        "field": "concepts not found as exact word",
+        "source": "needs backend (D33)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "All New",
+        "action": "reset all concepts of the block to New (D56); toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "All Learning",
+        "action": "mark all concepts of the block Learning",
+        "target": "none"
+      },
+      {
+        "label": "All Known",
+        "action": "mark all concepts of the block Known",
+        "target": "none"
+      },
+      {
+        "label": "Add all to list",
+        "action": "choose a list",
+        "target": "list-picker"
+      }
+    ],
+    "exits": [
+      "list-picker"
+    ],
+    "states": [
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Block",
+      "Concept",
+      "List",
+      "Offline queue",
+      "Focus mode",
+      "Undo",
+      "Mixed (block state)",
+      "New (reset)"
+    ],
+    "text": [
+      "All New",
+      "All Known",
+      "All Learning",
+      "Add all to list",
+      "Mixed",
+      "Concepts in this block",
+      "Not shown as a word in the text"
+    ]
+  },
+  {
+    "id": "image-pin-menu",
+    "surface": "page overlay",
+    "title": "Image menu",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "concepts matched to image",
+        "source": "needs backend: vision model (D33, D16)"
+      },
+      {
+        "field": "image block state",
+        "source": "derived from concept states (D32)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "All New",
+        "action": "reset all concepts of the image to New (D56); toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "All Learning",
+        "action": "mark all concepts of the image Learning",
+        "target": "none"
+      },
+      {
+        "label": "All Known",
+        "action": "mark all concepts of the image Known",
+        "target": "none"
+      },
+      {
+        "label": "Add all to list",
+        "action": "choose a list",
+        "target": "list-picker"
+      },
+      {
+        "label": "New",
+        "action": "reset one concept to New (D56); toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "Learning",
+        "action": "mark one concept Learning",
+        "target": "none"
+      },
+      {
+        "label": "Known",
+        "action": "mark one concept Known",
+        "target": "none"
+      },
+      {
+        "label": "Add to list",
+        "action": "choose a list for one concept",
+        "target": "list-picker"
+      }
+    ],
+    "exits": [
+      "list-picker"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "focus"
+    ],
+    "terms": [
+      "Block",
+      "Concept",
+      "List",
+      "Pin (mascot)",
+      "Focus mode",
+      "New (reset)",
+      "Undo"
+    ],
+    "text": [
+      "All New",
+      "New",
+      "This image is one block.",
+      "Concepts in this image",
+      "All Known",
+      "All Learning",
+      "Add all to list",
+      "Known",
+      "Learning",
+      "Add to list",
+      "Could not read this image."
+    ]
+  },
+  {
+    "id": "inline-quiz-pin",
+    "surface": "page overlay",
+    "title": "Section quiz pin",
+    "journeys": [
+      6
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "section new_concept_count",
+        "source": "scan result (needs backend D4)"
+      },
+      {
+        "field": "scroll position past section end",
+        "source": "content script"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Quiz this section",
+        "action": "start a mini quiz for this section only",
+        "target": "quiz-run"
+      }
+    ],
+    "exits": [
+      "quiz-run"
+    ],
+    "states": [
+      "focus",
+      "offline"
+    ],
+    "terms": [
+      "Quiz (mini)",
+      "Pin (mascot)",
+      "Focus mode"
+    ],
+    "text": [
+      "Quiz this section",
+      "5 questions"
+    ]
+  },
+  {
+    "id": "list-picker",
+    "surface": "page overlay",
+    "title": "Choose a list",
+    "journeys": [
+      3
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "lists (name, concept count)",
+        "source": "needs backend: list entity and API (D7, D8)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Add",
+        "action": "add concept or concepts to the chosen list",
+        "target": "none"
+      },
+      {
+        "label": "New list",
+        "action": "create a list",
+        "target": "list-edit"
+      },
+      {
+        "label": "Cancel",
+        "action": "close",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "list-edit"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "List",
+      "Concept"
+    ],
+    "text": [
+      "Add to list",
+      "Pick a list",
+      "You have no lists yet.",
+      "New list",
+      "Add",
+      "Cancel",
+      "Could not load your lists.",
+      "Added to Networking basics."
+    ]
+  },
+  {
+    "id": "scan-results",
+    "surface": "panel tab",
+    "title": "Scan results",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "area, topic, concept tree with state",
+        "source": "needs backend: concept extraction, area level (D4, D37, D38)"
+      },
+      {
+        "field": "sort key and direction",
+        "source": "UI setting; added date and last viewed need backend (D42)"
+      },
+      {
+        "field": "block state",
+        "source": "derived from concepts (D32)"
+      },
+      {
+        "field": "lists holding each concept",
+        "source": "needs backend (D7, D10)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Scan page",
+        "action": "scan current page",
+        "target": "scan-results"
+      },
+      {
+        "label": "Sort by",
+        "action": "choose sort key and direction",
+        "target": "none"
+      },
+      {
+        "label": "Add to list",
+        "action": "choose a list",
+        "target": "list-picker"
+      },
+      {
+        "label": "Add all concepts of topic",
+        "action": "add whole topic to a list",
+        "target": "list-picker"
+      },
+      {
+        "label": "Quiz this topic",
+        "action": "mini quiz on topic",
+        "target": "quiz-run"
+      },
+      {
+        "label": "Knowledge summary",
+        "action": "open summaries",
+        "target": "summary-panel"
+      },
+      {
+        "label": "Focus mode",
+        "action": "toggle focus mode",
+        "target": "focus-confirm"
+      },
+      {
+        "label": "Review",
+        "action": "open Review tab",
+        "target": "review"
+      },
+      {
+        "label": "Courses",
+        "action": "open Courses tab",
+        "target": "courses-tab"
+      },
+      {
+        "label": "Tracks",
+        "action": "open Tracks tab",
+        "target": "tracks-tab"
+      },
+      {
+        "label": "Settings",
+        "action": "open settings",
+        "target": "settings-home"
+      },
+      {
+        "label": "New",
+        "action": "reset concept to New (D56): icon, tooltip and label; toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "Learning",
+        "action": "set concept Learning (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Known",
+        "action": "mark concept Known (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Fold or unfold",
+        "action": "fold or unfold an area or topic",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "list-picker",
+      "quiz-run",
+      "summary-panel",
+      "focus-confirm",
+      "review",
+      "courses-tab",
+      "tracks-tab",
+      "settings-home"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Scan",
+      "Area",
+      "Topic",
+      "Concept",
+      "Block",
+      "List",
+      "Quiz (mini)",
+      "Summary",
+      "Sort options",
+      "Connection indicator",
+      "Focus mode",
+      "Settings",
+      "Ignore",
+      "Delete",
+      "Definition",
+      "New (reset)"
+    ],
+    "text": [
+      "Scan results",
+      "Scan page",
+      "Sort by",
+      "Name",
+      "Added date",
+      "Last viewed",
+      "Relevance",
+      "A to Z",
+      "Z to A",
+      "Newest first",
+      "Oldest first",
+      "Most recent first",
+      "Least recent first",
+      "Most relevant first",
+      "Least relevant first",
+      "Known",
+      "Learning",
+      "New",
+      "Add to list",
+      "Add all concepts of topic",
+      "Quiz this topic",
+      "Knowledge summary",
+      "Focus mode",
+      "Review",
+      "Courses",
+      "Tracks",
+      "Settings",
+      "Scan a page to see its concepts.",
+      "Scanning...",
+      "Could not scan this page.",
+      "Server down. Scan is off.",
+      "Focus mode is on. Results show only here."
+    ]
+  },
+  {
+    "id": "summary-panel",
+    "surface": "panel tab",
+    "title": "Summaries",
+    "journeys": [
+      2
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "topic overview",
+        "source": "derived from concept scan; needs backend (D4, D23)"
+      },
+      {
+        "field": "page text summary",
+        "source": "needs backend: new job kind (D25)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Back to scan results",
+        "action": "return",
+        "target": "scan-results"
+      },
+      {
+        "label": "Add all concepts of topic",
+        "action": "add whole topic to a list",
+        "target": "list-picker"
+      }
+    ],
+    "exits": [
+      "scan-results",
+      "list-picker"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Summary",
+      "Topic",
+      "Concept",
+      "List"
+    ],
+    "text": [
+      "Knowledge summary",
+      "Page text summary",
+      "Topics on this page",
+      "Concepts per topic",
+      "Scan the page first.",
+      "Writing the page text summary...",
+      "Could not write the page text summary.",
+      "Back to scan results",
+      "Add all concepts of topic"
+    ]
+  },
+  {
+    "id": "review",
+    "surface": "panel tab",
+    "title": "Review",
+    "journeys": [
+      6
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "tree area, topic, concept with state",
+        "source": "concept_marks via GET concepts (code) plus area level (needs backend D37)"
+      },
+      {
+        "field": "sort options",
+        "source": "added date, last viewed need backend (D42)"
+      },
+      {
+        "field": "mark write",
+        "source": "setConcept (extension/src/background.ts:52)"
+      },
+      {
+        "field": "ignored and deleted items",
+        "source": "needs backend (D55)"
+      },
+      {
+        "field": "concept count, N of M, mini counts per state",
+        "source": "derived from concept_marks (D55)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Sort by",
+        "action": "choose sort key and direction",
+        "target": "none"
+      },
+      {
+        "label": "Quiz me",
+        "action": "up to 5 questions for one topic",
+        "target": "quiz-run"
+      },
+      {
+        "label": "Add to list",
+        "action": "choose a list",
+        "target": "list-picker"
+      },
+      {
+        "label": "New",
+        "action": "reset concept to New (D56): icon, tooltip and label; toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "Learning",
+        "action": "set concept Learning (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Known",
+        "action": "set concept Known (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Collapse all",
+        "action": "fold every area and topic",
+        "target": "none"
+      },
+      {
+        "label": "Expand all",
+        "action": "unfold every area and topic",
+        "target": "none"
+      },
+      {
+        "label": "Filter New",
+        "action": "show or hide New concepts (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Filter Learning",
+        "action": "show or hide Learning concepts (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Filter Known",
+        "action": "show or hide Known concepts (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Only this page",
+        "action": "show only concepts found on the open page",
+        "target": "none"
+      },
+      {
+        "label": "Fold or unfold",
+        "action": "fold or unfold an area or topic; a concept row never does",
+        "target": "none"
+      },
+      {
+        "label": "Delete",
+        "action": "delete concept or topic, inline confirm, toast, Undo in the pin (D57) (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Ignore from now on",
+        "action": "hide concept or topic, add to Ignored list, inline confirm, toast, Undo in the pin (D57) (icon, tooltip and label)",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "quiz-run",
+      "list-picker"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Review",
+      "Topic",
+      "Concept",
+      "Sort options",
+      "Quiz (mini)",
+      "List",
+      "Offline queue",
+      "Not synced (dot)",
+      "Ignore",
+      "Delete",
+      "Definition",
+      "New (reset)"
+    ],
+    "text": [
+      "Review",
+      "Sort by",
+      "Name",
+      "Added date",
+      "Last viewed",
+      "Relevance",
+      "A to Z",
+      "Z to A",
+      "Newest first",
+      "Oldest first",
+      "Most recent first",
+      "Least recent first",
+      "Most relevant first",
+      "Least relevant first",
+      "New",
+      "Learning",
+      "Known",
+      "Quiz me",
+      "Add to list",
+      "No concepts yet. Scan a page first.",
+      "Could not load concepts.",
+      "Not synced",
+      "Search concepts",
+      "N of M concepts",
+      "Only this page",
+      "Collapse all",
+      "Expand all",
+      "Delete",
+      "Ignore from now on",
+      "Yes, delete",
+      "Yes, ignore",
+      "Cancel",
+      "Delete? A later scan can bring it back as New.",
+      "Ignore from now on? It is hidden and never found again."
+    ]
+  },
+  {
+    "id": "courses-tab",
+    "surface": "panel tab",
+    "title": "Courses",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "courses (title, version, concept count, exam option)",
+        "source": "courses API (code, D2); version and exam option need backend (D35)"
+      },
+      {
+        "field": "lists (name, concept count, last viewed)",
+        "source": "needs backend: list entity (D7, D8, D42)"
+      },
+      {
+        "field": "sort key",
+        "source": "UI setting (D42)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Open course",
+        "action": "open course",
+        "target": "course-detail"
+      },
+      {
+        "label": "Open list",
+        "action": "open a list",
+        "target": "list-detail"
+      },
+      {
+        "label": "New list",
+        "action": "create a list",
+        "target": "list-edit"
+      },
+      {
+        "label": "Generate course",
+        "action": "generate from a list",
+        "target": "course-generate"
+      },
+      {
+        "label": "Sort by",
+        "action": "choose sort key and direction",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "course-detail",
+      "list-detail",
+      "list-edit",
+      "course-generate"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Course",
+      "List",
+      "Concept",
+      "Sort options",
+      "Version 2"
+    ],
+    "text": [
+      "Courses",
+      "Lists",
+      "Lists are drafts. A list becomes a course when you generate it.",
+      "You have no courses yet.",
+      "You have no lists yet.",
+      "Open course",
+      "Open list",
+      "New list",
+      "Generate course",
+      "Sort by",
+      "Name",
+      "Added date",
+      "Last viewed",
+      "Relevance",
+      "A to Z",
+      "Z to A",
+      "Newest first",
+      "Oldest first",
+      "Most recent first",
+      "Least recent first",
+      "Most relevant first",
+      "Least relevant first",
+      "Version 2",
+      "Could not load courses.",
+      "Server down. Generate course is off."
+    ]
+  },
+  {
+    "id": "list-detail",
+    "surface": "panel tab",
+    "title": "List",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "list name and concepts grouped by topic",
+        "source": "needs backend: list entity (D7, D8, D14)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Rename",
+        "action": "rename list",
+        "target": "list-edit"
+      },
+      {
+        "label": "Delete list",
+        "action": "delete list",
+        "target": "list-delete"
+      },
+      {
+        "label": "Remove",
+        "action": "remove concept from list",
+        "target": "none"
+      },
+      {
+        "label": "Add all concepts of topic",
+        "action": "add a whole topic",
+        "target": "none"
+      },
+      {
+        "label": "Generate course",
+        "action": "generate course from list",
+        "target": "course-generate"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "courses-tab"
+      }
+    ],
+    "exits": [
+      "list-edit",
+      "list-delete",
+      "course-generate",
+      "courses-tab"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "List",
+      "Concept",
+      "Topic",
+      "Course"
+    ],
+    "text": [
+      "List",
+      "This list is a draft. It is not a course.",
+      "Rename",
+      "Delete list",
+      "Remove",
+      "Add all concepts of topic",
+      "Generate course",
+      "Back",
+      "This list is empty. Add concepts from a scan.",
+      "Could not load this list."
+    ]
+  },
+  {
+    "id": "list-edit",
+    "surface": "panel tab",
+    "title": "Name a list",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "list name",
+        "source": "needs backend: create and rename list API (D8)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Save",
+        "action": "create or rename list",
+        "target": "list-detail"
+      },
+      {
+        "label": "Cancel",
+        "action": "close",
+        "target": "courses-tab"
+      }
+    ],
+    "exits": [
+      "list-detail",
+      "courses-tab"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "List"
+    ],
+    "text": [
+      "List name",
+      "Save",
+      "Cancel",
+      "Could not save the list.",
+      "A list with this name exists."
+    ]
+  },
+  {
+    "id": "list-delete",
+    "surface": "panel tab",
+    "title": "Delete list",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "list name and concept count",
+        "source": "needs backend (D8)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Delete list",
+        "action": "delete list; courses made from it stay",
+        "target": "courses-tab"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "list-detail"
+      }
+    ],
+    "exits": [
+      "courses-tab",
+      "list-detail"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "List",
+      "Course"
+    ],
+    "text": [
+      "Delete this list?",
+      "The concepts stay marked as they are. Courses made from this list stay.",
+      "Delete list",
+      "Cancel",
+      "Could not delete the list."
+    ]
+  },
+  {
+    "id": "course-generate",
+    "surface": "panel tab",
+    "title": "Generate course",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "concepts by state (New, Learning, Known left out)",
+        "source": "concept_marks (code) and list (needs backend D8)"
+      },
+      {
+        "field": "learning_start_step (default 3-7 days)",
+        "source": "needs dojokit check: step names and numbers (D48, D49)"
+      },
+      {
+        "field": "exam option",
+        "source": "needs backend: dojokit exam pool and known signal (D35)"
+      },
+      {
+        "field": "create course",
+        "source": "POST /courses with concept_ids (code, D2); from list needs backend (D8)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Learning concepts start at",
+        "action": "choose start step",
+        "target": "none"
+      },
+      {
+        "label": "Add an exam",
+        "action": "toggle exam option",
+        "target": "none"
+      },
+      {
+        "label": "Generate",
+        "action": "generate course",
+        "target": "course-detail"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "courses-tab"
+      }
+    ],
+    "exits": [
+      "course-detail",
+      "courses-tab"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Course",
+      "Learning start step",
+      "Exam",
+      "Concept",
+      "List",
+      "Learning concepts start at"
+    ],
+    "text": [
+      "Generate course",
+      "New concepts are in the course.",
+      "Known concepts are left out.",
+      "Learning concepts start at: 3-7 days",
+      "Add an exam",
+      "The exam questions differ from the practice questions. Passing confirms a concept is learned.",
+      "Generate",
+      "Cancel",
+      "Generating...",
+      "Could not generate the course.",
+      "Server down. Generate course is off."
+    ]
+  },
+  {
+    "id": "course-detail",
+    "surface": "panel tab",
+    "title": "Course preview",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "course items with start step per concept",
+        "source": "courses API (code); per-concept start step needs dojokit check (D48)"
+      },
+      {
+        "field": "progress and mastery per concept",
+        "source": "trainer evidence (code, D35)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Change start",
+        "action": "change start step of one concept",
+        "target": "none"
+      },
+      {
+        "label": "Open course page",
+        "action": "open course on the course page",
+        "target": "course-page"
+      },
+      {
+        "label": "Regenerate",
+        "action": "replace this course",
+        "target": "course-regenerate"
+      },
+      {
+        "label": "Start exam",
+        "action": "open exam",
+        "target": "exam-run"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "courses-tab"
+      }
+    ],
+    "exits": [
+      "course-page",
+      "course-regenerate",
+      "exam-run",
+      "courses-tab"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Course",
+      "Concept",
+      "Learning start step",
+      "Exam",
+      "Regenerate",
+      "Version 2",
+      "Learning concepts start at"
+    ],
+    "text": [
+      "Course preview",
+      "Learning concepts start at: 3-7 days",
+      "Change start",
+      "Open course page",
+      "Regenerate",
+      "Start exam",
+      "Back",
+      "Version 2",
+      "Could not load the course."
+    ]
+  },
+  {
+    "id": "course-regenerate",
+    "surface": "panel tab",
+    "title": "Regenerate course",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "concept states carried over",
+        "source": "concept_marks (code, global marks, D12)"
+      },
+      {
+        "field": "new concepts from new sources",
+        "source": "needs backend: sources (D12, D16)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Regenerate",
+        "action": "replace the course; it becomes version 2",
+        "target": "course-detail"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "course-detail"
+      }
+    ],
+    "exits": [
+      "course-detail"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Course",
+      "Concept",
+      "Source",
+      "Learning start step",
+      "Regenerate",
+      "Version 2",
+      "Learning concepts start at"
+    ],
+    "text": [
+      "Regenerate course",
+      "Regenerate replaces this course. The new course is version 2.",
+      "Carried over",
+      "Concept states are kept.",
+      "New",
+      "Concepts added by new sources.",
+      "Learning concepts start at: 3-7 days",
+      "Regenerate",
+      "Cancel",
+      "Could not regenerate the course."
+    ]
+  },
+  {
+    "id": "course-page",
+    "surface": "course page",
+    "title": "Course items",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "course items",
+        "source": "dojo course page (dojokit; verify, D48)"
+      },
+      {
+        "field": "item to concept link",
+        "source": "courses API (code)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Start exam",
+        "action": "open exam",
+        "target": "exam-run"
+      },
+      {
+        "label": "Back to panel",
+        "action": "return",
+        "target": "course-detail"
+      }
+    ],
+    "exits": [
+      "exam-run",
+      "course-detail"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Course",
+      "Concept",
+      "Exam",
+      "Panel",
+      "Course page"
+    ],
+    "text": [
+      "Course items",
+      "Start exam",
+      "Back to panel",
+      "Could not load the course page."
+    ]
+  },
+  {
+    "id": "quiz-run",
+    "surface": "panel tab",
+    "title": "Quiz",
+    "journeys": [
+      6
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "up to 5 questions with 3-4 choices, answer index, source quote",
+        "source": "needs backend: fetched reference text, strict JSON, grounding check (D41, D45)"
+      },
+      {
+        "field": "source link and tier label",
+        "source": "needs backend (D46)"
+      },
+      {
+        "field": "answer effect",
+        "source": "correct moves New to Learning, wrong never lowers (D19)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Answer choice",
+        "action": "pick one prefilled answer",
+        "target": "none"
+      },
+      {
+        "label": "Next",
+        "action": "next question",
+        "target": "none"
+      },
+      {
+        "label": "Finish",
+        "action": "end the quiz",
+        "target": "quiz-end"
+      },
+      {
+        "label": "Stop quiz",
+        "action": "leave quiz",
+        "target": "review"
+      }
+    ],
+    "exits": [
+      "quiz-end",
+      "review"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Quiz (mini)",
+      "Source tier",
+      "Source",
+      "Concept",
+      "Quiz question source (label only)",
+      "Tier 1"
+    ],
+    "text": [
+      "Question 1 of 5",
+      "Next",
+      "Finish",
+      "Stop quiz",
+      "Source:",
+      "Tier 1",
+      "General reference",
+      "Could not write questions for this topic.",
+      "Server down. Quiz is off.",
+      "Writing questions..."
+    ]
+  },
+  {
+    "id": "quiz-end",
+    "surface": "panel tab",
+    "title": "Quiz result",
+    "journeys": [
+      6
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "concepts answered right or wrong",
+        "source": "quiz session in extension"
+      },
+      {
+        "field": "mark write",
+        "source": "setConcept (extension/src/background.ts:52)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Mark as New",
+        "action": "reset one concept to New (D56), source user; toast, Undo in the pin (D57)",
+        "target": "none"
+      },
+      {
+        "label": "Mark as Known",
+        "action": "confirm one concept Known, source user",
+        "target": "none"
+      },
+      {
+        "label": "Add to list",
+        "action": "choose a list",
+        "target": "list-picker"
+      },
+      {
+        "label": "Done",
+        "action": "return",
+        "target": "review"
+      }
+    ],
+    "exits": [
+      "list-picker",
+      "review"
+    ],
+    "states": [
+      "offline"
+    ],
+    "terms": [
+      "Quiz (mini)",
+      "Mark as Known (after quiz)",
+      "Concept",
+      "List",
+      "Offline queue",
+      "Not synced (dot)",
+      "New (reset)"
+    ],
+    "text": [
+      "Mark as New",
+      "Quiz result",
+      "Right answers move New concepts to Learning.",
+      "Mark as Known",
+      "I know SYN",
+      "Add to list",
+      "Done",
+      "Not synced"
+    ]
+  },
+  {
+    "id": "exam-run",
+    "surface": "course page",
+    "title": "Exam",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "exam questions (separate pool, Tier 1 sources only)",
+        "source": "needs backend: dojokit exam pool (D35, D46)"
+      },
+      {
+        "field": "per-concept result",
+        "source": "needs backend: explicit known signal synced to kata (D35)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Answer choice",
+        "action": "pick one answer",
+        "target": "none"
+      },
+      {
+        "label": "Next",
+        "action": "next question",
+        "target": "none"
+      },
+      {
+        "label": "Finish exam",
+        "action": "submit exam",
+        "target": "exam-result"
+      },
+      {
+        "label": "Leave exam",
+        "action": "leave without result",
+        "target": "course-detail"
+      }
+    ],
+    "exits": [
+      "exam-result",
+      "course-detail"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Exam",
+      "Course",
+      "Source tier",
+      "Focus mode",
+      "Concept",
+      "Tier 1",
+      "Course page"
+    ],
+    "text": [
+      "Exam",
+      "Question 1 of 10",
+      "Source: Tier 1",
+      "Next",
+      "Finish exam",
+      "Leave exam",
+      "Could not load the exam.",
+      "Turn on focus mode for the exam."
+    ]
+  },
+  {
+    "id": "exam-result",
+    "surface": "course page",
+    "title": "Exam result",
+    "journeys": [
+      4
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "per concept right or wrong",
+        "source": "needs backend: dojokit known signal (D35, D36)"
+      },
+      {
+        "field": "course item link per concept",
+        "source": "courses API (code)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Open course items",
+        "action": "link to items for a concept",
+        "target": "course-page"
+      },
+      {
+        "label": "Done",
+        "action": "return",
+        "target": "course-detail"
+      }
+    ],
+    "exits": [
+      "course-page",
+      "course-detail"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Exam",
+      "Exam result",
+      "Concept",
+      "Course",
+      "Needs practice",
+      "Course page"
+    ],
+    "text": [
+      "Exam result",
+      "Known",
+      "Needs practice",
+      "Right answers confirm the concept as Known. Nothing is lowered.",
+      "Open course items",
+      "Done",
+      "Could not load the result."
+    ]
+  },
+  {
+    "id": "tracks-tab",
+    "surface": "panel tab",
+    "title": "Tracks",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "tracks (name, goal, deadline, progress, velocity)",
+        "source": "M5 tracks API reshaped (D11); progress and velocity need backend (D11, D15)"
+      },
+      {
+        "field": "sort key",
+        "source": "UI setting; relevance needs backend (D42)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Open track",
+        "action": "open a track",
+        "target": "track-detail"
+      },
+      {
+        "label": "New track",
+        "action": "create a track",
+        "target": "track-create"
+      },
+      {
+        "label": "Sort by",
+        "action": "choose sort key and direction",
+        "target": "none"
+      }
+    ],
+    "exits": [
+      "track-detail",
+      "track-create"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Track",
+      "Goal",
+      "Progress",
+      "Velocity",
+      "Sort options"
+    ],
+    "text": [
+      "Tracks",
+      "You have no tracks yet.",
+      "Open track",
+      "New track",
+      "Sort by",
+      "Name",
+      "Added date",
+      "Last viewed",
+      "Relevance",
+      "A to Z",
+      "Z to A",
+      "Newest first",
+      "Oldest first",
+      "Most recent first",
+      "Least recent first",
+      "Most relevant first",
+      "Least relevant first",
+      "Progress",
+      "Velocity",
+      "Too slow for the deadline.",
+      "Could not load tracks."
+    ]
+  },
+  {
+    "id": "track-create",
+    "surface": "panel tab",
+    "title": "New track",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "name, goal, deadline, optional time budget",
+        "source": "needs backend: reshaped tracks API (D11)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Create track",
+        "action": "create track",
+        "target": "track-detail"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "tracks-tab"
+      }
+    ],
+    "exits": [
+      "track-detail",
+      "tracks-tab"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Track",
+      "Goal",
+      "Time budget"
+    ],
+    "text": [
+      "New track",
+      "Name",
+      "Goal",
+      "Deadline",
+      "Time budget (optional)",
+      "Create track",
+      "Cancel",
+      "Could not create the track."
+    ]
+  },
+  {
+    "id": "track-detail",
+    "surface": "panel tab",
+    "title": "Track",
+    "journeys": [
+      5,
+      6
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "goal, deadline, concepts in goal",
+        "source": "needs backend (D11)"
+      },
+      {
+        "field": "progress = concepts Known / concepts in goal",
+        "source": "concept_marks (code) plus goal concepts (needs backend D11)"
+      },
+      {
+        "field": "velocity, earlier finish date, too-slow warning",
+        "source": "needs backend (D15)"
+      },
+      {
+        "field": "sources list with added date, last viewed",
+        "source": "needs backend (D12, D42)"
+      },
+      {
+        "field": "banner reason when progress drops",
+        "source": "needs backend (D37)"
+      },
+      {
+        "field": "exam results history",
+        "source": "needs backend (D50, D51)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Add source",
+        "action": "add a source",
+        "target": "source-add"
+      },
+      {
+        "label": "Create list from missing concepts",
+        "action": "make a list of missing concepts",
+        "target": "list-detail"
+      },
+      {
+        "label": "Quiz this track",
+        "action": "mini quiz over the track",
+        "target": "quiz-run"
+      },
+      {
+        "label": "Generate course",
+        "action": "generate course for one part of the goal",
+        "target": "course-generate"
+      },
+      {
+        "label": "Enter exam results",
+        "action": "record an exam result",
+        "target": "exam-result-entry"
+      },
+      {
+        "label": "Sort by",
+        "action": "choose sort key and direction",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "tracks-tab"
+      }
+    ],
+    "exits": [
+      "source-add",
+      "list-detail",
+      "quiz-run",
+      "course-generate",
+      "exam-result-entry",
+      "tracks-tab"
+    ],
+    "states": [
+      "empty",
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Track",
+      "Goal",
+      "Source",
+      "Progress",
+      "Velocity",
+      "List",
+      "Course",
+      "Quiz (mini)",
+      "Exam result",
+      "Sort options"
+    ],
+    "text": [
+      "Track",
+      "Goal",
+      "Deadline",
+      "Progress",
+      "Velocity",
+      "Finish date: 3 weeks earlier than planned.",
+      "Too slow for the deadline.",
+      "Progress dropped because a new source added concepts.",
+      "Sources",
+      "Add source",
+      "Create list from missing concepts",
+      "Quiz this track",
+      "Generate course",
+      "Enter exam results",
+      "Sort by",
+      "Name",
+      "Added date",
+      "Last viewed",
+      "Relevance",
+      "A to Z",
+      "Z to A",
+      "Newest first",
+      "Oldest first",
+      "Most recent first",
+      "Least recent first",
+      "Most relevant first",
+      "Least relevant first",
+      "Back",
+      "This track has no sources yet.",
+      "Could not load the track."
+    ]
+  },
+  {
+    "id": "source-add",
+    "surface": "panel tab",
+    "title": "Add source",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "pasted text, file, current page, a course",
+        "source": "needs backend: source ingest (D12, D16)"
+      },
+      {
+        "field": "PDF with images reader",
+        "source": "needs backend: vision model, sandbox container (D16, D47)"
+      },
+      {
+        "field": "teachable-content check",
+        "source": "needs backend (D38)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Paste text",
+        "action": "paste text",
+        "target": "none"
+      },
+      {
+        "label": "Choose file",
+        "action": "pick a file",
+        "target": "none"
+      },
+      {
+        "label": "Use current page",
+        "action": "use page in the browser tab",
+        "target": "none"
+      },
+      {
+        "label": "Use a course",
+        "action": "pick a course as a source",
+        "target": "none"
+      },
+      {
+        "label": "Add source",
+        "action": "read the source and find topics",
+        "target": "source-confirm-tree"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "track-detail"
+      }
+    ],
+    "exits": [
+      "source-confirm-tree",
+      "track-detail"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Source",
+      "Track",
+      "Course",
+      "Topic"
+    ],
+    "text": [
+      "Add source",
+      "Paste text",
+      "Choose file",
+      "Use current page",
+      "Use a course",
+      "Add source",
+      "Cancel",
+      "Reading the source...",
+      "Could not read this source.",
+      "Nothing here looks like teaching content."
+    ]
+  },
+  {
+    "id": "source-confirm-tree",
+    "surface": "panel tab",
+    "title": "Confirm new topics",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "tree area, topic, concept of the new source",
+        "source": "needs backend: area level, size limits from configuration (D37, D38)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Fold or unfold",
+        "action": "open or close a level",
+        "target": "none"
+      },
+      {
+        "label": "Remove",
+        "action": "remove an item before it joins",
+        "target": "none"
+      },
+      {
+        "label": "Add to track",
+        "action": "concepts join the track at once",
+        "target": "track-detail"
+      },
+      {
+        "label": "Cancel",
+        "action": "discard the source",
+        "target": "track-detail"
+      }
+    ],
+    "exits": [
+      "track-detail"
+    ],
+    "states": [
+      "loading",
+      "error"
+    ],
+    "terms": [
+      "Source",
+      "Area",
+      "Topic",
+      "Concept",
+      "Track",
+      "Progress"
+    ],
+    "text": [
+      "Confirm new topics",
+      "These concepts join the track at once. Progress may drop.",
+      "Remove",
+      "Add to track",
+      "Cancel",
+      "Could not read this source."
+    ]
+  },
+  {
+    "id": "exam-result-entry",
+    "surface": "panel tab",
+    "title": "Enter exam results",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "date, pass or fail, score, per-domain scores (optional)",
+        "source": "needs backend: exam result record on track goal (D50, D51)"
+      },
+      {
+        "field": "domain to area, topic or concept mapping",
+        "source": "needs backend; origin of domain list open (D51, open question 12)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Save result",
+        "action": "record result",
+        "target": "exam-result-proposals"
+      },
+      {
+        "label": "Add domain score",
+        "action": "add one domain row",
+        "target": "none"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "track-detail"
+      }
+    ],
+    "exits": [
+      "exam-result-proposals",
+      "track-detail"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Exam result",
+      "Goal",
+      "Track",
+      "Area",
+      "Topic",
+      "Domain"
+    ],
+    "text": [
+      "Enter exam results",
+      "Date",
+      "Passed",
+      "Not passed",
+      "Score",
+      "Domain scores (optional)",
+      "Add domain score",
+      "Save result",
+      "Cancel",
+      "Could not save the result."
+    ]
+  },
+  {
+    "id": "exam-result-proposals",
+    "surface": "panel tab",
+    "title": "Concepts to review",
+    "journeys": [
+      5
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "concepts of weak domains currently Known",
+        "source": "needs backend: mapping domains to concepts (D51)"
+      },
+      {
+        "field": "mark write",
+        "source": "setConcept (extension/src/background.ts:52)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Move to Learning",
+        "action": "confirm one concept Known to Learning",
+        "target": "none"
+      },
+      {
+        "label": "Keep Known",
+        "action": "leave concept unchanged",
+        "target": "none"
+      },
+      {
+        "label": "Pick topics by hand",
+        "action": "choose topics when no mapping exists",
+        "target": "none"
+      },
+      {
+        "label": "Done",
+        "action": "return",
+        "target": "track-detail"
+      }
+    ],
+    "exits": [
+      "track-detail"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Exam result",
+      "Concept",
+      "Topic",
+      "Track",
+      "Domain"
+    ],
+    "text": [
+      "Concepts to review",
+      "These concepts are in domains with a low score. Move a concept to Learning only if you agree.",
+      "Move to Learning",
+      "Keep Known",
+      "Pick topics by hand",
+      "Done",
+      "No domain scores were entered.",
+      "Could not load the proposals."
+    ]
+  },
+  {
+    "id": "settings-home",
+    "surface": "settings page",
+    "title": "Settings",
+    "journeys": [
+      7
+    ],
+    "root": true,
+    "data": [
+      {
+        "field": "section list",
+        "source": "static"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Connection",
+        "action": "open section",
+        "target": "settings-connection"
+      },
+      {
+        "label": "Auto-scan sites",
+        "action": "open section",
+        "target": "settings-sites"
+      },
+      {
+        "label": "Jokes",
+        "action": "open section",
+        "target": "settings-jokes"
+      },
+      {
+        "label": "Appearance",
+        "action": "open section",
+        "target": "settings-appearance"
+      },
+      {
+        "label": "Allowed sources",
+        "action": "open section",
+        "target": "settings-allowlist"
+      },
+      {
+        "label": "Ignored words and topics",
+        "action": "open section",
+        "target": "ignored-list"
+      }
+    ],
+    "exits": [
+      "settings-connection",
+      "settings-sites",
+      "settings-jokes",
+      "settings-appearance",
+      "settings-allowlist",
+      "ignored-list"
+    ],
+    "states": [
+      "offline",
+      "error"
+    ],
+    "terms": [
+      "Connection indicator",
+      "Joke cloud",
+      "Source tier",
+      "Settings",
+      "Appearance",
+      "Auto-scan sites",
+      "Allowed sources"
+    ],
+    "text": [
+      "Settings",
+      "Connection",
+      "Auto-scan sites",
+      "Jokes",
+      "Appearance",
+      "Allowed sources",
+      "Ignored words and topics"
+    ]
+  },
+  {
+    "id": "settings-connection",
+    "surface": "settings page",
+    "title": "Connection settings",
+    "journeys": [
+      1,
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "server_url, device label",
+        "source": "extension storage.local"
+      },
+      {
+        "field": "device record",
+        "source": "/auth/devices/{id}"
+      },
+      {
+        "field": "server_up",
+        "source": "conn-detail"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Sign out",
+        "action": "remove this device",
+        "target": "signout-confirm"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "signout-confirm",
+      "settings-home"
+    ],
+    "states": [
+      "offline",
+      "error"
+    ],
+    "terms": [
+      "Device",
+      "Connection indicator",
+      "Sign out"
+    ],
+    "text": [
+      "Connection",
+      "Server URL",
+      "Device label",
+      "Connected",
+      "Server down",
+      "Sign out",
+      "Back"
+    ]
+  },
+  {
+    "id": "signout-confirm",
+    "surface": "settings page",
+    "title": "Sign out",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "unsynced_count",
+        "source": "extension outbox (verify, D43)"
+      },
+      {
+        "field": "revoke device",
+        "source": "/auth/devices/{id}"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Sign out",
+        "action": "revoke device and clear token",
+        "target": "signed-out"
+      },
+      {
+        "label": "Cancel",
+        "action": "return",
+        "target": "settings-connection"
+      }
+    ],
+    "exits": [
+      "signed-out",
+      "settings-connection"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Device",
+      "Offline queue",
+      "Sign out"
+    ],
+    "text": [
+      "Sign out of this device?",
+      "3 marks are not synced. They are lost if you sign out now.",
+      "Sign out",
+      "Cancel",
+      "Could not sign out."
+    ]
+  },
+  {
+    "id": "settings-sites",
+    "surface": "settings page",
+    "title": "Auto-scan sites",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "auto-scan site list",
+        "source": "extension storage.local (code in extension; D44)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Remove",
+        "action": "remove a site",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "settings-home"
+    ],
+    "states": [
+      "empty"
+    ],
+    "terms": [
+      "Scan",
+      "Auto-scan sites"
+    ],
+    "text": [
+      "Auto-scan sites",
+      "These sites are scanned when you open them.",
+      "Remove",
+      "Back",
+      "No sites yet."
+    ]
+  },
+  {
+    "id": "settings-jokes",
+    "surface": "settings page",
+    "title": "Jokes",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "jokes_on (default on)",
+        "source": "extension storage.local (D50)"
+      },
+      {
+        "field": "interval (default 2 hours)",
+        "source": "extension storage.local; default from configuration (D50)"
+      },
+      {
+        "field": "source choice",
+        "source": "needs backend: server-side list of known sources (D26, D28, D30)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Show jokes",
+        "action": "switch on or off",
+        "target": "none"
+      },
+      {
+        "label": "At most once every",
+        "action": "choose interval",
+        "target": "none"
+      },
+      {
+        "label": "Source",
+        "action": "choose from known sources",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "settings-home"
+    ],
+    "states": [
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Joke cloud"
+    ],
+    "text": [
+      "Jokes",
+      "Show jokes",
+      "At most once every",
+      "2 hours",
+      "Source",
+      "Jokes never show during a quiz, while marking or in focus mode.",
+      "Back"
+    ]
+  },
+  {
+    "id": "settings-appearance",
+    "surface": "settings page",
+    "title": "Appearance",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "theme, highlight style",
+        "source": "extension storage.local (design only; no code today)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Theme",
+        "action": "choose light, dark or system",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "settings-home"
+    ],
+    "states": [],
+    "terms": [
+      "Pin (mascot)",
+      "Appearance"
+    ],
+    "text": [
+      "Appearance",
+      "Theme",
+      "Light",
+      "Dark",
+      "System",
+      "Back"
+    ]
+  },
+  {
+    "id": "settings-allowlist",
+    "surface": "settings page",
+    "title": "Allowed sources",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "default domains per tier",
+        "source": "fixed in code; licence check per source open (D46, open question 15)"
+      },
+      {
+        "field": "owner domains per area",
+        "source": "needs backend (D46)"
+      },
+      {
+        "field": "quiz question model",
+        "source": "existing routing; wording not signed off (D45, open question 14)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Add domain",
+        "action": "add domain to an area",
+        "target": "none"
+      },
+      {
+        "label": "Make Tier 1",
+        "action": "promote a domain by hand",
+        "target": "none"
+      },
+      {
+        "label": "Remove",
+        "action": "remove an owner domain",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "settings-home"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "offline"
+    ],
+    "terms": [
+      "Source tier",
+      "Area",
+      "Source",
+      "Quiz question source (label only)",
+      "Allowed sources",
+      "Domain",
+      "Tier 1",
+      "Tier 2"
+    ],
+    "text": [
+      "Allowed sources",
+      "Tier 1",
+      "Tier 2",
+      "General reference. Used for practice only, never for exams.",
+      "Add domain",
+      "Domains you add start in Tier 2.",
+      "Make Tier 1",
+      "Remove",
+      "Free to read without an account only.",
+      "Back"
+    ]
+  },
+  {
+    "id": "ignored-list",
+    "surface": "settings page",
+    "title": "Ignored words and topics",
+    "journeys": [
+      7
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "ignored words and topics",
+        "source": "needs backend (D55)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Restore",
+        "action": "bring the word or topic back (icon, tooltip and label)",
+        "target": "none"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "settings-home"
+      }
+    ],
+    "exits": [
+      "settings-home"
+    ],
+    "states": [
+      "empty"
+    ],
+    "terms": [
+      "Ignore",
+      "Concept",
+      "Topic",
+      "Settings"
+    ],
+    "text": [
+      "Ignored words and topics",
+      "Ignored words and topics are hidden from scans and highlights.",
+      "Nothing is ignored.",
+      "Restore",
+      "Back",
+      "Topic",
+      "Word",
+      "Restored."
+    ]
+  },
+  {
+    "id": "page-changed",
+    "surface": "floating card",
+    "title": "Page changed",
+    "journeys": [
+      2,
+      3
+    ],
+    "root": false,
+    "data": [
+      {
+        "field": "new blocks and concepts since last scan",
+        "source": "extension page observer plus needs backend (D4, D55)"
+      }
+    ],
+    "controls": [
+      {
+        "label": "Show in panel",
+        "action": "open results tree",
+        "target": "scan-results"
+      },
+      {
+        "label": "Back",
+        "action": "return",
+        "target": "card-main"
+      }
+    ],
+    "exits": [
+      "scan-results",
+      "card-main"
+    ],
+    "states": [
+      "loading",
+      "offline",
+      "focus"
+    ],
+    "terms": [
+      "Scan",
+      "Concept",
+      "Floating card",
+      "Focus mode",
+      "Panel"
+    ],
+    "text": [
+      "Page changed",
+      "Page changed, scanning...",
+      "The page changed. New words are marked. Your marks stay as they are.",
+      "Focus mode is on. New words show only in the panel.",
+      "Server down. Scan is off.",
+      "Show in panel",
+      "Back"
+    ]
+  }
+]
