@@ -538,7 +538,8 @@ export class CoreClient {
     return this.request<JokeSource[]>("GET", "/jokes/sources");
   }
 
-  private async request<T>(
+  /** The one request path; public so coreClientTracks.ts can call it. */
+  async request<T>(
     method: string,
     path: string,
     body?: unknown,
