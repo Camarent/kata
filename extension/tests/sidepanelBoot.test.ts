@@ -586,17 +586,129 @@ describe("bootPanel tracks, exam and ignored handlers", () => {
   });
 
   it("the ignored list Restore and Undo send the unignore and ignore panel messages", async () => {
-    const { api, sendMessage } = fakeChrome({ ok: true });
+    const { api, sendMessage } = fakeChrome({ ok: true, data: [] });
     await bootPanel(document.createElement("div"), api);
+    // Restore sends unignore first (then reloads the list); Undo sends ignore as its first call.
+    const beforeRestore = sendMessage.mock.calls.length;
     await captured.handlers!.ignoredList!.onRestore(8);
-    expect(sendMessage).toHaveBeenLastCalledWith({ type: "panel:unignoreConcept", conceptId: 8 });
+    expect(sendMessage.mock.calls[beforeRestore]).toEqual([{ type: "panel:unignoreConcept", conceptId: 8 }]);
+    const beforeUndo = sendMessage.mock.calls.length;
     await captured.handlers!.ignoredList!.onUndo(8);
-    expect(sendMessage).toHaveBeenLastCalledWith({ type: "panel:ignoreConcept", conceptId: 8 });
+    expect(sendMessage.mock.calls[beforeUndo]).toEqual([{ type: "panel:ignoreConcept", conceptId: 8 }]);
   });
 
   it("a refused call rejects with the core status and code", async () => {
     const { api } = fakeChrome({ ok: false, error: "gone", status: 404, code: "not_found" });
     await bootPanel(document.createElement("div"), api);
     await expect(captured.handlers!.onGetTrack!(3)).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+});
+
+describe("bootPanel Tracks tab and settings home", () => {
+  const session = { baseUrl: "http://localhost:8000", token: "t" };
+  let root: HTMLElement;
+
+  afterEach(() => {
+    root?.remove();
+  });
+
+  /** Fake chrome that answers each panel message type from `replies`; other types get a bare ok reply. */
+  function chromeWith(replies: Record<string, PanelReply>) {
+    const sendMessage = vi.fn(async (message: PanelMessage) => replies[message.type] ?? { ok: true });
+    const api: PanelChromeLike = {
+      runtime: { sendMessage },
+      storage: { local: memoryArea({ "kata.session": session }) },
+      permissions: fakePermissions(),
+    };
+    return { api, sendMessage };
+  }
+
+  /** Clicks the tab button of `tab` in the tab bar. */
+  const openTab = (tab: string): void => {
+    root.querySelector<HTMLButtonElement>(`nav.tabs button.tab-${tab}`)!.click();
+  };
+
+  /** A track as the core sends it (`TrackOut`), with the fields the tab reads. */
+  const track = (id: number, name: string, status = "active") => ({
+    id,
+    name,
+    deadline: "2026-12-31",
+    priority: 1,
+    status,
+    items: [],
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  });
+
+  it("the Tracks tab draws the rows of the panel:tracks reply, sorted by name", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Zeta"), track(2, "Alpha")], next_before_id: null } },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.textContent).toContain("Alpha"));
+    const text = root.querySelector("section.tracks-tab")!.textContent!;
+    expect(text.indexOf("Alpha")).toBeLessThan(text.indexOf("Zeta"));
+    expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("ready");
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:tracks" });
+  });
+
+  it("the Tracks tab shows its could-not-load state when the panel:tracks reply is refused", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({ "panel:tracks": { ok: false, error: "gone" } });
+    await bootPanel(root, api);
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("error"));
+  });
+
+  it("the settings home opens the ignored list page, and its Back returns to the home", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({
+      "panel:ignored": { ok: true, data: [{ concept_id: 8, label: "serial" }] },
+    });
+    await bootPanel(root, api);
+    openTab("settings");
+    await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-ignored")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.ignored-list")?.textContent).toContain("serial"));
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:ignored" });
+    root.querySelector<HTMLButtonElement>("section.ignored-list button.back")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
+    expect(root.querySelector("section.ignored-list")).toBeNull();
+  });
+
+  it("a refused panel:ignored keeps the settings home drawn", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({ "panel:ignored": { ok: false, error: "gone" } });
+    await bootPanel(root, api);
+    openTab("settings");
+    await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-ignored")!.click();
+    // Let the refused reply settle; the page must not open and nothing may reject unhandled.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(root.querySelector("section.ignored-list")).toBeNull();
+    expect(root.querySelector("section.settings-home")).not.toBeNull();
+  });
+
+  it("the Tracks tab Open and New buttons call the boot track handlers", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+    });
+    await bootPanel(root, api);
+    const onOpenTrack = vi.spyOn(captured.handlers!, "onOpenTrack");
+    const onNewTrack = vi.spyOn(captured.handlers!, "onNewTrack");
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("button.open-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-track")!.click();
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    expect(onOpenTrack).toHaveBeenCalledWith(1);
+    expect(onNewTrack).toHaveBeenCalledTimes(1);
   });
 });

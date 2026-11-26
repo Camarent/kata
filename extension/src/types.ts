@@ -18,6 +18,8 @@ import type {
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { IgnoredListHandlers } from "./ui/panel/ignoredList";
+import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackSortKey } from "./ui/panel/tracksTab";
 
 /** A readable block of page text, optionally bound to its DOM element. */
 export interface Block {
@@ -114,6 +116,14 @@ export interface PanelHandlers {
   onUnignoreConcept?: (conceptId: number) => Promise<void>;
   /** Restore and Undo of the ignored list; each calls the panel messages for ignore and unignore. */
   ignoredList?: IgnoredListHandlers;
+  /** Tracks tab: the user changed the sort key; the panel re-sorts the rows it holds. */
+  onSortTracks?: (sort: TrackSortKey) => void;
+  /** Tracks tab: the user opened one track; the panel draws its detail screen when it has one. */
+  onOpenTrack?: (trackId: number) => void;
+  /** Tracks tab: the user chose New track; the panel draws the create screen when it has one. */
+  onNewTrack?: () => void;
+  /** Settings home: the user opened one settings page; the panel draws it when it has a screen for it. */
+  onOpenSettingsPage?: (page: SettingsPage) => void | Promise<void>;
   /** Feed tabs: aliases, page summary, jokes and concept views; each sends one panel message. */
   onListConceptAliases?: (conceptId: number) => Promise<ConceptAlias[]>;
   onAddConceptAlias?: (conceptId: number, alias: string) => Promise<ConceptAlias>;

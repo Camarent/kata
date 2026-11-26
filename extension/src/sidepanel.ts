@@ -6,7 +6,10 @@ import type { ReviewRow, Session } from "./types";
 import { button, el } from "./ui/dom";
 import { TEXT_SCAN_RESULTS } from "./ui/strings";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
+import type { IgnoredRowView } from "./ui/panel/ignoredList";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
+import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackSortKey, TracksTabProps } from "./ui/panel/tracksTab";
 import { routeScreen } from "./ui/panel/router";
 import type { ScanResultsStatus } from "./ui/panel/scanResults";
 import { ERROR_TEXT, SCANNING_TEXT, partialText } from "./ui/panel/statusText";
@@ -53,6 +56,12 @@ export interface PanelState {
   link?: ConnectionDetailProps;
   /** Marks waiting in the offline queue; non-null means the Not synced marks screen. */
   queue?: QueuedMarkView[] | null;
+  /** Tracks tab state and rows; unset means still loading. */
+  tracks?: TracksTabProps;
+  /** Settings page drawn in place of the settings home; null or unset shows the home. */
+  settingsPage?: SettingsPage | null;
+  /** Ignored concepts for the ignored list page. */
+  ignored?: IgnoredRowView[];
 }
 
 import type { PanelHandlers, PanelTab, ServerFormInput, SignInInput } from "./types";
@@ -254,16 +263,28 @@ function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElem
   return routeScreen("courses-tab", props, handlers);
 }
 
-/** Tracks tab: loading until the tracks task feeds rows and actions. */
-function renderTracksView(): HTMLElement {
-  const actions = { onOpen: () => {}, onNew: () => {}, onSort: () => {} };
-  return routeScreen("tracks-tab", { state: "loading", rows: [], sort: "name" }, actions);
+/** Tracks tab: the state the panel holds (loading until the panel:tracks reply arrives), with its rows. */
+function renderTracksView(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  const props: TracksTabProps = state.tracks ?? { state: "loading", rows: [], sort: "name" };
+  const actions = {
+    onOpen: (trackId: number) => handlers.onOpenTrack?.(trackId),
+    onNew: () => handlers.onNewTrack?.(),
+    onSort: (sort: TrackSortKey) => handlers.onSortTracks?.(sort),
+  };
+  return routeScreen("tracks-tab", props, actions);
 }
 
-/** Settings tab: the settings home, then the local model section. */
-function renderSettingsView(handlers: PanelHandlers): HTMLElement {
+/** Settings tab: the ignored list when its page is open, else the settings home then the local model section. */
+function renderSettingsView(state: PanelState, handlers: PanelHandlers): HTMLElement {
   const tab = el("div", undefined, "settings-tab");
-  tab.append(routeScreen("settings-home", undefined, { onOpen: () => {} }), renderLocalModel(handlers));
+  if (state.settingsPage === "ignored" && handlers.ignoredList !== undefined) {
+    tab.append(routeScreen("ignored-list", { rows: state.ignored ?? [] }, handlers.ignoredList));
+    return tab;
+  }
+  const open = (page: SettingsPage) => {
+    void handlers.onOpenSettingsPage?.(page);
+  };
+  tab.append(routeScreen("settings-home", undefined, { onOpen: open }), renderLocalModel(handlers));
   return tab;
 }
 
@@ -301,9 +322,9 @@ export function renderPanel(root: HTMLElement, state: PanelState, handlers: Pane
   } else if (tab === "courses") {
     root.append(renderCoursesView(state, handlers));
   } else if (tab === "tracks") {
-    root.append(renderTracksView());
+    root.append(renderTracksView(state, handlers));
   } else if (tab === "settings") {
-    root.append(renderSettingsView(handlers));
+    root.append(renderSettingsView(state, handlers));
   } else {
     root.append(renderScanTab(state, handlers));
   }

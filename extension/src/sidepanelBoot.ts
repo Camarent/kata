@@ -16,13 +16,25 @@ import type {
 import type { MarkOutcome } from "./offlineQueue";
 import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
-import { ignoredClientHandlers, type IgnoredClient } from "./ui/panel/ignoredList";
+import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
+import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackRowView, TrackSortKey } from "./ui/panel/tracksTab";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
 export interface OriginsRequest {
   origins: string[];
+}
+
+/** One track as the Tracks tab draws it. The core sends no progress or pace, so the status stands in for progress. */
+function trackRowView(track: Track): TrackRowView {
+  return { id: track.id, name: track.name, progress: track.status, tooSlow: false };
+}
+
+/** Rows in the order the sort key asks for; only the name sort reorders, the others keep the core order. */
+function sortTrackRows(rows: TrackRowView[], sort: TrackSortKey): TrackRowView[] {
+  return sort === "name" ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
 }
 
 /** The part of `chrome` the side panel page uses; tests pass a fake with these members. */
@@ -80,6 +92,8 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.review = null;
     state.courses = [];
     state.coursesFailed = false;
+    state.tracks = undefined;
+    state.settingsPage = null;
     state.tab = "scan";
     state.status = { kind: "idle" };
   };
@@ -94,10 +108,43 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     return reply.data as T;
   };
 
+  /** Tracks for the Tracks tab from the panel:tracks reply; a refused list shows the could-not-load state. */
+  const loadTracks = async (): Promise<void> => {
+    const sort = state.tracks?.sort ?? "name";
+    state.tracks = { state: "loading", rows: [], sort };
+    draw();
+    try {
+      const page = await send<TrackPage>({ type: "panel:tracks" });
+      const rows = page.items.map(trackRowView);
+      state.tracks = { state: rows.length === 0 ? "empty" : "ready", rows: sortTrackRows(rows, sort), sort };
+    } catch {
+      state.tracks = { state: "error", rows: [], sort };
+    }
+    draw();
+  };
+
+  /** Ignored concepts for the ignored list page, from the panel:ignored reply. */
+  const loadIgnored = async (): Promise<void> => {
+    const list = await send<IgnoredConcept[]>({ type: "panel:ignored" });
+    state.ignored = list.map((concept): IgnoredRowView => ({ conceptId: concept.concept_id, label: concept.label }));
+  };
+
   /** The two ignored calls the ignored list makes, each as one panel message. */
   const ignoredClient: IgnoredClient = {
     ignoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     unignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
+  };
+
+  /** After Restore or Undo the ignored list page reloads its rows from the core. */
+  const refreshIgnored = async (): Promise<void> => {
+    await loadIgnored();
+    draw();
+  };
+
+  /** Back from the ignored list page to the settings home. */
+  const backToSettings = (): void => {
+    state.settingsPage = null;
+    draw();
   };
 
   const handlers: PanelHandlers = {
@@ -189,7 +236,39 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       }
       state.review = null;
       state.tab = tab;
+      state.settingsPage = null;
+      if (tab === "tracks") {
+        await loadTracks();
+        return;
+      }
       draw();
+    },
+
+    onSortTracks(sort: TrackSortKey) {
+      if (state.tracks === undefined) return;
+      state.tracks = { ...state.tracks, sort, rows: sortTrackRows(state.tracks.rows, sort) };
+      draw();
+    },
+
+    async onOpenSettingsPage(page: SettingsPage) {
+      // Only the ignored list page has a screen so far; the other settings pages keep the home.
+      if (page !== "ignored") return;
+      try {
+        await loadIgnored();
+      } catch {
+        // The list did not load: the settings home stays drawn.
+        return;
+      }
+      state.settingsPage = "ignored";
+      draw();
+    },
+
+    onOpenTrack() {
+      // The track detail screen is not drawn yet: the Tracks tab stays as it is.
+    },
+
+    onNewTrack() {
+      // The create screen is not drawn yet: the Tracks tab stays as it is.
     },
 
     async onReview() {
@@ -265,8 +344,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
-    // The ignored list keeps no rows in the panel state, so its redraw is left to the list screen.
-    ignoredList: ignoredClientHandlers(ignoredClient, () => undefined),
+    ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
     onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
     onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),
