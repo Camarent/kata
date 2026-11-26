@@ -2,18 +2,18 @@ import type { PanelHandlers } from "../../types";
 import type { CourseSummary } from "../../coreClient";
 import { askConfirm } from "../confirm";
 import { el } from "../dom";
-import { TEXT_COURSES_TAB } from "../strings";
+import { COURSES_TAB_TEXT } from "../strings";
 
-const COURSES = TEXT_COURSES_TAB[0];
-const NO_COURSES = TEXT_COURSES_TAB[3];
-const OPEN_COURSE = TEXT_COURSES_TAB[5];
-const GENERATE = TEXT_COURSES_TAB[8];
-const LOAD_FAILED = TEXT_COURSES_TAB[23];
-const SERVER_DOWN = TEXT_COURSES_TAB[24];
-const DELETE = TEXT_COURSES_TAB[25];
-const DELETE_ASK = TEXT_COURSES_TAB[26];
-const DELETE_YES = TEXT_COURSES_TAB[27];
-const DELETE_FAILED = TEXT_COURSES_TAB[28];
+const COURSES = COURSES_TAB_TEXT.courses;
+const NO_COURSES = COURSES_TAB_TEXT.noCourses;
+const OPEN_COURSE = COURSES_TAB_TEXT.openCourse;
+const GENERATE = COURSES_TAB_TEXT.generate;
+const LOAD_FAILED = COURSES_TAB_TEXT.loadFailed;
+const SERVER_DOWN = COURSES_TAB_TEXT.serverDown;
+const DELETE = COURSES_TAB_TEXT.deleteCourse;
+const DELETE_ASK = COURSES_TAB_TEXT.deleteAsk;
+const DELETE_YES = COURSES_TAB_TEXT.deleteYes;
+const DELETE_FAILED = COURSES_TAB_TEXT.deleteFailed;
 
 /** Asks before deleting: the confirm box opens inside the row; a failed delete shows the error line. */
 async function confirmDelete(

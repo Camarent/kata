@@ -9,8 +9,10 @@ const EXTENSION_DIR = process.cwd();
 const screens: { id: string; text: string[] }[] = JSON.parse(
   readFileSync(join(EXTENSION_DIR, "tests/fixtures/screen-inventory.json"), "utf-8"),
 );
-/** Every exported const of strings.ts, by name. */
-const table: Record<string, readonly string[]> = { ...strings };
+/** Every exported TEXT_ array of strings.ts, by name (keyed `*_TEXT` objects are checked below). */
+const table: Record<string, readonly string[]> = Object.fromEntries(
+  Object.entries(strings).filter(([name]) => name.startsWith("TEXT_")),
+) as Record<string, readonly string[]>;
 /** Const name of a screen id: `TEXT_` plus the id upper-cased with `-` as `_`. */
 const constName = (id: string): string => `TEXT_${id.toUpperCase().replace(/-/g, "_")}`;
 /** Every string of every const, flattened. */
@@ -52,6 +54,78 @@ describe("ui strings pinned to the screen inventory", () => {
       expect(table[constName(screen.id)]).toEqual(screen.text);
     },
   );
+
+  it("named keys map to their inventory strings (review, block-menu, courses-tab)", () => {
+    const review = screens.find((s) => s.id === "review")?.text ?? [];
+    const reviewNamed: Record<keyof typeof strings.REVIEW_TEXT, string> = {
+      new: "New",
+      learning: "Learning",
+      known: "Known",
+      noConcepts: "No concepts yet. Scan a page first.",
+      loadFailed: "Could not load concepts.",
+      search: "Search concepts",
+      count: "N of M concepts",
+      onlyPage: "Only this page",
+      collapseAll: "Collapse all",
+      expandAll: "Expand all",
+      delete: "Delete",
+      ignore: "Ignore from now on",
+      yesDelete: "Yes, delete",
+      yesIgnore: "Yes, ignore",
+      cancel: "Cancel",
+      deleteNote: "Delete? A later scan can bring it back as New.",
+      ignoreNote: "Ignore from now on? It is hidden and never found again.",
+    };
+    for (const [key, text] of Object.entries(reviewNamed)) {
+      expect(strings.REVIEW_TEXT[key as keyof typeof reviewNamed], key).toBe(text);
+      expect(review, key).toContain(text);
+    }
+
+    const courses = screens.find((s) => s.id === "courses-tab")?.text ?? [];
+    const coursesNamed: Record<keyof typeof strings.COURSES_TAB_TEXT, string> = {
+      courses: "Courses",
+      noCourses: "You have no courses yet.",
+      openCourse: "Open course",
+      generate: "Generate course",
+      loadFailed: "Could not load courses.",
+      serverDown: "Server down. Generate course is off.",
+      deleteCourse: "Delete course",
+      deleteAsk: "Delete this course?",
+      deleteYes: "Yes, delete",
+      deleteFailed: "Could not delete the course.",
+    };
+    for (const [key, text] of Object.entries(coursesNamed)) {
+      expect(strings.COURSES_TAB_TEXT[key as keyof typeof coursesNamed], key).toBe(text);
+      expect(courses, key).toContain(text);
+    }
+  });
+
+  it("named block-menu and pin keys map to their inventory strings", () => {
+    const blockMenu = screens.find((s) => s.id === "block-menu")?.text ?? [];
+    const blockNamed: Record<keyof typeof strings.BLOCK_MENU_TEXT, string> = {
+      allNew: "All New",
+      allKnown: "All Known",
+      allLearning: "All Learning",
+      addAll: "Add all to list",
+      mixed: "Mixed",
+      title: "Concepts in this block",
+      notInText: "Not shown as a word in the text",
+    };
+    for (const [key, text] of Object.entries(blockNamed)) {
+      expect(strings.BLOCK_MENU_TEXT[key as keyof typeof blockNamed], key).toBe(text);
+      expect(blockMenu, key).toContain(text);
+    }
+
+    const pin = screens.find((s) => s.id === "pin")?.text ?? [];
+    const pinNamed: Record<keyof typeof strings.PIN_TEXT, string> = {
+      offline: "Server down",
+      undo: "Undo",
+    };
+    for (const [key, text] of Object.entries(pinNamed)) {
+      expect(strings.PIN_TEXT[key as keyof typeof pinNamed], key).toBe(text);
+      expect(pin, key).toContain(text);
+    }
+  });
 
   it("uses 'Summary' alone only on the card button (D52)", () => {
     const alone = screens.filter((s) => s.text.includes("Summary")).map((s) => s.id);

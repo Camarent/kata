@@ -1,14 +1,18 @@
 // Review screen: concepts grouped by area (collapsed, with counts), searchable and filterable,
 // one row per concept with a local state menu (ui/stateMenu.ts).
 import { STATE_ORDER, renderStateMenu } from "../stateMenu";
-import { TEXT_REVIEW } from "../strings";
+import { REVIEW_TEXT } from "../strings";
 import type { ReviewHandlers, ReviewRow, ReviewState } from "../../types";
 
-const [SEARCH_LABEL, COUNT_LABEL, ONLY_PAGE_LABEL, COLLAPSE_LABEL, EXPAND_LABEL] = TEXT_REVIEW.slice(22, 27);
+const SEARCH_LABEL = REVIEW_TEXT.search;
+const COUNT_LABEL = REVIEW_TEXT.count;
+const ONLY_PAGE_LABEL = REVIEW_TEXT.onlyPage;
+const COLLAPSE_LABEL = REVIEW_TEXT.collapseAll;
+const EXPAND_LABEL = REVIEW_TEXT.expandAll;
 const STATE_TEXT: Record<ReviewState, string> = {
-  new: TEXT_REVIEW[14],
-  learning: TEXT_REVIEW[15],
-  known: TEXT_REVIEW[16],
+  new: REVIEW_TEXT.new,
+  learning: REVIEW_TEXT.learning,
+  known: REVIEW_TEXT.known,
 };
 const OTHER_AREA = "Other concepts";
 const KEY_STATE: Record<string, ReviewState> = { "1": "known", "2": "learning", "3": "new" };

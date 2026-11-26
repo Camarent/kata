@@ -50,6 +50,12 @@ export const TEXT_PIN = [
   "Nothing to undo",
 ] as const;
 
+/** Named pin strings: read these by key, not by TEXT_PIN position. Each value is one TEXT_PIN entry. */
+export const PIN_TEXT = {
+  offline: TEXT_PIN[4],
+  undo: TEXT_PIN[6],
+} as const;
+
 export const TEXT_PIN_COLLAPSED = [
   "Open pin",
 ] as const;
@@ -141,6 +147,17 @@ export const TEXT_BLOCK_MENU = [
   "Concepts in this block",
   "Not shown as a word in the text",
 ] as const;
+
+/** Named block-menu strings: read these by key, not by TEXT_BLOCK_MENU position. Each value is one TEXT_BLOCK_MENU entry. */
+export const BLOCK_MENU_TEXT = {
+  allNew: TEXT_BLOCK_MENU[0],
+  allKnown: TEXT_BLOCK_MENU[1],
+  allLearning: TEXT_BLOCK_MENU[2],
+  addAll: TEXT_BLOCK_MENU[3],
+  mixed: TEXT_BLOCK_MENU[4],
+  title: TEXT_BLOCK_MENU[5],
+  notInText: TEXT_BLOCK_MENU[6],
+} as const;
 
 export const TEXT_IMAGE_PIN_MENU = [
   "All New",
@@ -256,6 +273,27 @@ export const TEXT_REVIEW = [
   "Ignore from now on? It is hidden and never found again.",
 ] as const;
 
+/** Named review strings: read these by key, not by TEXT_REVIEW position. Each value is one TEXT_REVIEW entry. */
+export const REVIEW_TEXT = {
+  new: TEXT_REVIEW[14],
+  learning: TEXT_REVIEW[15],
+  known: TEXT_REVIEW[16],
+  noConcepts: TEXT_REVIEW[19],
+  loadFailed: TEXT_REVIEW[20],
+  search: TEXT_REVIEW[22],
+  count: TEXT_REVIEW[23],
+  onlyPage: TEXT_REVIEW[24],
+  collapseAll: TEXT_REVIEW[25],
+  expandAll: TEXT_REVIEW[26],
+  delete: TEXT_REVIEW[27],
+  ignore: TEXT_REVIEW[28],
+  yesDelete: TEXT_REVIEW[29],
+  yesIgnore: TEXT_REVIEW[30],
+  cancel: TEXT_REVIEW[31],
+  deleteNote: TEXT_REVIEW[32],
+  ignoreNote: TEXT_REVIEW[33],
+} as const;
+
 export const TEXT_COURSES_TAB = [
   "Courses",
   "Lists",
@@ -287,6 +325,20 @@ export const TEXT_COURSES_TAB = [
   "Yes, delete",
   "Could not delete the course.",
 ] as const;
+
+/** Named courses-tab strings: read these by key, not by TEXT_COURSES_TAB position. Each value is one TEXT_COURSES_TAB entry. */
+export const COURSES_TAB_TEXT = {
+  courses: TEXT_COURSES_TAB[0],
+  noCourses: TEXT_COURSES_TAB[3],
+  openCourse: TEXT_COURSES_TAB[5],
+  generate: TEXT_COURSES_TAB[8],
+  loadFailed: TEXT_COURSES_TAB[23],
+  serverDown: TEXT_COURSES_TAB[24],
+  deleteCourse: TEXT_COURSES_TAB[25],
+  deleteAsk: TEXT_COURSES_TAB[26],
+  deleteYes: TEXT_COURSES_TAB[27],
+  deleteFailed: TEXT_COURSES_TAB[28],
+} as const;
 
 export const TEXT_LIST_DETAIL = [
   "List",

@@ -4,7 +4,7 @@
  * Delete and Ignore ask for confirmation, then offer one Undo before the change is committed.
  */
 import { askConfirm } from "../confirm";
-import { TEXT_BLOCK_MENU, TEXT_PIN, TEXT_REVIEW } from "../strings";
+import { BLOCK_MENU_TEXT, PIN_TEXT, REVIEW_TEXT } from "../strings";
 import { type Clock, deferCommit, type DeferredCommit } from "../undo";
 
 /** Data state of an overlay list: ready shows the items; the others show one status line. */
@@ -18,7 +18,7 @@ export function overlayStatus(state: OverlayState, texts: { empty: string; error
     case "error":
       return texts.error;
     case "offline":
-      return TEXT_PIN[4];
+      return PIN_TEXT.offline;
     default:
       return null;
   }
@@ -43,19 +43,23 @@ export function statusParagraph(doc: Document, text: string | null): HTMLElement
   return p;
 }
 
-const [BLOCK_ALL_NEW, BLOCK_ALL_KNOWN, BLOCK_ALL_LEARNING, BLOCK_ADD_ALL, BLOCK_MIXED, BLOCK_TITLE, BLOCK_NOT_IN_TEXT] =
-  TEXT_BLOCK_MENU;
-// TEXT_REVIEW entries by inventory index: concept empty and error lines, Delete / Ignore and their confirm.
-const EMPTY_CONCEPTS = TEXT_REVIEW[19];
-const ERROR_CONCEPTS = TEXT_REVIEW[20];
-const DELETE = TEXT_REVIEW[27];
-const IGNORE = TEXT_REVIEW[28];
-const YES_DELETE = TEXT_REVIEW[29];
-const YES_IGNORE = TEXT_REVIEW[30];
-const CANCEL = TEXT_REVIEW[31];
-const DELETE_NOTE = TEXT_REVIEW[32];
-const IGNORE_NOTE = TEXT_REVIEW[33];
-const UNDO = TEXT_PIN[6];
+const BLOCK_ALL_NEW = BLOCK_MENU_TEXT.allNew;
+const BLOCK_ALL_KNOWN = BLOCK_MENU_TEXT.allKnown;
+const BLOCK_ALL_LEARNING = BLOCK_MENU_TEXT.allLearning;
+const BLOCK_ADD_ALL = BLOCK_MENU_TEXT.addAll;
+const BLOCK_MIXED = BLOCK_MENU_TEXT.mixed;
+const BLOCK_TITLE = BLOCK_MENU_TEXT.title;
+const BLOCK_NOT_IN_TEXT = BLOCK_MENU_TEXT.notInText;
+const EMPTY_CONCEPTS = REVIEW_TEXT.noConcepts;
+const ERROR_CONCEPTS = REVIEW_TEXT.loadFailed;
+const DELETE = REVIEW_TEXT.delete;
+const IGNORE = REVIEW_TEXT.ignore;
+const YES_DELETE = REVIEW_TEXT.yesDelete;
+const YES_IGNORE = REVIEW_TEXT.yesIgnore;
+const CANCEL = REVIEW_TEXT.cancel;
+const DELETE_NOTE = REVIEW_TEXT.deleteNote;
+const IGNORE_NOTE = REVIEW_TEXT.ignoreNote;
+const UNDO = PIN_TEXT.undo;
 
 /** Bulk actions shown in the block menu, in the inventory order. */
 const BULK_LABELS = [BLOCK_ALL_NEW, BLOCK_ALL_KNOWN, BLOCK_ALL_LEARNING, BLOCK_ADD_ALL] as const;
