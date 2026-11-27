@@ -704,6 +704,7 @@ export const TEXT_IGNORED_LIST = [
   "Topic",
   "Word",
   "Restored.",
+  "Could not restore this word or topic.",
 ] as const;
 
 export const TEXT_PAGE_CHANGED = [
@@ -726,6 +727,7 @@ export const IGNORED_LIST_TEXT = {
   topic: TEXT_IGNORED_LIST[5],
   word: TEXT_IGNORED_LIST[6],
   restored: TEXT_IGNORED_LIST[7],
+  restoreFailed: TEXT_IGNORED_LIST[8],
 } as const;
 
 export const COURSE_DETAIL_TEXT = {

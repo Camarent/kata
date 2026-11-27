@@ -11,6 +11,7 @@ const {
   topic: TOPIC,
   word: WORD,
   restored: RESTORED,
+  restoreFailed: RESTORE_FAILED,
 } = IGNORED_LIST_TEXT;
 // The shared "Undo" is read by key from PIN_TEXT, not by index.
 const TEXT_UNDO = PIN_TEXT.undo;
@@ -78,6 +79,7 @@ export function renderIgnoredList(props: IgnoredListProps, handlers: IgnoredList
   if (props.rows.length === 0) {
     screen.append(el("p", EMPTY, "empty"));
   } else {
+    const status = el("p", undefined, "restore-status");
     const list = el("ul");
     for (const row of props.rows) {
       const item = el("li", undefined, "ignored-row");
@@ -85,18 +87,18 @@ export function renderIgnoredList(props: IgnoredListProps, handlers: IgnoredList
       if (row.kind !== undefined) {
         item.append(el("span", row.kind === "topic" ? TOPIC : WORD, "kind"));
       }
-      // A failed restore keeps the row in place; the rejection is caught so no unhandled rejection is raised.
+      // A failed restore keeps the row in place and shows the restore-failed line; the rejection is caught so no unhandled rejection is raised.
       const restore = async () => {
         try {
           await handlers.onRestore(row.conceptId);
         } catch {
-          // The core call failed: the row stays, no new copy is shown (copy approval pending).
+          status.textContent = RESTORE_FAILED;
         }
       };
       item.append(button(RESTORE, () => void restore(), "restore"));
       list.append(item);
     }
-    screen.append(list);
+    screen.append(list, status);
   }
   if (props.restored !== undefined) {
     const restored = props.restored;

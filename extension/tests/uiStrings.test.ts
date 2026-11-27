@@ -146,6 +146,7 @@ describe("ui strings pinned to the screen inventory", () => {
       topic: "Topic",
       word: "Word",
       restored: "Restored.",
+      restoreFailed: "Could not restore this word or topic.",
     };
     const courseDetailNamed: Record<keyof typeof strings.COURSE_DETAIL_TEXT, string> = {
       preview: "Course preview",

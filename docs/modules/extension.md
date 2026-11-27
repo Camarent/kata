@@ -55,7 +55,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/backgroundRescan.ts` `createConceptScanner` (`:87` `startRescan`) runs `runConceptScan` (`:74`) with the `POLL_MS` and `MAX_WAIT_MS` values from `config.ts`; `extension/src/backgroundBackend.ts:159` starts the rescanner after a scan.
 - `extension/src/rescan.ts:53` `createRescanner(deps)` - observes page mutations; every mutation restarts one `debounceMs` timer, so a burst fires `onRescan` once; `stop()` cancels the timer and the observer. `:17` `mergeMarks(prev, next)` keeps the previous state of a concept seen before, so a rescan does not blank marks.
 - UI (M25, approved design in `docs/design/extension-ui.md`, section 9): plain DOM TypeScript under `extension/src/ui/`, no framework.
-  - `extension/src/ui/strings.ts` every user-facing string (one owner, pinned to the screen inventory): keyed `TEXT_*` lists, one per screen or component, that the components index by key.
+  - `extension/src/ui/strings.ts` every user-facing string (one owner, pinned to the screen inventory): keyed `TEXT_*` lists, one per screen or component, that the components index by key (the ignored list's restore-failed message is `IGNORED_LIST_TEXT.restoreFailed`).
   - `extension/src/ui/dom.ts`, `confirm.ts`, `undo.ts`, `popover.ts`, `stateMenu.ts` shared primitives (DOM helper, confirm, undo, popover, state menu).
   - `extension/src/ui/panelCss.ts`, `cardCss.ts` stylesheets ported from the prototype. `panelCss.ts` has no `.panel` width rule (the dead one was removed); the layout test checks at a fixed width instead.
   - `extension/src/ui/panel/` panel tab screens (one `render*` function per screen), the tab router `router.ts`, and `screens.ts`.
