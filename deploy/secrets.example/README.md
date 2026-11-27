@@ -13,6 +13,7 @@ entrypoint exports each one into the env var named below (core reads no `*_FILE`
 | `postgres_password`        | `KATA_DATABASE_PASSWORD`   | core, postgres (`database.password_env`) |
 | `worker_token`             | `KATA_WORKER_TOKEN`        | worker (`worker.token_env`); must hold a device token issued by core (`docs/deployment.md` step 11), a random value only starts the stack |
 | `anthropic_api_key`        | `KATA_ANTHROPIC_API_KEY`   | core, only when cloud providers are on (`provider_anthropic.api_key_env`) |
+| `openai_api_key`           | `KATA_OPENAI_API_KEY`      | core, only when the OpenAI-compatible provider is on (`provider_openai.api_key_env`) |
 | `open_link_key`            | none: mounted at `/run/secrets/open_link_key` | core, read from `trainer.open_link_key_file` (signs open links) |
 
 ## Create the files
@@ -29,7 +30,7 @@ chmod 0600 deploy/secrets/*
 ```
 
 Add `anthropic_api_key` the same way (paste the key, do not generate it) only if cloud providers
-are enabled. Check the mode with `stat -c '%a %n' deploy/secrets/*`: every line must show `600`.
+are enabled. Add `openai_api_key` the same way only if the OpenAI-compatible provider is enabled. Check the mode with `stat -c '%a %n' deploy/secrets/*`: every line must show `600`.
 
 ## Owner of the files on the VM
 

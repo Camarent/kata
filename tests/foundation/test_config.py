@@ -52,6 +52,8 @@ def test_example_has_required_sections() -> None:
         "local_capability",
         "provider_local",
         "provider_anthropic",
+        "provider_openai",
+        "models",
         "policy",
         "trainer",
         "knowledge",
@@ -135,7 +137,7 @@ def test_example_has_required_sections() -> None:
         "dimensions",
     }
     assert set(data["lesson_check"]) == {"min_score", "known_hits", "search_limit"}
-    assert set(data["provider_local"]) == {"task_classes"}
+    assert set(data["provider_local"]) == {"task_classes", "vision"}
     assert set(data["provider_anthropic"]) == {
         "task_classes",
         "base_url",
@@ -143,7 +145,17 @@ def test_example_has_required_sections() -> None:
         "api_key_env",
         "timeout_seconds",
         "cache_system",
+        "vision",
     }
+    assert set(data["provider_openai"]) == {
+        "task_classes",
+        "base_url",
+        "model_name",
+        "api_key_env",
+        "timeout_seconds",
+        "vision",
+    }
+    assert set(data["models"]) == {"cloud", "local"}
     assert data["core"]["host"] == "127.0.0.1"
     assert data["database"]["host"] == "127.0.0.1"
 

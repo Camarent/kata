@@ -170,7 +170,7 @@ build-time server config (M15)" in `decisions.md`.
 creates and deletes courses.
 
 **Shipped.** `[trainer] max_courses_per_user` (default 10 in `config/kata.example.toml`; 0 means
-unlimited) is enforced by `POST /v1/courses`. Names are unique per user. Decisions: "Course limit
+unlimited) is enforced by `POST /v1/courses`. Names are unique per user. M26 config keys (`[models]`, `[provider_openai]`, `vision`) add no course behaviour. Decisions: "Course limit
 default lives in the example config (M16)" and "Course limit and unique names (M16)".
 
 ## Milestone 17: local-first routing (done)

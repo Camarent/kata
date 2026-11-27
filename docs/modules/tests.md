@@ -79,5 +79,5 @@ Baseline gate timings (before the speed-up) are in `docs/testing.md`.
 - Run: `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests` (`docs/api.md`); gate cmd `.venv/bin/python -m pytest tests ...` with coverage and `-m 'not flaky'` (`tools/gates.json:6`).
 
 ## Depends on / used by
-- Depends on: `core/` (`kata_core`), `worker/` (`kata_worker`), `config/kata.example.toml`, `tools/gates.json`, `docs/`, `extension/`.
+- Depends on: `core/` (`kata_core`), `worker/` (`kata_worker`), `config/kata.example.toml` (the M26 config tests load it and `deploy/kata.host.toml`), `tools/gates.json`, `docs/`, `extension/`.
 - Used by: the quality gates in `tools/gates.json` (pytest gate).

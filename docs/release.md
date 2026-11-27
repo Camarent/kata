@@ -59,3 +59,4 @@ The full steps, rollback and the variables are in `docs/deployment.md`.
 - `scripts/dev/check-all.sh` is green on `master`.
 - `CHANGELOG.md` has the entry for the version under `## [X.Y.Z]`, with `## [Unreleased]` above it.
 - The five version fields agree (`tests/scripts/test_version_consistency.py` checks this).
+- M26 adds config keys only; the release steps are unchanged (config note in `docs/deployment.md`).

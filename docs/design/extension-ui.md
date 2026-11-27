@@ -440,3 +440,5 @@ Source: the approved screen inventory (48 screens). Each surface and its count:
 | Page overlay | 6 |
 | Course page | 3 |
 | Total | 48 |
+
+M26 adds config keys only (`[models]`, `[provider_openai]`, `vision`) and changes no UI; see `docs/backlog.md`, `docs/modules/worker.md` and `docs/roadmap.md` for the M26 notes.
