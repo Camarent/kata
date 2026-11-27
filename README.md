@@ -6,11 +6,21 @@ Status: early release (0.x). Interfaces may change between releases.
 
 ## What it does
 
-- Keeps a model of what each learner already knows, per topic and per concept.
-- Reads the lesson page open in the browser when you click "Scan this page", and shows which parts are new to you.
-- Turns knowledge gaps into short practice courses.
-- Advises inside your own projects.
-- Runs on machines you control.
+- Keeps a model of what each learner already knows, per area, topic and concept. Each concept is marked new, learning or known.
+- Organises concepts into areas, topics and concepts. Aliases merge duplicate names, and the API can ignore or delete a concept.
+- Reads the lesson page open in the browser when you click "Scan this page", classifies the page, and shows which parts are new to you. The core asks "Which one?" when the topic is unclear. A rescan after the page changes keeps your marks.
+- Lets you mark a whole page as known with an "I know this" button.
+- Imports a skill list as text to set your marks in bulk.
+- Turns knowledge gaps into short practice courses. A course can be regenerated in place, with a preview of what carries over, and opens in the browser through a signed link. The side panel lists, creates and deletes courses; each user has a course limit and unique course names.
+- Keeps named concept lists and tracks with goals, progress and pace. Plans a syllabus into time-boxed tracks that share one time budget. Course progress is saved back from the course page through the extension.
+- Gives mini quizzes from allowlisted public sources, shows each source's licence, checks answers, and imports exam results after you confirm them.
+- Shows a review tree of areas and topics with new, learning and known counts, a searchable, filterable and sortable concept list, and an "Only this page" filter. Marks made while the core is unreachable wait in a queue and sync later.
+- Shows short jokes from a fixed list of sources in the page card.
+- Writes a short summary of the page into the page card. Summaries are cached per page text.
+- Reads PDF pages and images through a sandboxed reader. The reader is built in and off by default.
+- Advises inside your own projects: an editor extension, an MCP assistant, a terminal tool, and git hooks that block a commit containing a secret. Every intervention is journaled.
+- Keeps secrets out of cloud calls. A secret scanner runs before every cloud request, and a per-user daily spend cap warns before it stops cloud use.
+- Runs on machines you control: a server with Docker, TLS over a private network, and nightly encrypted backups. A local model can run on a GPU machine through a worker, and any OpenAI-compatible model server can be added in the host config.
 
 ## How it fits together
 
@@ -63,7 +73,7 @@ Chrome:
 2. Open the kata side panel from the toolbar button.
 3. Type the server URL (origin only, for example `http://127.0.0.1:8080`), the enrolment code and a device label, then click Connect. Accept the browser's permission prompt for that address.
 
-Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see [`docs/decisions.md`](docs/decisions.md), "Extension has no build-time server config (M15)").
+Not tested in a real browser yet: the permission prompt, the bridge registration and the course-page bridge (see [`docs/decisions.md`](docs/decisions.md), the entry titled "Extension has no build-time server config").
 
 To scan a page, open a lesson page, open the side panel and click "Scan this page". The page is read only when you click the button; kata never crawls pages.
 
@@ -71,7 +81,7 @@ To scan a page, open a lesson page, open the side panel and click "Scan this pag
 
 The worker runs model jobs next to a local Ollama server. The steps are in [`docs/deployment.md`](docs/deployment.md) and the settings in [`docs/configuration.md`](docs/configuration.md). No full run on a real machine is recorded yet.
 
-Model routing: each task class tries the providers in order and the first reply wins. The local model is first; the cloud is second and only runs when its API key env var is set. A class marked `cloud-only` in `[local_capability]` skips the local model. See [`docs/decisions.md`](docs/decisions.md), "Routing defaults are local first, cloud by token (M17)".
+Model routing: each task class tries the providers in order and the first reply wins. The local model is first; the cloud is second and only runs when its API key env var is set. A class marked `cloud-only` in `[local_capability]` skips the local model. See [`docs/decisions.md`](docs/decisions.md), the entry titled "Routing defaults are local first, cloud by token".
 
 | Task class | Provider order |
 |---|---|
