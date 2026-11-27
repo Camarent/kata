@@ -7,7 +7,7 @@ import tomllib
 from kata_core.config import EXAMPLE_PATH, load_config
 
 HOST_PATH = EXAMPLE_PATH.parent.parent / "deploy" / "kata.host.toml"
-JOKES_SOURCES = "jokeapi,icanhazdadjoke"
+JOKES_SOURCES = "jokeapi"
 
 
 def test_example_config_parses_jokes_section() -> None:

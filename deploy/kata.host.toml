@@ -285,7 +285,7 @@ spool_dir = "/spool"
 
 [jokes]
 enabled = true
-sources = "jokeapi,icanhazdadjoke"
+sources = "jokeapi"
 timeout_seconds = 10
 max_response_bytes = 16384
 max_joke_chars = 300

@@ -149,7 +149,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `reader.wait_seconds` | 120 | `KATA_READER_WAIT_SECONDS` |
 | `reader.spool_dir` | "/spool" | `KATA_READER_SPOOL_DIR` |
 | `jokes.enabled` | true | `KATA_JOKES_ENABLED` |
-| `jokes.sources` | "jokeapi,icanhazdadjoke" | `KATA_JOKES_SOURCES` |
+| `jokes.sources` | "jokeapi" | `KATA_JOKES_SOURCES` |
 | `jokes.timeout_seconds` | 10 | `KATA_JOKES_TIMEOUT_SECONDS` |
 | `jokes.max_response_bytes` | 16384 | `KATA_JOKES_MAX_RESPONSE_BYTES` |
 | `jokes.max_joke_chars` | 300 | `KATA_JOKES_MAX_JOKE_CHARS` |

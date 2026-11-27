@@ -278,8 +278,8 @@ spool_dir = "/spool"
 [jokes]
 # Set false to stop the joke job fetching from the sources.
 enabled = true
-# Comma list of source ids the joke job may fetch from, in order: jokeapi, icanhazdadjoke.
-sources = "jokeapi,icanhazdadjoke"
+# Comma list of source ids the joke job may fetch from, in order: jokeapi. icanhazdadjoke is opt-in.
+sources = "jokeapi"
 # Seconds one joke source fetch may take.
 timeout_seconds = 10
 # Cap on the bytes one joke source response may have.
