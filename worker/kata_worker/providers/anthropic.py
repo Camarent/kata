@@ -108,6 +108,7 @@ class AnthropicProvider:
         self._base_url = str(config.get(SECTION, "base_url"))
         self._model_name = str(config.get(SECTION, "model_name"))
         self.vision = vision_flag(config, SECTION, self._model_name)
+        self.model_name = self._model_name
         self._timeout = float(config.get(SECTION, "timeout_seconds"))
         self._cache_system = bool(config.get(SECTION, "cache_system"))
         key_env = str(config.get(SECTION, "api_key_env"))

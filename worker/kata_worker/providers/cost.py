@@ -133,6 +133,7 @@ class CappedProvider:
         self._unpriced_ok = unpriced_ok
         self.name = inner.name
         self.vision = isinstance(inner, VisionProvider) and inner.vision
+        self.model_name = inner.model_name if isinstance(inner, VisionProvider) else ""
         self.is_cloud = inner.is_cloud
 
     def complete(self, system: str, user: str) -> str:

@@ -79,6 +79,7 @@ class OpenAIProvider:
         self._model_name = str(config.get(SECTION, "model_name"))
         self._timeout = float(config.get(SECTION, "timeout_seconds"))
         self.vision = vision_flag(config, SECTION, self._model_name)
+        self.model_name = self._model_name
         key_env = str(config.get(SECTION, "api_key_env"))
         api_key = env.get(key_env, "")
         if not api_key:

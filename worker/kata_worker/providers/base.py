@@ -83,6 +83,8 @@ class VisionProvider(Protocol):
 
     # True when the configured model takes images; `vision_flag` reads it from the config.
     vision: bool
+    # The configured model name, named in the route message when the model takes no images.
+    model_name: str
 
     def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion: ...
 
