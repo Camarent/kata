@@ -300,6 +300,7 @@ Partial: the UI modules are built and unit-tested, but not all are mounted in th
   `extension/src/ui/overlay/hlMenu.ts` (hover menu), `whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`,
   `listPicker.ts`, `quizPin.ts`; the exam screens `extension/src/ui/panel/examRun.ts` and
   `extension/src/ui/panel/examResult.ts`; the course page `extension/src/ui/panel/coursePage.ts`.
+- Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate). Follow-ups, not yet wired.
 - Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
 
 ## Later
