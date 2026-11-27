@@ -153,7 +153,7 @@ def test_cloud_provider_classes_are_not_exposed_outside_guard() -> None:
 
 
 # Paths relative to the kata_worker package root, so a same-named file elsewhere is not allowed.
-ALLOWED_CLOUD_USERS = {"providers/guard.py", "providers/anthropic.py"}
+ALLOWED_CLOUD_USERS = {"providers/guard.py", "providers/anthropic.py", "providers/openai.py"}
 
 
 def _modules_naming(

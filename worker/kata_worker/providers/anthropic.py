@@ -13,7 +13,14 @@ from collections.abc import Mapping, Sequence
 import httpx
 from kata_core.config import Config
 
-from kata_worker.providers.base import Completion, ImageInput, Provider, ProviderError, TokenUsage
+from kata_worker.providers.base import (
+    Completion,
+    ImageInput,
+    Provider,
+    ProviderError,
+    TokenUsage,
+    usage_count,
+)
 from kata_worker.providers.cost import Ledger, LogSink, capped
 from kata_worker.providers.guard import AuditSink, guarded
 
@@ -57,12 +64,9 @@ def _reply_text(response: httpx.Response) -> str:
 
 def _count(usage: dict[str, object], key: str, *, optional: bool) -> int | None:
     """One non-negative int from the usage block; an optional key may be absent or null (then 0)."""
-    value = usage.get(key)
-    if optional and value is None:
+    if optional and usage.get(key) is None:
         return 0
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        return None
-    return value
+    return usage_count(usage, key)
 
 
 def reply_usage(response: httpx.Response) -> TokenUsage | None:

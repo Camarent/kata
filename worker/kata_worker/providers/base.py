@@ -46,6 +46,14 @@ class Completion:
     usage: TokenUsage | None
 
 
+def usage_count(usage: dict[str, object], key: str) -> int | None:
+    """One non-negative int from a backend usage block; None when absent, null, boolean or negative."""
+    value = usage.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 @runtime_checkable
 class Provider(Protocol):
     """A model backend. `is_cloud` is True when text leaves the machine."""
