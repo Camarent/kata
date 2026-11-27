@@ -441,4 +441,4 @@ Source: the approved screen inventory (48 screens). Each surface and its count:
 | Course page | 3 |
 | Total | 48 |
 
-M26 adds config keys only (`[models]`, `[provider_openai]`, `vision`) and changes no UI; see `docs/backlog.md`, `docs/modules/worker.md` and `docs/roadmap.md` for the M26 notes.
+M26 adds config keys only (`[models]`, `[provider_openai]`, `vision`) and changes no UI (the needs-cloud verdict follows the `[models]` cloud provider token, so the existing needs-cloud messages are unchanged); see `docs/backlog.md`, `docs/modules/worker.md` and `docs/roadmap.md` for the M26 notes.
