@@ -22,6 +22,8 @@ import pytest
 from kata_core.config import Config, load_config
 from kata_core.storage.provision import create_database, drop_database
 
+pytestmark = pytest.mark.integration
+
 REPO_ROOT = Path(__file__).parents[2]
 SCRIPT = REPO_ROOT / "deploy" / "backup.sh"
 UNIT_DIR = REPO_ROOT / "deploy" / "systemd"

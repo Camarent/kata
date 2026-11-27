@@ -21,6 +21,8 @@ import pytest
 from kata_core.config import Config, load_config
 from kata_core.storage.provision import connect, create_database, drop_database, migrate
 
+pytestmark = pytest.mark.integration
+
 PG_BIN_GLOB = "usr/lib/postgresql/*/bin"
 REPO_ROOT = Path(__file__).parents[2]
 BACKUP = REPO_ROOT / "deploy" / "backup.sh"
