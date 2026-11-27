@@ -37,7 +37,14 @@ CHAIN_SEPARATOR = ","
 
 
 class RouteExhausted(ProviderError):
-    """Every provider in the chain was skipped or failed. Names providers and reasons only."""
+    """Every provider in the chain was skipped or failed. Names providers and reasons only.
+
+    `no_vision` is true when every provider in the chain was text-only (no image support).
+    """
+
+    def __init__(self, message: str, *, no_vision: bool = False) -> None:
+        super().__init__(message)
+        self.no_vision = no_vision
 
 
 @dataclass(frozen=True)
@@ -120,7 +127,10 @@ class Router:
                 continue
             self._log(f"route {task_class}: answered by {name}")
             return Routed(reply=reply, provider=name)
-        raise RouteExhausted(f"route exhausted for {task_class}: {', '.join(outcomes)}")
+        no_vision = bool(outcomes) and all(outcome.endswith(f"={NO_VISION}") for outcome in outcomes)
+        raise RouteExhausted(
+            f"route exhausted for {task_class}: {', '.join(outcomes)}", no_vision=no_vision
+        )
 
 
 def _build_providers(

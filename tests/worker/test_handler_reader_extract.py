@@ -74,16 +74,17 @@ def _cfg(spool: Path, **reader: Any) -> Config:
     return Config(sections={**base.sections, "reader": section})
 
 
-def _router(script: list[str | ProviderError]) -> tuple[Router, FakeProvider]:
-    provider = FakeProvider(name="local", script=script, vision=True)
+def _policy() -> Policy:
     # The example config keeps vision cloud-only; these tests allow a local vision model, as test_router_vision does.
     base = load_config(EXAMPLE_PATH, env={})
     verdicts = {**base.sections["local_capability"], "vision": "kata-l"}
-    policy = Policy.from_config(
-        Config(sections={**base.sections, "local_capability": verdicts}), {}
-    )
+    return Policy.from_config(Config(sections={**base.sections, "local_capability": verdicts}), {})
+
+
+def _router(script: list[str | ProviderError]) -> tuple[Router, FakeProvider]:
+    provider = FakeProvider(name="local", script=script, vision=True)
     router = Router(
-        {handler.VISION_CLASS: (provider.name,)}, {provider.name: provider}, policy, [].append
+        {handler.VISION_CLASS: (provider.name,)}, {provider.name: provider}, _policy(), [].append
     )
     return router, provider
 
@@ -328,6 +329,29 @@ def test_vision_failure_fails_job_and_empties_spool(
     _run(client, router)
     assert client.failed == [5]
     assert client.outputs == []
+    assert _spool_empty(spool)
+
+
+def test_no_vision_model_fails_job_named_and_sends_no_image(
+    tmp_path: Path, monkeypatch: MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    spool = tmp_path / "spool"
+    result = _result([_page(1, text="", image="p0001.png")])
+    _setup(monkeypatch, spool, _publish_sleep(spool, result, {"p0001.png": _png(20, 20)}))
+    provider = FakeProvider(name="local", script=[], vision=False)
+    router = Router(
+        {handler.VISION_CLASS: (provider.name,)},
+        {provider.name: provider},
+        _policy(),
+        [].append,
+    )
+    client = FakeClient()
+    with caplog.at_level(logging.WARNING, logger=handler.__name__):
+        _run(client, router)
+    assert client.failed == [5]
+    assert client.outputs == []
+    assert provider.vision_calls == []
+    assert any(handler.NO_VISION_MESSAGE in record.getMessage() for record in caplog.records)
     assert _spool_empty(spool)
 
 
