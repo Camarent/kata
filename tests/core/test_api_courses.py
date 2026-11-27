@@ -377,6 +377,24 @@ def test_learning_rung_out_of_range_is_422_and_queues_nothing(
     assert _job_count(db) == 0
 
 
+def test_course_out_carries_version_one_then_two_after_regenerate(
+    client: TestClient, db: ScratchDatabase, cfg: Config
+) -> None:
+    headers = _token_for(client, db, cfg, "ana")
+    concept = _concept(client, headers, _shared_topic(client, headers, "Python"), "lists")
+    course = _create(client, headers, {"title": "lists", "concept_ids": [concept]})
+    course_id = int(str(course["id"]))
+    assert course["version"] == 1
+    assert client.get(f"/v1/courses/{course_id}", headers=headers).json()["version"] == 1
+
+    with db.connect() as conn:
+        conn.execute("UPDATE course SET status = 'ready' WHERE id = %s", (course_id,))
+    resp = client.post(f"/v1/courses/{course_id}/regenerate", headers=headers)
+    assert resp.status_code == 202, resp.text
+
+    assert client.get(f"/v1/courses/{course_id}", headers=headers).json()["version"] == 2
+
+
 def test_routes_need_a_token(client: TestClient) -> None:
     assert client.get("/v1/courses").status_code == 401
     assert client.post("/v1/courses", json={}).status_code == 401
