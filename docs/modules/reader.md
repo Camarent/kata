@@ -71,6 +71,7 @@ Core and worker never import `kata_reader`; the reader runs as its own process, 
 - Text per page is cut to `max_text_chars_per_page` and control characters except newline are dropped (`reader/kata_reader/extract.py:225` `_clean_text`).
 - Each page image is checked for PNG magic, byte cap and IHDR size by the worker before it is read (`worker/kata_worker/reader_spool.py:164`).
 - The `reader` service has `enabled` off by default in config; the upload route refuses with `409 reader_disabled` until the owner turns it on.
+- The worker refuses a document with page images when no vision route is usable: each provider in the `vision` chain has `vision` false (text-only). The job fails with no output posted; the worker logs a warning `no vision-capable model configured: <models skipped>`, and no image is sent to any model. The vision flag is per model, from `[model_vision]` or the provider's `vision` key, default false (`worker/kata_worker/handlers/reader_extract.py`, `worker/kata_worker/providers/base.py`).
 
 ## Depends on / used by
 - Depends on: `pypdfium2`, `Pillow` (`reader` extra), the Python standard library.
