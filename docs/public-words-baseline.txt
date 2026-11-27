@@ -1,3 +1,7 @@
 # Hit keys (file, word, text; tab-separated) that the public-words scan accepts. Max 10 entries.
 # .gitignore:1 names the pipeline config file; it must stay so the config is ignored by git.
 .gitignore	pipeline.json	pipeline.json
+# .gitignore:4 ignores the pipeline work folder; the entry must stay.
+.gitignore	.work/	.work/
+# scripts/deploy/validate_stack.py:53 is a placeholder tailnet name, not a real host.
+scripts/deploy/validate_stack.py	.ts.net	"KATA_TAILNET_NAME": "validate.example.ts.net",
