@@ -13,11 +13,17 @@ def _lines_with(text, needle):
 
 def test_pytest_step_runs_with_term_coverage_for_core_and_worker():
     text = SCRIPT.read_text(encoding="utf-8")
-    lines = _lines_with(text, "step pytest .venv/bin/python -m pytest tests --cov=core")
+    lines = _lines_with(text, "step pytest .venv/bin/python -m pytest tests -n auto --cov=core")
     assert len(lines) == 1
     assert "--cov=core" in lines[0]
     assert "--cov=worker" in lines[0]
     assert "--cov-report=term" in lines[0]
+
+
+def test_lint_caches_live_under_the_run_scratch_dir():
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert len(_lines_with(text, 'export MYPY_CACHE_DIR="$RUN_TMP/mypy"')) == 1
+    assert len(_lines_with(text, 'export RUFF_CACHE_DIR="$RUN_TMP/ruff"')) == 1
 
 
 def test_extension_step_runs_coverage_script():

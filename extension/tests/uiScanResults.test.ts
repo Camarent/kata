@@ -139,7 +139,7 @@ describe("summary panel screen", () => {
     expect(root.querySelector(".banner.err")?.textContent).toBe(TEXT_SUMMARY_PANEL[6]);
   });
 
-  it("offline shows the server-down text in the warn banner", () => {
+  it("summary panel offline shows the server-down text in the warn banner", () => {
     root.append(renderSummaryPanel({ status: "offline", topics: [] }));
     expect(root.querySelector(".banner.warn")?.textContent).toBe(TEXT_CONN_DETAIL[2]);
   });

@@ -40,7 +40,7 @@ export interface CardScanActions {
 }
 
 /** The found-concepts line: the approved inventory text with its example numbers swapped for the counts. */
-export function foundLine(counts: PageCounts): string {
+function foundLine(counts: PageCounts): string {
   const total = counts.new + counts.learning + counts.known;
   const values = [total, counts.new, counts.learning, counts.known];
   let next = 0;

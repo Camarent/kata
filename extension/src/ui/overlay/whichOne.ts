@@ -1,7 +1,7 @@
 import type { CoreClient } from "../../coreClient";
 import type { ScanConceptCandidate } from "../../coreClientTypes";
 import { el } from "../dom";
-import { TEXT_HL_WHICH_ONE } from "../strings";
+import { HL_WHICH_ONE_TEXT } from "../strings";
 
 export interface WhichOneOptions {
   topicId: number;
@@ -18,9 +18,9 @@ export interface WhichOneOptions {
  */
 export function renderWhichOne(opts: WhichOneOptions): HTMLElement {
   const root = el("div", undefined, "hl-which-one");
-  root.append(el("h2", TEXT_HL_WHICH_ONE[0], "title"));
+  root.append(el("h2", HL_WHICH_ONE_TEXT.title, "title"));
   // The inventory sample ends in "window"; the real word replaces it.
-  root.append(el("p", TEXT_HL_WHICH_ONE[4].split("window").join(opts.word), "word"));
+  root.append(el("p", HL_WHICH_ONE_TEXT.wordTemplate.split("window").join(opts.word), "word"));
   const list = el("ul", undefined, "candidates");
   const note = el("p", undefined, "note");
   for (const candidate of opts.candidates) {

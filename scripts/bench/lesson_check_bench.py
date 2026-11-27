@@ -48,7 +48,6 @@ class CaseResult:
     expected: str
     got: str
     source: str
-    hits: int
 
 
 @dataclass(frozen=True)
@@ -108,7 +107,6 @@ def run_bench(cfg: Config, cases: Cases) -> BenchResult:
             expected=concept.expected,
             got=check.state,
             source=check.source,
-            hits=len(check.evidence) if isinstance(check.evidence, tuple) else 0,
         )
         for concept, check in zip(cases.concepts, checks, strict=True)
     )

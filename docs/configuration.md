@@ -129,7 +129,6 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `modelhost.max_text_bytes` | 262144 | `KATA_MODELHOST_MAX_TEXT_BYTES` |
 | `exams.max_import_bytes` | 262144 | `KATA_EXAMS_MAX_IMPORT_BYTES` |
 | `quiz.max_fetch_bytes` | 262144 | `KATA_QUIZ_MAX_FETCH_BYTES` |
-| `quiz.max_question_chars` | 400 | `KATA_QUIZ_MAX_QUESTION_CHARS` |
 | `quiz.max_questions_per_source` | 50 | `KATA_QUIZ_MAX_QUESTIONS_PER_SOURCE` |
 | `quiz.mini_quiz_size` | 5 | `KATA_QUIZ_MINI_QUIZ_SIZE` |
 | `summary.max_text_chars` | 20000 | `KATA_SUMMARY_MAX_TEXT_CHARS` |
@@ -149,7 +148,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `reader.wait_seconds` | 120 | `KATA_READER_WAIT_SECONDS` |
 | `reader.spool_dir` | "/spool" | `KATA_READER_SPOOL_DIR` |
 | `jokes.enabled` | true | `KATA_JOKES_ENABLED` |
-| `jokes.sources` | "jokeapi,icanhazdadjoke" | `KATA_JOKES_SOURCES` |
+| `jokes.sources` | "jokeapi" | `KATA_JOKES_SOURCES` |
 | `jokes.timeout_seconds` | 10 | `KATA_JOKES_TIMEOUT_SECONDS` |
 | `jokes.max_response_bytes` | 16384 | `KATA_JOKES_MAX_RESPONSE_BYTES` |
 | `jokes.max_joke_chars` | 300 | `KATA_JOKES_MAX_JOKE_CHARS` |

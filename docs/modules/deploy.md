@@ -8,17 +8,17 @@ summary: Container stack for the VM (one image, compose with postgres, migrate, 
 Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image (`kata:<git short sha>`, `deploy/Dockerfile`, built with `deploy/compose.build.yaml` on dev) serves `core`, `worker` and `migrate`; `deploy/ship.sh` ships it and the deploy files over SSH. postgres and caddy are stock images. Runbook: `docs/deployment.md`. Checks for these files: `scripts/deploy/` (see `docs/modules/scripts.md`; browser test fixtures there use `install-browsers.sh --print-dir`).
 
 ## Public surface
-- `deploy/Dockerfile:11` `FROM ${PY_BASE_IMAGE}@${PY_BASE_DIGEST}` (base stage); `:47` runtime stage; `:66` `USER kata`; `:71` `CMD ["python", "-m", "kata_core"]`.
+- `deploy/Dockerfile:11` `FROM ${PY_BASE_IMAGE}@${PY_BASE_DIGEST}` (base stage); `:47` runtime stage; `:70` `USER kata`; `:75` `CMD ["python", "-m", "kata_core"]`.
 - `deploy/Dockerfile:19` `RUN test -n` guard: build stops when `GITLEAKS_*` or `TRAINER_*` is empty.
 - `deploy/compose.build.yaml:5` build override (`services` with `build:` for `migrate`, `core`, `worker`; the tag is `KATA_IMAGE_TAG`); run on dev only.
-- `deploy/compose.yaml:18` service `postgres`; `:40` service `migrate` (command runs `python -m kata_core.migrate`); `:61` service `core`; `:99` service `worker` (command runs `python -m kata_worker`); `:123` service `caddy`.
+- `deploy/compose.yaml:18` service `postgres`; `:40` service `migrate` (command runs `python -m kata_core.migrate`); `:61` service `core`; `:99` service `worker` (command runs `python -m kata_worker`); `:153` service `caddy`.
 - `deploy/compose.yaml:41`, `:62`, `:100` `image: kata:${KATA_IMAGE_TAG:?...}`: compose pulls the shipped tag, never builds.
 - `deploy/compose.yaml:82` `core` waits on `migrate` with `condition: service_completed_successfully` (`:84`).
-- `deploy/compose.yaml:132` only published port: `${KATA_BIND_ADDR:-127.0.0.1}:443:443` (caddy).
-- `deploy/compose.yaml:153` network `data` is `internal: true` (postgres, core and worker); `egress` is the worker's outbound network.
-- `deploy/compose.yaml:31`, `:58`, `:85`, `:120`, `:140` `mem_limit` from `KATA_MEM_*`; compose fails without them.
+- `deploy/compose.yaml:162` only published port: `${KATA_BIND_ADDR:-127.0.0.1}:443:443` (caddy).
+- `deploy/compose.yaml:183` network `data` is `internal: true` (postgres, core and worker); `egress` is the worker's outbound network.
+- `deploy/compose.yaml:31`, `:58`, `:85`, `:122`, `:150`, `:170` `mem_limit` from `KATA_MEM_*`; compose fails without them.
 - `deploy/compose.yaml:126` service `reader` (document sandbox, command `python -m kata_reader`): `network_mode: none`, `read_only`, no secrets; `:190`, `:191` volumes `reader-in` (worker read-write, reader read-only) and `reader-out`; `:150` `mem_limit: ${KATA_MEM_READER:-512m}`, `:151` `cpus: ${KATA_CPU_READER:-1.0}`: the defaults apply when the env file sets neither (the `deploy/env/*.env` files do not set them). Hardening list and the `reader-hardened` rule: [reader](reader.md).
-- `deploy/compose.yaml:137` mounts `${KATA_CERT_DIR:-/var/lib/kata/certs}` read-only at the Caddy cert directory.
+- `deploy/compose.yaml:167` mounts `${KATA_CERT_DIR:-/var/lib/kata/certs}` read-only at the Caddy cert directory.
 - `deploy/Caddyfile:24` site on the node name variable; `:25` `tls` with host-written cert files under the Caddy cert directory.
 - `deploy/ship.sh:34` `ship_files` (the only files copied to the VM; never `secrets/` or the Dockerfile); `:41` `--rollback <tag>`; `:40` `--dry-run`; `:94` `build_image`; `:107` `docker save | ssh docker load`; `:115` `write_tag` (`KATA_IMAGE_TAG` into the VM env file); `:123` `deep_health`.
 - `deploy/systemd/kata-cert.timer:6` `OnUnitActiveSec=30d`; `deploy/systemd/kata-cert.service:10` `EnvironmentFile=/etc/kata/cert.env`; `:13` the network client's cert command into `KATA_CERT_DIR`; `:14` caddy reload.
@@ -33,7 +33,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 
 ## Key files
 - `deploy/Dockerfile` - multi-stage build: fetch (gitleaks, trainer, sha256-checked), deps, runtime as non-root.
-- `deploy/compose.yaml` - the stack; header comment at `:4` states the port and network rules.
+- `deploy/compose.yaml` - the stack; header comment at `:6`-`:7` states the port and network rules.
 - `deploy/Caddyfile` - single site on the node name, TLS from the network's cert files (D19 in `docs/decisions.md`).
 - `deploy/versions.env` - image and binary pins; sourced before `docker compose`.
 - `deploy/secrets.example/README.md` - secret file layout; real files go in `deploy/secrets/` (git-ignored).
@@ -49,15 +49,15 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - The node name variable and `KATA_BIND_ADDR` must be in the env file compose reads on the VM (`KATA_SHIP_ENV_FILE`, e.g. `env/vm.env`): `ship.sh` exports neither.
 - Secrets are mounted under `/run/secrets/`; core reads env vars only, so each service command exports them with `$$(cat ...)`. Never write a secret value into a file in the repo.
 - `/c/*` (course files, `core/kata_core/api/routes/course_serve.py:55`) goes through the same proxy: `deploy/Caddyfile` has one catch-all `reverse_proxy core:8080` with no path matcher. A path matcher added there must cover `/c/*`; `tests/scripts/test_caddyfile_rules.py` checks it.
-- `open_link_key` is a secret (`deploy/compose.yaml:148`, file `deploy/secrets/open_link_key`, made with `openssl rand -hex 32`, listed in `deploy/secrets.example/README.md`). Core signs and checks open links with it; it is mounted at `/run/secrets/open_link_key` and read from `[trainer] open_link_key_file` (`deploy/kata.host.toml:154`), a file path and not an env var. Core refuses to start without a usable key while the trainer is on.
+- `open_link_key` is a secret (`deploy/compose.yaml:76`, file `deploy/secrets/open_link_key`, made with `openssl rand -hex 32`, listed in `deploy/secrets.example/README.md`). Core signs and checks open links with it; it is mounted at `/run/secrets/open_link_key` and read from `[trainer] open_link_key_file` (`deploy/kata.host.toml:168`), a file path and not an env var. Core refuses to start without a usable key while the trainer is on.
 - `KATA_CORE_PUBLIC_URL` (host env, never a tracked file) sets `[core] public_url` for the open link (`deploy/compose.yaml:64-67`). Unset, the link uses the URL the request came in on.
 - `deploy/Dockerfile:1` comment names `kata-migrate`; no such entry point exists. Migrate runs as the compose command above.
 - Pins: `GITLEAKS_SHA256` and `TRAINER_SHA256` are checked at build; `PY_BASE_DIGEST`, `EMBED_MODEL_*` are not checked by the Dockerfile.
 - Backup passphrase file path comes from `KATA_BACKUP_PASSPHRASE_FILE`; never printed.
 - `provision-vm.sh` ends with ufw allowing SSH only from the private network: join the network before logging out.
 - Memory limits are required by compose (`:?` syntax): an env file must be passed.
-- The VM worker keeps `[modelhost] control_enabled = false` (`deploy/kata.host.toml:192`), so it never claims the `modelhost.*` control jobs (`worker/kata_worker/loop.py:37-39`).
-- The GPU-PC worker is not part of this stack. It runs as the user that owns the model-host folder and its `data/`, in the docker group, never as root, with that user's own device token (`docs/decisions.md:580`). Its settings are the `[modelhost]` keys (`config/kata.example.toml:188`).
+- The VM worker keeps `[modelhost] control_enabled = false` (`deploy/kata.host.toml:208`), so it never claims the `modelhost.*` control jobs (`worker/kata_worker/loop.py:37-39`).
+- The GPU-PC worker is not part of this stack. It runs as the user that owns the model-host folder and its `data/`, in the docker group, never as root, with that user's own device token (`docs/decisions.md:580`). Its settings are the `[modelhost]` keys (`config/kata.example.toml:208`).
 
 ## Depends on / used by
 - Depends on: `core/` (image contents, `kata_core` entry points), `config/kata.example.toml` (template keys must match, checked by `scripts/deploy/validate_stack.py`), Docker compose, the network client on the host.

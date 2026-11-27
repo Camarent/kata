@@ -7,6 +7,8 @@ summary: pytest suites - core (API, repositories, auth, queue, import; needs Pos
 ## Purpose
 Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`, `tests/scripts/` (lesson-check bench in `scripts/bench/`), `tests/browser/` (side panel in real Firefox and Chrome through selenium).
 
+Baseline gate timings (before the speed-up) are in `docs/testing.md`.
+
 ## Public surface
 - `tests/support/scratch_db.py:15` `ScratchDatabase` - per-test database helper (imported by `tests/core/conftest.py:23`).
 - `tests/core/conftest.py:27` `cfg` fixture - loads config.
@@ -35,7 +37,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_flow.py` - `test_panel_flow` - side panel flow in each browser; `tests/browser/pages/lesson.html` is its page.
 - `tests/browser/test_panel_a11y.py` - `test_signin_tab_order_and_focus_indicator` - keyboard tab order (base URL, code, device label, submit) and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py` - `test_panel_signin_theme_contrast` - contrast of the sign-in view in light and dark; `contrast_ratio` and `test_contrast_ratio_known_pairs` check the ratio math.
-- `tests/browser/test_ui_layout.py` - `test_panel_does_not_scroll_sideways` (panel at panel and narrow width, no horizontal scroll), `test_scan_rows_clamp_to_two_lines`, `test_touch_targets_are_36px` (every button and link at least 36px by 36px).
+- `tests/browser/test_ui_layout.py` - `test_panel_does_not_scroll_sideways` (page body at panel width 360px and narrow width 320px, no horizontal scroll), `test_scan_rows_clamp_to_two_lines`, `test_touch_targets_are_36px` (every button and link at least 36px by 36px).
 - `tests/browser/panel_page.py` - `panel_url`, `open_panel`, `force_scheme` (forces light or dark) - shared panel helpers.
 - `tests/core/test_policy_engine.py` - policy engine: nudge and stop thresholds (`:44`, `:56`), stop-then-nudge (`:67`), quiet mark (`:115`), rate limit (`:144`, `:155`), late events (`:171`, `:183`), user isolation (`:200`).
 - `tests/core/test_journal_store.py` - journal write, paging with no overlap or gap (`:47`), newest first (`:65`), user isolation (`:72`), limit clamp (`:86`), cascade on user delete (`:93`).
@@ -43,7 +45,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/test_mcp.py`, `tests/core/test_mcp_gate.py`, `tests/core/test_mcp_route.py` - MCP server: JSON-RPC dispatch and tools (`test_mcp.py`); the egress gate quotes each result line and keeps injected instructions inside quotes (`tests/core/test_mcp_gate.py:15`, `:22`, `:33`); `POST /mcp` over HTTP (`test_mcp_route.py`).
 - `tests/device/` - `kata_device`: `test_device_cli.py`, `test_device_hooks.py`, `test_device_precommit.py`, `test_device_postcommit.py`, `test_device_queue.py` (local queue).
 - `tests/term/` - `kata term`: `test_term_session.py` (PTY relay and line capture), `test_term_mask.py` (masking), `test_term_spool.py` (JSONL spool trim and rewrite), `test_term_client.py` (batch post), `test_term_cli.py` (wiring).
-- `editor/tests/*.test.ts` - editor extension under vitest: `poster.test.ts`, `diagnostics.test.ts`, `extension.test.ts`, `infoView.test.ts`, `installHooks.test.ts`, `stopPatterns.test.ts`; run by `scripts/dev/check-all.sh --editor` (`npm --prefix editor run test:cov`).
+- `editor/tests/*.test.ts` - editor extension under vitest: `poster.test.ts`, `diagnostics.test.ts`, `extension.test.ts`, `infoView.test.ts`, `installHooks.test.ts`, `stopPatterns.test.ts`, `modelhost.test.ts`; run by `scripts/dev/check-all.sh --editor` (`npm --prefix editor run test:cov`).
 - `tests/foundation/test_core_config_keys.py:58`, `:64`, `:71` - `[policy]` example keys: bool and positive int, missing key raises `ConfigError`.
 - `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
 - M23 core: `tests/core/test_api_jobs.py`, `test_api_summary.py`, `test_api_reader.py`, `test_api_jokes.py`, `test_summary_service.py`, `test_reader_service.py`, `test_needs_cloud.py`, `test_m23_config.py`, `test_m23_jobs_schema.py` (migrations 0023 and 0024 on Postgres).

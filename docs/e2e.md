@@ -55,7 +55,7 @@ Test files:
 
 - `tests/browser/test_panel_a11y.py`: keyboard order and focus indicator of the sign-in view. Asserts the Tab order base URL, `code`, `deviceLabel`, submit button, that each focused control is inside `form.signin`, and that each shows an outline or box-shadow.
 - `tests/browser/test_panel_contrast.py`: WCAG 2.x contrast of the sign-in view in light and dark. Asserts every text element reaches a 4.5 to 1 ratio against its effective background, with the colour scheme forced; skips with a reason when the browser does not report it.
-- `tests/browser/test_ui_layout.py`: layout of the sign-in view at panel width and a narrow width. Asserts no horizontal scroll and every button and link at least 36px by 36px. A scan row built like the scan view (`ul.rows > li.rrow > span.nm.clamp2`) is injected and must render at most two lines.
+- `tests/browser/test_ui_layout.py`: layout of the sign-in view at panel width (360px) and a narrow width (320px), checked in the page body (no `.panel` host element). Asserts no horizontal scroll and every button and link at least 36px by 36px. A scan row built like the scan view (`ul.rows > li.rrow > span.nm.clamp2`) is injected and must render at most two lines.
 
 Prerequisites:
 

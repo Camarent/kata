@@ -8,10 +8,10 @@ import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
 import { runScan, type ScanResult } from "./scanSession";
-import type { ChromeLike, ScanResponse } from "./messages";
+import type { ChromeLike, CourseList, ModelhostRequest, ModelhostResult, ReviewRow, ScanResponse } from "./messages";
 import { validateServerUrl } from "./serverUrl";
 import { TokenStore, type StorageArea } from "./tokenStore";
-import type { ModelhostRequest, ModelhostResult, SignInInput, Session } from "./types";
+import type { SignInInput, Session } from "./types";
 
 /**
  * Sign-in values from the panel: the enrolment code, the device label and the typed server URL.
@@ -19,31 +19,6 @@ import type { ModelhostRequest, ModelhostResult, SignInInput, Session } from "./
  */
 export interface ServerSignIn extends SignInInput {
   baseUrl?: string;
-}
-
-/** A ready course the panel can open: its id and title only. */
-export interface CourseLink {
-  id: number;
-  title: string;
-}
-
-/** The Courses list: the ready courses, the course limit and the count against it. */
-export interface CourseList {
-  items: CourseLink[];
-  limit: number;
-  total: number;
-}
-
-/** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
-export interface ReviewRow {
-  conceptId: number;
-  label: string;
-  state: ConceptMark["state"] | null;
-  evidence: string;
-  /** Area of the page scan the concept came from; absent for concepts not on the scanned page. */
-  area?: string;
-  /** True when the concept is on the last scanned page ("Only this page"). */
-  onPage?: boolean;
 }
 
 /** Business logic behind the side panel; each call talks to the core. */

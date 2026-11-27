@@ -4,7 +4,7 @@ export interface Clock {
   clearTimeout(handle: number): void;
 }
 
-export const SYSTEM_CLOCK: Clock = {
+const SYSTEM_CLOCK: Clock = {
   setTimeout: (run, ms) => window.setTimeout(run, ms),
   clearTimeout: (handle) => window.clearTimeout(handle),
 };

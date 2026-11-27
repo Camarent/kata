@@ -783,9 +783,9 @@ Decided 2026-11-25 (M23). Status: implemented in M23. A summary is cached per `(
 
 Decided 2026-11-26 (M24). Status: implemented in M24 on the backend and in the extension client. The review screens are M25.
 
-The review routes are read-only: `GET /v1/review/tree` (areas > topics with new, learning and known counts) and `GET /v1/review/concepts`. Both filter by `q`, repeated `state` and `ids` (`core/kata_core/api/routes/review.py:70`, `:82`). The concept list sorts by `name`, `added`, `viewed` or `relevance` (`core/kata_core/storage/concept_rank.py:19`), the same sort as `GET /concepts/sorted`. A concept with no mark counts as `new` (`concept_rank.py:17`). The extension client has `reviewTree` and `reviewConcepts` (`extension/src/coreClient.ts:314`, `:319`).
+The review routes are read-only: `GET /v1/review/tree` (areas > topics with new, learning and known counts) and `GET /v1/review/concepts`. Both filter by `q`, repeated `state` and `ids` (`core/kata_core/api/routes/review.py:70`, `:82`). The concept list sorts by `name`, `added`, `viewed` or `relevance` (`core/kata_core/storage/concept_rank.py:19`), the same sort as `GET /concepts/sorted`. A concept with no mark counts as `new` (`core/kata_core/storage/concept_rank.py:17`). The extension client has `reviewTree` and `reviewConcepts` (`extension/src/coreClient.ts:314`, `:319`).
 
-The extension offline queue was a list of pending topic ids under `kata.pending`. It is now an ordered queue of marks, topic or concept, under `kata.markQueue` (`extension/src/offlineQueue.ts:6`). The legacy list is read once and converted, then removed (`offlineQueue.ts:185-197`). A bad entry is skipped, and a mark made during a flush stays queued.
+The extension offline queue was a list of pending topic ids under `kata.pending`. It is now an ordered queue of marks, topic or concept, under `kata.markQueue` (`extension/src/offlineQueue.ts:6`). The legacy list is read once and converted, then removed (`extension/src/offlineQueue.ts`). A bad entry is skipped, and a mark made during a flush stays queued.
 
 The sign-in code the extension asks for is an enrolment code. The admin CLI `enrol` command prints it once (`core/kata_core/auth/admin.py:67`).
 

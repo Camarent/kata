@@ -6,7 +6,7 @@ import type { TokenStore } from "./tokenStore";
 import type { Session } from "./types";
 
 /** Quiet time after the last page change before the concept rescan runs, in milliseconds. */
-export const RESCAN_DEBOUNCE_MS = 1500;
+const RESCAN_DEBOUNCE_MS = 1500;
 
 /** The page key: the URL without its fragment (the core keys classifications by it). */
 export function pageKeyOf(url: string): string {
@@ -16,7 +16,7 @@ export function pageKeyOf(url: string): string {
 }
 
 /** Merges a rescan into the previous result: concepts known before keep their state, the rest take the new one. */
-export function mergeScanResult(prev: ConceptScanResult, next: ConceptScanResult): ConceptScanResult {
+function mergeScanResult(prev: ConceptScanResult, next: ConceptScanResult): ConceptScanResult {
   const merged = mergeMarks(
     prev.blocks.flatMap((block) => block.concepts),
     next.blocks.flatMap((block) => block.concepts),

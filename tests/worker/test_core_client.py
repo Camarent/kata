@@ -122,14 +122,21 @@ def test_non_loopback_url_is_rejected(core_url: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "core_url", ["http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"]
+    ("core_url", "host"),
+    [
+        ("http://127.0.0.1:8080", "127.0.0.1"),
+        ("http://localhost:8080", "localhost"),
+        ("http://[::1]:8080", "::1"),
+    ],
 )
-def test_loopback_url_is_accepted(core_url: str) -> None:
-    CoreClient(_cfg(core_url), token="t")
+def test_loopback_url_is_accepted(core_url: str, host: str) -> None:
+    client = CoreClient(_cfg(core_url), token="t")
+    assert client._parts.hostname == host
 
 
 def test_in_network_core_host_is_accepted_when_listed() -> None:
-    CoreClient(_cfg("http://core:8080", ["core"]), token="t")
+    client = CoreClient(_cfg("http://core:8080", ["core"]), token="t")
+    assert client._parts.hostname == "core"
 
 
 def test_in_network_core_host_is_rejected_when_not_listed() -> None:

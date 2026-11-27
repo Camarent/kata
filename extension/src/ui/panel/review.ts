@@ -1,8 +1,10 @@
 // Review screen: concepts grouped by area (collapsed, with counts), searchable and filterable,
 // one row per concept with a local state menu (ui/stateMenu.ts).
+import { el } from "../dom";
 import { STATE_ORDER, renderStateMenu } from "../stateMenu";
-import { REVIEW_TEXT } from "../strings";
-import type { ReviewHandlers, ReviewRow, ReviewState } from "../../types";
+import { REVIEW_PENDING_COPY, REVIEW_TEXT } from "../strings";
+import type { ReviewRow, ReviewState } from "../../messages";
+import type { ReviewHandlers } from "../../types";
 
 const SEARCH_LABEL = REVIEW_TEXT.search;
 const COUNT_LABEL = REVIEW_TEXT.count;
@@ -14,25 +16,15 @@ const STATE_TEXT: Record<ReviewState, string> = {
   learning: REVIEW_TEXT.learning,
   known: REVIEW_TEXT.known,
 };
-const OTHER_AREA = "Other concepts";
+const OTHER_AREA = REVIEW_PENDING_COPY.otherArea;
+const NO_CONCEPTS = REVIEW_PENDING_COPY.noConceptsToReview;
 const KEY_STATE: Record<string, ReviewState> = { "1": "known", "2": "learning", "3": "new" };
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  text?: string,
-  className?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (text !== undefined) node.textContent = text;
-  if (className !== undefined) node.className = className;
-  return node;
-}
 
 /** Render the review tree into `root`, replacing its content: areas start collapsed with counts. */
 export function renderReview(root: HTMLElement, rows: ReviewRow[], handlers: ReviewHandlers): void {
   root.replaceChildren();
   if (rows.length === 0) {
-    root.append(el("p", "No concepts to review"));
+    root.append(el("p", NO_CONCEPTS));
     return;
   }
   const filter = { query: "", states: new Set<ReviewState>(), onlyPage: false };

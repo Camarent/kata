@@ -1,48 +1,6 @@
-import type { Backend, ServerSignIn } from "./backgroundBackend";
-import { CoreHttpError, type ConceptMark } from "./coreClient";
-import type { PointIn, TrackIn, TrackPatch } from "./coreClientTypes";
-import type { PanelReply } from "./messages";
-import type { ModelhostRequest } from "./types";
-
-/** Messages the side panel page sends to the background script. */
-export type PanelMessage =
-  | { type: "panel:signIn"; input: ServerSignIn }
-  | { type: "panel:disconnect" }
-  | { type: "panel:scan" }
-  | { type: "panel:scanConcepts" }
-  | { type: "panel:chooseConcept"; topicId: number; word: string; conceptId: number }
-  | { type: "panel:reassignConcept"; topicId: number; word: string; fromConceptId: number; toConceptId: number }
-  | { type: "panel:topicOverview"; topicId: number }
-  | { type: "panel:known"; topicId: number }
-  | { type: "panel:review" }
-  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
-  | { type: "panel:pending" }
-  | { type: "panel:courses" }
-  | { type: "panel:openCourse"; courseId: number }
-  | { type: "panel:deleteCourse"; courseId: number }
-  | { type: "panel:createCourse"; title: string }
-  | { type: "panel:regenerateCourse"; courseId: number }
-  | { type: "panel:modelhost"; request: ModelhostRequest }
-  | { type: "panel:tracks"; limit?: number; beforeId?: number }
-  | { type: "panel:getTrack"; trackId: number }
-  | { type: "panel:createTrack"; input: TrackIn }
-  | { type: "panel:patchTrack"; trackId: number; patch: TrackPatch }
-  | { type: "panel:deleteTrack"; trackId: number }
-  | { type: "panel:addDecisionPoint"; trackId: number; input: PointIn }
-  | { type: "panel:addQuizSource"; url: string }
-  | { type: "panel:importExamResult"; payload: string }
-  | { type: "panel:confirmExamResult"; resultId: number; conceptIds: number[] }
-  | { type: "panel:dismissExamResult"; resultId: number }
-  | { type: "panel:ignored" }
-  | { type: "panel:ignoreConcept"; conceptId: number }
-  | { type: "panel:unignoreConcept"; conceptId: number }
-  | { type: "panel:markConceptViewed"; conceptId: number }
-  | { type: "panel:listConceptAliases"; conceptId: number }
-  | { type: "panel:addConceptAlias"; conceptId: number; alias: string }
-  | { type: "panel:requestSummary"; url: string; text: string }
-  | { type: "panel:cachedSummary"; url: string; textSha256: string }
-  | { type: "panel:nextJoke" }
-  | { type: "panel:listJokeSources" };
+import type { Backend } from "./backgroundBackend";
+import { CoreHttpError } from "./coreClient";
+import type { PanelMessage, PanelReply } from "./messages";
 
 /** One panel message handler: the backend call for one message type, with its reply. */
 type PanelHandler<T extends PanelMessage["type"]> = (

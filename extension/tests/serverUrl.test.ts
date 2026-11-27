@@ -53,8 +53,6 @@ describe("validateServerUrl", () => {
 
   it("rejects empty and malformed input with a reason", () => {
     expect(validateServerUrl("   ")).toEqual({ ok: false, reason: "server URL is empty" });
-    const bad = validateServerUrl("not a url");
-    expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.reason).toBeTruthy();
+    expect(validateServerUrl("not a url")).toEqual({ ok: false, reason: "server URL is not a valid URL" });
   });
 });

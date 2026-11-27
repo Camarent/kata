@@ -289,20 +289,27 @@ section 9; the decision record is in [`decisions.md`](decisions.md). The UI modu
 [`modules/extension.md`](modules/extension.md). The old mockups were removed.
 
 Partial: the UI modules are built and unit-tested, but not all are mounted in the running extension.
-- Mounted: the page-changed overlay (`cardHost.ts`), the pin (`ui/card/pin.ts`), the panel CSS and
-  the card CSS. The panel tab screens, their router (`ui/panel/router.ts`) and the settings screens
-  are mounted in `sidepanel.ts` with stub handlers and placeholder data (courses, tracks, settings
-  home, scan results): they render, but their actions do nothing yet.
-- Not mounted: the page overlays (`hlMenu.ts` hover menu, `whichOne.ts`, `blockMenu.ts`,
-  `imageMenu.ts`, `listPicker.ts`, `quizPin.ts`), the exam screens (`ui/panel/examRun.ts`,
-  `ui/panel/examResult.ts`), the course page (`ui/panel/coursePage.ts`), the focus module
-  (`ui/card/focus.ts`), and the jokes screens (`jokeCloud.ts`). None of these has an importer.
+- Mounted: the card host (`extension/src/cardHost.ts`, mounted by `content.ts`) with its page-changed
+  overlay (`ui/overlay/pageChanged.ts`), the focus confirm (`ui/card/focus.ts`) and the joke cloud
+  (`ui/card/jokeCloud.ts`); the pin (`ui/card/pin.ts`), the panel CSS and the card CSS. The panel tab
+  screens and their router (`ui/panel/router.ts`) are mounted in `extension/src/sidepanel.ts`.
+  Courses and tracks load from the backend (`panel:courses`, `panel:tracks`, wired in
+  `extension/src/sidepanelBoot.ts`). Scan results still show placeholder rows (`rows: []` in
+  `sidepanel.ts`).
+- Unmounted, pending owner decision (no importer outside its group): the page overlays
+  `extension/src/ui/overlay/hlMenu.ts` (hover menu), `whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`,
+  `listPicker.ts`, `quizPin.ts`; the exam screens `extension/src/ui/panel/examRun.ts` and
+  `extension/src/ui/panel/examResult.ts`; the course page `extension/src/ui/panel/coursePage.ts`.
+- Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate). Follow-ups, not yet wired.
 - Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
 
 ## Later
 
 Video transcripts, a phone web app, Chrome packaging, passkeys, deeper terminal tracking,
 exam mode hardening, a public path for single pages.
+
+Exam mode recorder: a silent recorder of the owner's exam answers. Design step first (no code until
+the design is approved); the milestone comes after M26.
 
 Extension UI: design v2 is approved (2026-11-24; navigation, settings, auto-scan and block states;
 see [`design/extension-ui.md`](design/extension-ui.md) and [`decisions.md`](decisions.md)). The UI

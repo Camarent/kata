@@ -186,4 +186,17 @@ describe("panel shell screens, one test per inventory state", () => {
     expect(screen.querySelector("p.empty")?.textContent).toBe(TEXT_OFFLINE_QUEUE[1]);
     expect(typeof SCREENS["conn-detail"]).toBe("function");
   });
+
+  it("review: rows without an area group under the Other concepts heading", () => {
+    const row = { conceptId: 1, label: "Loose", state: null, evidence: "" };
+    const screen = routeScreen("review", [row], handlers());
+    const summaries = textsOf(screen, "details.review-area > summary");
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]?.startsWith("Other concepts (1)")).toBe(true);
+  });
+
+  it("review: an empty list shows No concepts to review", () => {
+    const screen = routeScreen("review", [], handlers());
+    expect(screen.querySelector("p")?.textContent).toBe("No concepts to review");
+  });
 });

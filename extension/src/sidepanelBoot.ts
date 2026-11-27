@@ -1,4 +1,4 @@
-import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply } from "./background";
+import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply, ReviewRow, ReviewState } from "./messages";
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
@@ -14,7 +14,6 @@ import type {
   TrackPage,
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
-import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
 import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
 import type { SettingsPage } from "./ui/panel/settingsHome";
@@ -141,6 +140,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     draw();
   };
 
+  /** Back from a track screen to the Tracks list. */
+  const backFromTrack = (): void => {
+    state.trackScreen = null;
+    draw();
+  };
+
   /** Back from the ignored list page to the settings home. */
   const backToSettings = (): void => {
     state.settingsPage = null;
@@ -263,12 +268,14 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       draw();
     },
 
-    onOpenTrack() {
-      // The track detail screen is not drawn yet: the Tracks tab stays as it is.
+    onOpenTrack(trackId: number) {
+      state.trackScreen = { kind: "detail", trackId };
+      draw();
     },
 
     onNewTrack() {
-      // The create screen is not drawn yet: the Tracks tab stays as it is.
+      state.trackScreen = { kind: "create" };
+      draw();
     },
 
     async onReview() {
@@ -345,6 +352,17 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
     ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
+    trackDetail: {
+      onBack: backFromTrack,
+      // Add source and Quiz are not wired yet: the detail only routes here.
+      onAddSource: () => {},
+      onQuiz: () => {},
+    },
+    trackCreate: {
+      // Save is not wired yet: the form only routes here.
+      onCreate: () => {},
+      onCancel: backFromTrack,
+    },
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
     onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
     onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),

@@ -1,7 +1,8 @@
 // Test harness bundle for tests/browser/test_ui_flow.py: mounts the page overlay pieces that the
 // content script does not wire yet (hover menu, Delete/Ignore with Undo, review tree, pin) on sample.html.
 // Built with esbuild by the test fixture; it is never part of the extension.
-import { renderReview, type ReviewRow } from "../../../extension/src/reviewScreen";
+import { renderReview } from "../../../extension/src/ui/panel/review";
+import type { ReviewRow } from "../../../extension/src/messages";
 import type { StorageArea } from "../../../extension/src/tokenStore";
 import { CARD_CSS } from "../../../extension/src/ui/cardCss";
 import { mountPin } from "../../../extension/src/ui/card/pin";

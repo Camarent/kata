@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderReview, type ReviewHandlers, type ReviewRow } from "../src/reviewScreen";
+import { renderReview } from "../src/ui/panel/review";
+import type { ReviewHandlers } from "../src/types";
+import type { ReviewRow } from "../src/messages";
 
 function handlers(overrides: Partial<ReviewHandlers> = {}): ReviewHandlers {
   return { onSet: vi.fn(async () => undefined), ...overrides };
@@ -63,7 +65,7 @@ describe("renderReview", () => {
       ["true", "false", "false"],
       ["false", "false", "false"],
     ]);
-    expect(items[0].querySelector('[role="group"]')?.getAttribute("aria-label")).toBeTruthy();
+    expect(items[0].querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("State of a");
     expect(rowButtons(items[0]).map((b) => b.textContent)).toEqual(["New", "Learning", "Known"]);
   });
 

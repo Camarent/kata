@@ -232,8 +232,6 @@ max_import_bytes = 262144
 [quiz]
 # Cap on the bytes one quiz source fetch reads.
 max_fetch_bytes = 262144
-# Cap on the characters of one quiz question.
-max_question_chars = 400
 # Cap on the questions kept from one quiz source.
 max_questions_per_source = 50
 # Questions in one mini quiz. At most 5.
@@ -278,8 +276,8 @@ spool_dir = "/spool"
 [jokes]
 # Set false to stop the joke job fetching from the sources.
 enabled = true
-# Comma list of source ids the joke job may fetch from, in order: jokeapi, icanhazdadjoke.
-sources = "jokeapi,icanhazdadjoke"
+# Comma list of source ids the joke job may fetch from, in order: jokeapi. icanhazdadjoke is opt-in.
+sources = "jokeapi"
 # Seconds one joke source fetch may take.
 timeout_seconds = 10
 # Cap on the bytes one joke source response may have.
