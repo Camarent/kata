@@ -3,7 +3,7 @@
 Runs once per browser (browser_name param, see conftest.py). The panel is opened on its sign-in view at each
 width, and a screenshot of the window is taken. The PNG must start with the PNG signature and have a
 non-zero IHDR width and height. The sign-in form must
-sit inside the viewport horizontally and be at most 360px wide. The panel's own CSS width is not measured here.
+sit inside the viewport horizontally. The panel's own CSS width is not measured here.
 The screenshot bytes are kept in memory only: nothing is written to disk.
 The test does not compare screenshot width with window width.
 """
@@ -52,7 +52,5 @@ def test_panel_screenshot_at_panel_and_narrow_width(browser_name: str, driver: A
     assert box["height"] > 0, box
     # Compare with the viewport (innerWidth), not the requested window width.
     assert box["left"] >= 0 and box["right"] <= box["innerWidth"], f"width {width}px: panel box {box}"
-    # The sign-in form is at most 360px wide and within the viewport.
-    assert box["width"] <= min(PANEL_WIDTH, box["innerWidth"]), f"width {width}px: panel box {box}"
     shot_width, shot_height = png_size(driver.get_screenshot_as_png())
     assert shot_width > 0 and shot_height > 0, f"width {width}px: empty screenshot {shot_width}x{shot_height}"

@@ -12,14 +12,13 @@ from typing import Any
 
 import pytest
 
-from browser.panel_page import force_scheme, open_panel
+from browser.panel_page import PANEL_WAIT_SECONDS, force_scheme, open_panel
 
 # WCAG 2.x AA minimum contrast ratio for normal text.
 MIN_RATIO = 4.5
-# Shown by the form when submitted empty (extension/src/sidepanel.ts:81).
+# Error paragraph of the sign-in form, rendered by renderSignIn (extension/src/ui/panel/signin.ts).
 ERROR_SELECTOR = "form.signin p.error"
 SUBMIT_SELECTOR = 'form.signin button[type="submit"]'
-PANEL_WAIT_SECONDS = 10
 # Name -> selector of the text elements checked. Each selector may match several elements.
 TEXT_TARGETS = {
     "label": "form.signin label",

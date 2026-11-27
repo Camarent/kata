@@ -14,9 +14,9 @@ from browser.panel_page import PANEL_INPUT_SELECTOR, PANEL_WAIT_SECONDS, panel_u
 
 LESSON_PATH = "/lesson.html"
 LESSON_TEXT = "Sample lesson page for browser tests."
-# scanBlocks sets this attribute on each block element it answers for (extension/src/scanner.ts:104).
+# scanBlocks sets BLOCK_ATTR (data-kata-block) on each block element it answers for (extension/src/scanner.ts).
 BLOCK_SELECTOR = "[data-kata-block]"
-# Asks the content script of every tab except the panel's own tab for a scan (extension/src/content.ts:26).
+# Asks the content script of every tab except the panel's own tab for a scan (handleContentMessage, extension/src/content.ts).
 # The last argument of execute_async_script is the callback; a tab without the content script is skipped.
 SCAN_OTHER_TABS = """
 const done = arguments[arguments.length - 1];
