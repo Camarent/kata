@@ -38,7 +38,7 @@ export interface CardHost {
 }
 
 /** Counts concepts of a scan result by state; a concept with no id is counted once per mention. */
-export function countConcepts(result: ConceptScanResult): PageCounts {
+function countConcepts(result: ConceptScanResult): PageCounts {
   const counts: PageCounts = { new: 0, learning: 0, known: 0 };
   for (const block of result.blocks) {
     if (block.skipped) continue;
@@ -48,7 +48,7 @@ export function countConcepts(result: ConceptScanResult): PageCounts {
 }
 
 /** Runs the concept scan through the background script and maps its reply to a card status. */
-export async function requestScan(runtime: CardRuntime): Promise<ScanStatus & { counts?: PageCounts }> {
+async function requestScan(runtime: CardRuntime): Promise<ScanStatus & { counts?: PageCounts }> {
   let reply: PanelReply;
   try {
     reply = (await runtime.sendMessage({ type: "panel:scanConcepts" })) as PanelReply;

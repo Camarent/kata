@@ -42,7 +42,7 @@ export function formatEndsAt(endsAt: number): string {
 }
 
 /** The ends-at line: the approved inventory text with its example time swapped for `endsAt`. */
-export function endsAtLine(endsAt: number): string {
+function endsAtLine(endsAt: number): string {
   return ENDS_AT.replace(/\d{2}:\d{2}/, formatEndsAt(endsAt));
 }
 

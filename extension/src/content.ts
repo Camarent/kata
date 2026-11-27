@@ -13,7 +13,7 @@ export type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } fr
  * Starts a mutation observer on the page body; `onChange` runs on each batch of changes. Changes
  * inside `ignore` (the extension's own UI) do not count. Returns the stop function.
  */
-export function watchPage(doc: Document, onChange: () => void, ignore?: Node): () => void {
+function watchPage(doc: Document, onChange: () => void, ignore?: Node): () => void {
   const observer = new MutationObserver((records) => {
     if (ignore && records.every((record) => ignore.contains(record.target))) return;
     onChange();
@@ -69,7 +69,7 @@ export function registerContentScript(runtime: RuntimeLike, doc: Document): void
 }
 
 /** The floating UI mounted in a page. */
-export interface FloatingUi {
+interface FloatingUi {
   pin: Pin;
   cards: CardHost;
   /** Removes the pin, the cards and the page watcher. */

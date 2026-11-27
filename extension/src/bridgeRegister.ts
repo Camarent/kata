@@ -4,7 +4,7 @@ import type { TokenStore } from "./tokenStore";
 export const BRIDGE_SCRIPT_ID = "kata-bridge";
 
 /** Bundle the bridge content script is registered with, relative to the extension root. */
-export const BRIDGE_SCRIPT = "bridge.js";
+const BRIDGE_SCRIPT = "bridge.js";
 
 /** Path of the course pages on the core. */
 const COURSE_PATH = "/c/*";
