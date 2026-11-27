@@ -303,6 +303,12 @@ Partial: the UI modules are built and unit-tested, but not all are mounted in th
 - Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate). Follow-ups, not yet wired.
 - Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
 
+## Milestone 26: generic model names and OpenAI-compatible provider (in progress)
+
+**Scope.** Generic model names `cloud` and `local` (mapped by `[models]` in the host config; a literal model name in a routing chain wins), an OpenAI-compatible provider (`[provider_openai]`: base URL and token env in the host config only; unpriced model, so no cap, calls logged), and a per-provider `vision` flag (default false) that the reader enforces.
+
+**Shipped.** Config keys, `OpenAIProvider` and `resolve_entry` on the worker, the vision flag, and the reader refusal. Decisions: "Generic model names, OpenAI-compatible provider and vision flag (M26)". Config: [configuration.md](configuration.md), section Models. The UI is not part of M26.
+
 ## Later
 
 Video transcripts, a phone web app, Chrome packaging, passkeys, deeper terminal tracking,

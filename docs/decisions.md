@@ -796,3 +796,13 @@ The OpenAPI schema is committed to `docs/openapi.json`. It is exported by `core/
 ## Extension UI is plain DOM TypeScript built to the approved design (M25)
 
 The extension UI (48 screens, decisions D1 to D58) is built as plain DOM TypeScript under `extension/src/ui/`, with no framework. Every user-facing string comes from `extension/src/ui/strings.ts`, pinned to the screen inventory. Panel screens are drawn only through the registry `SCREENS` in `extension/src/ui/panel/screens.ts`. The approved design notes are kept in `docs/design/extension-ui.md` (section 9). The old static mockups, their CSS tokens and their checker tests were removed. Module map: [modules/extension.md](modules/extension.md).
+
+## Generic model names, OpenAI-compatible provider and vision flag (M26)
+
+Decided 2026-11-27 (M26). Status: implemented in M26 on the backend, config and router; no UI. Three decisions:
+
+- **Address safety.** `[provider_openai] base_url` is set in the host config only and is trusted; no private-address check is made on it. The D45-D47 private-address block stays on page and quiz fetches. Code: `worker/kata_worker/providers/openai.py`.
+- **Vision flag.** `vision` is a key of each provider section (`[provider_local]`, `[provider_anthropic]`, `[provider_openai]`), not of each model. Default `false`. No auto-detection. The reader refuses a non-vision model and says so.
+- **Literal model name scope.** A `[routing]` chain entry resolves in order: literal `model_name` of a provider section, then the generic names `cloud` and `local` through `[models]`, then a provider name. The literal check covers only the configured `model_name` of each provider; no other string counts as a model name. Code: `resolve_entry` in `worker/kata_worker/providers/models.py`.
+
+Config: [configuration.md](configuration.md), section Models: generic names, provider sections and vision (M26).

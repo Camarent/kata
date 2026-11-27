@@ -61,6 +61,8 @@ Runs the pull loop. Takes one job from `GET /jobs/next` for each kind that has a
 - `worker/kata_worker/model.py` - prompt, chat call, reply parsing.
 - `worker/kata_worker/providers/base.py` - `Provider` protocol, task classes, `ProviderError`.
 - `worker/kata_worker/providers/local.py` - completion through the `[model]` OpenAI-compatible endpoint.
+- `worker/kata_worker/providers/openai.py` - `OpenAIProvider`: one completion through `/v1/chat/completions` (cloud, `[provider_openai]`); the bearer token is read once at construction from the env var in `api_key_env`; `base_url` is trusted from the host config (no private-address check). Wrapped with `CappedProvider(..., unpriced_ok=True)`, so the call is logged with no cap.
+- `worker/kata_worker/providers/models.py` - `resolve_entry(cfg, entry)` maps a `[routing]` chain entry to a provider name: literal `model_name` first, then the generic names `cloud` and `local` through `[models]`, then a provider name; anything else raises `RoutingError`.
 - `worker/kata_worker/providers/anthropic.py` - completion through the Anthropic Messages API over httpx.
 - `worker/kata_worker/providers/scheduled.py` - `ScheduledLocalProvider`, used by `build_local` only when `[modelhost] schedule` is true; gates each local call on the capabilities document.
 - `worker/kata_worker/providers/policy.py` - which provider may run which task class.
