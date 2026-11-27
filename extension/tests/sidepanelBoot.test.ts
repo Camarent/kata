@@ -707,8 +707,28 @@ describe("bootPanel Tracks tab and settings home", () => {
     openTab("tracks");
     await vi.waitFor(() => expect(root.querySelector("button.open-track")).not.toBeNull());
     root.querySelector<HTMLButtonElement>("button.open-track")!.click();
-    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
     expect(onOpenTrack).toHaveBeenCalledWith(1);
+    root.querySelector<HTMLButtonElement>("section.track-detail button.back")!.click();
+    await vi.waitFor(() => expect(root.querySelector("button.new-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
     expect(onNewTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it("a track row click draws the track detail, and New track draws the create form", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("button.open-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-track")!.click();
+    expect(root.querySelector("section.track-detail")).not.toBeNull();
+    expect(root.querySelector("section.tracks-tab")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.track-detail button.back")!.click();
+    await vi.waitFor(() => expect(root.querySelector("button.new-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    expect(root.querySelector("form.track-create")).not.toBeNull();
   });
 });

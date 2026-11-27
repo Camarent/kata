@@ -141,6 +141,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     draw();
   };
 
+  /** Back from a track screen to the Tracks list. */
+  const backFromTrack = (): void => {
+    state.trackScreen = null;
+    draw();
+  };
+
   /** Back from the ignored list page to the settings home. */
   const backToSettings = (): void => {
     state.settingsPage = null;
@@ -263,12 +269,14 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       draw();
     },
 
-    onOpenTrack() {
-      // The track detail screen is not drawn yet: the Tracks tab stays as it is.
+    onOpenTrack(trackId: number) {
+      state.trackScreen = { kind: "detail", trackId };
+      draw();
     },
 
     onNewTrack() {
-      // The create screen is not drawn yet: the Tracks tab stays as it is.
+      state.trackScreen = { kind: "create" };
+      draw();
     },
 
     async onReview() {
@@ -345,6 +353,17 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
     ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
+    trackDetail: {
+      onBack: backFromTrack,
+      // Add source and Quiz are not wired yet: the detail only routes here.
+      onAddSource: () => {},
+      onQuiz: () => {},
+    },
+    trackCreate: {
+      // Save is not wired yet: the form only routes here.
+      onCreate: () => {},
+      onCancel: backFromTrack,
+    },
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
     onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
     onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),

@@ -33,6 +33,9 @@ type PanelStatus =
   | { kind: "error"; reason: "timeout" | "auth" | "failed" }
   | { kind: "notice"; text: string };
 
+/** A track screen the Tracks tab opened: the detail of one track, or the create form. */
+export type TrackScreen = { kind: "detail"; trackId: number } | { kind: "create" };
+
 /**
  * Everything the panel draws. `session` null means signed out. `changing` true shows the
  * sign-in form over a live session (change server). `tab` is the current tab (default scan);
@@ -58,6 +61,8 @@ export interface PanelState {
   queue?: QueuedMarkView[] | null;
   /** Tracks tab state and rows; unset means still loading. */
   tracks?: TracksTabProps;
+  /** Track screen the Tracks tab opened: one track's detail, or the create form; null or unset shows the list. */
+  trackScreen?: TrackScreen | null;
   /** Settings page drawn in place of the settings home; null or unset shows the home. */
   settingsPage?: SettingsPage | null;
   /** Ignored concepts for the ignored list page. */
@@ -265,6 +270,13 @@ function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElem
 
 /** Tracks tab: the state the panel holds (loading until the panel:tracks reply arrives), with its rows. */
 function renderTracksView(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  if (state.trackScreen?.kind === "detail" && handlers.trackDetail !== undefined) {
+    // The track data is not loaded yet, so the detail stays in its loading state.
+    return routeScreen("track-detail", { state: "loading", track: null }, handlers.trackDetail);
+  }
+  if (state.trackScreen?.kind === "create" && handlers.trackCreate !== undefined) {
+    return routeScreen("track-create", { state: "form" }, handlers.trackCreate);
+  }
   const props: TracksTabProps = state.tracks ?? { state: "loading", rows: [], sort: "name" };
   const actions = {
     onOpen: (trackId: number) => handlers.onOpenTrack?.(trackId),

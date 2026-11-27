@@ -17,6 +17,8 @@ import type { MarkOutcome } from "./offlineQueue";
 import type { IgnoredListHandlers } from "./ui/panel/ignoredList";
 import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey } from "./ui/panel/tracksTab";
+import type { TrackDetailHandlers } from "./ui/panel/trackDetail";
+import type { TrackCreateHandlers } from "./ui/panel/trackCreate";
 
 /** A readable block of page text, optionally bound to its DOM element. */
 export interface Block {
@@ -113,6 +115,10 @@ export interface PanelHandlers {
   onUnignoreConcept?: (conceptId: number) => Promise<void>;
   /** Restore and Undo of the ignored list; each calls the panel messages for ignore and unignore. */
   ignoredList?: IgnoredListHandlers;
+  /** Track detail screen: back, add source and quiz; the panel draws it when the Tracks tab opened a track. */
+  trackDetail?: TrackDetailHandlers;
+  /** Create-track form: save and cancel; the panel draws it when the Tracks tab chose New track. */
+  trackCreate?: TrackCreateHandlers;
   /** Tracks tab: the user changed the sort key; the panel re-sorts the rows it holds. */
   onSortTracks?: (sort: TrackSortKey) => void;
   /** Tracks tab: the user opened one track; the panel draws its detail screen when it has one. */
