@@ -131,6 +131,7 @@ class CappedProvider:
         self._image_tokens = image_tokens
         self._unpriced_ok = unpriced_ok
         self.name = inner.name
+        self.vision = bool(getattr(inner, "vision", False))
         self.is_cloud = inner.is_cloud
 
     def complete(self, system: str, user: str) -> str:

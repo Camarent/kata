@@ -75,7 +75,7 @@ def _cfg(spool: Path, **reader: Any) -> Config:
 
 
 def _router(script: list[str | ProviderError]) -> tuple[Router, FakeProvider]:
-    provider = FakeProvider(name="local", script=script)
+    provider = FakeProvider(name="local", script=script, vision=True)
     # The example config keeps vision cloud-only; these tests allow a local vision model, as test_router_vision does.
     base = load_config(EXAMPLE_PATH, env={})
     verdicts = {**base.sections["local_capability"], "vision": "kata-l"}

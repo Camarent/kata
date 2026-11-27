@@ -21,6 +21,8 @@ class FakeProvider:
 
     name: str = "fake"
     is_cloud: bool = False
+    # The vision flag the real providers carry: the router sends images only to a provider with it on.
+    vision: bool = False
     script: list[str | ProviderError] = field(default_factory=list)
     usage_script: list[TokenUsage | None] = field(default_factory=list)
     calls: list[tuple[str, str]] = field(default_factory=list)

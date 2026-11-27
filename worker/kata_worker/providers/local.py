@@ -13,8 +13,9 @@ import httpx
 from kata_core.config import Config
 
 from kata_worker.model import CHAT_PATH, ModelError, reply_content
-from kata_worker.providers.base import Completion, ImageInput, ProviderError
+from kata_worker.providers.base import Completion, ImageInput, ProviderError, vision_flag
 
+SECTION = "provider_local"
 REASONING_KEY = "reasoning_effort"
 OLLAMA_IMAGES_KEY = "images"
 FINISH_LENGTH = "length"
@@ -38,6 +39,7 @@ class LocalProvider:
     is_cloud = False
 
     def __init__(self, config: Config, *, transport: httpx.BaseTransport | None = None) -> None:
+        self.vision = vision_flag(config, SECTION)
         self._base_url = str(config.get("model", "base_url"))
         self._model_name = str(config.get("model", "model_name"))
         self._timeout = float(config.get("model", "timeout_seconds"))

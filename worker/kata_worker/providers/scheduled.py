@@ -60,6 +60,7 @@ class ScheduledLocalProvider:
         self._capabilities = capabilities
         self._log = log
         self._clock = clock
+        self.vision = bool(getattr(inner, "vision", False))
 
     def complete(self, system: str, user: str) -> str:
         """Return the local reply when the model may run; raise ProviderError when it may not."""

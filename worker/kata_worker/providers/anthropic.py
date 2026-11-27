@@ -20,6 +20,7 @@ from kata_worker.providers.base import (
     ProviderError,
     TokenUsage,
     usage_count,
+    vision_flag,
 )
 from kata_worker.providers.cost import Ledger, LogSink, capped
 from kata_worker.providers.guard import AuditSink, guarded
@@ -104,6 +105,7 @@ class AnthropicProvider:
         env: Mapping[str, str] = os.environ,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        self.vision = vision_flag(config, SECTION)
         self._base_url = str(config.get(SECTION, "base_url"))
         self._model_name = str(config.get(SECTION, "model_name"))
         self._timeout = float(config.get(SECTION, "timeout_seconds"))

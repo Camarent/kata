@@ -49,6 +49,7 @@ class GuardedProvider:
         self._audit = audit
         self.name = inner.name
         self.is_cloud = inner.is_cloud
+        self.vision = bool(getattr(inner, "vision", False))
 
     def complete(self, system: str, user: str) -> str:
         self._scan(system, user)

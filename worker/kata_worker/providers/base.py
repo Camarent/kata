@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from kata_core.config import Config
+
 TASK_CLASSES = (
     "tag",
     "explain",
@@ -87,3 +89,11 @@ def require_vision(provider: Provider) -> VisionProvider:
     if not isinstance(provider, VisionProvider):
         raise ProviderError(f"provider {provider.name} does not take images")
     return provider
+
+
+VISION_KEY = "vision"
+
+
+def vision_flag(config: Config, section: str) -> bool:
+    """The `vision` key of a provider section: whether its model takes images. False when the key is absent."""
+    return bool(config.sections.get(section, {}).get(VISION_KEY, False))

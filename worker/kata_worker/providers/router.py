@@ -89,7 +89,7 @@ class Router:
         return self._walk(
             task_class,
             lambda provider: require_vision(provider).complete_vision(system, user, images).text,
-            can_answer=lambda provider: isinstance(provider, VisionProvider),
+            can_answer=lambda provider: isinstance(provider, VisionProvider) and bool(getattr(provider, "vision", False)),
         )
 
     def _walk(
@@ -109,6 +109,7 @@ class Router:
                 continue
             if not can_answer(provider):
                 outcomes.append(f"{name}={NO_VISION}")
+                self._log(f"route {task_class}: {name}={NO_VISION}")
                 continue
             try:
                 reply = call(provider)
