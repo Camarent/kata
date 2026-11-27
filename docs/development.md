@@ -77,6 +77,29 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
 `-m 'not flaky'`, extension build, extension test), each as a plain command. On a clean clone, run `scripts/dev/check-all.sh`.
 
+## JS audit rows
+
+`run_js_audit` in `scripts/dev/check-all.sh` runs two checks on the extension, both from
+`extension/tools-js`, an isolated tree with its own typescript 5 (madge 8 cannot load the
+extension's typescript 7). Each check goes through `extension/tools-js/baseline-gate.mjs`.
+
+| Row | Command (from the repo root) | Config | Baseline file | Pass rule |
+|---|---|---|---|---|
+| madge (cycles) | `node extension/tools-js/baseline-gate.mjs madge` | `extension/tools-js/.madgerc` (`skipTypeImports: true`) | `extension/tools-js/madge-baseline.txt` | no cycle missing from the baseline (`madge --circular` over `../src`) |
+| knip (unused files) | `node extension/tools-js/baseline-gate.mjs knip` | `extension/knip.json` (read from `extension/`) | `extension/tools-js/knip-baseline.txt` | no unused file missing from the baseline (`knip --production --include files`) |
+| jscpd (duplication) | `extension/node_modules/.bin/jscpd` (run by `check-all.sh`) | none | none | report only: no threshold, exit code ignored |
+
+- The gate runs each tool, ignores its exit code, and fails only on a finding that is not in the
+  tracked baseline file. A baseline entry the tool no longer finds is printed as "remove it"; the
+  gate still passes.
+- Baseline files take one entry per line. Lines starting with `#` are comments and are ignored.
+- madge baseline: zero cycles. The 6 cycles found without `skipTypeImports` are all closed by
+  type-only imports.
+- knip baseline: 9 unmounted modules under `src/ui/overlay/` and `src/ui/panel/`, kept pending an
+  owner decision. Remove a line when its module is mounted or deleted.
+- `tests/foundation/test_js_audit_baselines.py` checks that `check-all.sh` names both gates, that
+  every knip entry is an existing file, and that the madge baseline is empty with `skipTypeImports` on.
+
 ## Coverage baseline
 
 Recorded 2026-11-20 at git commit `b0ae863`, from the output of the run above.
