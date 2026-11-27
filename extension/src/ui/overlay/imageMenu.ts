@@ -1,12 +1,12 @@
 /**
  * Image pin menu: the page overlay menu for an image's concepts. Text comes from the approved strings.
  */
-import { TEXT_IMAGE_PIN_MENU, TEXT_REVIEW } from "../strings";
+import { IMAGE_PIN_MENU_TEXT, REVIEW_TEXT, TEXT_IMAGE_PIN_MENU } from "../strings";
 import { type OverlayState, menuButton, overlayStatus, statusParagraph } from "./blockMenu";
 
-const NOTE = TEXT_IMAGE_PIN_MENU[2];
-const HEADER = TEXT_IMAGE_PIN_MENU[3];
-const ERROR_IMAGE = TEXT_IMAGE_PIN_MENU[10];
+const NOTE = IMAGE_PIN_MENU_TEXT.note;
+const HEADER = IMAGE_PIN_MENU_TEXT.header;
+const ERROR_IMAGE = IMAGE_PIN_MENU_TEXT.error;
 /** Menu buttons by inventory index: every label except the note, the header and the error line. */
 const BUTTON_INDEXES = [0, 1, 4, 5, 6, 7, 8, 9] as const;
 
@@ -35,6 +35,6 @@ export function renderImageMenu(doc: Document, state: OverlayState, actions: Ima
   }
   menu.append(list);
 
-  menu.append(statusParagraph(doc, overlayStatus(state, { empty: TEXT_REVIEW[19], error: ERROR_IMAGE })));
+  menu.append(statusParagraph(doc, overlayStatus(state, { empty: REVIEW_TEXT.noConcepts, error: ERROR_IMAGE })));
   return menu;
 }

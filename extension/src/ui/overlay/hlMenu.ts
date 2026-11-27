@@ -4,7 +4,7 @@ import type { ReviewState } from "../../types";
 import { el } from "../dom";
 import { createPopover } from "../popover";
 import { renderStateMenu } from "../stateMenu";
-import { TEXT_HL_HOVER_MENU } from "../strings";
+import { HL_HOVER_MENU_TEXT } from "../strings";
 import { renderWhichOne } from "./whichOne";
 
 export interface HlMenuOptions {
@@ -29,12 +29,12 @@ export function renderHlMenu(opts: HlMenuOptions, showPanel: (content: HTMLEleme
   root.append(el("h2", item.label, "concept"));
   if (item.definition !== "") root.append(el("p", item.definition, "definition"));
   root.append(renderStateMenu(item.state, opts.onState));
-  if (opts.offline) root.append(el("p", TEXT_HL_HOVER_MENU[6], "offline"));
+  if (opts.offline) root.append(el("p", HL_HOVER_MENU_TEXT.offline, "offline"));
 
   if (item.candidates.length === 0) {
-    root.append(el("p", TEXT_HL_HOVER_MENU[5], "no-meaning"));
+    root.append(el("p", HL_HOVER_MENU_TEXT.noMeaning, "no-meaning"));
   } else {
-    const notThis = el("button", TEXT_HL_HOVER_MENU[4], "not-this-meaning");
+    const notThis = el("button", HL_HOVER_MENU_TEXT.notThisMeaning, "not-this-meaning");
     notThis.type = "button";
     notThis.addEventListener("click", () => {
       showPanel(

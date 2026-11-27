@@ -129,6 +129,13 @@ export const TEXT_HL_HOVER_MENU = [
   "Ignore from now on",
 ] as const;
 
+/** Named hover-menu strings: read these by key, not by TEXT_HL_HOVER_MENU position. Each value is one TEXT_HL_HOVER_MENU entry. */
+export const HL_HOVER_MENU_TEXT = {
+  offline: TEXT_HL_HOVER_MENU[6],
+  noMeaning: TEXT_HL_HOVER_MENU[5],
+  notThisMeaning: TEXT_HL_HOVER_MENU[4],
+} as const;
+
 export const TEXT_HL_WHICH_ONE = [
   "Which one?",
   "Window",
@@ -136,6 +143,12 @@ export const TEXT_HL_WHICH_ONE = [
   "Software > UI",
   "Word on the page: window",
 ] as const;
+
+/** Named which-one strings: read these by key, not by TEXT_HL_WHICH_ONE position. Each value is one TEXT_HL_WHICH_ONE entry. */
+export const HL_WHICH_ONE_TEXT = {
+  title: TEXT_HL_WHICH_ONE[0],
+  wordTemplate: TEXT_HL_WHICH_ONE[4],
+} as const;
 
 export const TEXT_BLOCK_MENU = [
   "All New",
@@ -172,6 +185,13 @@ export const TEXT_IMAGE_PIN_MENU = [
   "Could not read this image.",
 ] as const;
 
+/** Named image-pin-menu strings: read these by key, not by TEXT_IMAGE_PIN_MENU position. Each value is one TEXT_IMAGE_PIN_MENU entry. */
+export const IMAGE_PIN_MENU_TEXT = {
+  note: TEXT_IMAGE_PIN_MENU[2],
+  header: TEXT_IMAGE_PIN_MENU[3],
+  error: TEXT_IMAGE_PIN_MENU[10],
+} as const;
+
 export const TEXT_INLINE_QUIZ_PIN = [
   "Quiz this section",
   "5 questions",
@@ -187,6 +207,16 @@ export const TEXT_LIST_PICKER = [
   "Could not load your lists.",
   "Added to Networking basics.",
 ] as const;
+
+/** Named list-picker strings: read these by key, not by TEXT_LIST_PICKER position. Each value is one TEXT_LIST_PICKER entry. */
+export const LIST_PICKER_TEXT = {
+  title: TEXT_LIST_PICKER[0],
+  prompt: TEXT_LIST_PICKER[1],
+  noLists: TEXT_LIST_PICKER[2],
+  newList: TEXT_LIST_PICKER[3],
+  cancel: TEXT_LIST_PICKER[5],
+  loadFailed: TEXT_LIST_PICKER[6],
+} as const;
 
 export const TEXT_SCAN_RESULTS = [
   "Scan results",
@@ -222,6 +252,15 @@ export const TEXT_SCAN_RESULTS = [
   "Server down. Scan is off.",
   "Focus mode is on. Results show only here.",
 ] as const;
+
+/** Named scan-tab strings: read these by key, not by TEXT_SCAN_RESULTS position. Each value is one TEXT_SCAN_RESULTS entry. */
+export const SCAN_RESULTS_TEXT = {
+  scan: TEXT_SCAN_RESULTS[0],
+  review: TEXT_SCAN_RESULTS[23],
+  courses: TEXT_SCAN_RESULTS[24],
+  tracks: TEXT_SCAN_RESULTS[25],
+  settings: TEXT_SCAN_RESULTS[26],
+} as const;
 
 export const TEXT_SUMMARY_PANEL = [
   "Knowledge summary",
@@ -291,6 +330,15 @@ export const REVIEW_TEXT = {
   cancel: TEXT_REVIEW[31],
   deleteNote: TEXT_REVIEW[32],
   ignoreNote: TEXT_REVIEW[33],
+} as const;
+
+/**
+ * Review-screen copy that is not in the approved inventory yet (screen-inventory.json), kept
+ * apart from TEXT_REVIEW so the inventory guards stay exact. Move these in once the owner approves them.
+ */
+export const REVIEW_PENDING_COPY = {
+  otherArea: "Other concepts",
+  noConceptsToReview: "No concepts to review",
 } as const;
 
 export const TEXT_COURSES_TAB = [
@@ -427,6 +475,11 @@ export const TEXT_QUIZ_RUN = [
   "Server down. Quiz is off.",
   "Writing questions...",
 ] as const;
+
+/** Named quiz-run strings: read these by key, not by TEXT_QUIZ_RUN position. Each value is one TEXT_QUIZ_RUN entry. */
+export const QUIZ_RUN_TEXT = {
+  offline: TEXT_QUIZ_RUN[8],
+} as const;
 
 export const TEXT_QUIZ_END = [
   "Mark as New",

@@ -2,15 +2,15 @@
  * List picker: the page overlay card that adds a concept to one of the user's lists.
  * Text comes from the approved strings; the list names come from the caller.
  */
-import { TEXT_LIST_PICKER } from "../strings";
+import { LIST_PICKER_TEXT } from "../strings";
 import { type OverlayState, menuButton, overlayStatus, statusParagraph } from "./blockMenu";
 
-const TITLE = TEXT_LIST_PICKER[0];
-const PROMPT = TEXT_LIST_PICKER[1];
-const NO_LISTS = TEXT_LIST_PICKER[2];
-const NEW_LIST = TEXT_LIST_PICKER[3];
-const CANCEL = TEXT_LIST_PICKER[5];
-const ERROR_LOAD = TEXT_LIST_PICKER[6];
+const TITLE = LIST_PICKER_TEXT.title;
+const PROMPT = LIST_PICKER_TEXT.prompt;
+const NO_LISTS = LIST_PICKER_TEXT.noLists;
+const NEW_LIST = LIST_PICKER_TEXT.newList;
+const CANCEL = LIST_PICKER_TEXT.cancel;
+const ERROR_LOAD = LIST_PICKER_TEXT.loadFailed;
 
 /** Callbacks of the list picker: `onPick` gets the chosen list name, `onNew` opens list creation. */
 export interface ListPickerActions {

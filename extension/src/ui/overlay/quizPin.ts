@@ -3,11 +3,11 @@
  * count). Hidden in focus mode and when the section has no new concepts. Text comes from the
  * approved strings.
  */
-import { TEXT_INLINE_QUIZ_PIN, TEXT_QUIZ_RUN } from "../strings";
+import { QUIZ_RUN_TEXT, TEXT_INLINE_QUIZ_PIN } from "../strings";
 import { menuButton, statusParagraph } from "./blockMenu";
 
 const [LABEL, COUNT] = TEXT_INLINE_QUIZ_PIN;
-const OFFLINE = TEXT_QUIZ_RUN[8];
+const OFFLINE = QUIZ_RUN_TEXT.offline;
 
 /** Inputs of the section quiz pin: the section's new concept count, focus mode and the core state. */
 export interface QuizPinProps {

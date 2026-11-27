@@ -4,7 +4,7 @@ import type { MarkOutcome } from "./offlineQueue";
 import type { ModelhostEngine } from "./coreClient";
 import type { ReviewRow, Session } from "./types";
 import { button, el } from "./ui/dom";
-import { TEXT_SCAN_RESULTS } from "./ui/strings";
+import { SCAN_RESULTS_TEXT } from "./ui/strings";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
 import type { IgnoredRowView } from "./ui/panel/ignoredList";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
@@ -217,11 +217,11 @@ function renderLocalModel(handlers: PanelHandlers): HTMLElement {
 
 /** Tabs in bar order, with the label each shows (labels come from the Scan results inventory text). */
 const TABS: [PanelTab, string][] = [
-  ["scan", TEXT_SCAN_RESULTS[0]],
-  ["review", TEXT_SCAN_RESULTS[23]],
-  ["courses", TEXT_SCAN_RESULTS[24]],
-  ["tracks", TEXT_SCAN_RESULTS[25]],
-  ["settings", TEXT_SCAN_RESULTS[26]],
+  ["scan", SCAN_RESULTS_TEXT.scan],
+  ["review", SCAN_RESULTS_TEXT.review],
+  ["courses", SCAN_RESULTS_TEXT.courses],
+  ["tracks", SCAN_RESULTS_TEXT.tracks],
+  ["settings", SCAN_RESULTS_TEXT.settings],
 ];
 
 /** Tab bar: one button per tab; the current one carries aria-current. */
