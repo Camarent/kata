@@ -4,8 +4,9 @@
 the ledger's spend today before the call, raises `CapReached` at or over the cap, and after a
 successful call records the cost (from the reported usage, else the text estimate) and logs once
 when spend reaches the warn level.
-Local providers pass through with no ledger access. There is no flag, config or env switch that
-skips the cap.
+Local providers pass through with no ledger access. No flag, config or env switch skips the cap for
+a priced model. `unpriced_ok` (default False) lets a model with no pinned price run uncapped and
+logged, since its cost cannot be estimated; with it False an unpriced model raises `PricingError`.
 """
 
 from __future__ import annotations
@@ -115,6 +116,8 @@ class CappedProvider:
         safety_percent: int,
         log: LogSink,
         image_tokens: int,
+        *,
+        unpriced_ok: bool = False,
     ) -> None:
         if safety_percent < HUNDREDTHS:
             raise ProviderError(f"estimate_safety_percent must be at least 100, got {safety_percent}")
@@ -126,6 +129,7 @@ class CappedProvider:
         self._safety = safety_percent
         self._log = log
         self._image_tokens = image_tokens
+        self._unpriced_ok = unpriced_ok
         self.name = inner.name
         self.is_cloud = inner.is_cloud
 
@@ -152,6 +156,10 @@ class CappedProvider:
         self, system: str, user: str, image_count: int, call: Callable[[], Completion]
     ) -> Completion:
         """Refuse over the cap, run `call`, record its cost and warn. Shared by text and vision calls."""
+        if self._model not in PRICES and self._unpriced_ok:
+            # Opt-in for a host-configured model with no pinned price: no estimate, no cap, no spend.
+            self._log(f"cost unknown: model {self._model} not capped")
+            return call()
         image_in = image_count * self._image_tokens
         # Price the model before any off-machine call, so an unpriced model cannot spend uncounted.
         # The input estimate raised by the safety percent (rounded up) is what this call may add.
@@ -173,11 +181,30 @@ class CappedProvider:
 
 
 def capped(
-    inner: Provider, ledger: Ledger, model: str, cfg: Config, log: LogSink
+    inner: Provider,
+    ledger: Ledger,
+    model: str,
+    cfg: Config,
+    log: LogSink,
+    *,
+    unpriced_ok: bool = False,
 ) -> CappedProvider:
-    """Wrap `inner` with the cap, warn and estimate safety levels from `[cost]` in the config."""
+    """Wrap `inner` with the cap, warn and estimate safety levels from `[cost]` in the config.
+
+    `unpriced_ok` lets a model with no pinned price run uncapped (logged); default refuses it.
+    """
     cap = int(cfg.get("cost", "cap_micro_usd"))
     warn = int(cfg.get("cost", "warn_micro_usd"))
     safety = int(cfg.get("cost", "estimate_safety_percent"))
     image_tokens = int(cfg.get("cost", "image_input_tokens"))
-    return CappedProvider(inner, ledger, model, cap, warn, safety, log, image_tokens)
+    return CappedProvider(
+        inner,
+        ledger,
+        model,
+        cap,
+        warn,
+        safety,
+        log,
+        image_tokens,
+        unpriced_ok=unpriced_ok,
+    )

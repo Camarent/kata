@@ -135,7 +135,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Score scale: hits carry the fused RRF score (`1 / (rrf_k + rank)` summed over the keyword and vector lists). With the example `rrf_k` 60, one list gives at most 1/61, below the example `min_score` 0.02, so a hit passes only when both lists rank it.
 - Lesson check reads `[lesson_check]` (`min_score`, `known_hits`, `search_limit`) and `[retrieval]` (through `Retriever.from_config`); every query filters by `user_id`.
 - Usage is per user per day in UTC: `usage_daily` is keyed by `(user_id, day)` and money is integer micro-USD; the route takes the day from the server clock (`core/kata_core/api/routes/usage.py:36`, `:43`), never from the client.
-- `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`).
+- `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`); an `unpriced_ok` model records no spend.
 - Journal reads page by id: `before_id` is the id of the last item of the previous page; pages never overlap or skip (`core/kata_core/journal/store.py:45`). `limit` is validated 1..200 by the route (422) and clamped again in the store.
 - Journal `user_id` comes from the token (`core/kata_core/api/routes/journal.py:42`); rows cascade on user delete (`core/migrations/0005_journal.sql:6`).
 - `write_entry` takes `at` from the caller; the store does not set `created_at` (`core/kata_core/journal/store.py:33`).

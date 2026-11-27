@@ -213,7 +213,7 @@ def test_capped_provider_keeps_identity_and_is_built_from_config() -> None:
     assert wrapped.is_cloud is True
 
 
-def test_capped_has_no_bypass_parameter() -> None:
+def test_capped_bypass_only_for_unpriced() -> None:
     params = list(inspect.signature(CappedProvider.__init__).parameters)
     assert params == [
         "self",
@@ -225,8 +225,17 @@ def test_capped_has_no_bypass_parameter() -> None:
         "safety_percent",
         "log",
         "image_tokens",
+        "unpriced_ok",
     ]
-    assert list(inspect.signature(capped).parameters) == ["inner", "ledger", "model", "cfg", "log"]
+    # The only keyword that skips anything is `unpriced_ok`, and it covers unpriced models only.
+    assert list(inspect.signature(capped).parameters) == [
+        "inner",
+        "ledger",
+        "model",
+        "cfg",
+        "log",
+        "unpriced_ok",
+    ]
 
 
 def test_cap_boundary_is_inclusive() -> None:

@@ -58,7 +58,8 @@ Project items after Milestone 0.
       `worker/kata_worker/providers/cost.py` reads `usage_today()`, calls the provider, then
       records. Two concurrent calls can both pass the check before either records, so the
       cap can overshoot by more than one call. The store write itself (`add_usage` in
-      `core/kata_core/storage/usage.py`) is an upsert.
+      `core/kata_core/storage/usage.py`) is an upsert. Models run with `unpriced_ok` record
+      no spend at all, so they are outside the cap.
 - [ ] `POST /usage` trusts client-reported `micro_usd`: `core/kata_core/api/routes/usage.py`
       adds the value with no server-side price check, so a client can under-report spend.
       Decide whether the server prices the call or the cap stays advisory (see
