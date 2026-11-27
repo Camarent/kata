@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 import pytest
 from fakes.fake_provider import FakeProvider
-from kata_core.config import Config
+from kata_core.config import Config, load_config
 from kata_worker.providers.models import RoutingError, resolve_entry
-from kata_worker.providers.policy import Policy
+from kata_worker.providers.policy import PROVIDER_NAMES, Policy
 
 OPENAI_KEY = "KATA_OPENAI_API_KEY"
 ANTHROPIC_KEY = "KATA_ANTHROPIC_API_KEY"
+EXAMPLE_PATH = Path(__file__).parents[2] / "config" / "kata.example.toml"
+ROUTING_SECTION = "routing"
+# Sections that pick a task by name and never name a model: a model key here would bypass resolve_entry.
+NON_MODEL_SECTIONS = ("summary", "quiz", "reader", "scan", "syllabus")
+MODEL_NAME_KEYS = ("model", "models", "model_name")
 
 
 def _config(**overrides: dict[str, Any]) -> Config:
@@ -50,6 +56,32 @@ def test_generic_cloud_and_local_resolve_through_models() -> None:
     cfg = _config(models={"cloud": "openai"})
     assert resolve_entry(cfg, "cloud") == "openai"
     assert resolve_entry(_config(), "local") == "local"
+
+
+def test_example_routing_chain_entries_all_resolve() -> None:
+    cfg = load_config(EXAMPLE_PATH, env={})
+    for task_class, chain in cfg.sections[ROUTING_SECTION].items():
+        for entry in str(chain).split(","):
+            assert resolve_entry(cfg, entry.strip()) in PROVIDER_NAMES, task_class
+
+
+def test_example_literal_model_name_beats_generic_name() -> None:
+    base = load_config(EXAMPLE_PATH, env={})
+    sections: dict[str, dict[str, Any]] = {
+        name: dict(values) for name, values in base.sections.items()
+    }
+    sections["provider_anthropic"]["model_name"] = "cloud"
+    sections["models"]["cloud"] = "openai"
+    cfg = Config(sections=MappingProxyType({k: MappingProxyType(v) for k, v in sections.items()}))
+    assert resolve_entry(cfg, "cloud") == "anthropic"
+    assert resolve_entry(cfg, "local") == "local"
+
+
+def test_model_naming_sections_hold_no_model_key() -> None:
+    cfg = load_config(EXAMPLE_PATH, env={})
+    for section in NON_MODEL_SECTIONS:
+        model_keys = [key for key in cfg.sections.get(section, {}) if key in MODEL_NAME_KEYS]
+        assert model_keys == [], f"[{section}] names a model; route it through resolve_entry"
 
 
 def test_provider_name_resolves_to_itself() -> None:
