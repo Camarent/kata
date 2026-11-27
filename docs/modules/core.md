@@ -179,7 +179,7 @@ Invariants and gotchas (trainer):
 - Evidence rows are unique per `(user, course, item, new counters)`: replaying the same document changes nothing.
 - A concept marked by the user is never changed by evidence until the hold count is reached; `source` is what tells user and trainer marks apart (`core/kata_core/storage/concepts.py:17`, migration `0010`).
 - `[knowledge]` thresholds must satisfy `learning <= known` (`mastery.state_for` raises otherwise).
-- Course limit and titles: the limit is checked under the user row lock (`lock_user`, `core/kata_core/trainer/store.py:78`); a title is unique per user after normalisation, enforced by the index in migration `0014`. A deleted course frees its slot and title. `[trainer] max_courses_per_user` must be an integer >= 0 (`core/kata_core/config.py:111`).
+- Course limit and titles: the limit is checked under the user row lock (`lock_user`, `core/kata_core/trainer/store.py:78`); a title is unique per user after normalisation, enforced by the index in migration `0014`. A deleted course frees its slot and title. `[trainer] max_courses_per_user` must be an integer >= 0 (`core/kata_core/config.py:111`); 0 means unlimited (`MAX_COURSES_UNLIMITED`, `core/kata_core/config.py:26`; the check is `core/kata_core/api/routes/courses.py:180`).
 - `course.build` loads config inside the handler (`core/kata_core/trainer/build.py:73`), so the runner process needs `KATA_CONFIG`.
 - The trainer binary is a config-supplied command, not part of this repo: `[trainer] command` is the `dojo` CLI (`core/kata_core/trainer/dojo_cli.py`, text output; `validate --json` exits 0 or 1, the other subcommands must exit 0); the default `/opt/trainer/dojo` is a placeholder path (`config/kata.example.toml:125`). `[model_vision]`, the provider `vision` key and `api_key_env` are read by the worker providers and documented in `config/kata.example.toml` (the `[model_vision]` block, line 152); core only loads them as config sections.
 
@@ -200,11 +200,11 @@ Flow:
 3. Triage (`planning/triage.py`, pure, no clock): per module, no matched concept gives `new`; every matched score at or above `[knowledge] known_threshold` gives `known`; any score at or above `learning_threshold` gives `partly_known`; otherwise `new`. Action: `known` gives `skip`; `partly_known` gives `skim` when the known share is at or above `[planning] skim_share`, else `practice`; `new` gives `learn`. Effort is the action's minutes (`[planning] minutes_skip`, `minutes_skim`, `minutes_practice`, `minutes_learn`) times the module's units (`ceil(words / words_per_unit)`, at least 1). `triage_view` writes nothing.
 4. Tracks and budget: a track has an optional deadline, priority and ordered items (a module or a label). `planning_budget` holds the weekly minutes per user (`GET` and `PUT /v1/plan/budget`).
 5. Allocation (`planning/allocate.py`, pure, clock injected): capacity of a deadline is `floor(minutes_per_week * days / 7)`, where `days` is the whole days from today to the deadline, never below 0. Active tracks run in order (deadline, -priority, id); items run in position order. An item is allocated while the running total stays within the capacity of its track's deadline. The first item that does not fit, and every later item of that track, is deferred; other tracks are still tried.
-6. Decision points (D12): `POST /v1/tracks/{id}/decision-points` opens a point at a track position (`open_point`). An open point holds its track's items after that position (`plan.py` `build_plan`, passed to `allocate` as `hold_after`). `POST /v1/decision-points/{id}/decide` (`decisions.py` `decide`) changes the track and writes the `plan.decision` journal entry in one transaction.
+6. Decision points (D12): `POST /v1/tracks/{id}/decision-points` opens a point at a track position (`open_point`). An open point holds its track's items after that position (`core/kata_core/planning/plan.py` `build_plan`, passed to `allocate` as `hold_after`). `POST /v1/decision-points/{id}/decide` (`core/kata_core/planning/decisions.py` `decide`) changes the track and writes the `plan.decision` journal entry in one transaction.
 7. Plan: `GET /v1/plan` (`planning/plan.py` `build_plan`) loads the user's tracks, budget and open points, then calls `allocate`. The clock is injected, so tests pass a fixed date.
 
 Invariants and gotchas (planning):
-- Every planning query filters by `user_id` from the token. Another user's syllabus, track, budget or point reads as not found (404) and writes as nothing (`syllabus_store.py`, `tracks_store.py`).
+- Every planning query filters by `user_id` from the token. Another user's syllabus, track, budget or point reads as not found (404) and writes as nothing (`core/kata_core/planning/syllabus_store.py`, `core/kata_core/planning/tracks_store.py`).
 - Module and item rows are written only after the ownership check passes.
 - `allocate` never plans more minutes than a track's deadline capacity allows, and never plans an item after an open decision point on its track (tests: `tests/core/test_allocate.py`, `tests/core/test_plan_service.py`).
 - Triage and allocation are pure: no database, no wall clock. Only the route and the store touch I/O.
@@ -336,7 +336,7 @@ Named lists, track goals and course regenerate and start rung (decisions D7, D8,
 
 - Lists: `core/kata_core/lists/store.py` owns `concept_list` and `concept_list_item` (one list per name and user, name normalised). Routes in `api/routes/named_lists.py` under `/v1/lists`; the list-to-course route queues the same `course.generate` job as `POST /v1/courses`. Deleting a list keeps the courses made from it.
 - Track goals: `core/kata_core/planning/goals_store.py` (goals, sources, concept links; every query filters by the track's `user_id`). `planning/velocity.py` is pure: progress is known over total, velocity is concepts gained per day over `planning.velocity_window_days`, and pace is `slow`, `ok`, `fast` or `no_deadline`. Routes in `api/routes/track_goals.py` under `/v1/tracks/{id}/goals`.
-- Regenerate: `api/routes/courses.py` `regenerate_course` replaces the course row in place (same id, `version` plus one) and queues `course.generate` again; the preview route writes nothing.
+- Regenerate: `api/routes/courses.py` `regenerate_course` replaces the course row in place (same id, `version` plus one) and queues `course.generate` again for the carried and added concepts, passing each one's state and label to the job (`core/kata_core/api/routes/courses.py:324`). The preview (`regenerate_preview_route`, `core/kata_core/api/routes/courses.py:346`) lists carried, added and dropped concepts and writes nothing.
 - Start rung: `core/kata_core/trainer/rungs.py` maps new to stage 0, learning to the course `learning_rung` (0 to 3, default `trainer.learning_start_rung`), and known to no rung. Stage 4 is learned and is never a start rung. The job payload carries each concept's `start_rung`.
 
 Invariants and gotchas:
@@ -392,3 +392,31 @@ Invariants and gotchas:
 - `core/kata_core/storage/concept_rank.py:17` `UNMARKED` (`"new"`), `:19` `SortField`, `:20` `SortOrder`: the sort fields shared with `GET /concepts/sorted`.
 - `core/kata_core/api/openapi_export.py:20` `schema_text()` renders the app schema as sorted-key JSON; `:29` `main` writes `docs/openapi.json`. `tests/core/test_openapi_export.py` fails when the committed file drifts.
 - Tests: `tests/core/test_api_review.py`, `tests/core/test_review_tree.py`, `tests/core/test_openapi_export.py`.
+
+## Concept model
+
+Area > topic > concept identity, the aliases, the definition line, the ignored list and hard delete. Schema: `core/migrations/0015_concept_model.sql` (`concept_aliases`, `concepts.definition`, `concepts.added_at`, `concepts.last_viewed_at`, `concept_ignored`) and the data copy in `core/migrations/0016_topic_to_concept.sql`.
+
+- Routes under `/concepts` (`core/kata_core/api/routes/concepts.py`): `POST /concepts/{id}/aliases` (`:149`), `GET /concepts/{id}/aliases` (`:162`), `PUT /concepts/{id}/definition` (`:172`), `GET /concepts/ignored` (`:185`), `PUT` and `DELETE /concepts/{id}/ignore` (`:194`, `:202`), `DELETE /concepts/{id}` (`:210`, hard delete).
+- Sorted lists and block state: `core/kata_core/api/routes/concept_lists.py` (`GET /concepts/sorted`, `POST /concepts/block-state`, `POST /concepts/{id}/viewed`); the rank rules are in `core/kata_core/storage/concept_rank.py`.
+- Marks are keyed by concept id, so a rescan or a reassigned word keeps the mark.
+
+## Quiz and exam results
+
+Quiz questions come from allowlisted public pages. Exam results come from the dojo course exam and are confirmed in kata. Migration `core/migrations/0022_quiz_exam.sql` adds `quiz_source` (unique per `url` and `text_sha256`, with `tier`, `licence`, `fetched_at`), `quiz_question` (`choices` jsonb, `answer_index`, `quote`; cascades on source delete), `exam_result` and `exam_result_concept`. Quiz sources and questions are shared by all users; exam results belong to one user.
+
+- Allowlist: `core/kata_core/quiz/allowlist.py:73` `classify(url)` gives tier 1 or 2 for an allowlisted https URL, else None; `:101` `exams_allowed(tier)`. Each source keeps its licence (`core/kata_core/quiz/service.py:30` `licence_for`).
+- Source request `POST /quiz/sources` (`core/kata_core/api/routes/quiz.py:61`, 202): a URL off the allowlist answers 400 before any fetch; 409 `needs_cloud` when the quiz generate task needs a cloud token that is not set, and nothing is queued. It queues the `quiz.fetch` job (`core/kata_core/quiz/job_kinds.py:24` `fetch_handler`).
+- Fetch: `core/kata_core/quiz/fetch.py:154` `fetch_text` is the hardened fetch. It checks the scheme and the resolved address of each target (`:78` `_checked_target`; private addresses fail `:59` `_is_public`), accepts only `text/html`, `text/plain` and `application/json`, and an over-size body is an error, not a truncated text.
+- Questions: `core/kata_core/quiz/questions.py:45` `parse_questions(raw, source_text)` accepts strict JSON with 3 to 4 choices, drops a question whose quote is not in the fetched text, and drops a question whose stem gives the answer (`:101` `_gives_answer`). The `quiz.generate` output hook (`core/kata_core/quiz/job_kinds.py:41` `generate_output_hook`) stores the kept questions through `store_questions` (`core/kata_core/quiz/service.py:77`).
+- Mini quiz `GET /quiz/mini` (`core/kata_core/api/routes/quiz.py:74`): up to `[quiz] mini_quiz_size` questions, at most 5. Each item holds the question, the choices, the source URL, tier and licence. No answer index.
+- Answer check `POST /quiz/answer` (`core/kata_core/api/routes/quiz.py:86`): 404 for an unknown question or a concept the caller cannot see, 422 for a choice that is not one of the question's choices. A correct answer moves a New concept to Learning with evidence `quiz answer`; Known is never set here.
+- Exam import `POST /exams/import` (`core/kata_core/api/routes/exams.py:82`): stores the dojo exam result as pending and changes no mark. 413 above `[exams] max_import_bytes`; 422 for malformed JSON, non-UTF-8 text or a concept label the caller cannot see (`core/kata_core/exams/service.py:63` `import_result`).
+- `POST /exams/{id}/confirm` (`core/kata_core/api/routes/exams.py:103`) marks each listed concept of a pending result Known with source `user` (`core/kata_core/exams/service.py:101`); 404 for another user's result, 409 when the result is not pending. `POST /exams/{id}/dismiss` (`core/kata_core/api/routes/exams.py:116`) changes no mark.
+- `core/kata_core/exams/placement.py:37` `placement_known` sets dojo stage 4 on the course items of confirmed concepts and writes no evidence. No caller exists in `core/kata_core/` yet, so confirming a result does not send the dojo placement answer.
+
+Invariants and gotchas:
+- No exam result marks a concept Known without a confirm.
+- The client never receives an answer index (`QuestionOut` in `core/kata_core/api/routes/quiz.py:41` has no such field).
+- Quiz questions are stored only when their quote is in the fetched text.
+- Tests: `tests/core/test_quiz_allowlist.py`, `tests/core/test_quiz_fetch.py`, `tests/core/test_quiz_questions.py`, `tests/core/test_quiz_job.py`, `tests/core/test_quiz_store.py`, `tests/core/test_quiz_exam_schema.py`, `tests/core/test_api_quiz.py`, `tests/core/test_api_exams.py`, `tests/core/test_exam_parse.py`, `tests/core/test_exam_placement.py`, `tests/core/test_exam_results_store.py`.
