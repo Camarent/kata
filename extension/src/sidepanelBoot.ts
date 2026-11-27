@@ -1,4 +1,4 @@
-import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply } from "./background";
+import type { CourseList, ModelhostRequest, ModelhostResult, PanelMessage, PanelReply, ReviewRow, ReviewState } from "./messages";
 import { renderPanel, type PanelHandlers, type PanelRow, type PanelTab, type PanelState, type ServerFormInput } from "./sidepanel";
 import { TokenStore, type StorageArea } from "./tokenStore";
 import { CoreHttpError } from "./coreClient";
@@ -14,7 +14,6 @@ import type {
   TrackPage,
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
-import type { ReviewRow, ReviewState } from "./reviewScreen";
 import { validateServerUrl } from "./serverUrl";
 import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
 import type { SettingsPage } from "./ui/panel/settingsHome";

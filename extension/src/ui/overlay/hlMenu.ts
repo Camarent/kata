@@ -1,6 +1,6 @@
 import type { CoreClient } from "../../coreClient";
 import type { ScanConceptItem } from "../../coreClientTypes";
-import type { ReviewState } from "../../types";
+import type { ReviewState } from "../../messages";
 import { el } from "../dom";
 import { createPopover } from "../popover";
 import { renderStateMenu } from "../stateMenu";

@@ -1,8 +1,8 @@
-import type { CourseLink, ModelhostRequest, ModelhostResult } from "./background";
+import type { CourseLink, ModelhostRequest, ModelhostResult, ReviewRow } from "./messages";
 import type { ScanTopic } from "./scanSession";
 import type { MarkOutcome } from "./offlineQueue";
 import type { ModelhostEngine } from "./coreClient";
-import type { ReviewRow, Session } from "./types";
+import type { Session } from "./types";
 import { button, el } from "./ui/dom";
 import { SCAN_RESULTS_TEXT } from "./ui/strings";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";

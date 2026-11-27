@@ -9,9 +9,7 @@ import type { ChromeLike, PageMutatedMessage, PanelReply } from "./messages";
 import type { ProgressBridge } from "./progressBridge";
 
 export type { ChromeLike, PanelReply } from "./messages";
-export type { ModelhostRequest, ModelhostResult } from "./types";
-export type { PanelMessage } from "./backgroundPanel";
-export type { Backend, CourseLink, CourseList, ReviewRow, ServerSignIn } from "./backgroundBackend";
+export type { Backend, ServerSignIn } from "./backgroundBackend";
 export { createBackend } from "./backgroundBackend";
 
 /**

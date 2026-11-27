@@ -3,7 +3,8 @@
 import { el } from "../dom";
 import { STATE_ORDER, renderStateMenu } from "../stateMenu";
 import { REVIEW_PENDING_COPY, REVIEW_TEXT } from "../strings";
-import type { ReviewHandlers, ReviewRow, ReviewState } from "../../types";
+import type { ReviewRow, ReviewState } from "../../messages";
+import type { ReviewHandlers } from "../../types";
 
 const SEARCH_LABEL = REVIEW_TEXT.search;
 const COUNT_LABEL = REVIEW_TEXT.count;

@@ -1,4 +1,4 @@
-import type { ReviewState } from "../types";
+import type { ReviewState } from "../messages";
 import { el } from "./dom";
 
 /** Menu order: New, Learning, Known. */

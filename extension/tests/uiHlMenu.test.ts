@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { attachHlHover, renderHlMenu } from "../src/ui/overlay/hlMenu";
 import type { HlMenuOptions } from "../src/ui/overlay/hlMenu";
 import type { ScanConceptItem } from "../src/coreClientTypes";
-import type { ReviewState } from "../src/reviewScreen";
+import type { ReviewState } from "../src/messages";
 import { TEXT_HL_HOVER_MENU, TEXT_HL_WHICH_ONE } from "../src/ui/strings";
 
 function item(over: Partial<ScanConceptItem> = {}): ScanConceptItem {

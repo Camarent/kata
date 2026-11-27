@@ -4,7 +4,7 @@ import { execSync } from "node:child_process";
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { PANEL_CSS } from "../src/ui/panelCss";
 import { bootPanel, mountPanelStyle, type OriginsRequest, type PanelChromeLike } from "../src/sidepanelBoot";
-import type { PanelMessage, PanelReply } from "../src/background";
+import type { PanelMessage, PanelReply } from "../src/messages";
 import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
 import { ERROR_TEXT } from "../src/ui/panel/statusText";

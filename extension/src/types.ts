@@ -1,4 +1,4 @@
-import type { ModelhostEngine, ModelhostOutput } from "./coreClient";
+import type { ModelhostRequest, ModelhostResult, ReviewState } from "./messages";
 import type {
   ConceptAlias,
   DecisionPoint,
@@ -33,33 +33,10 @@ export interface Session {
   token: string;
 }
 
-/** Review state of one concept: known, learning or new. */
-export type ReviewState = "known" | "learning" | "new";
-
-/** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
-export interface ReviewRow {
-  conceptId: number;
-  label: string;
-  state: ReviewState | null;
-  evidence: string;
-  /** Area the concept belongs to; rows without one go to a shared group. */
-  area?: string;
-  /** True when the concept is on the scanned page ("Only this page"). */
-  onPage?: boolean;
-}
-
 /** User actions on the review screen. */
 export interface ReviewHandlers {
   onSet(conceptId: number, state: ReviewState): Promise<void>;
 }
-
-/** One local model host action from the panel: start, measure, status, or choose the engine. */
-export type ModelhostRequest =
-  | { action: "start" | "measure" | "status" }
-  | { action: "use"; engine: ModelhostEngine };
-
-/** Finished output of a modelhost job, or "pending" when the PC worker has not answered in time. */
-export type ModelhostResult = ModelhostOutput | "pending";
 
 /** Values typed into the sign-in form: pairing code and device label. */
 export interface SignInInput {

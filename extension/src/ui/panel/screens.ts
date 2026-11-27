@@ -3,7 +3,8 @@
  * draws one screen from its props and its actions (ctx); the props and ctx types come from the
  * render function itself, so a render signature change reaches this file at compile time.
  */
-import type { ReviewHandlers, ReviewRow } from "../../types";
+import type { ReviewRow } from "../../messages";
+import type { ReviewHandlers } from "../../types";
 import { renderReview } from "./review";
 import { renderConnectionDetail } from "./connection";
 import { renderSignIn, renderSignedOut } from "./signin";

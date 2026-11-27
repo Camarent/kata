@@ -1,6 +1,9 @@
 import type { PanelOpenApi } from "./browser";
 import type { ScriptingLike } from "./bridgeRegister";
 import type { HighlightResult } from "./highlight";
+import type { ServerSignIn } from "./backgroundBackend";
+import type { ModelhostEngine, ModelhostOutput } from "./coreClient";
+import type { ConceptMark, PointIn, TrackIn, TrackPatch } from "./coreClientTypes";
 
 /** Message the side panel sends to the page through the background script. */
 export type ContentMessage =
@@ -45,3 +48,79 @@ export interface ChromeLike extends PanelOpenApi {
   runtime: RuntimeLike;
   scripting: ScriptingLike;
 }
+
+/** Review state of one concept: known, learning or new. */
+export type ReviewState = "known" | "learning" | "new";
+
+/** One concept on the review screen; `state` is null when the core abstains and no mark exists. */
+export interface ReviewRow {
+  conceptId: number;
+  label: string;
+  state: ReviewState | null;
+  evidence: string;
+  /** Area the concept belongs to; rows without one go to a shared group. */
+  area?: string;
+  /** True when the concept is on the scanned page ("Only this page"). */
+  onPage?: boolean;
+}
+
+/** A ready course the panel can open: its id and title only. */
+export interface CourseLink {
+  id: number;
+  title: string;
+}
+
+/** The Courses list: the ready courses, the course limit and the count against it. */
+export interface CourseList {
+  items: CourseLink[];
+  limit: number;
+  total: number;
+}
+
+/** One local model host action from the panel: start, measure, status, or choose the engine. */
+export type ModelhostRequest =
+  | { action: "start" | "measure" | "status" }
+  | { action: "use"; engine: ModelhostEngine };
+
+/** Finished output of a modelhost job, or "pending" when the PC worker has not answered in time. */
+export type ModelhostResult = ModelhostOutput | "pending";
+
+/** Messages the side panel page sends to the background script. */
+export type PanelMessage =
+  | { type: "panel:signIn"; input: ServerSignIn }
+  | { type: "panel:disconnect" }
+  | { type: "panel:scan" }
+  | { type: "panel:scanConcepts" }
+  | { type: "panel:chooseConcept"; topicId: number; word: string; conceptId: number }
+  | { type: "panel:reassignConcept"; topicId: number; word: string; fromConceptId: number; toConceptId: number }
+  | { type: "panel:topicOverview"; topicId: number }
+  | { type: "panel:known"; topicId: number }
+  | { type: "panel:review" }
+  | { type: "panel:setConcept"; conceptId: number; state: ConceptMark["state"] }
+  | { type: "panel:pending" }
+  | { type: "panel:courses" }
+  | { type: "panel:openCourse"; courseId: number }
+  | { type: "panel:deleteCourse"; courseId: number }
+  | { type: "panel:createCourse"; title: string }
+  | { type: "panel:regenerateCourse"; courseId: number }
+  | { type: "panel:modelhost"; request: ModelhostRequest }
+  | { type: "panel:tracks"; limit?: number; beforeId?: number }
+  | { type: "panel:getTrack"; trackId: number }
+  | { type: "panel:createTrack"; input: TrackIn }
+  | { type: "panel:patchTrack"; trackId: number; patch: TrackPatch }
+  | { type: "panel:deleteTrack"; trackId: number }
+  | { type: "panel:addDecisionPoint"; trackId: number; input: PointIn }
+  | { type: "panel:addQuizSource"; url: string }
+  | { type: "panel:importExamResult"; payload: string }
+  | { type: "panel:confirmExamResult"; resultId: number; conceptIds: number[] }
+  | { type: "panel:dismissExamResult"; resultId: number }
+  | { type: "panel:ignored" }
+  | { type: "panel:ignoreConcept"; conceptId: number }
+  | { type: "panel:unignoreConcept"; conceptId: number }
+  | { type: "panel:markConceptViewed"; conceptId: number }
+  | { type: "panel:listConceptAliases"; conceptId: number }
+  | { type: "panel:addConceptAlias"; conceptId: number; alias: string }
+  | { type: "panel:requestSummary"; url: string; text: string }
+  | { type: "panel:cachedSummary"; url: string; textSha256: string }
+  | { type: "panel:nextJoke" }
+  | { type: "panel:listJokeSources" };
