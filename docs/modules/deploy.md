@@ -7,6 +7,14 @@ summary: Container stack for the VM (one image, compose with postgres, migrate, 
 ## Purpose
 Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image (`kata:<git short sha>`, `deploy/Dockerfile`, built with `deploy/compose.build.yaml` on dev) serves `core`, `worker` and `migrate`; `deploy/ship.sh` ships it and the deploy files over SSH. postgres and caddy are stock images. Runbook: `docs/deployment.md`. Checks for these files: `scripts/deploy/` (see `docs/modules/scripts.md`; browser test fixtures there use `install-browsers.sh --print-dir`).
 
+## Target VM
+- Host: Ubuntu Server LTS, 2 cores, 3 GB memory, 32 GB disk; Docker installed by `deploy/provision-vm.sh`; the private network client is a prerequisite installed by hand (ufw allows its interface, `provision-vm.sh:159`).
+- No public access: the reverse proxy (caddy) serves TLS over the private network only, with cert files written by `deploy/systemd/kata-cert.service`.
+- `deploy/ship.sh` runs a deep health check after each start (`deploy/ship.sh:123` `deep_health`).
+- The restore drill (`deploy/restore.sh`, design 4.3 steps 3 to 5) runs against a temporary Postgres; its tests are in `tests/scripts/test_restore.py`.
+- Nightly encrypted dump: `deploy/systemd/kata-backup.timer` runs `deploy/backup.sh` at 02:30.
+- The first run on a real VM is tracked in [`docs/backlog.md`](../backlog.md).
+
 ## Public surface
 - `deploy/Dockerfile:11` `FROM ${PY_BASE_IMAGE}@${PY_BASE_DIGEST}` (base stage); `:47` runtime stage; `:70` `USER kata`; `:75` `CMD ["python", "-m", "kata_core"]`.
 - `deploy/Dockerfile:19` `RUN test -n` guard: build stops when `GITLEAKS_*` or `TRAINER_*` is empty.
@@ -23,6 +31,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - `deploy/ship.sh:34` `ship_files` (the only files copied to the VM; never `secrets/` or the Dockerfile); `:41` `--rollback <tag>`; `:40` `--dry-run`; `:94` `build_image`; `:107` `docker save | ssh docker load`; `:115` `write_tag` (`KATA_IMAGE_TAG` into the VM env file); `:123` `deep_health`.
 - `deploy/systemd/kata-cert.timer:6` `OnUnitActiveSec=30d`; `deploy/systemd/kata-cert.service:10` `EnvironmentFile=/etc/kata/cert.env`; `:13` the network client's cert command into `KATA_CERT_DIR`; `:14` caddy reload.
 - `deploy/versions.env:10` `PY_BASE_IMAGE`; `:11` `PY_BASE_DIGEST`; `:21` `GITLEAKS_VERSION`; `:25` `TRAINER_URL`; `:30` `EMBED_MODEL_ID`. Empty values are filled by hand. The trainer is pinned to the dojo-kit v0.5.1 tarball; repin it after each dojo-kit release.
+- `deploy/compose.yaml:19` and `:154` pin the postgres and caddy images by tag and manifest digest (`POSTGRES_DIGEST`, `CADDY_DIGEST` in `deploy/versions.env`); compose stops while a digest is empty.
 - `deploy/env/small.env:4` (`KATA_MEM_CORE=768m`, default for the 3 GB VM); `deploy/env/large.env:3`.
 - `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`. Includes the M26 `[models]`, `[provider_openai]` and `vision` keys.
 - `deploy/backup.sh:25` needs `KATA_BACKUP_DIR`; `:68` `pg_dump -Fc`; `:73` `openssl enc -aes-256-cbc -pbkdf2`; `:80` writes the `.dump.enc.hmac` sidecar.
