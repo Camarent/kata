@@ -52,6 +52,7 @@ Baseline gate timings (before the speed-up) are in `docs/testing.md`.
 - M23 jokes: `tests/core/test_jokes_job.py`, `test_jokes_hostile.py` (hostile fetch input), `test_jokes_sanitise.py`, `test_jokes_sources.py`, `test_jokes_config.py`, `test_jokes_isolation.py` (no joke text in payloads or prompts), `test_joke_cache_schema.py`.
 - M23 reader: `tests/reader/` (`test_extract.py` hostile corpus, `test_spool.py`, `test_sandbox.py`, `test_config.py`, `test_import_boundary.py`); worker side `tests/worker/test_reader_spool.py`, `test_handler_reader_extract.py`, `test_router_vision.py`, `test_providers_vision.py`, `test_handler_summary.py`.
 - `tests/worker/test_cost.py` - cost estimate in integer micro-USD from pinned prices.
+- `tests/worker/test_cost_unpriced.py` - `unpriced_ok` on `CappedProvider`: unpriced model runs uncapped and logged with the ledger untouched; default still raises `PricingError`.
 - `tests/worker/test_policy.py` - cloud policy: the cloud token (`api_key_env` set) and the task class in `[provider_anthropic] task_classes` must both hold; cloud-only classes refuse local (`:49`, `:66`); unknown names raise or deny.
 - `tests/worker/test_router.py` - router: first success wins and later providers are not called (`:73`); policy-denied cloud skipped without call (`:80`); over-cap and failing providers fall to the next (`:91`, `:100`); secret block falls to local (`:156`); exhausted names skipped and failed only (`:170`); no implicit local fallback (`:192`); `build_router` config errors (`:214`-`:235`); guard runs before cap (`:243`).
 - `tests/worker/test_providers.py` - `LocalProvider` and `AnthropicProvider` against local fakes and httpx mock transport (`:81`, `:202`); missing key raises at construction (`:293`).
@@ -79,5 +80,5 @@ Baseline gate timings (before the speed-up) are in `docs/testing.md`.
 - Run: `KATA_CONFIG=path/to/kata.toml python3 -m pytest tests` (`docs/api.md`); gate cmd `.venv/bin/python -m pytest tests ...` with coverage and `-m 'not flaky'` (`tools/gates.json:6`).
 
 ## Depends on / used by
-- Depends on: `core/` (`kata_core`), `worker/` (`kata_worker`), `config/kata.example.toml`, `tools/gates.json`, `docs/`, `extension/`.
+- Depends on: `core/` (`kata_core`), `worker/` (`kata_worker`), `config/kata.example.toml` (the M26 config tests load it and `deploy/kata.host.toml`), `tools/gates.json`, `docs/`, `extension/`.
 - Used by: the quality gates in `tools/gates.json` (pytest gate).

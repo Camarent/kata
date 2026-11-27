@@ -170,7 +170,7 @@ build-time server config (M15)" in `decisions.md`.
 creates and deletes courses.
 
 **Shipped.** `[trainer] max_courses_per_user` (default 10 in `config/kata.example.toml`; 0 means
-unlimited) is enforced by `POST /v1/courses`. Names are unique per user. Decisions: "Course limit
+unlimited) is enforced by `POST /v1/courses`. Names are unique per user. M26 config keys (`[models]`, `[provider_openai]`, `vision`) add no course behaviour. Decisions: "Course limit
 default lives in the example config (M16)" and "Course limit and unique names (M16)".
 
 ## Milestone 17: local-first routing (done)
@@ -302,6 +302,12 @@ Partial: the UI modules are built and unit-tested, but not all are mounted in th
   `extension/src/ui/panel/examResult.ts`; the course page `extension/src/ui/panel/coursePage.ts`.
 - Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate). Follow-ups, not yet wired.
 - Follow-ups are in `.notes/later.md` (local notes, not in the repo) and must land before M26.
+
+## Milestone 26: generic model names and OpenAI-compatible provider (in progress)
+
+**Scope.** Generic model names `cloud` and `local` (mapped by `[models]` in the host config; a literal model name in a routing chain wins), an OpenAI-compatible provider (`[provider_openai]`: base URL and token env in the host config only; unpriced model, so no cap, calls logged), and a per-provider `vision` flag (default false) that the reader enforces.
+
+**Shipped.** Config keys, `OpenAIProvider` and `resolve_entry` on the worker, the vision flag, and the reader refusal. Decisions: "Generic model names, OpenAI-compatible provider and vision flag (M26)". Config: [configuration.md](configuration.md), section Models. The UI is not part of M26.
 
 ## Later
 

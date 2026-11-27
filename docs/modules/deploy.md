@@ -24,7 +24,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - `deploy/systemd/kata-cert.timer:6` `OnUnitActiveSec=30d`; `deploy/systemd/kata-cert.service:10` `EnvironmentFile=/etc/kata/cert.env`; `:13` the network client's cert command into `KATA_CERT_DIR`; `:14` caddy reload.
 - `deploy/versions.env:10` `PY_BASE_IMAGE`; `:11` `PY_BASE_DIGEST`; `:21` `GITLEAKS_VERSION`; `:25` `TRAINER_URL`; `:30` `EMBED_MODEL_ID`. Empty values are filled by hand. The trainer is pinned to the dojo-kit v0.5.1 tarball; repin it after each dojo-kit release.
 - `deploy/env/small.env:4` (`KATA_MEM_CORE=768m`, default for the 3 GB VM); `deploy/env/large.env:3`.
-- `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`.
+- `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`. Includes the M26 `[models]`, `[provider_openai]` and `vision` keys.
 - `deploy/backup.sh:25` needs `KATA_BACKUP_DIR`; `:68` `pg_dump -Fc`; `:73` `openssl enc -aes-256-cbc -pbkdf2`; `:80` writes the `.dump.enc.hmac` sidecar.
 - `deploy/restore.sh:4` usage `[--dry-run] <dump.enc> <target-database> [counts.json]`; `:28` `--dry-run`; `:74` `verify_sidecar` (refuses a dump without a matching `.hmac`).
 - `deploy/relocate.sh:4` usage; `:39` `--dry-run`; `:40` `--confirm-maintenance` (real run needs it).

@@ -58,7 +58,8 @@ Project items after Milestone 0.
       `worker/kata_worker/providers/cost.py` reads `usage_today()`, calls the provider, then
       records. Two concurrent calls can both pass the check before either records, so the
       cap can overshoot by more than one call. The store write itself (`add_usage` in
-      `core/kata_core/storage/usage.py`) is an upsert.
+      `core/kata_core/storage/usage.py`) is an upsert. Models run with `unpriced_ok` record
+      no spend at all, so they are outside the cap.
 - [ ] `POST /usage` trusts client-reported `micro_usd`: `core/kata_core/api/routes/usage.py`
       adds the value with no server-side price check, so a client can under-report spend.
       Decide whether the server prices the call or the cap stays advisory (see
@@ -93,7 +94,7 @@ Project items after Milestone 0.
       `KATA_SMOKE_LOCAL=1` against the local model and records one row per model and class in
       [`research/benchmarks/LOCAL_AUDIT.md`](research/benchmarks/LOCAL_AUDIT.md). Not run yet.
 - [ ] Set `[local_capability]` from the audit verdicts in `config/kata.example.toml` and
-      `deploy/kata.host.toml`: a class gets `cloud-only` where no local model is good enough.
+      `deploy/kata.host.toml`: a class gets `cloud-only` where no local model is good enough. M26 added `[models]`, `[provider_openai]` and `vision` keys to both files; this item is unchanged by them.
       Until then every class is `kata-l` (see [`decisions.md`](decisions.md), "Routing defaults
       are local first, cloud by token (M17)").
 - [ ] M11 note, thinking on/off numbers for the local models (`kata-l` is not a thinking model,

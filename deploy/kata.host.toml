@@ -83,6 +83,12 @@ case_timeout_seconds = 180
 warmup_timeout_seconds = 600
 num_ctx = 8192
 
+# Generic model names: cloud and local map to a provider name. A routing chain entry resolves a
+# literal model_name first, then these generic names, then the provider name.
+[models]
+cloud = "anthropic"
+local = "local"
+
 # Local first for every task class: the cloud (anthropic) is always after local in the chain, so a
 # class with no usable local provider falls to the cloud. The cloud turns on by itself when its
 # token (api_key_env) is set; there is no separate switch. Secret guard, per-repository opt-in and
@@ -116,8 +122,10 @@ quiz_generate = "kata-l"
 # No local vision model is verified yet: vision needs the cloud token until one is.
 vision = "cloud-only"
 
+# vision: whether the model accepts page images. The reader refuses a non-vision model.
 [provider_local]
 task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision"
+vision = false
 
 [provider_anthropic]
 task_classes = "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision"
@@ -126,6 +134,17 @@ model_name = "claude-model"
 api_key_env = "KATA_ANTHROPIC_API_KEY"
 timeout_seconds = 60
 cache_system = false
+vision = true
+
+# OpenAI-compatible provider. Empty task_classes means no task class routes to it. base_url and
+# model_name are set in the host config only; the token is the env var named by api_key_env.
+[provider_openai]
+task_classes = ""
+base_url = ""
+model_name = ""
+api_key_env = "KATA_OPENAI_API_KEY"
+timeout_seconds = 60
+vision = false
 
 [policy]
 quiet_mark_enabled = true

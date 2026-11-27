@@ -114,7 +114,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0023_m23_jobs.sql` - `page_summary` and `reader_document` (M23).
 - `core/migrations/0024_joke_cache.sql` - `joke_cache` (M23).
 - `core/kata_core/summary/`, `core/kata_core/reader/` and `core/kata_core/jokes/` - page summary, reader document and joke jobs (M23 sections below).
-- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set.
+- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set. The cloud token is read from the provider named by `[models] cloud` (`cloud_provider_section`, default `anthropic`; `cloud_token_present`).
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.
@@ -135,7 +135,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - Score scale: hits carry the fused RRF score (`1 / (rrf_k + rank)` summed over the keyword and vector lists). With the example `rrf_k` 60, one list gives at most 1/61, below the example `min_score` 0.02, so a hit passes only when both lists rank it.
 - Lesson check reads `[lesson_check]` (`min_score`, `known_hits`, `search_limit`) and `[retrieval]` (through `Retriever.from_config`); every query filters by `user_id`.
 - Usage is per user per day in UTC: `usage_daily` is keyed by `(user_id, day)` and money is integer micro-USD; the route takes the day from the server clock (`core/kata_core/api/routes/usage.py:36`, `:43`), never from the client.
-- `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`).
+- `POST /usage` adds spend and counts one call in a single upsert (`core/kata_core/storage/usage.py:18-23`); the cap itself is enforced by the worker, not the core (`worker/kata_worker/providers/cost.py`); an `unpriced_ok` model records no spend.
 - Journal reads page by id: `before_id` is the id of the last item of the previous page; pages never overlap or skip (`core/kata_core/journal/store.py:45`). `limit` is validated 1..200 by the route (422) and clamped again in the store.
 - Journal `user_id` comes from the token (`core/kata_core/api/routes/journal.py:42`); rows cascade on user delete (`core/migrations/0005_journal.sql:6`).
 - `write_entry` takes `at` from the caller; the store does not set `created_at` (`core/kata_core/journal/store.py:33`).
@@ -181,7 +181,7 @@ Invariants and gotchas (trainer):
 - `[knowledge]` thresholds must satisfy `learning <= known` (`mastery.state_for` raises otherwise).
 - Course limit and titles: the limit is checked under the user row lock (`lock_user`, `core/kata_core/trainer/store.py:78`); a title is unique per user after normalisation, enforced by the index in migration `0014`. A deleted course frees its slot and title. `[trainer] max_courses_per_user` must be an integer >= 0 (`core/kata_core/config.py:111`).
 - `course.build` loads config inside the handler (`core/kata_core/trainer/build.py:73`), so the runner process needs `KATA_CONFIG`.
-- The trainer binary is a config-supplied command, not part of this repo: `[trainer] command` is the `dojo` CLI (`core/kata_core/trainer/dojo_cli.py`, text output; `validate --json` exits 0 or 1, the other subcommands must exit 0); the default `/opt/trainer/dojo` is a placeholder path (`config/kata.example.toml:125`).
+- The trainer binary is a config-supplied command, not part of this repo: `[trainer] command` is the `dojo` CLI (`core/kata_core/trainer/dojo_cli.py`, text output; `validate --json` exits 0 or 1, the other subcommands must exit 0); the default `/opt/trainer/dojo` is a placeholder path (`config/kata.example.toml:125`). The M26 keys in that file (`[models]`, `[provider_openai]`, `vision`) are not part of this section.
 
 ### Course artifact
 

@@ -1,7 +1,8 @@
 """Decide whether a job must run on a cloud model.
 
 A job needs the cloud when its task class is `cloud-only` in `[local_capability]` and no cloud
-token is present: the env var named by `[provider_anthropic] api_key_env` is unset or empty.
+token is present: the env var named by `api_key_env` in the cloud provider section is unset or empty.
+The cloud provider is `[models] cloud` (section `provider_<name>`); without it, anthropic.
 The class verdicts come from config; this module only maps job kinds to task classes.
 """
 
@@ -10,13 +11,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from kata_core.config import Config
+from kata_core.config import Config, ConfigError
 from kata_core.planning.job_kinds import SYLLABUS_EXTRACT_KIND
 from kata_core.quiz.job_kinds import QUIZ_GENERATE_KIND
 from kata_core.trainer.job_kinds import COURSE_GENERATE_KIND
 
 LOCAL_CAPABILITY_SECTION = "local_capability"
-PROVIDER_SECTION = "provider_anthropic"
+MODELS_SECTION = "models"
+CLOUD_KEY = "cloud"
+PROVIDER_PREFIX = "provider_"
+DEFAULT_CLOUD_PROVIDER = "anthropic"
 CLOUD_ONLY = "cloud-only"
 
 # Mirrors TASK_CLASSES in worker/kata_worker/providers/base.py, the canonical list.
@@ -47,9 +51,18 @@ JOB_KIND_CLASS: dict[str, str] = {
 }
 
 
+def cloud_provider_section(cfg: Config) -> str:
+    """Config section of the cloud provider: `[models] cloud` names it; absent means anthropic."""
+    try:
+        provider = str(cfg.get(MODELS_SECTION, CLOUD_KEY))
+    except ConfigError:
+        provider = DEFAULT_CLOUD_PROVIDER
+    return f"{PROVIDER_PREFIX}{provider}"
+
+
 def cloud_token_present(cfg: Config, env: Mapping[str, Any]) -> bool:
     """True when the cloud API key env var named in config is set and not empty."""
-    key_env = str(cfg.get(PROVIDER_SECTION, "api_key_env"))
+    key_env = str(cfg.get(cloud_provider_section(cfg), "api_key_env"))
     return bool(env.get(key_env, ""))
 
 

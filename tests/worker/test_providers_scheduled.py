@@ -71,6 +71,16 @@ def test_schedule_true_gives_gated_local_provider() -> None:
     assert isinstance(build_local(_config(schedule=True), lambda _: None), ScheduledLocalProvider)
 
 
+def test_vision_flag_follows_vision_inner() -> None:
+    cache = CapabilitiesCache(lambda: _caps(True), TTL_SECONDS)
+    vision_gate = ScheduledLocalProvider(
+        FakeProvider(name="local", vision=True), MODEL, cache, [].append, lambda: 0.0
+    )
+    assert vision_gate.vision is True
+    text_gate, _ = _gate(_caps(True))
+    assert text_gate.vision is False
+
+
 def test_null_fits_alone_raises_provider_error_naming_reason_and_skips_local() -> None:
     gate, local = _gate(_caps(None))
     with pytest.raises(ProviderError, match="fit not measured"):

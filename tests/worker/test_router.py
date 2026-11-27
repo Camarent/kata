@@ -282,3 +282,63 @@ def test_cloud_only_class_without_token_exhausts_without_any_call() -> None:
         router.route(EXPLAIN, SYSTEM, USER)
     assert local.calls == []
     assert cloud.calls == []
+
+
+OPENAI = "openai"
+OPENAI_TOKEN = {"KATA_OPENAI_API_KEY": "test-key"}
+OPENAI_REPLY = "openai says"
+OPENAI_MODEL = "gpt-literal"
+
+
+def _openai_config(chain: str, cloud_target: str | None = None) -> Config:
+    """Host config: openai allowed for EXPLAIN with a literal model name; EXPLAIN chain set to chain."""
+    base = _config()
+    sections = dict(base.sections)
+    sections["routing"] = {**base.sections["routing"], EXPLAIN: chain}
+    sections["provider_openai"] = {
+        **base.sections["provider_openai"],
+        "task_classes": EXPLAIN,
+        "model_name": OPENAI_MODEL,
+    }
+    if cloud_target is not None:
+        sections["models"] = {**base.sections["models"], "cloud": cloud_target}
+    return Config(sections=sections)
+
+
+def _openai_fake() -> FakeProvider:
+    return FakeProvider(name=OPENAI, is_cloud=True, script=[OPENAI_REPLY])
+
+
+def test_build_router_generic_cloud_routes_to_openai_with_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(router_module, "build_local", lambda _cfg, _log: _local())
+    openai = _openai_fake()
+    monkeypatch.setattr(router_module, "build_openai", lambda *_args: openai)
+    log: list[str] = []
+    cfg = _openai_config("cloud", cloud_target=OPENAI)
+    router = build_router(cfg, FakeLedger(), OPENAI_TOKEN, lambda _: None, log.append)
+    assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=OPENAI_REPLY, provider=OPENAI)
+    assert openai.calls == [(SYSTEM, USER)]
+    assert log == ["route explain: answered by openai"]
+
+
+def test_build_router_literal_model_name_routes_to_openai_with_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(router_module, "build_local", lambda _cfg, _log: _local())
+    openai = _openai_fake()
+    monkeypatch.setattr(router_module, "build_openai", lambda *_args: openai)
+    cfg = _openai_config(f"{OPENAI_MODEL},local")
+    router = build_router(cfg, FakeLedger(), OPENAI_TOKEN, lambda _: None, lambda _: None)
+    assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=OPENAI_REPLY, provider=OPENAI)
+    assert openai.calls == [(SYSTEM, USER)]
+
+
+def test_build_router_openai_without_token_is_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(router_module, "build_local", lambda _cfg, _log: _local())
+    log: list[str] = []
+    cfg = _openai_config(f"{OPENAI_MODEL},local")
+    router = build_router(cfg, FakeLedger(), {}, lambda _: None, log.append)
+    assert router.route(EXPLAIN, SYSTEM, USER) == Routed(reply=LOCAL_REPLY, provider="local")
+    assert log == ["route explain: answered by local"]

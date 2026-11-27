@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from kata_core.config import Config, load_config
 
 from kata_worker.core_client import CoreError
+from kata_worker.providers.router import RouteExhausted
 from kata_worker.reader_spool import (
     STATUS_OK,
     ResultLimits,
@@ -47,8 +48,13 @@ CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 NEW_ID = new_request_id
 CLOCK = time.monotonic
 SLEEP = time.sleep
+NO_VISION_MESSAGE = "no vision-capable model configured"
 
 log = logging.getLogger(__name__)
+
+
+class NoVisionModel(Exception):
+    """Every vision provider is text-only: the document has page images no model can read."""
 
 
 @dataclass(frozen=True)
@@ -111,7 +117,12 @@ def _read_pages(
         if page["image"] is not None and images_left > 0:
             images_left -= 1
             png = read_page_image(out_dir, page["image"], settings.limits)
-            routed = router.route_vision(VISION_CLASS, SYSTEM, USER, [(IMAGE_MEDIA_TYPE, png)])
+            try:
+                routed = router.route_vision(VISION_CLASS, SYSTEM, USER, [(IMAGE_MEDIA_TYPE, png)])
+            except RouteExhausted as exc:
+                if exc.no_vision:
+                    raise NoVisionModel(NO_VISION_MESSAGE) from None
+                raise
             text = _join(text, _clean(routed.reply, limit), limit)
         posted.append({"n": page["n"], "text": text})
     return posted
@@ -151,6 +162,9 @@ def handle(job: Job, router: Router, client: CoreClient) -> None:
         _run(job, router, client, settings, request_id)
     except CoreError:
         raise  # a core call failed: run_forever logs it and goes on
+    except NoVisionModel as exc:
+        log.warning("job %s failed while reading document: %s", job.id, exc)
+        client.fail(job.id)
     except Exception as exc:  # noqa: BLE001 - a reader or model failure must fail this job, not stop the worker
         log.warning("job %s failed while reading document: %s", job.id, _reason(exc))
         client.fail(job.id)

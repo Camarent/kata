@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from kata_core.config import Config
+
 TASK_CLASSES = (
     "tag",
     "explain",
@@ -46,6 +48,14 @@ class Completion:
     usage: TokenUsage | None
 
 
+def usage_count(usage: dict[str, object], key: str) -> int | None:
+    """One non-negative int from a backend usage block; None when absent, null, boolean or negative."""
+    value = usage.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 @runtime_checkable
 class Provider(Protocol):
     """A model backend. `is_cloud` is True when text leaves the machine."""
@@ -71,6 +81,9 @@ ImageInput = tuple[str, bytes]
 class VisionProvider(Protocol):
     """A provider that takes images with the user message. Text-only providers do not match."""
 
+    # True when the configured model takes images; `vision_flag` reads it from the config.
+    vision: bool
+
     def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion: ...
 
 
@@ -79,3 +92,11 @@ def require_vision(provider: Provider) -> VisionProvider:
     if not isinstance(provider, VisionProvider):
         raise ProviderError(f"provider {provider.name} does not take images")
     return provider
+
+
+VISION_KEY = "vision"
+
+
+def vision_flag(config: Config, section: str) -> bool:
+    """The `vision` key of a provider section: whether its model takes images. False when the key is absent."""
+    return bool(config.sections.get(section, {}).get(VISION_KEY, False))

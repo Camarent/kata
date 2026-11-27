@@ -26,6 +26,7 @@ from kata_worker.providers.base import (
     ImageInput,
     Provider,
     ProviderError,
+    VisionProvider,
     require_vision,
 )
 from kata_worker.providers.cost import LogSink
@@ -60,6 +61,7 @@ class ScheduledLocalProvider:
         self._capabilities = capabilities
         self._log = log
         self._clock = clock
+        self.vision = isinstance(inner, VisionProvider) and inner.vision
 
     def complete(self, system: str, user: str) -> str:
         """Return the local reply when the model may run; raise ProviderError when it may not."""

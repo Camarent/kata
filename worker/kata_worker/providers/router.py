@@ -25,6 +25,8 @@ from kata_worker.providers.base import (
 )
 from kata_worker.providers.cost import Ledger, LogSink
 from kata_worker.providers.guard import AuditSink
+from kata_worker.providers.models import RoutingError, resolve_entry
+from kata_worker.providers.openai import build_openai
 from kata_worker.providers.policy import PROVIDER_NAMES, Policy, PolicyError
 from kata_worker.providers.scheduled import build_local
 
@@ -34,12 +36,15 @@ NO_VISION = "no_vision"
 CHAIN_SEPARATOR = ","
 
 
-class RoutingError(Exception):
-    """The [routing] config or a Router chain is bad: unknown class or provider, or an empty chain."""
-
-
 class RouteExhausted(ProviderError):
-    """Every provider in the chain was skipped or failed. Names providers and reasons only."""
+    """Every provider in the chain was skipped or failed. Names providers and reasons only.
+
+    `no_vision` is true when every provider in the chain was text-only (no image support).
+    """
+
+    def __init__(self, message: str, *, no_vision: bool = False) -> None:
+        super().__init__(message)
+        self.no_vision = no_vision
 
 
 @dataclass(frozen=True)
@@ -91,7 +96,7 @@ class Router:
         return self._walk(
             task_class,
             lambda provider: require_vision(provider).complete_vision(system, user, images).text,
-            can_answer=lambda provider: isinstance(provider, VisionProvider),
+            can_answer=lambda provider: isinstance(provider, VisionProvider) and provider.vision,
         )
 
     def _walk(
@@ -103,25 +108,31 @@ class Router:
         """Try the chain in order: first reply wins. Skips, failures and unsuited providers are logged."""
         if task_class not in TASK_CLASSES:
             raise PolicyError(f"unknown task class: {task_class}")
-        outcomes: list[str] = []
+        # Each outcome: (text for the message, True when the provider was skipped for lacking vision).
+        outcomes: list[tuple[str, bool]] = []
         for name in self._chains.get(task_class, ()):
             provider = self._providers.get(name)
             if provider is None or not self._policy.allows(provider, task_class):
-                outcomes.append(f"{name}={SKIPPED}")
+                outcomes.append((f"{name}={SKIPPED}", False))
                 continue
             if not can_answer(provider):
-                outcomes.append(f"{name}={NO_VISION}")
+                outcomes.append((f"{name}={NO_VISION}", True))
+                self._log(f"route {task_class}: {name}={NO_VISION}")
                 continue
             try:
                 reply = call(provider)
             except ProviderError as exc:
                 kind = type(exc).__name__
-                outcomes.append(f"{name}={kind}")
+                outcomes.append((f"{name}={kind}", False))
                 self._log(f"route {task_class}: provider {name} failed: {kind}")
                 continue
             self._log(f"route {task_class}: answered by {name}")
             return Routed(reply=reply, provider=name)
-        raise RouteExhausted(f"route exhausted for {task_class}: {', '.join(outcomes)}")
+        no_vision = bool(outcomes) and all(refused for _, refused in outcomes)
+        raise RouteExhausted(
+            f"route exhausted for {task_class}: {', '.join(text for text, _ in outcomes)}",
+            no_vision=no_vision,
+        )
 
 
 def _build_providers(
@@ -132,6 +143,9 @@ def _build_providers(
     # No key: the cloud provider is absent, so the router skips it without a call.
     if cloud is not None:
         providers[cloud.name] = cloud
+    openai = build_openai(cfg, ledger, env, audit, log)
+    if openai is not None:
+        providers[openai.name] = openai
     return providers
 
 
@@ -146,7 +160,10 @@ def build_router(
     if missing:
         raise RoutingError(f"no chain in [{ROUTING_SECTION}] for task class: {', '.join(missing)}")
     chains = {
-        task_class: _parse_chain(str(cfg.get(ROUTING_SECTION, task_class)))
+        task_class: tuple(
+            resolve_entry(cfg, entry)
+            for entry in _parse_chain(str(cfg.get(ROUTING_SECTION, task_class)))
+        )
         for task_class in routing
     }
     policy = Policy.from_config(cfg, env)

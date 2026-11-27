@@ -200,7 +200,7 @@ Category / Topic = Alias
 
 ### Configuration
 
-The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` environment variable, or from `--config` where the CLI accepts it. Each key can be overridden by an environment variable named in the README. The example file is `config/kata.example.toml`.
+The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` environment variable, or from `--config` where the CLI accepts it. Each key can be overridden by an environment variable named in the README. The example file is `config/kata.example.toml`; the OpenAI-compatible provider token is the env var named by `[provider_openai] api_key_env`, not a key in the file.
 
 The database password is not in the file. The file names an environment variable in `[database] password_env`; set that variable to the password.
 

@@ -84,3 +84,4 @@ Skip behaviour:
 
 - The end-to-end test in `tests/e2e/` does not skip. A missing prerequisite fails it. The Browser tests above do skip, with a reason.
 - Jobs are claimed in no fixed order, so the test compares the set of topics, not their order.
+- M26 adds config keys only; the e2e prerequisites are unchanged (config note in `docs/api.md`, Configuration).

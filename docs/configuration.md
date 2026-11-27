@@ -70,13 +70,23 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.scan_extract` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_EXTRACT` |
 | `local_capability.quiz_generate` | "kata-l" | `KATA_LOCAL_CAPABILITY_QUIZ_GENERATE` |
 | `local_capability.vision` | "cloud-only" | `KATA_LOCAL_CAPABILITY_VISION` |
+| `models.cloud` | "anthropic" | `KATA_MODELS_CLOUD` |
+| `models.local` | "local" | `KATA_MODELS_LOCAL` |
 | `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_local.vision` | false | `KATA_PROVIDER_LOCAL_VISION` |
 | `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
 | `provider_anthropic.model_name` | "claude-model" | `KATA_PROVIDER_ANTHROPIC_MODEL_NAME` |
 | `provider_anthropic.api_key_env` | "KATA_ANTHROPIC_API_KEY" | `KATA_PROVIDER_ANTHROPIC_API_KEY_ENV` |
 | `provider_anthropic.timeout_seconds` | 60 | `KATA_PROVIDER_ANTHROPIC_TIMEOUT_SECONDS` |
 | `provider_anthropic.cache_system` | false | `KATA_PROVIDER_ANTHROPIC_CACHE_SYSTEM` |
+| `provider_anthropic.vision` | true | `KATA_PROVIDER_ANTHROPIC_VISION` |
+| `provider_openai.task_classes` | "" | `KATA_PROVIDER_OPENAI_TASK_CLASSES` |
+| `provider_openai.base_url` | "" | `KATA_PROVIDER_OPENAI_BASE_URL` |
+| `provider_openai.model_name` | "" | `KATA_PROVIDER_OPENAI_MODEL_NAME` |
+| `provider_openai.api_key_env` | "KATA_OPENAI_API_KEY" | `KATA_PROVIDER_OPENAI_API_KEY_ENV` |
+| `provider_openai.timeout_seconds` | 60 | `KATA_PROVIDER_OPENAI_TIMEOUT_SECONDS` |
+| `provider_openai.vision` | false | `KATA_PROVIDER_OPENAI_VISION` |
 | `policy.quiet_mark_enabled` | true | `KATA_POLICY_QUIET_MARK_ENABLED` |
 | `policy.quiet_mark_idle_seconds` | 600 | `KATA_POLICY_QUIET_MARK_IDLE_SECONDS` |
 | `policy.nudge_enabled` | true | `KATA_POLICY_NUDGE_ENABLED` |
@@ -156,3 +166,29 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `jokes.refill_interval_seconds` | 7200 | `KATA_JOKES_REFILL_INTERVAL_SECONDS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
+
+## Models: generic names, provider sections and vision (M26)
+
+`[models]` maps the generic names `cloud` and `local` to a provider name (`cloud = "anthropic"`,
+`local = "local"`). A `[routing]` chain entry resolves in this order, first match wins:
+
+1. a literal `model_name` of a provider section (`[model]` for local, `[provider_<name>]` for the rest);
+2. the generic names `cloud` and `local`, through `[models]`;
+3. a provider name.
+
+Any other entry is a config error. The literal wins, so an explicit model name beats a generic name.
+The literal check only looks at each provider's configured `model_name`; an arbitrary string is not a
+model name. A task class can also name a model directly in `[routing]`.
+
+`[provider_openai]` is an OpenAI-compatible cloud provider. `base_url` and `model_name` are set in the
+host config only. The bearer token is not in the config: `api_key_env` names the env var that holds
+it (default `KATA_OPENAI_API_KEY`), and that var lives in the secret store (`deploy/secrets/`), never
+in a committed file. The base URL is trusted from the host config: no private-address check is made on
+it. The private-address block (D45-D47) stays on the page and quiz fetches.
+
+A model with no pinned price is not capped: its calls are still logged to the usage ledger. The cap
+applies to priced models only, so an unknown price means no cap, not a refusal.
+
+Vision is a flag per provider section (`vision` in `[provider_local]`, `[provider_anthropic]`,
+`[provider_openai]`), not per model. Default `false`; there is no auto-detection. The reader refuses
+a model that is not vision-capable and says so.

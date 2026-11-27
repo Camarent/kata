@@ -70,7 +70,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`scripts/smoke/smoke_core.py:195-198`, `:255`).
 
 ## scripts/smoke: local capability audit
-`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by hand by a maintainer; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:109`): `kata-l`, `kata-m` or `cloud-only` per task class.
+`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by hand by a maintainer; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:109`): `kata-l`, `kata-m` or `cloud-only` per task class. This section is unchanged by the M26 `[models]`, `[provider_openai]` and `vision` keys.
 
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_audit.py [--model NAME] [--api-key-env NAME]`
 

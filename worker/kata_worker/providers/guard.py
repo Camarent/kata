@@ -18,6 +18,7 @@ from kata_worker.providers.base import (
     ImageInput,
     Provider,
     ProviderError,
+    VisionProvider,
     require_vision,
 )
 
@@ -49,6 +50,7 @@ class GuardedProvider:
         self._audit = audit
         self.name = inner.name
         self.is_cloud = inner.is_cloud
+        self.vision = isinstance(inner, VisionProvider) and inner.vision
 
     def complete(self, system: str, user: str) -> str:
         self._scan(system, user)

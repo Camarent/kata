@@ -52,7 +52,7 @@ def _router(providers: dict[str, Provider], log: list[str]) -> Router:
 
 def test_text_only_provider_is_skipped_and_vision_provider_answers() -> None:
     text_only = TextOnly()
-    cloud = FakeProvider(name="anthropic", is_cloud=True, script=["a cat"])
+    cloud = FakeProvider(name="anthropic", is_cloud=True, script=["a cat"], vision=True)
     log: list[str] = []
 
     routed = _router({"local": text_only, "anthropic": cloud}, log).route_vision(
@@ -62,12 +62,12 @@ def test_text_only_provider_is_skipped_and_vision_provider_answers() -> None:
     assert routed == Routed(reply="a cat", provider="anthropic")
     assert text_only.calls == 0
     assert cloud.vision_calls == [(SYSTEM, USER, (IMAGE,))]
-    assert log == ["route vision: answered by anthropic"]
+    assert log == ["route vision: local=no_vision", "route vision: answered by anthropic"]
 
 
 def test_failing_vision_provider_falls_through_to_the_next() -> None:
-    broken = BrokenVision(name="local", script=["never used"])
-    cloud = FakeProvider(name="anthropic", is_cloud=True, script=["recovered"])
+    broken = BrokenVision(name="local", script=["never used"], vision=True)
+    cloud = FakeProvider(name="anthropic", is_cloud=True, script=["recovered"], vision=True)
     log: list[str] = []
 
     routed = _router({"local": broken, "anthropic": cloud}, log).route_vision(
@@ -93,8 +93,21 @@ def test_route_exhausted_when_no_provider_takes_images() -> None:
     assert text_only.calls == 0
 
 
+def test_no_vision_is_false_when_a_policy_skip_is_mixed_with_a_text_only_refusal() -> None:
+    # "anthropic" is absent from the providers: the router skips it by policy, not by vision.
+    text_only = TextOnly()
+    log: list[str] = []
+
+    with pytest.raises(RouteExhausted) as excinfo:
+        _router({"local": text_only}, log).route_vision(VISION, SYSTEM, USER, [IMAGE])
+
+    assert "local=no_vision" in str(excinfo.value)
+    assert "anthropic=skipped" in str(excinfo.value)
+    assert excinfo.value.no_vision is False
+
+
 def test_route_exhausted_when_every_vision_provider_fails() -> None:
-    broken = BrokenVision(name="local", script=[])
+    broken = BrokenVision(name="local", script=[], vision=True)
     log: list[str] = []
 
     with pytest.raises(RouteExhausted, match="local=ProviderError"):
