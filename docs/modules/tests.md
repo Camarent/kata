@@ -35,7 +35,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/browser/test_panel_flow.py` - `test_panel_flow` - side panel flow in each browser; `tests/browser/pages/lesson.html` is its page.
 - `tests/browser/test_panel_a11y.py` - `test_signin_tab_order_and_focus_indicator` - keyboard tab order (base URL, code, device label, submit) and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py` - `test_panel_signin_theme_contrast` - contrast of the sign-in view in light and dark; `contrast_ratio` and `test_contrast_ratio_known_pairs` check the ratio math.
-- `tests/browser/test_ui_layout.py` - `test_panel_does_not_scroll_sideways` (panel at panel and narrow width, no horizontal scroll), `test_scan_rows_clamp_to_two_lines`, `test_touch_targets_are_36px` (every button and link at least 36px by 36px).
+- `tests/browser/test_ui_layout.py` - `test_panel_does_not_scroll_sideways` (page body at panel width 360px and narrow width 320px, no horizontal scroll), `test_scan_rows_clamp_to_two_lines`, `test_touch_targets_are_36px` (every button and link at least 36px by 36px).
 - `tests/browser/panel_page.py` - `panel_url`, `open_panel`, `force_scheme` (forces light or dark) - shared panel helpers.
 - `tests/core/test_policy_engine.py` - policy engine: nudge and stop thresholds (`:44`, `:56`), stop-then-nudge (`:67`), quiet mark (`:115`), rate limit (`:144`, `:155`), late events (`:171`, `:183`), user isolation (`:200`).
 - `tests/core/test_journal_store.py` - journal write, paging with no overlap or gap (`:47`), newest first (`:65`), user isolation (`:72`), limit clamp (`:86`), cascade on user delete (`:93`).

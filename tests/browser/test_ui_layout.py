@@ -17,7 +17,7 @@ import pytest
 
 from browser.panel_page import open_panel
 
-# Panel width: the `.panel` rule sets width 360px (extension/src/ui/panelCss.ts).
+# Panel width the layout is checked at (the window width; panelCss.ts sets no `.panel` width).
 PANEL_WIDTH = 360
 # A narrow phone-like width below the panel width.
 NARROW_WIDTH = 320
@@ -47,7 +47,7 @@ function addRow(label, cls) {
   list.append(item);
   return nm;
 }
-const host = document.querySelector('.panel') || document.body;
+const host = document.body;
 host.append(list);
 const probe = addRow('Line', 'nm');
 const row = addRow(arguments[0], labelClass);

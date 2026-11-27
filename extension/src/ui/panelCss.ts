@@ -114,7 +114,6 @@ select { width: auto; min-height: 36px; min-width: 36px; }
 .note { font-size: var(--font-size-small); color: var(--color-text-muted); }
 .tag { font-size: 12px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0 6px; background: var(--color-surface); }
 
-.panel { display: flex; flex-direction: column; width: 360px; max-width: 100%; min-height: 520px; max-height: 100vh; overflow: hidden; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: var(--shadow); }
 .panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); background: var(--color-surface); flex-wrap: wrap; }
 .panel-head .title { flex: 1; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .connind { font: inherit; font-size: 12px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 12px; padding: 2px 8px; min-height: 36px; min-width: 36px; cursor: pointer; color: var(--color-text); display: inline-flex; align-items: center; gap: 4px; }

@@ -53,7 +53,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - UI (M25, approved design in `docs/design/extension-ui.md`, section 9): plain DOM TypeScript under `extension/src/ui/`, no framework.
   - `extension/src/ui/strings.ts` every user-facing string (one owner, pinned to the screen inventory).
   - `extension/src/ui/dom.ts`, `confirm.ts`, `undo.ts`, `popover.ts`, `stateMenu.ts` shared primitives (DOM helper, confirm, undo, popover, state menu).
-  - `extension/src/ui/panelCss.ts`, `cardCss.ts` stylesheets ported from the prototype.
+  - `extension/src/ui/panelCss.ts`, `cardCss.ts` stylesheets ported from the prototype. `panelCss.ts` has no `.panel` width rule (the dead one was removed); the layout test checks at a fixed width instead.
   - `extension/src/ui/panel/` panel tab screens (one `render*` function per screen), the tab router `router.ts`, and `screens.ts`.
   - `extension/src/ui/panel/screens.ts` `SCREENS`: the only registry of panel and settings screens; `drawScreen` draws one screen by its inventory id. Add a screen here, not in the router.
   - `extension/src/ui/card/` floating card screens (`cardMain.ts`, `cardScan.ts`, `cardSummary.ts`, `jokeCloud.ts`), the pin (`pin.ts`, `pinPosition.ts`) and `focus.ts`.
@@ -100,4 +100,4 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 
 ## Depends on / used by
 - Depends on: Node/npm for `build` and `test` (TODO(verify) Node version: no `engines` field in any `package.json`; root `.nvmrc` pins Node 26); talks to `core` HTTP API (`docs/api.md`).
-- Used by: `tests/browser/conftest.py` loads `dist/<browser>/` in Firefox and Chrome (`docs/e2e.md`, "Browser tests"), and the layout and contrast checks in `tests/browser/test_ui_layout.py` and `test_panel_contrast.py` open the same built panel page; `tests/e2e/driver.ts` imports `extension/src/scanner`, `scanSession`, `coreClient`, `offlineQueue`, `tokenStore`; `tests/foundation/test_extension_scaffold.py` checks manifest and package.json.
+- Used by: `tests/browser/conftest.py` loads `dist/<browser>/` in Firefox and Chrome (`docs/e2e.md`, "Browser tests"), and the layout and contrast checks in `tests/browser/test_ui_layout.py` and `test_panel_contrast.py` open the same built panel page (the layout probe is injected into the page body, not a `.panel` element); `tests/e2e/driver.ts` imports `extension/src/scanner`, `scanSession`, `coreClient`, `offlineQueue`, `tokenStore`; `tests/foundation/test_extension_scaffold.py` checks manifest and package.json.
