@@ -16,17 +16,29 @@ def _literal(*words: str) -> tuple[str, ...]:
 
 
 # Words that must not reach the public docs (regex, matched case-insensitively).
+# Policy, one verdict per word:
+#   Proxmox: dropped, generic deployment technology the docs may name.
+#   hypervisor: dropped, generic deployment technology the docs may name.
+#   tailnet: dropped, generic concept; a concrete tailnet name is caught by the ts.net rule.
+#   tailscale: dropped, generic product name the docs may name.
+#   VM id, VM 101, vmid: kept, concrete identifiers of the owner's infrastructure.
+#   [a-z0-9-]+.ts.net: kept, concrete host names of the owner's tailnet.
+#   pipeline.json, cs-qrun, cs-wave, cs-plan, orch.py, release_script, claude-safe: kept, pipeline-internal.
+#   TASKS.md, .work/, stage/: kept, pipeline-internal file and folder names.
+#   release: minor|patch|major, no-release: kept, pipeline-internal release markers.
 PUBLIC_FORBIDDEN = (
-    *_literal("Proxmox", "hypervisor", "VM id", "VM 101", "vmid", "tailnet", "tailscale"),
+    *_literal("VM id", "VM 101", "vmid"),
     r"[a-z0-9-]+\.ts\.net",
-    *_literal("pipeline.json", "cs-qrun", "release_script"),
+    *_literal("pipeline.json", "cs-qrun", "cs-wave", "cs-plan", "orch.py", "release_script", "claude-safe"),
     r"release: (minor|patch|major)",
     *_literal("no-release", "TASKS.md", ".work/", "stage/"),
 )
 
 # Deploy scope: only comment lines and systemd Description= lines are scanned.
+# Verdicts: VM 101 kept (concrete VM id); ts.net kept (concrete host names);
+# Proxmox, hypervisor, tailnet, tailscale dropped (generic deployment words, see PUBLIC_FORBIDDEN).
 DEPLOY_GLOBS = ("deploy/**/*", "scripts/deploy/*.py")
-DEPLOY_FORBIDDEN = (*_literal("Proxmox", "hypervisor", "tailnet", "tailscale", "VM 101"), r"ts\.net")
+DEPLOY_FORBIDDEN = (*_literal("VM 101"), r"ts\.net")
 
 
 def _tracked(pattern_globs: tuple[str, ...]) -> list[str]:
@@ -84,10 +96,15 @@ def test_public_docs_use_generic_wording():
 
 
 def test_wording_helper_flags_forbidden_word_in_memory_text():
-    text = "intro line\nRuns on the Proxmox host.\nSee pipeline.json for gates.\n"
+    text = "intro line\nRuns on the VM 101 host.\nSee pipeline.json for gates.\n"
     hits = _hits("docs/example.md", text, PUBLIC_FORBIDDEN)
-    assert "docs/example.md:2: Proxmox" in hits
+    assert f"docs/example.md:2: {re.escape('VM 101')}" in hits
     assert "docs/example.md:3: pipeline\\.json" in hits
+
+
+def test_wording_helper_passes_generic_deployment_words():
+    text = "Runs on Proxmox under a hypervisor, reached over Tailscale and a tailnet.\n"
+    assert _hits("docs/example.md", text, PUBLIC_FORBIDDEN) == []
 
 
 def test_wording_helper_matches_regex_entries():
@@ -97,10 +114,23 @@ def test_wording_helper_matches_regex_entries():
     assert hits == ["docs/example.md:1: release: (minor|patch|major)"]
 
 
+def test_wording_helper_flags_pipeline_words_but_not_generic_ones():
+    assert _hits("docs/example.md", "run cs-wave next\n", PUBLIC_FORBIDDEN) == [
+        f"docs/example.md:1: {re.escape('cs-wave')}",
+    ]
+    assert _hits("docs/example.md", "a plain cs note\n", PUBLIC_FORBIDDEN) == []
+
+
 def test_deploy_scan_skips_code_lines_but_flags_comments():
-    text = "import os\nname = 'tailnet'\n# runs on tailnet\nDescription=Proxmox cert\n"
+    text = (
+        "import os\n"
+        "name = 'VM 101'\n"
+        "# runs on VM 101\n"
+        "Description=node.ts.net cert\n"
+        "# runs on Proxmox over Tailscale\n"
+    )
     hits = _hits("deploy/kata-cert.service", text, DEPLOY_FORBIDDEN)
     assert hits == [
-        "deploy/kata-cert.service:3: tailnet",
-        "deploy/kata-cert.service:4: Proxmox",
+        f"deploy/kata-cert.service:3: {re.escape('VM 101')}",
+        "deploy/kata-cert.service:4: ts\\.net",
     ]
