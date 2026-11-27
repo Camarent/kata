@@ -41,7 +41,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/smoke/local_audit.py` - opt-in local capability audit: the audit cases against a local model, scored and printed as a table (`scripts/smoke/audit_cases.py`, `scripts/smoke/audit_score.py`).
 - `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
 - `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
-- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel worktrees.
+- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel checkouts.
 - `scripts/dev/reader_probe.py` - live reader probe: writes `/spool/in` files for the worker, polls `/spool/out/<id>/result.json` via the `worker` and `reader` services, runs two sandbox checks, writes the report (`docs/research/reader-live.md` is its filled output); tested by `tests/scripts/test_reader_probe.py`.
 - `scripts/dev/check_research_note.py` - research note checker (`python3 scripts/dev/check_research_note.py NOTE.md`); tested by `tests/scripts/test_check_research_note.py`, which also checks `docs/research/m23-sources.md`.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.
@@ -56,10 +56,10 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - Exit codes (`scripts/smoke/dojo_real.py:54-56`): 0 when every step succeeds with no diagnostics; 1 on a diagnostic or a `TrainerError`; 2 when refused.
 - Uses `DojoTrainerCli` (`core/kata_core/trainer/dojo_cli.py:36`) with a 60 s timeout per call. Tested by `tests/scripts/test_dojo_real.py`.
 - Init id probe runs first (`probe_init_ids` in `scripts/smoke/dojo_real.py`): `dojo init "Bad Id"` must exit non-zero, and the smoke prints that id-rule error text (`init rejects 'Bad Id': <text>`). `dojo init kata-<uuid>` must exit 0.
-- The id rules the real `dojo` enforces are not yet measured here. After the first real run, the lead records the measured rules in `docs/decisions.md` (lead step, not the dev).
+- The id rules the real `dojo` enforces are not yet measured here. After the first real run, a maintainer records the measured rules in `docs/decisions.md`.
 
 ## scripts/smoke
-`scripts/smoke/real_model.py` runs the 4 prepared cases (`scripts/smoke/data/cases.json`) against the Anthropic API. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (env file holds `KATA_CONFIG` and the key in `KATA_ANTHROPIC_API_KEY`):
+`scripts/smoke/real_model.py` runs the 4 prepared cases (`scripts/smoke/data/cases.json`) against the Anthropic API. It is opt-in and run by hand by a maintainer; check-all and CI never run it. Run line (env file holds `KATA_CONFIG` and the key in `KATA_ANTHROPIC_API_KEY`):
 
 `set -a; . <env file>; set +a; KATA_SMOKE_REAL=1 python scripts/smoke/real_model.py`
 
@@ -70,7 +70,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - The key never reaches stdout or stderr. A reply reaches stdout only as a masked excerpt of at most 200 characters (`scripts/smoke/smoke_core.py:195-198`, `:255`).
 
 ## scripts/smoke: local capability audit
-`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by the lead by hand; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:109`): `kata-l`, `kata-m` or `cloud-only` per task class.
+`scripts/smoke/local_audit.py` runs the audit cases against a local OpenAI-compatible model and prints a markdown table. It is opt-in and run by hand by a maintainer; check-all and CI never run it. Its verdicts feed `[local_capability]` (`config/kata.example.toml:109`): `kata-l`, `kata-m` or `cloud-only` per task class.
 
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_audit.py [--model NAME] [--api-key-env NAME]`
 
@@ -81,7 +81,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - Exit codes: 0 only when every case of every model passes; 1 when any case fails; 2 when refused (`scripts/smoke/local_model.py:76, :89-91`, `EXIT_REFUSED`); 0 and 1 are `scripts/smoke/local_audit.py:310` (`EXIT_OK`, `EXIT_FAILED`).
 
 ## scripts/smoke: local model
-`scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by the lead by hand; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
+`scripts/smoke/local_model.py` runs the same prepared cases against the local OpenAI-compatible runtime through `LocalProvider`. It is opt-in and run by hand by a maintainer; check-all and CI never run it. Run line (the base URL is a value the operator supplies; it is never printed):
 
 `KATA_SMOKE_LOCAL=1 KATA_SMOKE_LOCAL_BASE_URL=<base URL> python scripts/smoke/local_model.py`
 
@@ -105,7 +105,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `abstain_rate` is over all cases; `abstain_precision` is `None` when nothing was predicted abstain (`scripts/bench/scoring.py:121`).
 - Report never prints entry text (tested by `test_rendered_report_has_no_entry_text`).
 - `install-browsers.sh` fails closed: an empty sha256 pin refuses the install. Chromedriver is not pinned; Chrome is found on `PATH`.
-- `reader_probe.py` is not run by `check-all.sh` or CI; the lead runs it by hand against the live stack. Spool names and protocol version (`IN_DIR`, `OUT_DIR`, `RESULT_NAME`, `SPOOL_VERSION`) are copied from the reader side: `scripts/dev/reader_probe.py:36-41`.
+- `reader_probe.py` is not run by `check-all.sh` or CI; a maintainer runs it by hand against the live stack. Spool names and protocol version (`IN_DIR`, `OUT_DIR`, `RESULT_NAME`, `SPOOL_VERSION`) are copied from the reader side: `scripts/dev/reader_probe.py:36-41`.
 - `docs/research/benchmarks/RESULTS.md` holds a pasted block between `bench:lesson-check` markers; `tests/scripts/test_bench_results_note.py` fails when it differs from the bench output.
 
 ## Depends on / used by

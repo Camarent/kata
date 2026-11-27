@@ -17,15 +17,15 @@ scripts/dev/check-all.sh
 It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), runs
 `npm ci` in `extension/` and `editor/`, starts a throwaway Postgres, runs ruff, mypy, the smoke tests
 (`-m smoke`, 2 today in `tests/e2e/test_fixtures.py`; an empty selection is red), pytest with `-m 'not flaky and not browser'`, and the
-extension build and tests, then the editor build and tests (`editor/`). It is safe to run in several worktrees at once: they share one
+extension build and tests, then the editor build and tests (`editor/`). It is safe to run in several checkouts at once: they share one
 Postgres (started under a lock, never stopped by the script; stop it with
-`scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. Flags:
+`scripts/dev/pg.sh stop`), and each test creates and drops its own scratch database. The pytest step runs with `-n auto` (pytest-xdist, one worker per core). Flags:
 `--unit` runs ruff, mypy and pytest with `-m 'not integration and not e2e and not smoke and not browser'`;
 `--py` runs ruff, mypy and pytest only (the Python part of the full run, with `-m 'not browser'`); `--merge`
 runs pytest with `-m 'not e2e and not browser'` plus the extension and editor build and tests; `--ext`
 runs the extension build and tests, then the editor build and tests; `--editor` runs the editor build
 and tests only; `--setup` only creates `.venv`, `extension/node_modules` and `editor/node_modules` when they are missing
-(no tests, no Postgres), so a fresh git worktree can be made ready in a couple of seconds.
+(no tests, no Postgres), so a fresh git checkout can be made ready in a couple of seconds.
 
 ### Output of the full run
 

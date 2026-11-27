@@ -29,11 +29,11 @@ flaky tests included). No driver or stage was running. Machine: 8 cores, load av
 | **Total, one bare `check-all.sh --py` run** | **181.7 s** |
 
 The ruff and mypy times are from separate timed runs of the same commands, wrapped by the
-`cs-qrun` runner. They include runner overhead, so the three phases do not add up exactly to the
+timing wrapper. They include wrapper overhead, so the three phases do not add up exactly to the
 total.
 
-Per level, one bare run each, on the same machine class, from a temporary worktree of `f0f551e`
-(the commit just before the speed-up). That worktree had `.venv` and `extension/node_modules`
+Per level, one bare run each, on the same machine class, from a temporary checkout of `f0f551e`
+(the commit just before the speed-up). That checkout had `.venv` and `extension/node_modules`
 set up by `--setup`. Load average was not sampled for these runs. The columns match After.
 
 | Level | Wall time | pytest (own clock) | Other | Target | Met |
