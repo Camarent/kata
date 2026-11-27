@@ -24,7 +24,7 @@ test the foundation, so it waits for a later milestone.
 - Embeddings: a small CPU model with hybrid keyword retrieval; re-evaluate multilingual models
   on real data.
 - License MIT. The repository is named `kata`; the PyPI name `kata` is taken, so the package
-  name would be e.g. `kata-companion`. The repository stays private until it contains
+  name would be e.g. `kata-companion`. The repository is public under MIT and holds
   nothing personal.
 
 ## Providers and routing
@@ -81,7 +81,7 @@ Benchmarks and method: [`research/benchmarks`](research/benchmarks).
 - **Scan target.** 30 seconds counts the card (all blocks tagged, counts and top gaps); the
   summary appears when ready, with no deadline.
 - **Marks.** Topic marks (`marks`) stay as they are. Concept marks (`concept_marks`) shipped in milestone 2: each user marks a concept `known`, `learning` or `new`, with optional evidence. Concept marks are private to their user.
-- **Chunk sharing.** Chunks are shared by content hash; the user-to-chunk link stays private so
+- **Chunk sharing.** Chunks are shared by content hash; the user-to-chunk link is kept private so
   the store does not reveal who studies what.
 - **Language.** The vector table is built for a multilingual embedding model from the start.
 - **Code to the cloud.** For a user without a worker, code and diffs go to a cloud model only
