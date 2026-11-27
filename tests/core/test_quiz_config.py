@@ -12,7 +12,6 @@ MINI_QUIZ_MAX = 5
 def test_example_config_parses_quiz_section() -> None:
     cfg = load_config(EXAMPLE_PATH, env={})
     assert cfg.get("quiz", "max_fetch_bytes") > 0
-    assert cfg.get("quiz", "max_question_chars") > 0
     assert cfg.get("quiz", "max_questions_per_source") > 0
 
 

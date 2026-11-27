@@ -240,8 +240,6 @@ max_import_bytes = 262144
 [quiz]
 # Cap on the bytes one quiz source fetch reads.
 max_fetch_bytes = 262144
-# Cap on the characters of one quiz question.
-max_question_chars = 400
 # Cap on the questions kept from one quiz source.
 max_questions_per_source = 50
 # Questions in one mini quiz. At most 5.
