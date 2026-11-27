@@ -181,14 +181,21 @@ The literal check only looks at each provider's configured `model_name`; an arbi
 model name. A task class can also name a model directly in `[routing]`.
 
 `[provider_openai]` is an OpenAI-compatible cloud provider. `base_url` and `model_name` are set in the
-host config only. The bearer token is not in the config: `api_key_env` names the env var that holds
-it (default `KATA_OPENAI_API_KEY`), and that var lives in the secret store (`deploy/secrets/`), never
-in a committed file. The base URL is trusted from the host config: no private-address check is made on
+host config only. The bearer token lives only in the env var that `api_key_env` names (default
+`KATA_OPENAI_API_KEY`), fed from the secret store (`deploy/secrets/`). It never appears in config,
+logs or the usage ledger, and never in a committed file. The base URL is trusted from the host config: no private-address check is made on
 it. The private-address block (D45-D47) stays on the page and quiz fetches.
 
 A model with no pinned price is not capped: its calls are still logged to the usage ledger. The cap
 applies to priced models only, so an unknown price means no cap, not a refusal.
 
 Vision is a flag per provider section (`vision` in `[provider_local]`, `[provider_anthropic]`,
-`[provider_openai]`), not per model. Default `false`; there is no auto-detection. The reader refuses
-a model that is not vision-capable and says so.
+`[provider_openai]`). That flag is the default for every model of the provider. Default `false`; there
+is no auto-detection. A `[model_vision]` table overrides it per model: its keys are literal model
+names (quote names with dots, e.g. `"qwen2.5-vl" = true`), and a listed model uses its own value;
+an unlisted one uses the provider flag. The reader refuses a model that is not vision-capable and
+says so.
+
+The literal-name rule holds wherever a setting names a model: in `[routing]` a literal model name wins
+over a generic name (`cloud`, `local`). `[model_vision]` keys are literal model names only; generic
+names do not apply there.
