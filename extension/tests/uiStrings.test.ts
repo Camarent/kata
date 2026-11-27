@@ -17,14 +17,6 @@ const table: Record<string, readonly string[]> = Object.fromEntries(
 const constName = (id: string): string => `TEXT_${id.toUpperCase().replace(/-/g, "_")}`;
 /** Every string of every const, flattened. */
 const allStrings = Object.values(table).flat();
-/**
- * Strings in strings.ts that are not in the approved screen inventory, by screen id. They are pinned
- * here, not in the fixture: the queued-summary line was added to the code (fb3af62) and is absent from
- * the approved inventory copy, so the screen text is the inventory text plus these entries, in order.
- */
-const NOT_IN_INVENTORY: Record<string, string[]> = {
-  "card-summary": ["The page text summary is queued. Open the summary again in a moment."],
-};
 
 /**
  * Glossary draft 4, section 3: terms that must not appear in UI text, with the rule they break.
@@ -59,17 +51,9 @@ describe("ui strings pinned to the screen inventory", () => {
   it.each(screens.map((screen) => [screen.id, screen] as const))(
     "%s text equals the inventory text verbatim",
     (_id, screen) => {
-      expect(table[constName(screen.id)]).toEqual([...screen.text, ...(NOT_IN_INVENTORY[screen.id] ?? [])]);
+      expect(table[constName(screen.id)]).toEqual(screen.text);
     },
   );
-
-  it("keeps the strings that are not in the approved inventory in the named extras list only", () => {
-    const queued = "The page text summary is queued. Open the summary again in a moment.";
-    expect(NOT_IN_INVENTORY).toEqual({ "card-summary": [queued] });
-    for (const screen of screens) {
-      expect(screen.text, screen.id).not.toContain(queued);
-    }
-  });
 
   it("every keyed panel string is an inventory string", () => {
     const inventory = new Set(screens.flatMap((screen) => screen.text));

@@ -65,7 +65,7 @@ export async function requestScan(runtime: CardRuntime): Promise<ScanStatus & { 
 
 /**
  * Asks the background script for the page summary (`panel:requestSummary`) and maps the reply to a
- * card status. A queued job (`{ id }`) shows the queued text: the card does not poll the job, so the
+ * card status. A queued job (`{ id }`) shows the loading text: the card does not poll the job, so the
  * user opens the summary again to get the result.
  */
 export async function requestSummary(runtime: CardRuntime, url: string, text: string): Promise<SummaryStatus> {

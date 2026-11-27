@@ -97,7 +97,6 @@ export const TEXT_CARD_SUMMARY = [
   "Could not write the page text summary.",
   "Open in panel",
   "Back",
-  "The page text summary is queued. Open the summary again in a moment.",
 ] as const;
 
 export const TEXT_FOCUS_CONFIRM = [

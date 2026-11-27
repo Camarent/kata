@@ -161,8 +161,8 @@ describe("floating card, summary screen", () => {
     expect(paragraphs(renderCardSummary({ kind: "error" }, actions))).toEqual([TEXT_CARD_SUMMARY[5]]);
   });
 
-  it("a queued job says it is queued, not loading", () => {
-    expect(paragraphs(renderCardSummary({ kind: "queued" }, actions))).toEqual([TEXT_CARD_SUMMARY[8]]);
+  it("a queued job shows the loading text (the queued copy is not in the approved inventory)", () => {
+    expect(paragraphs(renderCardSummary({ kind: "queued" }, actions))).toEqual([TEXT_CARD_SUMMARY[4]]);
   });
 
   it("ready shows the page text summary and the topics found", () => {

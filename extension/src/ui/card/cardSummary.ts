@@ -14,7 +14,6 @@ const [
   ERROR,
   OPEN_IN_PANEL,
   BACK,
-  QUEUED,
 ] = TEXT_CARD_SUMMARY;
 
 /** Where the summary stands. `ready` carries the page text summary and the topics found. */
@@ -40,7 +39,7 @@ export function renderCardSummary(status: SummaryStatus, actions: CardSummaryAct
   } else if (status.kind === "loading") {
     card.append(el("p", LOADING, "loading"));
   } else if (status.kind === "queued") {
-    card.append(el("p", QUEUED, "queued"));
+    card.append(el("p", LOADING, "queued"));
   } else if (status.kind === "error") {
     card.append(el("p", ERROR, "error"));
   } else {
