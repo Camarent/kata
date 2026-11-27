@@ -232,7 +232,7 @@ describe("focus mode confirm (D50)", () => {
     expect(buttonLabels(card)).toEqual([TEXT_FOCUS_CONFIRM[4], TEXT_FOCUS_CONFIRM[6]]);
   });
 
-  it("Cancel calls onCancel", () => {
+  it("focus confirm Cancel calls onCancel", () => {
     const a = actions();
     const card = renderFocusConfirm(null, () => 0, a);
     card.querySelector<HTMLButtonElement>(".cancel")?.click();

@@ -208,7 +208,7 @@ describe("track create", () => {
     expect(form.querySelector(".error")?.textContent).toBe(UNREACHABLE);
   });
 
-  it("Cancel calls onCancel", () => {
+  it("track create Cancel calls onCancel", () => {
     const onCancel = vi.fn();
     const form = renderTrackCreate({ state: "form" }, { onCreate: vi.fn(), onCancel });
     const cancel = Array.from(form.querySelectorAll<HTMLButtonElement>("button")).find(
@@ -272,7 +272,7 @@ describe("track detail", () => {
     expect(screen.querySelector(".error")?.textContent).toBe("Could not load the track.");
   });
 
-  it("offline: shows Server not reachable.", () => {
+  it("track detail offline: shows Server not reachable.", () => {
     const screen = renderTrackDetail({ state: "offline", track: null }, detailHandlers());
     expect(screen.querySelector(".offline")?.textContent).toBe(UNREACHABLE);
   });

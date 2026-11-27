@@ -105,7 +105,7 @@ describe("sidepanel.html", () => {
     const scripts = Array.from(parsedPage().querySelectorAll("script"));
     expect(scripts.length).toBeGreaterThan(0);
     for (const script of scripts) {
-      expect(script.getAttribute("src")).toBeTruthy();
+      expect(script.getAttribute("src")).toMatch(/^[\w.-]+\.js$/);
       expect(script.textContent?.trim()).toBe("");
     }
   });

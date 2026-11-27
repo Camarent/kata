@@ -65,7 +65,7 @@ describe("renderReview", () => {
       ["true", "false", "false"],
       ["false", "false", "false"],
     ]);
-    expect(items[0].querySelector('[role="group"]')?.getAttribute("aria-label")).toBeTruthy();
+    expect(items[0].querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("State of a");
     expect(rowButtons(items[0]).map((b) => b.textContent)).toEqual(["New", "Learning", "Known"]);
   });
 
