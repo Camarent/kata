@@ -23,6 +23,7 @@ from kata_worker.providers.base import (
     ProviderError,
     TokenUsage,
     UsageProvider,
+    VisionProvider,
     require_vision,
 )
 
@@ -131,7 +132,7 @@ class CappedProvider:
         self._image_tokens = image_tokens
         self._unpriced_ok = unpriced_ok
         self.name = inner.name
-        self.vision = bool(getattr(inner, "vision", False))
+        self.vision = isinstance(inner, VisionProvider) and inner.vision
         self.is_cloud = inner.is_cloud
 
     def complete(self, system: str, user: str) -> str:

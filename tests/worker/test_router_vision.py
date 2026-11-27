@@ -93,6 +93,19 @@ def test_route_exhausted_when_no_provider_takes_images() -> None:
     assert text_only.calls == 0
 
 
+def test_no_vision_is_false_when_a_policy_skip_is_mixed_with_a_text_only_refusal() -> None:
+    # "anthropic" is absent from the providers: the router skips it by policy, not by vision.
+    text_only = TextOnly()
+    log: list[str] = []
+
+    with pytest.raises(RouteExhausted) as excinfo:
+        _router({"local": text_only}, log).route_vision(VISION, SYSTEM, USER, [IMAGE])
+
+    assert "local=no_vision" in str(excinfo.value)
+    assert "anthropic=skipped" in str(excinfo.value)
+    assert excinfo.value.no_vision is False
+
+
 def test_route_exhausted_when_every_vision_provider_fails() -> None:
     broken = BrokenVision(name="local", script=[], vision=True)
     log: list[str] = []

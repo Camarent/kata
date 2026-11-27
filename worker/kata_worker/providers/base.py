@@ -81,6 +81,9 @@ ImageInput = tuple[str, bytes]
 class VisionProvider(Protocol):
     """A provider that takes images with the user message. Text-only providers do not match."""
 
+    # True when the configured model takes images; `vision_flag` reads it from the config.
+    vision: bool
+
     def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion: ...
 
 

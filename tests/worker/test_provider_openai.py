@@ -171,6 +171,15 @@ def test_vision_refused_when_config_vision_is_false() -> None:
     assert called == []
 
 
+def test_config_without_vision_key_builds_a_text_only_provider() -> None:
+    base = load_config(EXAMPLE_PATH, env={})
+    section = {key: value for key, value in base.sections["provider_openai"].items() if key != "vision"}
+    section.update({"base_url": BASE_URL, "model_name": MODEL})
+    config = Config(sections={**base.sections, "provider_openai": section})
+
+    assert OpenAIProvider(config, _env()).vision is False
+
+
 def test_build_openai_returns_guarded_capped_provider() -> None:
     # An unpriced model runs uncapped by design; a priced one proves the cap is wired in.
     base = _config()
