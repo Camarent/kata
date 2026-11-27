@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.21] - 2026-11-27
+
+- fix(worker): per-model vision flag, token leak test, M26 docs
+
 ## [0.1.20] - 2026-11-27
 
 - feat(worker): generic cloud/local model names and OpenAI-compatible provider
