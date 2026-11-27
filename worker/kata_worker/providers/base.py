@@ -83,6 +83,8 @@ class VisionProvider(Protocol):
 
     # True when the configured model takes images; `vision_flag` reads it from the config.
     vision: bool
+    # The configured model name, named in the route message when the model takes no images.
+    model_name: str
 
     def complete_vision(self, system: str, user: str, images: Sequence[ImageInput]) -> Completion: ...
 
@@ -95,8 +97,15 @@ def require_vision(provider: Provider) -> VisionProvider:
 
 
 VISION_KEY = "vision"
+MODEL_VISION_SECTION = "model_vision"
 
 
-def vision_flag(config: Config, section: str) -> bool:
-    """The `vision` key of a provider section: whether its model takes images. False when the key is absent."""
+def vision_flag(config: Config, section: str, model: str) -> bool:
+    """Whether `model` takes images: its `[model_vision]` entry first, else the `vision` key of `section`.
+
+    False when neither names it. The `[model_vision]` keys are literal model names.
+    """
+    overrides = config.sections.get(MODEL_VISION_SECTION, {})
+    if model in overrides:
+        return bool(overrides[model])
     return bool(config.sections.get(section, {}).get(VISION_KEY, False))

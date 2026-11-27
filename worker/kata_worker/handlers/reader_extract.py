@@ -121,7 +121,8 @@ def _read_pages(
                 routed = router.route_vision(VISION_CLASS, SYSTEM, USER, [(IMAGE_MEDIA_TYPE, png)])
             except RouteExhausted as exc:
                 if exc.no_vision:
-                    raise NoVisionModel(NO_VISION_MESSAGE) from None
+                    named = ", ".join(exc.skipped_models)
+                    raise NoVisionModel(f"{NO_VISION_MESSAGE}: {named}") from None
                 raise
             text = _join(text, _clean(routed.reply, limit), limit)
         posted.append({"n": page["n"], "text": text})

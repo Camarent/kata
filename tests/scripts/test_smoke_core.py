@@ -104,6 +104,13 @@ def test_allow_list_reads_config_and_passes_haiku(smoke: ModuleType) -> None:
     assert smoke.require_allowed(config) == HAIKU
 
 
+def test_allow_list_accepts_literal_id_unchanged(smoke: ModuleType) -> None:
+    # A literal id equal to a generic name ("cloud") is kept verbatim, never mapped to a provider.
+    config = _config(model="cloud", allowed=f"cloud, {HAIKU}")
+    assert smoke.allowed_models(config) == frozenset({"cloud", HAIKU})
+    assert smoke.require_allowed(config) == "cloud"
+
+
 @pytest.mark.parametrize("model", REFUSED_MODELS)
 def test_refused_model_sends_no_request(smoke: ModuleType, model: str) -> None:
     recorder = Recorder()

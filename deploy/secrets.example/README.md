@@ -13,7 +13,7 @@ entrypoint exports each one into the env var named below (core reads no `*_FILE`
 | `postgres_password`        | `KATA_DATABASE_PASSWORD`   | core, postgres (`database.password_env`) |
 | `worker_token`             | `KATA_WORKER_TOKEN`        | worker (`worker.token_env`); must hold a device token issued by core (`docs/deployment.md` step 11), a random value only starts the stack |
 | `anthropic_api_key`        | `KATA_ANTHROPIC_API_KEY`   | core, only when cloud providers are on (`provider_anthropic.api_key_env`) |
-| `openai_api_key`           | `KATA_OPENAI_API_KEY`      | core, only when the OpenAI-compatible provider is on (`provider_openai.api_key_env`) |
+| `openai_api_key`           | `KATA_OPENAI_API_KEY`      | core, only when the OpenAI-compatible provider is on (`provider_openai.api_key_env`); the token lives only in that env var, never in config, logs or the usage ledger |
 | `open_link_key`            | none: mounted at `/run/secrets/open_link_key` | core, read from `trainer.open_link_key_file` (signs open links) |
 
 ## Create the files

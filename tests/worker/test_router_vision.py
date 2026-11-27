@@ -93,6 +93,19 @@ def test_route_exhausted_when_no_provider_takes_images() -> None:
     assert text_only.calls == 0
 
 
+def test_refusal_names_a_wrapper_over_a_text_only_inner_by_provider_name() -> None:
+    # A wrapper over a text-only inner carries an empty model_name; the refusal must still name it.
+    wrapper = FakeProvider(name="local", script=[], vision=False, model_name="")
+    log: list[str] = []
+
+    with pytest.raises(RouteExhausted) as excinfo:
+        _router({"local": wrapper}, log).route_vision(VISION, SYSTEM, USER, [IMAGE])
+
+    assert "local" in excinfo.value.skipped_models
+    assert "''" not in str(excinfo.value)
+    assert wrapper.vision_calls == []
+
+
 def test_no_vision_is_false_when_a_policy_skip_is_mixed_with_a_text_only_refusal() -> None:
     # "anthropic" is absent from the providers: the router skips it by policy, not by vision.
     text_only = TextOnly()

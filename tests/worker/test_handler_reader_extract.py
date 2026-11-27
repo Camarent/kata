@@ -20,7 +20,7 @@ from kata_reader.spool import process_once
 from kata_worker.core_client import CoreClient, CoreError, Job
 from kata_worker.handlers import load_handlers
 from kata_worker.handlers import reader_extract as handler
-from kata_worker.providers.base import ProviderError
+from kata_worker.providers.base import ProviderError, vision_flag
 from kata_worker.providers.policy import Policy
 from kata_worker.providers.router import Router
 from PIL import Image
@@ -72,6 +72,18 @@ def _cfg(spool: Path, **reader: Any) -> Config:
     base = load_config(EXAMPLE_PATH, env={})
     section = {**base.sections["reader"], "spool_dir": str(spool), **reader}
     return Config(sections={**base.sections, "reader": section})
+
+
+def _model_vision_config(model: str) -> Config:
+    """The example config with `model` as the local model, its provider key on, and `[model_vision]` off for it."""
+    base = load_config(EXAMPLE_PATH, env={})
+    sections = {
+        **base.sections,
+        "model": {**base.sections["model"], "model_name": model},
+        "provider_local": {**base.sections["provider_local"], "vision": True},
+        "model_vision": {model: False},
+    }
+    return Config(sections=sections)
 
 
 def _policy() -> Policy:
@@ -338,7 +350,15 @@ def test_no_vision_model_fails_job_named_and_sends_no_image(
     spool = tmp_path / "spool"
     result = _result([_page(1, text="", image="p0001.png")])
     _setup(monkeypatch, spool, _publish_sleep(spool, result, {"p0001.png": _png(20, 20)}))
-    provider = FakeProvider(name="local", script=[], vision=False)
+    model = "text-only-model"
+    config = _model_vision_config(model)
+    provider = FakeProvider(
+        name="local",
+        script=[],
+        vision=vision_flag(config, "provider_local", model),
+        model_name=model,
+    )
+    assert provider.vision is False
     router = Router(
         {handler.VISION_CLASS: (provider.name,)},
         {provider.name: provider},
@@ -352,6 +372,7 @@ def test_no_vision_model_fails_job_named_and_sends_no_image(
     assert client.outputs == []
     assert provider.vision_calls == []
     assert any(handler.NO_VISION_MESSAGE in record.getMessage() for record in caplog.records)
+    assert any("text-only-model" in record.getMessage() for record in caplog.records)
     assert _spool_empty(spool)
 
 

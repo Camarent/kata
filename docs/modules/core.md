@@ -181,7 +181,7 @@ Invariants and gotchas (trainer):
 - `[knowledge]` thresholds must satisfy `learning <= known` (`mastery.state_for` raises otherwise).
 - Course limit and titles: the limit is checked under the user row lock (`lock_user`, `core/kata_core/trainer/store.py:78`); a title is unique per user after normalisation, enforced by the index in migration `0014`. A deleted course frees its slot and title. `[trainer] max_courses_per_user` must be an integer >= 0 (`core/kata_core/config.py:111`).
 - `course.build` loads config inside the handler (`core/kata_core/trainer/build.py:73`), so the runner process needs `KATA_CONFIG`.
-- The trainer binary is a config-supplied command, not part of this repo: `[trainer] command` is the `dojo` CLI (`core/kata_core/trainer/dojo_cli.py`, text output; `validate --json` exits 0 or 1, the other subcommands must exit 0); the default `/opt/trainer/dojo` is a placeholder path (`config/kata.example.toml:125`). The M26 keys in that file (`[models]`, `[provider_openai]`, `vision`) are not part of this section.
+- The trainer binary is a config-supplied command, not part of this repo: `[trainer] command` is the `dojo` CLI (`core/kata_core/trainer/dojo_cli.py`, text output; `validate --json` exits 0 or 1, the other subcommands must exit 0); the default `/opt/trainer/dojo` is a placeholder path (`config/kata.example.toml:125`). `[model_vision]`, the provider `vision` key and `api_key_env` are read by the worker providers and documented in `config/kata.example.toml` (the `[model_vision]` block, line 152); core only loads them as config sections.
 
 ### Course artifact
 

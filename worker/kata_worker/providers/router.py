@@ -40,11 +40,16 @@ class RouteExhausted(ProviderError):
     """Every provider in the chain was skipped or failed. Names providers and reasons only.
 
     `no_vision` is true when every provider in the chain was text-only (no image support).
+    `skipped_models` names the models of the providers skipped for lacking images (provider names
+    for text-only ones), so the caller can say which model to change.
     """
 
-    def __init__(self, message: str, *, no_vision: bool = False) -> None:
+    def __init__(
+        self, message: str, *, no_vision: bool = False, skipped_models: tuple[str, ...] = ()
+    ) -> None:
         super().__init__(message)
         self.no_vision = no_vision
+        self.skipped_models = skipped_models
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,16 @@ def _validate_chains(chains: Mapping[str, tuple[str, ...]]) -> None:
         for name in chain:
             if name not in PROVIDER_NAMES:
                 raise RoutingError(f"unknown provider {name} in chain for {task_class}")
+
+
+def _model_label(provider: Provider) -> str:
+    """The configured model name of a vision provider; the provider name when it has none.
+
+    A wrapper over a text-only inner carries an empty model_name, so it falls back to the provider name.
+    """
+    if isinstance(provider, VisionProvider) and provider.model_name:
+        return provider.model_name
+    return provider.name
 
 
 def _parse_chain(raw: str) -> tuple[str, ...]:
@@ -110,6 +125,7 @@ class Router:
             raise PolicyError(f"unknown task class: {task_class}")
         # Each outcome: (text for the message, True when the provider was skipped for lacking vision).
         outcomes: list[tuple[str, bool]] = []
+        refused_models: list[str] = []
         for name in self._chains.get(task_class, ()):
             provider = self._providers.get(name)
             if provider is None or not self._policy.allows(provider, task_class):
@@ -117,6 +133,7 @@ class Router:
                 continue
             if not can_answer(provider):
                 outcomes.append((f"{name}={NO_VISION}", True))
+                refused_models.append(_model_label(provider))
                 self._log(f"route {task_class}: {name}={NO_VISION}")
                 continue
             try:
@@ -132,6 +149,7 @@ class Router:
         raise RouteExhausted(
             f"route exhausted for {task_class}: {', '.join(text for text, _ in outcomes)}",
             no_vision=no_vision,
+            skipped_models=tuple(refused_models),
         )
 
 

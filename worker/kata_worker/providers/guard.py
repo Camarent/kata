@@ -51,6 +51,7 @@ class GuardedProvider:
         self.name = inner.name
         self.is_cloud = inner.is_cloud
         self.vision = isinstance(inner, VisionProvider) and inner.vision
+        self.model_name = inner.model_name if isinstance(inner, VisionProvider) else ""
 
     def complete(self, system: str, user: str) -> str:
         self._scan(system, user)
