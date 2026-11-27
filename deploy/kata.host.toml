@@ -146,6 +146,11 @@ api_key_env = "KATA_OPENAI_API_KEY"
 timeout_seconds = 60
 vision = false
 
+# [model_vision]: per model, whether it takes page images. Keys are literal model names (quote names
+# with dots, e.g. "qwen2.5-vl" = true). A listed model overrides its provider's vision key; an
+# unlisted one uses that key. Empty here: no model is listed by default.
+[model_vision]
+
 [policy]
 quiet_mark_enabled = true
 quiet_mark_idle_seconds = 600

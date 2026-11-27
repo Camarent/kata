@@ -53,6 +53,7 @@ def test_example_has_required_sections() -> None:
         "provider_local",
         "provider_anthropic",
         "provider_openai",
+        "model_vision",
         "models",
         "policy",
         "trainer",

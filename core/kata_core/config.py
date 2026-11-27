@@ -84,6 +84,21 @@ def _is_course_limit(value: Any) -> bool:
     return value >= MAX_COURSES_UNLIMITED
 
 
+# [model_vision]: the keys are literal model names, so the example cannot list them. Each value
+# must be a TOML bool: whether that model takes images. A model not listed falls back to its provider.
+_MODEL_VISION_SECTION = "model_vision"
+
+
+def _model_vision_table(given: dict[str, Any], file_arg: object) -> dict[str, bool]:
+    for model, flag in given.items():
+        if not isinstance(flag, bool):
+            raise ConfigError(
+                f"{_MODEL_VISION_SECTION}.{model} must be true or false in {file_arg}, "
+                f"got a {type(flag).__name__}"
+            )
+    return dict(given)
+
+
 def load_config(
     path: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] = os.environ,
@@ -102,6 +117,9 @@ def load_config(
         given = file_data.get(section)
         if not isinstance(given, dict):
             raise ConfigError(f"missing section [{section}] in {file_arg}")
+        if section == _MODEL_VISION_SECTION:
+            sections[section] = MappingProxyType(_model_vision_table(given, file_arg))
+            continue
         values: dict[str, Any] = {}
         for field in keys:
             if field not in given:

@@ -39,9 +39,9 @@ class LocalProvider:
     is_cloud = False
 
     def __init__(self, config: Config, *, transport: httpx.BaseTransport | None = None) -> None:
-        self.vision = vision_flag(config, SECTION)
         self._base_url = str(config.get("model", "base_url"))
         self._model_name = str(config.get("model", "model_name"))
+        self.vision = vision_flag(config, SECTION, self._model_name)
         self._timeout = float(config.get("model", "timeout_seconds"))
         self._reasoning_effort = str(config.get("model", REASONING_KEY))
         self._transport = transport

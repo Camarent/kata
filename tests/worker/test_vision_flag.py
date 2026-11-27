@@ -127,6 +127,37 @@ def test_anthropic_provider_reads_the_flag_from_its_section() -> None:
     assert AnthropicProvider(_config_without_vision("provider_anthropic"), env=env).vision is False
 
 
+def _config_with_model_vision(models: dict[str, bool]) -> Config:
+    """The example config with the `[model_vision]` table replaced by `models`."""
+    base = load_config(EXAMPLE_PATH, env={})
+    return Config(sections={**base.sections, "model_vision": models})
+
+
+def test_model_vision_true_beats_provider_false() -> None:
+    base = load_config(EXAMPLE_PATH, env={})
+    model = str(base.get("model", "model_name"))
+    config = _config_with_model_vision({model: True})
+
+    assert base.get("provider_local", "vision") is False
+    assert LocalProvider(config).vision is True
+
+
+def test_model_vision_false_beats_provider_true() -> None:
+    env = {ANTHROPIC_KEY_ENV: "test-key"}
+    base = load_config(EXAMPLE_PATH, env=env)
+    model = str(base.get("provider_anthropic", "model_name"))
+    config = _config_with_model_vision({model: False})
+
+    assert AnthropicProvider(config, env=env).vision is False
+    assert AnthropicProvider(base, env=env).vision is True
+
+
+def test_model_vision_unlisted_model_falls_back_to_provider_key() -> None:
+    config = _config_with_model_vision({"some-other-model": True})
+
+    assert LocalProvider(config).vision is False
+
+
 def test_text_only_provider_is_refused_even_when_its_flag_says_true() -> None:
     # A provider with no complete_vision is refused by the router even when a flag says true.
     class TextOnly:
