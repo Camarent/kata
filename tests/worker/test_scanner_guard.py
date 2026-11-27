@@ -33,6 +33,12 @@ def _events() -> tuple[list[AuditEvent], AuditSink]:
     return sink_events, sink_events.append
 
 
+def test_guarded_vision_flag_follows_vision_inner() -> None:
+    _, sink = _events()
+    assert guarded(FakeProvider(name="cloud", is_cloud=True, vision=True), sink).vision is True
+    assert guarded(FakeProvider(name="cloud", is_cloud=True, vision=False), sink).vision is False
+
+
 def test_clean_cloud_text_reaches_inner_provider() -> None:
     inner = _cloud()
     events, sink = _events()
