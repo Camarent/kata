@@ -11,7 +11,7 @@ dependencies = ["fastapi==0.165.0", "psycopg[binary]==3.3.9", "httpx==0.28.1", "
 reader = ["pypdfium2==5.15.2", "pillow==13.0.0"]
 
 [dependency-groups]
-dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "coverage==7.17.4", "ruff==0.17.6", "mypy==2.4.1", "pyyaml==6.0.3", "pypdfium2==5.15.2", "pillow==13.0.0"]
+dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "pytest-xdist==3.8.0","coverage==7.17.4", "ruff==0.17.6", "mypy==2.4.1", "pyyaml==6.0.3", "pypdfium2==5.15.2", "pillow==13.0.0"]
 
 [tool.ruff]
 line-length = 100

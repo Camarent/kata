@@ -67,6 +67,9 @@ cd "$REPO_ROOT"
 RUN_TMP="$(mktemp -d "${TMPDIR:-/tmp}/kata-check.XXXXXX")"
 trap 'rm -rf "$RUN_TMP"' EXIT
 export TMPDIR="$RUN_TMP"
+# mypy and ruff caches live under the run dir too, so a run leaves no cache behind and runs do not share one.
+export MYPY_CACHE_DIR="$RUN_TMP/mypy"
+export RUFF_CACHE_DIR="$RUN_TMP/ruff"
 
 # Run one command through qrun when KATA_QRUN is set, else directly.
 run_cmd() {
@@ -124,9 +127,10 @@ run_lint() {
   step mypy env MYPYPATH=worker .venv/bin/mypy core scripts/smoke/real_model.py scripts/smoke/local_model.py scripts/smoke/smoke_core.py
 }
 
-# pytest with coverage. Extra arguments select tests, for example -m 'not flaky'.
+# pytest with coverage, one xdist worker per core (-n auto). Each test owns its TMPDIR and scratch
+# database, so workers do not share state. Extra arguments select tests, for example -m 'not flaky'.
 run_tests() {
-  step pytest .venv/bin/python -m pytest tests --cov=core --cov=worker --cov-report=term "$@"
+  step pytest .venv/bin/python -m pytest tests -n auto --cov=core --cov=worker --cov-report=term "$@"
 }
 
 run_python() {
