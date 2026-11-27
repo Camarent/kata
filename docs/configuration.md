@@ -199,3 +199,16 @@ says so.
 The literal-name rule holds wherever a setting names a model: in `[routing]` a literal model name wins
 over a generic name (`cloud`, `local`). `[model_vision]` keys are literal model names only; generic
 names do not apply there.
+
+## Behaviour of the settings
+
+- `trainer.max_courses_per_user` caps the courses one user can hold. `POST /v1/courses` refuses a new course above the cap. `0` means unlimited.
+- Course names are unique per user. The side panel lists, creates and deletes courses.
+- Each task class tries its `[routing]` chain in order. The default chain is `local,anthropic`: local models first, then the cloud.
+- The cloud is on when its token is set (`provider_anthropic.api_key_env`, default `KATA_ANTHROPIC_API_KEY`). Without a token, a job that needs the cloud is refused with HTTP 409 `needs_cloud` before it is queued.
+- One worker program runs on the GPU machine next to Ollama. It polls core over outbound HTTP every `worker.poll_interval_seconds`, using the URL in `worker.core_url` and the token in the env var named by `worker.token_env`.
+- The worker runs as the owning user, never as root. It accepts only a fixed allow-list of subcommands.
+- The control jobs `modelhost.up`, `modelhost.use`, `modelhost.measure` and `modelhost.status` go through the same job queue as the other jobs.
+- `cost.cap_micro_usd` caps each user's daily spend in micro-USD, and `cost.warn_micro_usd` sets the level at which a warning is raised.
+- Each intervention in `[policy]` (quiet mark, nudge, stop) has an `*_enabled` switch and a threshold: `*_error_threshold` or `*_seconds`, set per intervention.
+- `provider_<name>.task_classes` lists the task classes that provider may serve. The provider policy flags apply per provider and per task class.
