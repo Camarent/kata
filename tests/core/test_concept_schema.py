@@ -107,6 +107,9 @@ def test_same_alias_for_other_owner_allowed(conn: psycopg.Connection[Any]) -> No
     _alias(conn, concept, topic, "Iterators", owner_user_id=alice)
     _alias(conn, concept, topic, "Iterators", owner_user_id=bob)
     _alias(conn, concept, topic, "Iterators", owner_user_id=None)
+    row = conn.execute("SELECT count(*) FROM concept_aliases WHERE alias = 'Iterators'").fetchone()
+    assert row is not None
+    assert row[0] == 3
 
 
 def test_deleting_concept_cascades_to_aliases_and_ignored(conn: psycopg.Connection[Any]) -> None:
