@@ -13,6 +13,8 @@ The gate levels must fit these wall-time limits:
 | merge | `scripts/dev/check-all.sh --merge` | 5 min (300 s) |
 | full | `scripts/dev/check-all.sh` | 9 min (540 s) |
 
+The merge and full levels run the browser tests as one concurrent job with pytest, the extension and the editor. The browser job runs only when Firefox and geckodriver are installed (`scripts/dev/install-browsers.sh`); otherwise it prints a skip line.
+
 ## Before
 
 Baseline taken after the cleanup-m25 tasks and before the speed task 16. Measured 2026-11-27.

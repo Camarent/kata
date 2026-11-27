@@ -194,6 +194,8 @@ Decided 2026-11-21. `scripts/dev/install-browsers.sh` downloads Firefox 140.0esr
 
 Decided 2026-11-21. Tests marked `browser` (`pyproject.toml`, marker `browser`) run only through `scripts/dev/check-all.sh --browser`. Every other mode excludes them with `-m 'not browser'`: `--py`, `--unit`, `--merge`, the smoke step and the full run. Reason: CI and the pipeline gate have no browser and no Firefox, so a browser test there would fail or skip for a reason that is not a code fault. The marker keeps the browser tier out of the default gate without deleting its tests.
 
+Addendum (m25-finish): `--merge` and the full run now also run the browser tests, as one of the concurrent jobs; the browser deps install runs once in the parent first. Without browsers the job prints a skip line and the run goes on. `--unit`, `--py` and the smoke step still exclude the marker.
+
 ## Browser tests skip with a message when a browser is missing
 
 Decided 2026-11-21. With no Firefox or geckodriver from the install, `check-all.sh --browser` prints `check-all: browser tests skipped: ...` and exits 0. Each browser case also skips with a reason from `tests/browser/conftest.py` (`pytest.skip`) when its binary is missing. A missing built extension is a failure, not a skip: the case says to run `npm run build`. Reason: a developer without browsers keeps a green run, and a broken build still shows red.

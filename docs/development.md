@@ -65,10 +65,10 @@ The test tiers are markers in `pyproject.toml`:
 Which `scripts/dev/check-all.sh` flag runs which tier:
 
 - no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky and not browser'` with coverage,
-  extension build and tests, then editor build and tests, then the jscpd report. The closest local run to CI, plus the extras.
+  extension build, then pytest, extension tests, editor tests and browser tests as concurrent jobs, then the jscpd report. The closest local run to CI, plus the extras.
 - `--unit`: ruff, mypy, pytest without the `integration`, `e2e`, `smoke` and `browser` tiers.
 - `--py`: ruff, mypy, pytest with every test except `browser`, `flaky` included.
-- `--merge`: pytest `-m 'not e2e and not browser'` with coverage, then the extension and editor build and tests.
+- `--merge`: extension build, then pytest `-m 'not e2e and not browser'` with coverage, extension and editor tests and browser tests as concurrent jobs.
 - `--ext`: extension build and tests, then editor build and tests.
 - `--editor`: editor build and tests only.
 - `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
@@ -76,6 +76,8 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
 
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
 `-m 'not flaky'`, extension build, extension test), each as a plain command. On a clean clone, run `scripts/dev/check-all.sh`.
+
+In the merge and full modes each job logs to its own file under the run's temp dir: a red job's log is printed and the run ends with `CHECK-ALL FAILED at <job>`; a green job prints only its `check-all:` notice lines, such as the browser skip line.
 
 ## JS audit rows
 

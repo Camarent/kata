@@ -78,7 +78,7 @@ Skip behaviour:
 - A Chrome case skips with a reason when `google-chrome`, `chromium` or `chromedriver` is not on `PATH`.
 - A skip is not a pass. Read the skip lines of `pytest tests/browser -m browser -rs`; an all-skipped run is not a browser check.
 - The Chrome case has never run against a real Chrome. See `docs/decisions.md` for the open risk.
-- The browser marker is excluded from every other gate. CI and the default `check-all.sh` never run these tests.
+- The browser marker is excluded from `--unit`, `--py` and the smoke step, and from CI. The `--merge` and full modes run these tests as a concurrent job; without browsers that job prints the skip line and the run goes on.
 
 ## Notes
 

@@ -54,7 +54,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 ## Build and test commands
 From `tools/gates.json` (plain commands): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
 Editor (from `editor/package.json`): `npm --prefix editor run build` (`tsc --noEmit`), `npm --prefix editor run test:cov` (vitest with coverage); CI runs build and `npm --prefix editor test` (`.github/workflows/ci.yml:58-60`).
-The full check is `scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`).
+The full check is `scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`). Its merge and full modes run the pytest, extension, editor and browser jobs concurrently; the first red job fails the run.
 
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:29`). It refuses any embedder but `fake`.
 
