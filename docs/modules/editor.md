@@ -45,4 +45,4 @@ Client for the editor signal: a VS Code extension that posts one `editor.save` e
 
 ## Depends on / used by
 - Depends on: VS Code extension host API (`vscode`); Node for `build` and `test` (`npm --prefix editor`); `python3` with the `kata_device` package for the install command; the core `POST /v1/events` route (`docs/api.md`).
-- Used by: `scripts/dev/check-all.sh --editor` runs `npm --prefix editor run build` and `run test:cov` (`scripts/dev/check-all.sh:146-148`); CI runs `npm --prefix editor run build` and `npm --prefix editor test` (no coverage) (`.github/workflows/ci.yml:58-60`).
+- Used by: `scripts/dev/check-all.sh --editor` runs `npm --prefix editor run build` and `run test:cov` (`scripts/dev/check-all.sh:161-164` `run_editor`); CI runs `npm --prefix editor run build` and `npm --prefix editor test` (no coverage) (`.github/workflows/ci.yml:58-60`).

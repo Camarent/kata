@@ -7,6 +7,8 @@ summary: pytest suites - core (API, repositories, auth, queue, import; needs Pos
 ## Purpose
 Verify core behaviour against a real Postgres, check repo-level contracts (config keys, README and decisions text, gate list, extension scaffold), test the worker against fakes, and run the end-to-end lesson loop. Test layout: `tests/core/`, `tests/foundation/`, `tests/worker/`, `tests/fakes/` (fake core and fake model servers), `tests/e2e/`, `tests/scripts/` (lesson-check bench in `scripts/bench/`), `tests/browser/` (side panel in real Firefox and Chrome through selenium).
 
+Baseline gate timings (before the speed-up) are in `docs/testing.md`.
+
 ## Public surface
 - `tests/support/scratch_db.py:15` `ScratchDatabase` - per-test database helper (imported by `tests/core/conftest.py:23`).
 - `tests/core/conftest.py:27` `cfg` fixture - loads config.
@@ -43,7 +45,7 @@ Verify core behaviour against a real Postgres, check repo-level contracts (confi
 - `tests/core/test_mcp.py`, `tests/core/test_mcp_gate.py`, `tests/core/test_mcp_route.py` - MCP server: JSON-RPC dispatch and tools (`test_mcp.py`); the egress gate quotes each result line and keeps injected instructions inside quotes (`tests/core/test_mcp_gate.py:15`, `:22`, `:33`); `POST /mcp` over HTTP (`test_mcp_route.py`).
 - `tests/device/` - `kata_device`: `test_device_cli.py`, `test_device_hooks.py`, `test_device_precommit.py`, `test_device_postcommit.py`, `test_device_queue.py` (local queue).
 - `tests/term/` - `kata term`: `test_term_session.py` (PTY relay and line capture), `test_term_mask.py` (masking), `test_term_spool.py` (JSONL spool trim and rewrite), `test_term_client.py` (batch post), `test_term_cli.py` (wiring).
-- `editor/tests/*.test.ts` - editor extension under vitest: `poster.test.ts`, `diagnostics.test.ts`, `extension.test.ts`, `infoView.test.ts`, `installHooks.test.ts`, `stopPatterns.test.ts`; run by `scripts/dev/check-all.sh --editor` (`npm --prefix editor run test:cov`).
+- `editor/tests/*.test.ts` - editor extension under vitest: `poster.test.ts`, `diagnostics.test.ts`, `extension.test.ts`, `infoView.test.ts`, `installHooks.test.ts`, `stopPatterns.test.ts`, `modelhost.test.ts`; run by `scripts/dev/check-all.sh --editor` (`npm --prefix editor run test:cov`).
 - `tests/foundation/test_core_config_keys.py:58`, `:64`, `:71` - `[policy]` example keys: bool and positive int, missing key raises `ConfigError`.
 - `tests/core/test_api_usage.py`, `tests/core/test_usage_store.py` - `POST`/`GET /usage` over HTTP and the atomic per-user daily upsert.
 - M23 core: `tests/core/test_api_jobs.py`, `test_api_summary.py`, `test_api_reader.py`, `test_api_jokes.py`, `test_summary_service.py`, `test_reader_service.py`, `test_needs_cloud.py`, `test_m23_config.py`, `test_m23_jobs_schema.py` (migrations 0023 and 0024 on Postgres).
