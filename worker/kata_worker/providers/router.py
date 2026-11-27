@@ -25,6 +25,8 @@ from kata_worker.providers.base import (
 )
 from kata_worker.providers.cost import Ledger, LogSink
 from kata_worker.providers.guard import AuditSink
+from kata_worker.providers.models import RoutingError, resolve_entry
+from kata_worker.providers.openai import build_openai
 from kata_worker.providers.policy import PROVIDER_NAMES, Policy, PolicyError
 from kata_worker.providers.scheduled import build_local
 
@@ -32,10 +34,6 @@ ROUTING_SECTION = "routing"
 SKIPPED = "skipped"
 NO_VISION = "no_vision"
 CHAIN_SEPARATOR = ","
-
-
-class RoutingError(Exception):
-    """The [routing] config or a Router chain is bad: unknown class or provider, or an empty chain."""
 
 
 class RouteExhausted(ProviderError):
@@ -132,6 +130,9 @@ def _build_providers(
     # No key: the cloud provider is absent, so the router skips it without a call.
     if cloud is not None:
         providers[cloud.name] = cloud
+    openai = build_openai(cfg, ledger, env, audit, log)
+    if openai is not None:
+        providers[openai.name] = openai
     return providers
 
 
@@ -146,7 +147,10 @@ def build_router(
     if missing:
         raise RoutingError(f"no chain in [{ROUTING_SECTION}] for task class: {', '.join(missing)}")
     chains = {
-        task_class: _parse_chain(str(cfg.get(ROUTING_SECTION, task_class)))
+        task_class: tuple(
+            resolve_entry(cfg, entry)
+            for entry in _parse_chain(str(cfg.get(ROUTING_SECTION, task_class)))
+        )
         for task_class in routing
     }
     policy = Policy.from_config(cfg, env)

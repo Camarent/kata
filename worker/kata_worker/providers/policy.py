@@ -1,9 +1,9 @@
 """Cloud policy: which provider may take which task class.
 
 A local provider takes a task class listed in its config, unless the class is cloud-only in
-`[local_capability]`. A cloud provider takes a task class listed in its config when the cloud
-token (the env var named by `[provider_anthropic] api_key_env`) is set: text leaves the machine
-only when both agree. There is no separate cloud switch.
+`[local_capability]`. A cloud provider takes a task class listed in its config when its own cloud
+token (the env var named by its `api_key_env`, e.g. `[provider_anthropic] api_key_env`) is set:
+text leaves the machine only when both agree. There is no separate cloud switch.
 """
 
 from __future__ import annotations
@@ -13,11 +13,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from kata_core.config import Config
-from kata_core.jobs.needs_cloud import CLOUD_ONLY, LOCAL_CAPABILITY_SECTION, cloud_token_present
+from kata_core.jobs.needs_cloud import CLOUD_ONLY, LOCAL_CAPABILITY_SECTION, PROVIDER_PREFIX
 
 from kata_worker.providers.base import TASK_CLASSES, Provider
 
-PROVIDER_NAMES = ("local", "anthropic")
+PROVIDER_NAMES = ("local", "anthropic", "openai")
+API_KEY_ENV_KEY = "api_key_env"
 
 
 class PolicyError(Exception):
@@ -50,19 +51,24 @@ class _Rule:
 class Policy:
     """Per-provider rules, the cloud token switch and the cloud-only classes. Build with `from_config`."""
 
-    cloud_token: bool
+    cloud_tokens: frozenset[str]
     cloud_only: frozenset[str]
     rules: dict[str, _Rule]
 
     @classmethod
     def from_config(cls, config: Config, env: Mapping[str, str]) -> Policy:
         rules: dict[str, _Rule] = {}
+        tokens: set[str] = set()
         for name in PROVIDER_NAMES:
-            section = f"provider_{name}"
-            rules[name] = _Rule(task_classes=_parse_classes(str(config.get(section, "task_classes"))))
+            # A provider without a section (openai, by default) takes no task class.
+            section = config.sections.get(f"{PROVIDER_PREFIX}{name}", {})
+            rules[name] = _Rule(task_classes=_parse_classes(str(section.get("task_classes", ""))))
+            key_env = section.get(API_KEY_ENV_KEY, "")
+            if key_env and env.get(str(key_env), ""):
+                tokens.add(name)
         verdicts = config.sections.get(LOCAL_CAPABILITY_SECTION, {})
         return cls(
-            cloud_token=cloud_token_present(config, env),
+            cloud_tokens=frozenset(tokens),
             cloud_only=_cloud_only_classes(verdicts),
             rules=rules,
         )
@@ -75,4 +81,4 @@ class Policy:
             return False
         if not provider.is_cloud:
             return task_class not in self.cloud_only
-        return self.cloud_token
+        return provider.name in self.cloud_tokens
