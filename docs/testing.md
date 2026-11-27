@@ -1,6 +1,17 @@
 # Testing: timings
 
-This page records how long the local gates take. It is a baseline, not a target.
+This page records how long the local gates take before and after the speed-up, and checks each
+level against its target.
+
+## Targets
+
+The gate levels must fit these wall-time limits:
+
+| Level | Command | Target |
+|---|---|---|
+| unit | `scripts/dev/check-all.sh --unit` | 2 min (120 s) |
+| merge | `scripts/dev/check-all.sh --merge` | 5 min (300 s) |
+| full | `scripts/dev/check-all.sh` | 9 min (540 s) |
 
 ## Before
 
@@ -14,16 +25,56 @@ flaky tests included). No driver or stage was running. Machine: 8 cores, load av
 |---|---|
 | ruff (`.venv/bin/ruff check .`) | about 2.0 s |
 | mypy (`env MYPYPATH=worker .venv/bin/mypy core scripts/smoke/...`) | about 3.4 s |
-| pytest (2686 passed, 38 deselected, 1 warning) | 178.1 s (pytest's own clock) |
+| pytest | 178.1 s (pytest's own clock) |
 | **Total, one bare `check-all.sh --py` run** | **181.7 s** |
 
 The ruff and mypy times are from separate timed runs of the same commands, wrapped by the
 `cs-qrun` runner. They include runner overhead, so the three phases do not add up exactly to the
 total.
 
-### Slowest tests
+Per level, one bare run each, on the same machine class, from a temporary worktree of `f0f551e`
+(the commit just before the speed-up). That worktree had `.venv` and `extension/node_modules`
+set up by `--setup`. Load average was not sampled for these runs. The columns match After.
 
-`pytest --durations=15` output, same selection as the `--py` gate. Paths are repo-relative:
+| Level | Wall time | pytest (own clock) | Other | Target | Met |
+|---|---|---|---|---|---|
+| unit | 51.3 s | 48.6 s | 2.7 s | 120 s | yes |
+| merge | 200.5 s | 176.7 s | 23.8 s | 300 s | yes |
+| full | 204.8 s | 177.0 s (plus 4.4 s smoke) | 23.4 s | 540 s | yes |
+
+## After
+
+Measured after task 16 on the same machine class, one bare run per level, no driver running.
+Each run was started from a plain subprocess call (wall time), and pytest's own clock is taken
+from the pytest summary line in the run log. "Other" is the wall time minus pytest and minus the
+smoke step (only the full level runs smoke). The table splits pytest from the rest; it does not
+time each non-pytest phase alone. What each level's "Other" contains:
+
+- unit: ruff and mypy.
+- py: Postgres start, ruff and mypy.
+- merge: Postgres start, extension build and test (with the JS audit), editor build and test. No lint.
+- full: Postgres start, ruff and mypy, extension build and test (with the JS audit), editor build and
+  test, jscpd report.
+
+The Before phase table (ruff about 2.0 s, mypy about 3.4 s, cold caches) is a separate timing and
+is not re-timed per level after task 16. The py "Other" of 2.4 s is smaller than that cold lint
+cost (about 5.4 s), so the lint share of the After "Other" values is not established. Do not
+subtract the Before lint figures from the After "Other" values.
+
+| Level | Wall time | pytest (own clock) | Other | Target | Met |
+|---|---|---|---|---|---|
+| unit | 26.2 s | 20.7 s | 5.5 s | 120 s | yes |
+| merge | 100.9 s | 77.1 s | 23.8 s | 300 s | yes |
+| full | 103.3 s | 74.1 s (plus 4.6 s smoke) | 24.6 s | 540 s | yes |
+| py (not a gate level) | 85.0 s | 82.6 s | 2.4 s | none | n/a |
+
+All three gate levels meet their targets. Browser tests are not in any of these levels.
+The remaining slowest phase is pytest in merge and full, about 75 s each.
+
+### Slowest tests (pre-speed run)
+
+The slowest tests below are from the pre-speed `--py` run (see Before), not re-measured after task 16.
+`pytest --durations=15` output, same selection as the `--py` gate. Paths are repo-relative.
 
 ```
 7.52s call     tests/foundation/test_conftest_tiers.py::test_tier_selection_matches_directories
