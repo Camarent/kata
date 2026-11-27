@@ -1,0 +1,3 @@
+# Hit keys (file, word, text; tab-separated) that the public-words scan accepts. Max 10 entries.
+# .gitignore:1 names the pipeline config file; it must stay so the config is ignored by git.
+.gitignore	pipeline.json	pipeline.json
