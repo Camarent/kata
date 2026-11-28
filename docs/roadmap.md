@@ -43,8 +43,24 @@ Open:
 Video transcripts, a phone web app, Chrome packaging, passkeys, deeper terminal tracking,
 exam mode hardening, a public path for single pages.
 
-Exam mode recorder: a silent recorder of the owner's exam answers. Design step first (no code until
-the design is approved).
+Exam mode recorder: a silent recorder of the owner's exam answers. The raw question text is never
+stored: the recorder reads question, choices and the owner's pick, analyses them in the background and
+keeps only derived data (concepts, topics, weak points). Open: where the exam domain list comes from;
+how weak points map to concepts (an existing concept gets "Needs practice", an unknown one is only
+proposed after the mode ends).
+
+Latency split: log model and worker wait time apart from server time per request, with a summary, so a
+slow model can be told from a server hot spot.
+
+Client and API cleanup: one stable client API surface, a shared client library and versioned types, as
+groundwork for the VS Code client and the desktop assistant.
+
+Desktop assistant (future): a Windows app that is always running. A global hotkey starts a push-to-talk
+voice question, answered in a small popup. The app transcribes the question, checks the knowledge base,
+asks the MCP server of the target app when one exists (for example Blender), takes a screenshot for
+context, recommends the hotkey or steps, and writes a remark into the knowledge base. It needs screenshot
+capture, speech to text, an MCP client and knowledge lookup through the client API, so the client and API
+cleanup comes first. Out of scope until then: an agent that clicks for the user.
 
 Extension UI: design v2 is approved (2026-11-24; navigation, settings, auto-scan and block states;
 see [`design/extension-ui.md`](design/extension-ui.md) and [`decisions.md`](decisions.md)).
