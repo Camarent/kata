@@ -22,10 +22,9 @@ are in [`design/extension-ui.md`](design/extension-ui.md), section 9; the decisi
 [`decisions.md`](decisions.md). The UI modules are listed in [`modules/extension.md`](modules/extension.md).
 
 Open:
-- Unmounted, pending owner decision (no importer outside its group): the page overlays
-  `extension/src/ui/overlay/hlMenu.ts` (hover menu), `whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`,
-  `listPicker.ts`, `quizPin.ts`; the exam run screen `extension/src/ui/panel/examRun.ts` (the core has no
-  route that starts an exam run yet).
+- Still unmounted (no importer outside its group): the exam run screen `extension/src/ui/panel/examRun.ts`
+  (the core has no route that starts an exam run yet). The six page overlays are mounted by
+  `extension/src/overlayHost.ts` (`whichOne.ts` is opened from the hover menu `hlMenu.ts`).
   The course page `extension/src/ui/panel/coursePage.ts` is mounted from Open course on the courses tab
   (task-18, `renderCoursesView` in `extension/src/sidepanel.ts`, boot in `extension/src/sidepanelBoot.ts`).
   The exam result screen `extension/src/ui/panel/examResult.ts` is mounted in the panel.
