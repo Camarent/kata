@@ -158,6 +158,31 @@ def test_model_vision_unlisted_model_falls_back_to_provider_key() -> None:
     assert LocalProvider(config).vision is False
 
 
+def test_fallback_skips_non_vision_model_and_second_answers() -> None:
+    # The first model is not vision (model_vision false); the chain falls through to the second, which is.
+    text_only = FakeProvider(name="local", script=["never"], vision=False)
+    vision = FakeProvider(name="anthropic", is_cloud=True, script=["a cat"], vision=True)
+    log: list[str] = []
+    base = load_config(EXAMPLE_PATH, env={})
+    verdicts = {**base.sections["local_capability"], VISION: LOCAL_MODEL}
+    config = Config(sections={**base.sections, "local_capability": verdicts})
+    router = Router(
+        {VISION: ("local", "anthropic")},
+        {"local": text_only, "anthropic": vision},
+        Policy.from_config(config, TOKEN),
+        log.append,
+    )
+
+    routed = router.route_vision(VISION, SYSTEM, USER, [IMAGE])
+
+    assert routed.reply == "a cat"
+    assert routed.provider == "anthropic"
+    assert text_only.vision_calls == []
+    assert text_only.calls == []
+    assert vision.vision_calls == [(SYSTEM, USER, (IMAGE,))]
+    assert log == ["route vision: local=no_vision", "route vision: answered by anthropic"]
+
+
 def test_text_only_provider_is_refused_even_when_its_flag_says_true() -> None:
     # A provider with no complete_vision is refused by the router even when a flag says true.
     class TextOnly:
