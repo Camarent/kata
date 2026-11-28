@@ -122,6 +122,10 @@ with open("pyproject.toml", "rb") as f:
 print("\n".join(data["project"]["dependencies"] + data["dependency-groups"]["dev"]))
 PY
   uv pip install -q --python .venv/bin/python -r .venv/requirements.txt
+  # Browser test deps: installed only on this fresh-venv path, so an existing .venv is untouched.
+  if [ -f requirements-browser.txt ]; then
+    uv pip install -q --python .venv/bin/python -r requirements-browser.txt
+  fi
 }
 
 setup_extension() {

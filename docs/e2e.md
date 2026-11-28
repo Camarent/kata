@@ -60,7 +60,7 @@ Test files:
 Prerequisites:
 
 - **Browser install.** `scripts/dev/install-browsers.sh` installs Firefox 140.0esr and geckodriver 0.36.0 into `$KATA_BROWSERS_DIR` (default `$HOME/.cache/kata-browsers`), with sha256 checks. Run it once; `scripts/dev/install-browsers.sh --status` checks it with no network. Chrome and chromedriver are not installed by the script: they are looked up on `PATH`.
-- **Selenium** and `pytest-xdist` from `requirements-browser.txt`. `check-all.sh --browser` installs it into `.venv`.
+- **Selenium** and `pytest-xdist` from `requirements-browser.txt`. `check-all.sh --browser` installs it into `.venv`; `check-all.sh --setup` also installs it into a fresh `.venv` when the file exists.
 - **Built extension.** `npm run build` in `extension/` writes `extension/dist/firefox/` and `extension/dist/chrome/`. A missing build fails the Browser test, it does not skip.
 - **No Postgres** is needed.
 

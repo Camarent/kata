@@ -14,7 +14,7 @@ Everything below works from a clean clone. Nothing depends on files from another
 scripts/dev/check-all.sh
 ```
 
-It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), runs
+It creates `.venv` from `pyproject.toml` (runtime and `dev` dependencies, all pinned), and installs `requirements-browser.txt` into it when that file exists, runs
 `npm ci` in `extension/` and `editor/`, starts a throwaway Postgres, runs ruff, mypy, the smoke tests
 (`-m smoke`, 2 today in `tests/e2e/test_fixtures.py`; an empty selection is red), pytest with `-m 'not flaky and not browser'`, and the
 extension build and tests, then the editor build and tests (`editor/`). It is safe to run in several checkouts at once: they share one
@@ -25,7 +25,7 @@ Postgres (started under a lock, never stopped by the script; stop it with
 runs pytest with `-m 'not e2e and not browser'` plus the extension and editor build and tests; `--ext`
 runs the extension build and tests, then the editor build and tests; `--editor` runs the editor build
 and tests only; `--setup` only creates `.venv`, `extension/node_modules` and `editor/node_modules` when they are missing
-(no tests, no Postgres), so a fresh git checkout can be made ready in a couple of seconds.
+(and installs `requirements-browser.txt` into a fresh `.venv` when that file exists; no tests, no Postgres), so a fresh git checkout can be made ready in a couple of seconds.
 
 ### Output of the full run
 
