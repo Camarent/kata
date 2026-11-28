@@ -204,6 +204,13 @@ describe("renderPanel", () => {
     expect(root.querySelectorAll("section.group")).toHaveLength(1);
   });
 
+  it("the scan screen lists both scan rows by label", () => {
+    const rows = [row(1, "c", "pan", false), row(2, "c", "whisk", true)];
+    renderPanel(root, { session, rows, status: { kind: "idle" } }, handlers());
+    const labels = [...root.querySelectorAll("section.scan-results li.rrow span.nm")].map((node) => node.textContent);
+    expect(labels).toEqual(["pan", "whisk"]);
+  });
+
   it("calls onKnown once on click and shows queued text when offline", async () => {
     const h = handlers({ onKnown: vi.fn(async () => "queued" as const) });
     renderPanel(root, { session, rows: [row(7, "c", "pan", false)], status: { kind: "idle" } }, h);

@@ -332,7 +332,7 @@ describe("bootPanel", () => {
       await vi.waitFor(() => expect(root.querySelector("li.row")).not.toBeNull());
       expect(sendMessage).toHaveBeenCalledWith({ type: "panel:scan" });
       expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:scan")).toHaveLength(1);
-      expect(Array.from(root.querySelectorAll("span.badge"), (badge) => badge.textContent)).toEqual(["known", "new"]);
+      expect(Array.from(root.querySelectorAll("li.row span.badge"), (badge) => badge.textContent)).toEqual(["known", "new"]);
       expect(Array.from(root.querySelectorAll<HTMLButtonElement>("li.row button"), (button) => button.hidden)).toEqual([
         true,
         false,

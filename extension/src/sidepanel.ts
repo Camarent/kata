@@ -11,7 +11,7 @@ import type { QueuedMarkView } from "./ui/panel/offlineQueue";
 import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey, TracksTabProps } from "./ui/panel/tracksTab";
 import { routeScreen } from "./ui/panel/router";
-import type { ScanResultsStatus } from "./ui/panel/scanResults";
+import type { ScanResultRow, ScanResultsStatus } from "./ui/panel/scanResults";
 import { ERROR_TEXT, SCANNING_TEXT, partialText } from "./ui/panel/statusText";
 
 /** Group heading for rows whose block has no topic. */
@@ -240,13 +240,18 @@ function renderTabBar(current: PanelTab, handlers: PanelHandlers): HTMLElement {
   return bar;
 }
 
+/** Scan-results row for one panel row: its topic label (or the untagged reason) and known/new state. */
+function scanResultRow(row: PanelRow): ScanResultRow {
+  return { label: row.topic?.label ?? row.reason ?? "no topic", state: row.known === true ? "known" : "new" };
+}
+
 /** Scan tab: the scan-results screen, the status line, then the grouped rows with "I know this". */
 function renderScanTab(state: PanelState, handlers: PanelHandlers): HTMLElement {
   const tab = el("div", undefined, "scan-tab");
   const scanning = state.status.kind === "scanning";
   const empty = state.rows.length === 0 && state.status.kind === "idle";
   const status: ScanResultsStatus = scanning ? "loading" : empty ? "empty" : "ready";
-  const screen = routeScreen("scan-results", { status, rows: [] }, handlers);
+  const screen = routeScreen("scan-results", { status, rows: state.rows.map(scanResultRow) }, handlers);
   // A scan in flight disables the button; the boot script also ignores a second call.
   const scanButton = screen.querySelector<HTMLButtonElement>("button.scan-page");
   if (scanButton !== null) scanButton.disabled = scanning;
