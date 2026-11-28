@@ -53,6 +53,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 QRUN="${KATA_QRUN:-}"
+# Upper bound on the browser test workers (-n auto picks one per core): each worker starts a Firefox
+# and a Chrome, so a big core count would overload the box.
+BROWSER_MAX_WORKERS=4
 
 MODE_FLAG=""
 for arg in "$@"; do
@@ -209,7 +212,9 @@ run_browser() {
     echo "check-all: browser tests skipped: firefox or geckodriver missing from $dir; run scripts/dev/install-browsers.sh"
     return 0
   fi
-  step browser .venv/bin/python -m pytest tests/browser -m browser
+  # One xdist worker per core, at most BROWSER_MAX_WORKERS. Each driver fixture owns its profile dir,
+  # driver port and temp dir (tests/browser/conftest.py), so workers do not share browser state.
+  step browser .venv/bin/python -m pytest tests/browser -m browser -n auto --maxprocesses "$BROWSER_MAX_WORKERS"
 }
 
 # run_parallel <label=function>...: run each function as a background job, wait for every job, then

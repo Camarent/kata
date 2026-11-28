@@ -54,13 +54,13 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 ## Build and test commands
 From `tools/gates.json` (plain commands): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.
 Editor (from `editor/package.json`): `npm --prefix editor run build` (`tsc --noEmit`), `npm --prefix editor run test:cov` (vitest with coverage); CI runs build and `npm --prefix editor test` (`.github/workflows/ci.yml:58-60`).
-The full check is `scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`). Its merge and full modes run the pytest, extension, editor and browser jobs concurrently; the first red job fails the run.
+The full check is `scripts/dev/check-all.sh` (the clean-clone chain, see `docs/development.md`). Its merge and full modes run the pytest, extension, editor and browser jobs concurrently; the first red job fails the run. The browser job runs its cases under xdist workers (`-n auto`, at most 4).
 
 Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py --format markdown` with `KATA_CONFIG` and dev Postgres env set; output pasted into `docs/research/benchmarks/RESULTS.md` (`docs/research/benchmarks/RESULTS.md:29`). It refuses any embedder but `fake`.
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
-E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests": sign-in a11y, light and dark contrast, panel layout at 360px and 320px, checked in the page body).
+E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests": sign-in a11y, light and dark contrast, panel layout at 360px and 320px, checked in the page body). Each `driver` case owns its profile dir, driver port and temp dir, removed at teardown.
 
 ## Releases
 How a tag becomes a GitHub release and how the VM takes it: `docs/release.md`.

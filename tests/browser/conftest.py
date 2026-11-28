@@ -145,7 +145,12 @@ def _load_chrome_extension(driver: Any, path: Path) -> None:
 
 @pytest.fixture
 def driver(browser_name: str, color_scheme: str) -> Iterator[Any]:
-    """A headless selenium driver with the built extension loaded. Quit at teardown."""
+    """A headless selenium driver with the built extension loaded. Quit at teardown.
+
+    Each call owns its state, so xdist workers and cases do not share it: a profile dir, a driver
+    port (the driver service picks a free port per instance, port 0) and a temp dir, all removed at
+    teardown.
+    """
     webdriver = pytest.importorskip("selenium.webdriver")
     if browser_name == "firefox":
         from selenium.webdriver.firefox.options import Options as FirefoxOptions
@@ -153,41 +158,48 @@ def driver(browser_name: str, color_scheme: str) -> Iterator[Any]:
 
         firefox, geckodriver = _firefox_binaries()
         extension = _require_extension("firefox")
-        options = FirefoxOptions()
-        options.binary_location = str(firefox)
-        options.add_argument("-headless")
-        options.set_preference(
-            "extensions.webextensions.uuids",
-            json.dumps({FIREFOX_GECKO_ID: FIREFOX_EXTENSION_UUID}),
-        )
-        # 0 = dark, 1 = light: every page this driver opens reports the scheme (see panel_page.py).
-        options.set_preference(
-            "layout.css.prefers-color-scheme.content-override",
-            FIREFOX_SCHEME_OVERRIDE[color_scheme],
-        )
-        service = FirefoxService(executable_path=str(geckodriver))
-        drv = webdriver.Firefox(service=service, options=options)
-        try:
-            drv.install_addon(str(extension), temporary=True)
-            yield drv
-        finally:
-            drv.quit()
+        with tempfile.TemporaryDirectory(prefix="kata-ff-profile-") as profile:
+            options = FirefoxOptions()
+            options.binary_location = str(firefox)
+            options.add_argument("-headless")
+            # This case's own profile: geckodriver uses it, the TemporaryDirectory removes it.
+            options.add_argument("-profile")
+            options.add_argument(profile)
+            options.set_preference(
+                "extensions.webextensions.uuids",
+                json.dumps({FIREFOX_GECKO_ID: FIREFOX_EXTENSION_UUID}),
+            )
+            # 0 = dark, 1 = light: every page this driver opens reports the scheme (see panel_page.py).
+            options.set_preference(
+                "layout.css.prefers-color-scheme.content-override",
+                FIREFOX_SCHEME_OVERRIDE[color_scheme],
+            )
+            service = FirefoxService(executable_path=str(geckodriver), port=0)
+            drv = webdriver.Firefox(service=service, options=options)
+            try:
+                drv.install_addon(str(extension), temporary=True)
+                yield drv
+            finally:
+                drv.quit()
     else:
         from selenium.webdriver.chrome.options import Options as ChromeOptions
         from selenium.webdriver.chrome.service import Service as ChromeService
 
         chrome, chromedriver = _chrome_binaries()
         extension = _require_extension("chrome")
-        options = ChromeOptions()
-        options.binary_location = str(chrome)
-        options.add_argument("--headless=new")
-        # Branded Chrome 137+ ignores --load-extension; the extension is installed over CDP instead.
-        options.add_argument("--enable-unsafe-extension-debugging")
-        # The CDP websocket below comes from this test process; the debugger port is local only.
-        options.add_argument("--remote-allow-origins=*")
+        # Chrome gets its own short temp dir under CHROME_TMP_ROOT; its user-data-dir is a child of it.
         with tempfile.TemporaryDirectory(dir=CHROME_TMP_ROOT) as chrome_tmp:
+            options = ChromeOptions()
+            options.binary_location = str(chrome)
+            options.add_argument("--headless=new")
+            options.add_argument(f"--user-data-dir={Path(chrome_tmp) / 'profile'}")
+            # Branded Chrome 137+ ignores --load-extension; the extension is installed over CDP instead.
+            options.add_argument("--enable-unsafe-extension-debugging")
+            # The CDP websocket below comes from this test process; the debugger port is local only.
+            options.add_argument("--remote-allow-origins=*")
             service = ChromeService(
                 executable_path=str(chromedriver),
+                port=0,
                 env={**os.environ, "TMPDIR": chrome_tmp},
             )
             drv = webdriver.Chrome(service=service, options=options)

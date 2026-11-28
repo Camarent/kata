@@ -168,6 +168,16 @@ def test_merge_green_run_skips_browser_without_ending_the_run() -> None:
     assert "CHECK-ALL OK (merge)" in result.stdout
 
 
+def test_browser_pytest_step_runs_under_xdist_with_a_worker_cap() -> None:
+    # The browser step runs its cases in parallel workers: -n auto, capped by BROWSER_MAX_WORKERS.
+    script = (REPO_ROOT / "scripts" / "dev" / "check-all.sh").read_text(encoding="utf-8")
+    lines = [line for line in script.splitlines() if "-m pytest tests/browser" in line]
+    assert len(lines) == 1, lines
+    assert " -n auto " in lines[0], lines[0]
+    assert '--maxprocesses "$BROWSER_MAX_WORKERS"' in lines[0], lines[0]
+    assert re.search(r"^BROWSER_MAX_WORKERS=\d+$", script, re.MULTILINE), "worker cap constant missing"
+
+
 def test_browser_mode_without_browsers_exits_zero_without_building() -> None:
     # The extension build is red here, but without browsers the browser arm builds nothing: rc 0.
     with tempfile.TemporaryDirectory() as tmp:
