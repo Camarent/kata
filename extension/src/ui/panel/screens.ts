@@ -16,6 +16,7 @@ import { renderCourseGenerate } from "./courseGenerate";
 import { renderCoursesTab } from "./coursesTab";
 import { renderExamEntry } from "./examEntry";
 import { renderExamProposals } from "./examProposals";
+import { renderExamResult } from "./examResult";
 import { renderIgnoredList } from "./ignoredList";
 import { renderListDelete } from "./listDelete";
 import { renderListDetail } from "./listDetail";
@@ -65,6 +66,7 @@ export interface ScreenArgs {
   "source-confirm-tree": { props: Arg<typeof renderSourceConfirm, 0>; ctx: Arg<typeof renderSourceConfirm, 1> };
   "exam-result-entry": { props: Arg<typeof renderExamEntry, 0>; ctx: Arg<typeof renderExamEntry, 1> };
   "exam-result-proposals": { props: Arg<typeof renderExamProposals, 0>; ctx: Arg<typeof renderExamProposals, 1> };
+  "exam-result": { props: Arg<typeof renderExamResult, 0>; ctx: Arg<typeof renderExamResult, 1> };
   "settings-home": { props: undefined; ctx: Arg<typeof renderSettingsHome, 0> };
   "settings-connection": { props: Arg<typeof renderSettingsConnection, 0>; ctx: Arg<typeof renderSettingsConnection, 1> };
   "signout-confirm": { props: Arg<typeof renderSignOutConfirm, 0>; ctx: Arg<typeof renderSignOutConfirm, 1> };
@@ -113,6 +115,7 @@ export const SCREENS: InventoryRegistry = {
   "source-confirm-tree": (props, handlers) => renderSourceConfirm(props, handlers),
   "exam-result-entry": (props, handlers) => renderExamEntry(props, handlers),
   "exam-result-proposals": (props, handlers) => renderExamProposals(props, handlers),
+  "exam-result": (props, handlers) => renderExamResult(props, handlers),
   "settings-home": (_props, handlers) => renderSettingsHome(handlers),
   "settings-connection": (props, handlers) => renderSettingsConnection(props, handlers),
   "signout-confirm": (props, handlers) => renderSignOutConfirm(props, handlers),

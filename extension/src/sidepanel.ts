@@ -5,6 +5,7 @@ import type { ModelhostEngine } from "./coreClient";
 import type { Session } from "./types";
 import { button, el } from "./ui/dom";
 import { SCAN_RESULTS_TEXT } from "./ui/strings";
+import type { ExamResult } from "./coreClientTypes";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
 import type { IgnoredRowView } from "./ui/panel/ignoredList";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
@@ -13,6 +14,10 @@ import type { TrackSortKey, TracksTabProps } from "./ui/panel/tracksTab";
 import { routeScreen } from "./ui/panel/router";
 import type { ScanResultRow, ScanResultsStatus } from "./ui/panel/scanResults";
 import { ERROR_TEXT, SCANNING_TEXT, partialText } from "./ui/panel/statusText";
+
+/** Panel-only exam texts: the Settings button that opens the entry form, and the score line label. */
+const EXAM_ENTRY_OPEN = "Enter exam result";
+const EXAM_SCORE_LABEL = "Score:";
 
 /** Group heading for rows whose block has no topic. */
 const UNTAGGED = "untagged";
@@ -65,6 +70,8 @@ export interface PanelState {
   trackScreen?: TrackScreen | null;
   /** Settings page drawn in place of the settings home; null or unset shows the home. */
   settingsPage?: SettingsPage | null;
+  /** Exam screen the Settings tab opened: the entry form (failed after a refused save) or a stored result. */
+  examScreen?: { kind: "entry"; failed: boolean } | { kind: "result"; result: ExamResult; confirmFailed?: boolean } | null;
   /** Ignored concepts for the ignored list page. */
   ignored?: IgnoredRowView[];
 }
@@ -298,10 +305,22 @@ function renderSettingsView(state: PanelState, handlers: PanelHandlers): HTMLEle
     tab.append(routeScreen("ignored-list", { rows: state.ignored ?? [] }, handlers.ignoredList));
     return tab;
   }
+  if (state.examScreen?.kind === "entry" && handlers.examEntry !== undefined) {
+    tab.append(routeScreen("exam-result-entry", { failed: state.examScreen.failed }, handlers.examEntry));
+    return tab;
+  }
+  if (state.examScreen?.kind === "result" && handlers.examResult !== undefined) {
+    const { result, confirmFailed } = state.examScreen;
+    tab.append(routeScreen("exam-result", { result, failed: confirmFailed === true }, handlers.examResult));
+    if (result.score !== null) tab.append(el("p", `${EXAM_SCORE_LABEL} ${Math.round(result.score * 100)}%`, "exam-score"));
+    return tab;
+  }
   const open = (page: SettingsPage) => {
     void handlers.onOpenSettingsPage?.(page);
   };
   tab.append(routeScreen("settings-home", undefined, { onOpen: open }), renderLocalModel(handlers));
+  const onOpenExamEntry = handlers.onOpenExamEntry;
+  if (onOpenExamEntry !== undefined) tab.append(button(EXAM_ENTRY_OPEN, () => onOpenExamEntry(), "open-exam-entry"));
   return tab;
 }
 

@@ -15,6 +15,8 @@ import type {
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { IgnoredListHandlers } from "./ui/panel/ignoredList";
+import type { ExamEntryHandlers } from "./ui/panel/examEntry";
+import type { ExamResultHandlers } from "./ui/panel/examResult";
 import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey } from "./ui/panel/tracksTab";
 import type { TrackDetailHandlers } from "./ui/panel/trackDetail";
@@ -102,6 +104,12 @@ export interface PanelHandlers {
   onOpenTrack?: (trackId: number) => void;
   /** Tracks tab: the user chose New track; the panel draws the create screen when it has one. */
   onNewTrack?: () => void;
+  /** Exam entry screen actions (save imports the result, cancel returns to the settings home). */
+  examEntry?: ExamEntryHandlers;
+  /** Exam result screen actions (Done confirms the right answers). */
+  examResult?: ExamResultHandlers;
+  /** Settings tab: the user chose Enter exam result. */
+  onOpenExamEntry?: () => void;
   /** Settings home: the user opened one settings page; the panel draws it when it has a screen for it. */
   onOpenSettingsPage?: (page: SettingsPage) => void | Promise<void>;
   /** Feed tabs: aliases, page summary, jokes and concept views; each sends one panel message. */

@@ -8,7 +8,7 @@ import type { PanelMessage, PanelReply } from "../src/messages";
 import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
 import { ERROR_TEXT } from "../src/ui/panel/statusText";
-import { TEXT_COURSES_TAB, TEXT_SCAN_RESULTS } from "../src/ui/strings";
+import { TEXT_COURSES_TAB, TEXT_EXAM_RESULT_ENTRY, TEXT_SCAN_RESULTS } from "../src/ui/strings";
 
 /** The handlers bootPanel hands to renderPanel; the courses regenerate action has no other DOM entry point yet. */
 const captured = vi.hoisted(() => ({ handlers: undefined as PanelHandlers | undefined }));
@@ -679,6 +679,116 @@ describe("bootPanel Tracks tab and settings home", () => {
     root.querySelector<HTMLButtonElement>("section.ignored-list button.back")!.click();
     await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
     expect(root.querySelector("section.ignored-list")).toBeNull();
+  });
+
+  it("the settings tab opens the exam entry, saving imports the result and draws the result screen with its score", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const stored = {
+      id: 5,
+      origin: "page",
+      taken_at: "2026-01-01T00:00:00Z",
+      passed: true,
+      score: 0.85,
+      status: "pending",
+      concepts: [],
+    };
+    const { api, sendMessage } = chromeWith({ "panel:importExamResult": { ok: true, data: stored } });
+    await bootPanel(root, api);
+    openTab("settings");
+    root.querySelector<HTMLButtonElement>("button.open-exam-entry")!.click();
+    const entry = root.querySelector("section.exam-entry")!;
+    entry.querySelector<HTMLInputElement>('input[name="date"]')!.value = "2026-01-01";
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "85";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    expect(root.querySelector("p.exam-score")?.textContent).toContain("85%");
+    const sent = sendMessage.mock.calls.map((c) => c[0]).find((m) => m.type === "panel:importExamResult") as {
+      payload: string;
+    };
+    expect(JSON.parse(sent.payload)).toMatchObject({ score: 0.85, taken_at: "2026-01-01T00:00:00Z" });
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:confirmExamResult", resultId: 5, conceptIds: [] });
+  });
+
+  /** Opens the exam entry on the settings tab and fills the date; the caller sets the score and saves. */
+  const openFilledEntry = async (replies: Record<string, PanelReply>) => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const chrome = chromeWith(replies);
+    await bootPanel(root, chrome.api);
+    openTab("settings");
+    root.querySelector<HTMLButtonElement>("button.open-exam-entry")!.click();
+    const entry = root.querySelector("section.exam-entry")!;
+    entry.querySelector<HTMLInputElement>('input[name="date"]')!.value = "2026-01-01";
+    return { entry, sendMessage: chrome.sendMessage };
+  };
+
+  it("a blank or out-of-range score is refused: no import is sent and the form shows its error", async () => {
+    for (const score of ["", "   ", "101", "-1", "abc"]) {
+      const { entry, sendMessage } = await openFilledEntry({ "panel:importExamResult": { ok: true, data: {} } });
+      entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = score;
+      entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+      await vi.waitFor(() => expect(entry.querySelector("p.error")?.textContent).toBe(TEXT_EXAM_RESULT_ENTRY[9]));
+      expect(sendMessage.mock.calls.some((c) => c[0].type === "panel:importExamResult")).toBe(false);
+      expect(root.querySelector("section.exam-entry")).not.toBeNull();
+    }
+  });
+
+  it("the score field is a percentage: 1 is sent as 0.01 and 0.5 as 0.005", async () => {
+    for (const [typed, sent] of [
+      ["1", 0.01],
+      ["0.5", 0.005],
+    ] as const) {
+      const { entry, sendMessage } = await openFilledEntry({
+        "panel:importExamResult": { ok: true, data: { id: 6, score: sent, concepts: [] } },
+      });
+      entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = typed;
+      entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+      await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+      const imported = sendMessage.mock.calls.map((c) => c[0]).find((m) => m.type === "panel:importExamResult") as {
+        payload: string;
+      };
+      expect(JSON.parse(imported.payload)).toMatchObject({ score: sent });
+    }
+  });
+
+  it("a refused Done keeps the result screen with its error line, and Done can be pressed again", async () => {
+    const stored = { id: 7, origin: "page", taken_at: "2026-01-01T00:00:00Z", passed: true, score: 0.9, status: "pending", concepts: [] };
+    const { entry, sendMessage } = await openFilledEntry({
+      "panel:importExamResult": { ok: true, data: stored },
+      "panel:confirmExamResult": { ok: false, error: "gone" },
+    });
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "90";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() => expect(root.querySelector("p.exam-confirm-error")?.textContent).toBe("Could not confirm the result. Press Done to try again."));
+    expect(root.querySelector("section.exam-result")).not.toBeNull();
+    expect(root.querySelector("section.settings-home")).toBeNull();
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() =>
+      expect(sendMessage.mock.calls.filter((c) => c[0].type === "panel:confirmExamResult")).toHaveLength(2),
+    );
+  });
+
+  it("the result screen with a wrong concept draws no Open course items button until it is wired", async () => {
+    const stored = {
+      id: 8,
+      origin: "page",
+      taken_at: "2026-01-01T00:00:00Z",
+      passed: false,
+      score: 0.4,
+      status: "pending",
+      concepts: [{ concept_id: 3, correct: false, confirmed: false }],
+    };
+    const { entry } = await openFilledEntry({ "panel:importExamResult": { ok: true, data: stored } });
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "40";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    expect(root.querySelector(".exam-needs")).not.toBeNull();
+    expect(root.querySelector("button.exam-open-items")).toBeNull();
   });
 
   it("a refused panel:ignored keeps the settings home drawn", async () => {

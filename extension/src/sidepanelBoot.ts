@@ -152,6 +152,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     draw();
   };
 
+  /** Back from an exam screen to the settings home. */
+  const closeExam = (): void => {
+    state.examScreen = null;
+    draw();
+  };
+
   const handlers: PanelHandlers = {
     async onSignIn(input: ServerFormInput) {
       const server = validateServerUrl(input.baseUrl);
@@ -242,6 +248,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       state.review = null;
       state.tab = tab;
       state.settingsPage = null;
+      state.examScreen = null;
       if (tab === "tracks") {
         await loadTracks();
         return;
@@ -266,6 +273,49 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       }
       state.settingsPage = "ignored";
       draw();
+    },
+
+    onOpenExamEntry() {
+      state.examScreen = { kind: "entry", failed: false };
+      draw();
+    },
+
+    examEntry: {
+      async onSave(input) {
+        // The score field is a percentage from 0 to 100 ("85"); the core takes a fraction from 0 to 1.
+        // A blank score is refused: Number("") is 0, which would store a 0% result.
+        const trimmed = input.score.trim();
+        const percent = trimmed === "" ? Number.NaN : Number(trimmed);
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100 || input.date === "") {
+          throw new Error("invalid exam result");
+        }
+        const payload = JSON.stringify({
+          origin: "page",
+          taken_at: `${input.date}T00:00:00Z`,
+          passed: input.passed,
+          score: percent / 100,
+          concepts: [],
+        });
+        const result = await send<ExamResult>({ type: "panel:importExamResult", payload });
+        state.examScreen = { kind: "result", result };
+        draw();
+      },
+      onCancel: closeExam,
+    },
+
+    examResult: {
+      onConfirm(conceptIds) {
+        const shown = state.examScreen;
+        if (shown?.kind !== "result") return;
+        // A refused confirm keeps the result screen with an error line; Done can be pressed again.
+        void send<ExamResult>({ type: "panel:confirmExamResult", resultId: shown.result.id, conceptIds }).then(
+          closeExam,
+          () => {
+            state.examScreen = { kind: "result", result: shown.result, confirmFailed: true };
+            draw();
+          },
+        );
+      },
     },
 
     onOpenTrack(trackId: number) {
