@@ -401,6 +401,11 @@ export class CoreClient {
     await this.request("PUT", `/concepts/${conceptId}/ignore`);
   }
 
+  /** Hard-delete a concept the caller owns, with its marks and aliases (`DELETE /concepts/{id}`). */
+  async deleteConcept(conceptId: number): Promise<void> {
+    await this.request("DELETE", `/concepts/${conceptId}`);
+  }
+
   /** Show an ignored concept in the caller's lists again (`DELETE /concepts/{id}/ignore`). */
   async unignoreConcept(conceptId: number): Promise<void> {
     await this.request("DELETE", `/concepts/${conceptId}/ignore`);

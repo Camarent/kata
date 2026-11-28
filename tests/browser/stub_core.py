@@ -34,6 +34,12 @@ def _handler_for(routes: Mapping[str, Any], received: list[str] | None) -> type[
         def do_POST(self) -> None:
             self._answer()
 
+        def do_PUT(self) -> None:
+            self._answer()
+
+        def do_DELETE(self) -> None:
+            self._answer()
+
         def _answer(self) -> None:
             path = self.path.split("?", 1)[0]
             if received is not None:

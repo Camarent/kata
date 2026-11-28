@@ -52,6 +52,13 @@ describe("block menu", () => {
     expect(statusText(menu)).toBe("");
   });
 
+  it("hides the bulk buttons until onBulk is wired", () => {
+    const menu = renderBlockMenu(document, "ready", {});
+    expect(menu.querySelector(".menu-list")).toBeNull();
+    expect(menu.querySelectorAll("button")).toHaveLength(0);
+    expect(menu.querySelector("h2")?.textContent).toBe(TEXT_BLOCK_MENU[5]);
+  });
+
   it("shows the empty, error and offline line and disables buttons while loading", () => {
     expect(statusText(renderBlockMenu(document, "empty", { onBulk: vi.fn() }))).toBe(TEXT_REVIEW[19]);
     expect(statusText(renderBlockMenu(document, "error", { onBulk: vi.fn() }))).toBe(TEXT_REVIEW[20]);

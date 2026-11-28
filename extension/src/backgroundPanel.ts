@@ -77,6 +77,7 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:dismissExamResult": (backend, message) => refusable(() => backend.dismissExamResult(message.resultId)),
   "panel:ignored": (backend) => refusable(() => backend.ignored()),
   "panel:ignoreConcept": (backend, message) => refusable(() => backend.ignoreConcept(message.conceptId)),
+  "panel:deleteConcept": (backend, message) => refusable(() => backend.deleteConcept(message.conceptId)),
   "panel:unignoreConcept": (backend, message) => refusable(() => backend.unignoreConcept(message.conceptId)),
   "panel:markConceptViewed": (backend, message) => refusable(() => backend.markConceptViewed(message.conceptId)),
   "panel:listConceptAliases": (backend, message) => refusable(() => backend.listConceptAliases(message.conceptId)),

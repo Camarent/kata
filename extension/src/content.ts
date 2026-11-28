@@ -88,8 +88,8 @@ interface FloatingUi {
  * Injects the card stylesheet into `doc`, mounts the floating pin at its stored position and the
  * page cards beside it. A pin button press opens the main card; after a scan the page is watched
  * and a change shows the page-changed prompt. The hover menus on highlighted words are attached by
- * the overlay host (registerContentScript). The block menu, image menu and list picker are not
- * wired on the page yet.
+ * the overlay host (registerContentScript), and so is the block menu. The image menu and list picker
+ * are not wired on the page yet.
  */
 export async function mountFloatingUi(doc: Document, storage: StorageArea, runtime: CardRuntime): Promise<FloatingUi> {
   const style = doc.createElement("style");

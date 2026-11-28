@@ -64,12 +64,12 @@ const UNDO = PIN_TEXT.undo;
 /** Bulk actions shown in the block menu, in the inventory order. */
 const BULK_LABELS = [BLOCK_ALL_NEW, BLOCK_ALL_KNOWN, BLOCK_ALL_LEARNING, BLOCK_ADD_ALL] as const;
 
-/** Callbacks of the block menu: `onBulk` gets the chosen bulk label. */
+/** Callbacks of the block menu: `onBulk` gets the chosen bulk label. Without it the bulk buttons are not shown. */
 export interface BlockMenuActions {
-  onBulk(label: string): void;
+  onBulk?(label: string): void;
 }
 
-/** Builds the block menu card: heading, bulk buttons, the mixed and not-in-text notes, and the state line. */
+/** Builds the block menu card: heading, bulk buttons (only with `onBulk`), mixed and not-in-text notes, state line. */
 export function renderBlockMenu(doc: Document, state: OverlayState, actions: BlockMenuActions): HTMLElement {
   const menu = doc.createElement("div");
   menu.className = "block-menu";
@@ -78,12 +78,15 @@ export function renderBlockMenu(doc: Document, state: OverlayState, actions: Blo
   title.textContent = BLOCK_TITLE;
   menu.append(title);
 
-  const list = doc.createElement("div");
-  list.className = "menu-list";
-  for (const label of BULK_LABELS) {
-    list.append(menuButton(doc, label, "btn", () => actions.onBulk(label), state === "loading"));
+  const onBulk = actions.onBulk;
+  if (onBulk !== undefined) {
+    const list = doc.createElement("div");
+    list.className = "menu-list";
+    for (const label of BULK_LABELS) {
+      list.append(menuButton(doc, label, "btn", () => onBulk(label), state === "loading"));
+    }
+    menu.append(list);
   }
-  menu.append(list);
 
   const mixed = doc.createElement("p");
   mixed.className = "menu-note";

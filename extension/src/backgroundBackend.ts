@@ -73,6 +73,8 @@ export interface Backend {
   /** Concepts the caller ignores, for the ignored list. */
   ignored(): Promise<IgnoredConcept[]>;
   ignoreConcept(conceptId: number): Promise<void>;
+  /** Hard-delete a concept of the caller, from the block menu. */
+  deleteConcept(conceptId: number): Promise<void>;
   unignoreConcept(conceptId: number): Promise<void>;
   /** Stamps the last-viewed time of a concept. */
   markConceptViewed(conceptId: number): Promise<void>;
@@ -336,6 +338,10 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
 
     async ignoreConcept(conceptId) {
       await clientFor(await requireSession()).ignoreConcept(conceptId);
+    },
+
+    async deleteConcept(conceptId) {
+      await clientFor(await requireSession()).deleteConcept(conceptId);
     },
 
     async unignoreConcept(conceptId) {
