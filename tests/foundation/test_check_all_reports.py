@@ -62,7 +62,7 @@ def test_editor_mode_is_a_flag_and_runs_in_full_merge_and_ext():
     assert "--ext|--editor|--setup|--browser)" in text
     assert "  editor) run_editor ;;" in text
     assert "  ext)   run_extension; run_editor ;;" in text
-    assert "merge) start_postgres; build_extension; prepare_browser; run_parallel pytest=run_merge_tests extension=run_extension_tests editor=run_editor browser=run_browser ;;" in text
+    assert "merge) start_postgres; run_lint; build_extension; prepare_browser; run_parallel pytest=run_merge_tests extension=run_extension_tests editor=run_editor browser=run_browser ;;" in text
     assert "run_merge_tests() { run_tests -m 'not e2e and not browser'; }" in text
 
 

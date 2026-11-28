@@ -10,7 +10,7 @@
 #   scripts/dev/check-all.sh --unit   ruff, mypy, pytest -m 'not integration and not e2e and not smoke'
 #   scripts/dev/check-all.sh --py     ruff, mypy, pytest (with coverage) only: the Python part of the
 #                                     full run, without the -m filter
-#   scripts/dev/check-all.sh --merge  pytest -m 'not e2e and not browser' (with coverage), extension
+#   scripts/dev/check-all.sh --merge  ruff, mypy, pytest -m 'not e2e and not browser' (with coverage), extension
 #                                     build and test, editor test, and the browser tests (when browsers
 #                                     are installed), run as concurrent jobs
 #   merge and full: the extension build runs once, and the browser deps install once, before the
@@ -267,7 +267,7 @@ case "$MODE" in
   setup) ;;
   unit)  run_lint; run_tests -m 'not integration and not e2e and not smoke and not browser' ;;
   py)    start_postgres; run_python ;;
-  merge) start_postgres; build_extension; prepare_browser; run_parallel pytest=run_merge_tests extension=run_extension_tests editor=run_editor browser=run_browser ;;
+  merge) start_postgres; run_lint; build_extension; prepare_browser; run_parallel pytest=run_merge_tests extension=run_extension_tests editor=run_editor browser=run_browser ;;
   ext)   run_extension; run_editor ;;
   editor) run_editor ;;
   browser) if scripts/dev/install-browsers.sh --status; then build_extension; prepare_browser; fi; run_browser ;;
