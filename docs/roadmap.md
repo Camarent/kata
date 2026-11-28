@@ -30,6 +30,13 @@ Open:
   The exam result screen `extension/src/ui/panel/examResult.ts` is mounted in the panel.
 - Track create: Save (`trackCreate.onCreate` in `extension/src/sidepanelBoot.ts`) sends `panel:createTrack` with name and deadline, then reloads the Tracks list; a refused save shows the form's error line. Add source and Quiz open their screens.
 - Track detail loads the real track (name, deadline, items as sources). The core `Track` has no goal, progress, velocity, finishEarly, tooSlow or dropReason, so `trackDetailView` in `extension/src/sidepanelBoot.ts` gives them neutral empty values: open work, needs core fields.
+- Quiz pin: its onStart sends `panel:miniQuiz` (`extension/src/overlayHost.ts:210`) and shows no result; the
+  quiz result is not shown yet.
+- Image action: `panel:imageAction` returns `ok:false` (`extension/src/backgroundPanel.ts:82`), so the image
+  menu action is a dead end. Errors are swallowed at `extension/src/overlayHost.ts:129`, `:211` and `:249`.
+- Block menu: bulk buttons are unwired (`extension/src/overlayHost.ts:116`) and New list is hidden (`extension/src/overlayHost.ts:93`).
+- No-op handlers (do nothing when called): `onPasteText`, `onChooseFile`, `onUsePage`, `onUseCourse`,
+  `onAddSource` (`extension/src/sidepanelBoot.ts:463-467`), `onNext` (`extension/src/sidepanelBoot.ts:472`), and `onGenerate` (`extension/src/sidepanel.ts:295`).
 
 ## Later
 
