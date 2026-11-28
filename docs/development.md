@@ -68,7 +68,7 @@ Which `scripts/dev/check-all.sh` flag runs which tier:
   extension build, then pytest, extension tests, editor tests and browser tests as concurrent jobs, then the jscpd report. The closest local run to CI, plus the extras.
 - `--unit`: ruff, mypy, pytest without the `integration`, `e2e`, `smoke` and `browser` tiers.
 - `--py`: ruff, mypy, pytest with every test except `browser`, `flaky` included.
-- `--merge`: extension build, then pytest `-m 'not e2e and not browser'` with coverage, extension and editor tests and browser tests as concurrent jobs.
+- `--merge`: ruff and mypy, extension build, then pytest `-m 'not e2e and not browser'` with coverage, extension and editor tests and browser tests as concurrent jobs.
 - `--ext`: extension build and tests, then editor build and tests.
 - `--editor`: editor build and tests only.
 - `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
