@@ -14,7 +14,7 @@ from fakes.fake_core import FakeCore
 from fakes.fake_model import FakeModel
 from fakes.fake_provider import FakeProvider
 from kata_core.config import Config, load_config
-from kata_worker.core_client import CoreClient
+from kata_worker.core_client import CoreClient, CoreError, ExamAnalysisItem
 from kata_worker.handlers import course as course_handler
 from kata_worker.handlers import (
     load_handlers,
@@ -30,6 +30,7 @@ from kata_worker.handlers import scan_extract as scan_extract_handler
 from kata_worker.handlers import summary as summary_handler
 from kata_worker.handlers import syllabus as syllabus_handler
 from kata_worker.handlers import tag as tag_handler
+from kata_worker.handlers.exam_mode_analyse import EXAM_ANALYSE_CLASS
 from kata_worker.handlers.tag import TAG_CLASS
 from kata_worker.loop import run_forever, run_once
 from kata_worker.model import SYSTEM_PROMPT
@@ -130,7 +131,11 @@ def test_run_once_returns_false_when_idle_and_does_not_report(
 
     assert run_once(client, router) is False
 
-    assert [r.method for r in fake_core.requests] == ["GET"]
+    # the lane is polled first (its route is absent on the fake core, so empty), then the job route
+    assert [(r.method, urlsplit(r.path).path) for r in fake_core.requests] == [
+        ("GET", "/exam-mode/analysis/next"),
+        ("GET", "/jobs/next"),
+    ]
     assert fake_model.requests == []
 
 
@@ -180,7 +185,7 @@ def test_run_once_claims_only_handled_kinds_and_leaves_other_jobs_queued(
 
     assert run_once(client, _local_router(cfg)) is True
 
-    gets = [r.path for r in fake_core.requests if r.method == "GET"]
+    gets = [r.path for r in fake_core.requests if r.method == "GET" and r.path.startswith("/jobs/")]
     assert len(gets) == 1
     claim = urlsplit(gets[0])
     assert claim.path == "/jobs/next"
@@ -279,3 +284,78 @@ def test_run_forever_survives_unreachable_core(fake_model: FakeModel) -> None:
         stop.set()
         worker.join(timeout=2)
     assert not worker.is_alive()
+
+
+def test_run_once_handles_lane_item_before_any_job(
+    fake_core: FakeCore,
+    fake_model: FakeModel,
+    token_env: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = _config(fake_core.url, fake_model.url)
+    fake_core.enqueue({"id": 7, "payload": "pasta recipe text"})
+    item = ExamAnalysisItem(
+        ticket=5, session_id=2, position=3, question="q?", choices=("a", "b"), picked=0
+    )
+    reported: list[tuple[int, str | None, list[str], str]] = []
+    monkeypatch.setattr(CoreClient, "next_exam_analysis", lambda self: item)
+    monkeypatch.setattr(
+        CoreClient,
+        "report_exam_analysis",
+        lambda self, ticket, topic, concepts, outcome: reported.append(
+            (ticket, topic, list(concepts), outcome)
+        ),
+    )
+    fake_model.add_reply(json.dumps({"topic": "T", "concepts": ["c"], "outcome": "unsure"}))
+    lane_router = Router(
+        {EXAM_ANALYSE_CLASS: ("local",)},
+        {"local": LocalProvider(cfg)},
+        Policy.from_config(cfg, {}),
+        [].append,
+    )
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, lane_router) is True
+
+    assert reported == [(5, "T", ["c"], "unsure")]
+    assert not [r for r in fake_core.requests if r.path.startswith("/jobs/")]
+
+
+def test_broken_lane_poll_does_not_starve_the_job_path(
+    fake_core: FakeCore,
+    fake_model: FakeModel,
+    token_env: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = _config(fake_core.url, fake_model.url)
+    fake_core.enqueue({"id": 7, "payload": "pasta recipe text"})
+
+    def lane_500(self: CoreClient) -> None:
+        raise CoreError("core answered 500 on /exam-mode/analysis/next")
+
+    monkeypatch.setattr(CoreClient, "next_exam_analysis", lane_500)
+    fake_model.add_reply(_tag_reply("food", "pasta"))
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, _local_router(cfg)) is True
+
+    posts = [(r.path, json.loads(r.body)) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/7/result", {"category": "food", "topic": "pasta"})]
+
+
+def test_run_once_takes_job_when_lane_is_empty(
+    fake_core: FakeCore,
+    fake_model: FakeModel,
+    token_env: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = _config(fake_core.url, fake_model.url)
+    fake_core.enqueue({"id": 7, "payload": "pasta recipe text"})
+    monkeypatch.setattr(CoreClient, "next_exam_analysis", lambda self: None)
+    fake_model.add_reply(_tag_reply("food", "pasta"))
+    client = CoreClient(cfg, token=token_env)
+
+    assert run_once(client, _local_router(cfg)) is True
+
+    posts = [(r.path, json.loads(r.body)) for r in fake_core.requests if r.method == "POST"]
+    assert posts == [("/jobs/7/result", {"category": "food", "topic": "pasta"})]

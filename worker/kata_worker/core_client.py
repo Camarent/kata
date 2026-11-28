@@ -11,7 +11,7 @@ import http.client
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import SplitResult, urlencode, urlsplit
 
@@ -22,6 +22,8 @@ LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 ALLOWED_SCHEMES = frozenset({"http", "https"})
 OK = 200
 NO_CONTENT = 204
+NOT_FOUND = 404
+EXAM_ANALYSIS_PATH = "/exam-mode/analysis"
 # The kind the core claims when a pull names no kind (D2): old workers keep getting `tag` jobs.
 DEFAULT_KIND = "tag"
 
@@ -35,6 +37,18 @@ class Job:
     id: int
     payload: str
     kind: str = DEFAULT_KIND
+
+
+@dataclass(frozen=True)
+class ExamAnalysisItem:
+    """One leased exam question. The question and its choices are left out of repr: never log them."""
+
+    ticket: int
+    session_id: int
+    position: int
+    question: str = field(repr=False)
+    choices: tuple[str, ...] = field(repr=False)
+    picked: int | None
 
 
 def _loopback_base(core_url: str, core_hosts: Sequence[str]) -> SplitResult:
@@ -161,6 +175,48 @@ class CoreClient:
         status, _ = self._call("POST", f"/jobs/{job_id}/fail")
         if status != NO_CONTENT:
             raise CoreError(f"POST /jobs/{job_id}/fail -> {status}")
+
+    def next_exam_analysis(self) -> ExamAnalysisItem | None:
+        """Lease the oldest queued exam question; None when the lane is empty (204) or has no route (404)."""
+        path = f"{EXAM_ANALYSIS_PATH}/next"
+        status, raw = self._call("GET", path)
+        if status in (NO_CONTENT, NOT_FOUND):
+            return None
+        if status != OK:
+            raise CoreError(f"GET {path} -> {status}")
+        try:
+            data = json.loads(raw)
+            choices = data["choices"]
+            if not isinstance(choices, list):
+                raise TypeError("choices is not a list")
+            picked = data["picked"]
+            return ExamAnalysisItem(
+                ticket=int(data["ticket"]),
+                session_id=int(data["session_id"]),
+                position=int(data["position"]),
+                question=str(data["question"]),
+                choices=tuple(str(choice) for choice in choices),
+                picked=None if picked is None else int(picked),
+            )
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise CoreError(f"GET {path}: unreadable exam analysis body") from exc
+
+    def report_exam_analysis(
+        self, ticket: int, topic: str | None, concepts: Sequence[str], outcome: str
+    ) -> None:
+        """Post the analysis of one leased exam question; the core checks its shape and stores it."""
+        path = f"{EXAM_ANALYSIS_PATH}/{ticket}/output"
+        body = {"topic": topic, "concepts": list(concepts), "outcome": outcome}
+        status, _ = self._call("POST", path, body)
+        if status != NO_CONTENT:
+            raise CoreError(f"POST {path} -> {status}")
+
+    def fail_exam_analysis(self, ticket: int) -> None:
+        """Give one leased exam question back to the lane."""
+        path = f"{EXAM_ANALYSIS_PATH}/{ticket}/fail"
+        status, _ = self._call("POST", path)
+        if status != NO_CONTENT:
+            raise CoreError(f"POST {path} -> {status}")
 
     def record_usage(self, micro_usd: int) -> None:
         """Add spend in micro-USD to today's total on the core."""

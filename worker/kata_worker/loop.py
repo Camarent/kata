@@ -16,7 +16,7 @@ from kata_core.config import Config
 from kata_core.modelhost.spec import KINDS as MODELHOST_KINDS
 
 from kata_worker.core_client import CoreClient, CoreError
-from kata_worker.handlers import Handler, load_handlers
+from kata_worker.handlers import Handler, exam_mode_analyse, load_handlers
 from kata_worker.providers.guard import AuditEvent
 from kata_worker.providers.router import Router, build_router
 from kata_worker.providers.scheduled import MODELHOST_SECTION
@@ -40,7 +40,16 @@ def claimable_handlers(cfg: Config) -> Mapping[str, Handler]:
 
 
 def run_once(client: CoreClient, router: Router, handlers: Mapping[str, Handler] = HANDLERS) -> bool:
-    """Handle at most one queued job; return True when a job was handled, False when idle."""
+    """Handle one exam question from the lane, else one queued job; True when one was handled, False when idle."""
+    try:
+        item = client.next_exam_analysis()
+    except (CoreError, OSError, http.client.HTTPException) as exc:
+        # A broken lane route must not starve the job path: log it and fall through to the jobs.
+        log.warning("exam analysis lane poll failed: %s", exc)
+        item = None
+    if item is not None:
+        exam_mode_analyse.handle_item(item, router, client)
+        return True
     job = client.next_job(tuple(sorted(handlers)))
     if job is None:
         return False

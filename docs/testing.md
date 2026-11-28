@@ -97,6 +97,7 @@ The slowest tests below are from the pre-speed `--py` run (see Before), not re-m
 ```
 
 The last line is a teardown phase, not a call phase. The list is pytest's output as printed. The timings are a sample from one run and are not updated when test files change.
+The exam-mode worker tests added by task 11 are not in this sample: the lane-first and lane-empty cases in `tests/worker/test_loop.py` (`test_run_once_handles_lane_item_before_any_job`, `test_run_once_takes_job_when_lane_is_empty`) and the leak test in `tests/worker/test_handler_exam_mode_analyse.py`.
 Pytest truncates long node ids with `...`.
 
 ## Parallel gates
