@@ -1,21 +1,5 @@
 # knip --production unused files, known debt (A1 unmounted modules). One path per line, relative to extension/.
 # The gate fails on any unused file not listed here. Remove a line when its module is mounted or deleted.
 # Each entry below is an unmounted module the owner keeps pending a decision: not deleted, not dead code to remove now.
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/blockMenu.ts
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/hlMenu.ts
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/imageMenu.ts
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/listPicker.ts
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/quizPin.ts
-# overlay module, unmounted (A1), kept pending owner decision
-src/ui/overlay/whichOne.ts
-# panel module, unmounted (A1), kept pending owner decision
-src/ui/panel/coursePage.ts
-# panel module, unmounted (A1), kept pending owner decision
-src/ui/panel/examResult.ts
 # panel module, unmounted (A1), kept pending owner decision
 src/ui/panel/examRun.ts

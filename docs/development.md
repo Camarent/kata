@@ -97,10 +97,12 @@ extension's typescript 7). Each check goes through `extension/tools-js/baseline-
 - Baseline files take one entry per line. Lines starting with `#` are comments and are ignored.
 - madge baseline: zero cycles. The 6 cycles found without `skipTypeImports` are all closed by
   type-only imports.
-- knip baseline: 9 unmounted modules under `src/ui/overlay/` and `src/ui/panel/`, kept pending an
-  owner decision. Remove a line when its module is mounted or deleted.
+- knip baseline: 1 unmounted module, `src/ui/panel/examRun.ts`, kept pending an owner decision. The
+  other unmounted modules were mounted and their lines removed. Remove a line when its module is
+  mounted or deleted.
 - `tests/foundation/test_js_audit_baselines.py` checks that `check-all.sh` names both gates, that
-  every knip entry is an existing file, and that the madge baseline is empty with `skipTypeImports` on.
+  the knip baseline lists exactly one entry and that it is an existing file, and that the madge
+  baseline is empty with `skipTypeImports` on.
 
 ## Coverage baseline
 

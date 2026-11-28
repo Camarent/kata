@@ -26,7 +26,7 @@ def test_check_all_runs_madge_and_knip_through_the_baseline_gate():
 
 def test_knip_baseline_lists_only_existing_extension_files():
     entries = _entries(TOOLS / "knip-baseline.txt")
-    assert len(entries) == 9
+    assert len(entries) == 1
     for entry in entries:
         assert (ROOT / "extension" / entry).is_file(), entry
 
