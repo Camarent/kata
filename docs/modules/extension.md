@@ -97,7 +97,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Review keyboard: Tab moves focus through the rows and buttons; ArrowUp/ArrowDown move between rows; keys 1, 2, 3 set known, learning, new.
 - No `extension/manifest.json` in the repo: `extension/build/build.mjs:71` writes one into each `dist/<browser>/`; edit `manifest.base.json` or `build/manifest.mjs`.
 - The core URL is not in the build. One build serves every core; the user types the URL at first run, and the origin is granted by the browser at that moment (`docs/decisions.md`, "Extension has no build-time server config (M15)"). Do not add a build-time URL or a fixed host permission.
-- Not tested in a real browser: the origin permission prompt, the `kata-bridge` registration and the course-page bridge. Vitest checks them with fake browser APIs only.
+- Not tested in a real browser: the origin permission prompt, the `kata-bridge` registration and the course-page bridge. Vitest checks them with fake browser APIs only. The browser tests seed the session and grant the stub origin (`tests/browser/signed_in.py`, `tests/browser/conftest.py` `driver`); Chrome's copy of the extension grants loopback in its manifest, so the real prompt stays untested.
 - Firefox first; Chrome later from the same code.
 - Adding a permission widens what users grant; keep the list minimal. `scripting` is there only for the bridge registration.
 - Match patterns cannot name a port: the bridge pattern uses `*` as host, so a core on a non-default port still gets `bridge.js`; `runBridge` returns early on any other origin.

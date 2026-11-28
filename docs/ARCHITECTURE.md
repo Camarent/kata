@@ -60,7 +60,7 @@ Lesson-check benchmark: `.venv/bin/python3 scripts/bench/lesson_check_bench.py -
 
 Core tests need a reachable Postgres and `KATA_CONFIG` pointing at a config whose DB user has `CREATEDB` (`docs/api.md`, Tests).
 Extension (from `extension/package.json`): `npm run build` (`tsc --noEmit`, then `build/build.mjs` runs esbuild and writes `dist/chrome/` and `dist/firefox/`), `npm test` (vitest run). Node install: TODO(verify).
-E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests": sign-in a11y, light and dark contrast, panel layout at 360px and 320px, checked in the page body). Each `driver` case owns its profile dir, driver port and temp dir, removed at teardown.
+E2e test: `python3 -m pytest tests/e2e` (`docs/e2e.md`). Browser tests: `scripts/dev/check-all.sh --browser` after `scripts/dev/install-browsers.sh` (`docs/e2e.md`, "Browser tests": sign-in a11y, light and dark contrast, panel layout at 360px and 320px, checked in the page body). Each `driver` case owns its profile dir, driver port and temp dir, removed at teardown; the signed-in panel test (`tests/browser/test_signed_in_panel.py`) seeds a session against a stub core on 127.0.0.1.
 
 ## Releases
 How a tag becomes a GitHub release and how the VM takes it: `docs/release.md`.

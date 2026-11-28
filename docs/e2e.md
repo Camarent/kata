@@ -72,7 +72,7 @@ scripts/dev/check-all.sh --browser
 
 To run only the browser tests by hand: `.venv/bin/python -m pytest tests/browser -m browser`.
 
-`check-all.sh --browser` runs them with `-n auto --maxprocesses 4` (`BROWSER_MAX_WORKERS` in `check-all.sh`). Each `driver` case owns its Firefox profile or Chrome `--user-data-dir`, its driver port and its temp dir; all are removed at teardown.
+`check-all.sh --browser` runs them with `-n auto --maxprocesses 4` (`BROWSER_MAX_WORKERS` in `check-all.sh`). Each `driver` case owns its Firefox profile or Chrome `--user-data-dir`, its driver port and its temp dir; all are removed at teardown. The Chrome copy of the extension grants `http://127.0.0.1/*` in its manifest, since headless Chrome never answers `permissions.request`.
 
 Skip behaviour:
 

@@ -8,6 +8,7 @@ scripts/dev/install-browsers.sh (pinned); Chrome and chromedriver are looked up 
 from __future__ import annotations
 
 import functools
+import shutil
 import json
 import os
 import subprocess
@@ -29,6 +30,10 @@ PAGES_DIR = TESTS_BROWSER / "pages"
 INSTALL_SCRIPT = REPO / "scripts" / "dev" / "install-browsers.sh"
 PRINT_DIR_TIMEOUT_SECONDS = 10
 CDP_TIMEOUT_SECONDS = 20
+# The path of the Chrome extension copy a case loaded: Chrome derives the extension id from the path,
+# so panel_page.py reads it from this variable. The fixture sets it and removes it at teardown.
+CHROME_LOADED_PATH_ENV = "KATA_BROWSER_CHROME_EXTENSION_PATH"
+LOOPBACK_HOST_PATTERN = "http://127.0.0.1/*"
 FIREFOX_GECKO_ID = "kata@kata.invalid"
 # Fixed uuid for the Firefox extension origin: moz-extension://<uuid>/sidepanel.html is known.
 FIREFOX_EXTENSION_UUID = "6f1c3d2e-8a4b-4c5d-9e7f-0a1b2c3d4e5f"
@@ -115,6 +120,20 @@ def _require_extension(browser: str) -> Path:
     if not (path / "manifest.json").is_file():
         pytest.fail(f"{path} missing: build the extension first (npm run build in extension/)")
     return path
+
+
+def _chrome_extension_with_loopback_grant(source: Path, target: Path) -> Path:
+    """Copy the built Chrome extension to target with 127.0.0.1 granted as a host permission.
+
+    Headless Chrome never answers permissions.request, so the tests grant the loopback origin in the
+    manifest copy instead (a match pattern ignores the port, so any stub port is covered).
+    """
+    shutil.copytree(source, target)
+    manifest_path = target / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["host_permissions"] = [LOOPBACK_HOST_PATTERN]
+    manifest_path.write_text(json.dumps(manifest))
+    return target
 
 
 def _load_chrome_extension(driver: Any, path: Path) -> None:
@@ -204,7 +223,10 @@ def driver(browser_name: str, color_scheme: str) -> Iterator[Any]:
             )
             drv = webdriver.Chrome(service=service, options=options)
             try:
-                _load_chrome_extension(drv, extension)
+                granted = _chrome_extension_with_loopback_grant(extension, Path(chrome_tmp) / "extension")
+                _load_chrome_extension(drv, granted)
+                os.environ[CHROME_LOADED_PATH_ENV] = str(granted)
                 yield drv
             finally:
+                os.environ.pop(CHROME_LOADED_PATH_ENV, None)
                 drv.quit()
