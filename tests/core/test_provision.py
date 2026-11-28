@@ -73,6 +73,9 @@ SCHEMA_TABLES = {
     "page_summary",
     "reader_document",
     "joke_cache",
+    "exam_mode_session",
+    "exam_mode_signal",
+    "exam_mode_proposal_decision",
 }
 
 
