@@ -401,6 +401,13 @@ Area > topic > concept identity, the aliases, the definition line, the ignored l
 - Sorted lists and block state: `core/kata_core/api/routes/concept_lists.py` (`GET /concepts/sorted`, `POST /concepts/block-state`, `POST /concepts/{id}/viewed`); the rank rules are in `core/kata_core/storage/concept_rank.py`.
 - Marks are keyed by concept id, so a rescan or a reassigned word keeps the mark.
 
+## Exam mode sessions
+
+- Routes under `/exam-mode` (`core/kata_core/api/routes/exam_mode.py`, router at `:35`): `POST /exam-mode/sessions` (`:101`, start or return the open session), `GET /exam-mode/sessions/{session_id}` (`:110`), `POST /exam-mode/sessions/{session_id}/end` (`:120`, idempotent), `POST /exam-mode/sessions/{session_id}/result` (`:130`), `POST /exam-mode/sessions/{session_id}/signals` (`:152`, 202 queued; the text goes to the analysis lane and is never logged).
+- `core/kata_core/exam_mode/sessions.py` holds the lazy idle end: every start, get and signal call sets `ended_at` to `last_activity_at` plus `idle_timeout_seconds` when `now - last_activity_at` reaches the timeout. `now` is a parameter; the route calls `datetime.now(UTC)` once.
+- The analysis lane is the `get_exam_lane` dependency (`core/kata_core/api/routes/exam_mode.py:48`), so tests override it. A signal the cloud cannot run (`needs_cloud`, task class `exam_analyse`) is stored `skipped` with no lane item.
+- Tests: `tests/core/test_api_exam_mode.py`.
+
 ## Quiz and exam results
 
 Quiz questions come from allowlisted public pages. Exam results come from the dojo course exam and are confirmed in kata. Migration `core/migrations/0022_quiz_exam.sql` adds `quiz_source` (unique per `url` and `text_sha256`, with `tier`, `licence`, `fetched_at`), `quiz_question` (`choices` jsonb, `answer_index`, `quote`; cascades on source delete), `exam_result` and `exam_result_concept`. Quiz sources and questions are shared by all users; exam results belong to one user.

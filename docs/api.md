@@ -106,6 +106,11 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/v1/health/deep` | none | none | 200 `{"status": "ok", "checks": {"db", "migrations"}}` | 503 `{"status": "fail", "failed": [...], "checks"}` when the database is unreachable or migrations are pending |
 | GET | `/capabilities` | none | none | 200 capabilities document, schema 2 (`models`, `fits_together`, `loaded_now`) | not a core route: served by the model host info service at `[modelhost] info_url` (default `http://127.0.0.1:11435`); the worker reads it, see [worker](modules/worker.md) |
 | POST | `/mcp` | bearer, `mcp` scope | one JSON-RPC 2.0 message (see MCP below) | 200 JSON-RPC reply; 204 for a valid notification (no `id`) | 401 missing, invalid or revoked token, or an `api` token; 200 with JSON-RPC error `-32700` for bad JSON |
+| POST | `/exam-mode/sessions` | bearer | `{"site_host"?: str}` | 200 session JSON with `idle_timeout_seconds`: the caller's open session, or a new one | an open session that has gone idle ends first (lazy idle end) |
+| GET | `/exam-mode/sessions/{session_id}` | bearer | none | 200 session JSON | 404 another user's id or an unknown id |
+| POST | `/exam-mode/sessions/{session_id}/end` | bearer | none | 200 session JSON; idempotent, an ended session answers 200 unchanged | 404 another user's id or an unknown id |
+| POST | `/exam-mode/sessions/{session_id}/result` | bearer | `{"result_date", "passed", "score", "picked_topic_ids"}` (score capped) | 200 session JSON with the result | 404 another user's id or an unknown id; 422 score over the cap |
+| POST | `/exam-mode/sessions/{session_id}/signals` | bearer | `{"position", "question", "choices", "picked"}` (question at most `max_question_chars`) | 202 `{"position", "status"}` queued; 200 `{"position", "recorded": false}` when the position is already recorded | 404 another user's id or an unknown id; 409 session ended; 422 question over `max_question_chars`; 503 lane full (row `failed`); the question text is never logged or returned |
 
 Notes:
 

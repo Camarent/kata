@@ -41,7 +41,7 @@ Run the bench with the project venv: `.venv/bin/python3 scripts/bench/lesson_che
 - `scripts/smoke/local_audit.py` - opt-in local capability audit: the audit cases against a local model, scored and printed as a table (`scripts/smoke/audit_cases.py`, `scripts/smoke/audit_score.py`).
 - `scripts/smoke/local_model.py` - opt-in local-model smoke CLI, timed; tested by `tests/scripts/test_smoke_local.py`.
 - `scripts/smoke/dojo_real.py` - opt-in real-dojo smoke (probe, init, add, validate, lock, build; wasm and web assets optional); tested by `tests/scripts/test_dojo_real.py`.
-- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel checkouts. `--setup` on a fresh `.venv` also installs `requirements-browser.txt` when that file exists.
+- `scripts/dev/check-all.sh` - the gate, one checkout at a time or in parallel checkouts. `--setup` on a fresh `.venv` also installs `requirements-browser.txt` when that file exists. `--py` runs pytest over all of `tests`, so the exam-mode route tests (`tests/core/test_api_exam_mode.py`) run there.
 - `scripts/dev/reader_probe.py` - live reader probe: writes `/spool/in` files for the worker, polls `/spool/out/<id>/result.json` via the `worker` and `reader` services, runs two sandbox checks, writes the report (`docs/research/reader-live.md` is its filled output); tested by `tests/scripts/test_reader_probe.py`.
 - `scripts/dev/check_research_note.py` - research note checker (`python3 scripts/dev/check_research_note.py NOTE.md`); tested by `tests/scripts/test_check_research_note.py`, which also checks `docs/research/m23-sources.md`.
 - `scripts/dev/install-browsers.sh` - pinned Firefox and geckodriver install, user level, no sudo. Change a version, URL and sha256 pin together.

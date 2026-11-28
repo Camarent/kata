@@ -2060,6 +2060,39 @@
         "title": "RegeneratePreviewOut",
         "type": "object"
       },
+      "ResultIn": {
+        "properties": {
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "picked_topic_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Picked Topic Ids",
+            "type": "array"
+          },
+          "result_date": {
+            "format": "date",
+            "title": "Result Date",
+            "type": "string"
+          },
+          "score": {
+            "maxLength": 40,
+            "title": "Score",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_date",
+          "passed",
+          "score",
+          "picked_topic_ids"
+        ],
+        "title": "ResultIn",
+        "type": "object"
+      },
       "ResultRequest": {
         "properties": {
           "category": {
@@ -2123,6 +2156,160 @@
           "relevance"
         ],
         "title": "ReviewConceptOut",
+        "type": "object"
+      },
+      "SessionOut": {
+        "properties": {
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "idle_timeout_seconds": {
+            "title": "Idle Timeout Seconds",
+            "type": "integer"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "picked_topic_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Picked Topic Ids",
+            "type": "array"
+          },
+          "result_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Date"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "site_host": {
+            "title": "Site Host",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "site_host",
+          "started_at",
+          "last_activity_at",
+          "ended_at",
+          "end_reason",
+          "result_date",
+          "passed",
+          "score",
+          "picked_topic_ids",
+          "idle_timeout_seconds"
+        ],
+        "title": "SessionOut",
+        "type": "object"
+      },
+      "SignalIn": {
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "picked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picked"
+          },
+          "position": {
+            "minimum": 0.0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "position",
+          "question",
+          "choices"
+        ],
+        "title": "SignalIn",
+        "type": "object"
+      },
+      "StartIn": {
+        "properties": {
+          "site_host": {
+            "default": "",
+            "title": "Site Host",
+            "type": "string"
+          }
+        },
+        "title": "StartIn",
         "type": "object"
       },
       "SummaryOut": {
@@ -3689,6 +3876,312 @@
           }
         },
         "summary": "Viewed Concept Route"
+      }
+    },
+    "/exam-mode/sessions": {
+      "post": {
+        "description": "The user's open session, or a new one. An open session that has gone idle ends first.",
+        "operationId": "start_exam_mode_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StartIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start"
+      }
+    },
+    "/exam-mode/sessions/{session_id}": {
+      "get": {
+        "description": "One of the user's sessions. 404 for another user's id or an unknown id.",
+        "operationId": "get_one_exam_mode_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One"
+      }
+    },
+    "/exam-mode/sessions/{session_id}/end": {
+      "post": {
+        "description": "End the session by the user's button. Idempotent: a session already ended returns 200 unchanged.",
+        "operationId": "end_exam_mode_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End"
+      }
+    },
+    "/exam-mode/sessions/{session_id}/result": {
+      "post": {
+        "description": "Store the exam result on the session. 422 when the score is over the cap.",
+        "operationId": "post_result_exam_mode_sessions__session_id__result_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Result"
+      }
+    },
+    "/exam-mode/sessions/{session_id}/signals": {
+      "post": {
+        "description": "Record one captured question. 202 queued, 200 when the position is already recorded.\n\n409 when the session has ended. 422 when the question is over `max_question_chars`. The row is\n`skipped` with no lane item when the analysis task needs the cloud and no token is set. The row is\n`failed` and the answer 503 when the lane is full. The question text is never logged or returned.",
+        "operationId": "post_signal_exam_mode_sessions__session_id__signals_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Signal"
       }
     },
     "/exams/import": {
