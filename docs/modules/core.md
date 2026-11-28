@@ -114,7 +114,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0023_m23_jobs.sql` - `page_summary` and `reader_document` (M23).
 - `core/migrations/0024_joke_cache.sql` - `joke_cache` (M23).
 - `core/kata_core/summary/`, `core/kata_core/reader/` and `core/kata_core/jokes/` - page summary, reader document and joke jobs (M23 sections below).
-- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set. The cloud token is read from the provider named by `[models] cloud` (`cloud_provider_section`, default `anthropic`; `cloud_token_present`).
+- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set. The cloud token is read from the provider named by `[models] cloud` (`cloud_provider_section`, default `anthropic`; `cloud_token_present`). `exam_analyse` is local only, so `needs_cloud` is false for it.
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.

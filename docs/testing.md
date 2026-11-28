@@ -96,7 +96,7 @@ The slowest tests below are from the pre-speed `--py` run (see Before), not re-m
 1.00s teardown tests/worker/test_loop.py::test_model_error_fails_job_and_loop_continues
 ```
 
-The last line is a teardown phase, not a call phase. The list is pytest's output as printed.
+The last line is a teardown phase, not a call phase. The list is pytest's output as printed. The timings are a sample from one run and are not updated when test files change.
 Pytest truncates long node ids with `...`.
 
 ## Parallel gates

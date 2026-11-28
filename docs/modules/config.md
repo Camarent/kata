@@ -27,7 +27,7 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 
 ## Key files
 - `core/kata_core/config.py` - loader, `Config`, cast rules.
-- `config/kata.example.toml` - reference values; every key must exist here. M26 keys: `[models]` (`cloud`, `local`), `[provider_openai]` (`api_key_env` = `KATA_OPENAI_API_KEY`), and `vision` in the provider tables.
+- `config/kata.example.toml` - reference values; every key must exist here. M26 keys: `[models]` (`cloud`, `local`), `[provider_openai]` (`api_key_env` = `KATA_OPENAI_API_KEY`), and `vision` in the provider tables. `[exam_mode]` (`idle_timeout_seconds`, `analysis_lease_seconds`, `lane_max_items`, `max_question_chars`, `max_name_chars`) and the `exam_analyse` routing and local capability entries are local only; `exam_analyse` is never a cloud class.
 - `deploy/kata.host.toml` - host config template for the VM stack (M6). Its keys must exist in the example file: `scripts/deploy/validate_stack.py:195` `check_config_keys` checks it, run by `scripts/deploy/validate_stack.py:208` `main`.
 - `deploy/env/small.env` (3 GB VM) and `deploy/env/large.env` (real server) - named memory and CPU profiles, passed to compose with `--env-file` (see `docs/deployment.md`, Profiles).
 - `core/kata_core/api/deps.py` `require_feature` - feature sections with `enabled` (`[trainer]`) gate their routes.

@@ -33,7 +33,7 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - `deploy/versions.env:10` `PY_BASE_IMAGE`; `:11` `PY_BASE_DIGEST`; `:21` `GITLEAKS_VERSION`; `:25` `TRAINER_URL`; `:30` `EMBED_MODEL_ID`. Empty values are filled by hand. The trainer is pinned to the dojo-kit v0.5.1 tarball; repin it after each dojo-kit release.
 - `deploy/compose.yaml:19` and `:154` pin the postgres and caddy images by tag and manifest digest (`POSTGRES_DIGEST`, `CADDY_DIGEST` in `deploy/versions.env`); compose stops while a digest is empty.
 - `deploy/env/small.env:4` (`KATA_MEM_CORE=768m`, default for the 3 GB VM); `deploy/env/large.env:3`.
-- `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`. Includes the M26 `[models]`, `[provider_openai]` and `vision` keys.
+- `deploy/kata.host.toml:12` `[core]`: host config template, same keys as `config/kata.example.toml`. Includes the M26 `[models]`, `[provider_openai]` and `vision` keys, and the `[exam_mode]` section.
 - `deploy/backup.sh:25` needs `KATA_BACKUP_DIR`; `:68` `pg_dump -Fc`; `:73` `openssl enc -aes-256-cbc -pbkdf2`; `:80` writes the `.dump.enc.hmac` sidecar.
 - `deploy/restore.sh:4` usage `[--dry-run] <dump.enc> <target-database> [counts.json]`; `:28` `--dry-run`; `:74` `verify_sidecar` (refuses a dump without a matching `.hmac`).
 - `deploy/relocate.sh:4` usage; `:39` `--dry-run`; `:40` `--confirm-maintenance` (real run needs it).
@@ -69,5 +69,5 @@ Runs kata on one Ubuntu VM with Docker compose. The VM runs no builds: one image
 - The GPU-PC worker is not part of this stack. It runs as the user that owns the model-host folder and its `data/`, in the docker group, never as root, with that user's own device token (`docs/decisions.md:580`). Its settings are the `[modelhost]` keys (`config/kata.example.toml:208`).
 
 ## Depends on / used by
-- Depends on: `core/` (image contents, `kata_core` entry points), `config/kata.example.toml` (template keys must match, checked by `scripts/deploy/validate_stack.py`), Docker compose, the network client on the host.
+- Depends on: `core/` (image contents, `kata_core` entry points), `config/kata.example.toml` (template keys must match, checked by `scripts/deploy/validate_stack.py`; `[exam_mode]` included), Docker compose, the network client on the host.
 - Used by: `docs/deployment.md` (operator steps); `tests/scripts/test_backup.py`, `test_restore.py`, `test_relocate.py`, `test_provision_vm.py`, `test_validate_stack.py`, `test_check_image_rules.py`, `test_caddyfile_rules.py`, `test_ship.py`, `test_cert_units.py`, `test_compose_pins.py`.

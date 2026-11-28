@@ -168,7 +168,7 @@ scripts/dev/pg.sh stop
 The server listens on `127.0.0.1` only, with trust authentication, role and database
 `kata_dev`. The role is allowed to create databases because each test creates and drops a
 scratch one. Configuration comes from `config/kata.example.toml` (M26 added `[models]`, `[provider_openai]` and `vision` keys there) plus `KATA_*` environment
-overrides, which `pg.sh env` prints; no config file is copied or generated.
+overrides, which `pg.sh env` prints; no config file is copied or generated. The `[exam_mode]` section (five limits) is in the same two files.
 
 | Variable | Default | Meaning |
 |---|---|---|

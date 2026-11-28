@@ -58,6 +58,7 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `routing.quiz_generate` | "local,anthropic" | `KATA_ROUTING_QUIZ_GENERATE` |
 | `routing.extract_syllabus` | "local,anthropic" | `KATA_ROUTING_EXTRACT_SYLLABUS` |
 | `routing.scan_classify` | "local,anthropic" | `KATA_ROUTING_SCAN_CLASSIFY` |
+| `routing.exam_analyse` | "local" | `KATA_ROUTING_EXAM_ANALYSE` |
 | `routing.scan_extract` | "local,anthropic" | `KATA_ROUTING_SCAN_EXTRACT` |
 | `routing.vision` | "local,anthropic" | `KATA_ROUTING_VISION` |
 | `local_capability.tag` | "kata-l" | `KATA_LOCAL_CAPABILITY_TAG` |
@@ -67,12 +68,13 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `local_capability.generate_course` | "kata-l" | `KATA_LOCAL_CAPABILITY_GENERATE_COURSE` |
 | `local_capability.extract_syllabus` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXTRACT_SYLLABUS` |
 | `local_capability.scan_classify` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_CLASSIFY` |
+| `local_capability.exam_analyse` | "kata-l" | `KATA_LOCAL_CAPABILITY_EXAM_ANALYSE` |
 | `local_capability.scan_extract` | "kata-l" | `KATA_LOCAL_CAPABILITY_SCAN_EXTRACT` |
 | `local_capability.quiz_generate` | "kata-l" | `KATA_LOCAL_CAPABILITY_QUIZ_GENERATE` |
 | `local_capability.vision` | "cloud-only" | `KATA_LOCAL_CAPABILITY_VISION` |
 | `models.cloud` | "anthropic" | `KATA_MODELS_CLOUD` |
 | `models.local` | "local" | `KATA_MODELS_LOCAL` |
-| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
+| `provider_local.task_classes` | "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision,exam_analyse" | `KATA_PROVIDER_LOCAL_TASK_CLASSES` |
 | `provider_local.vision` | false | `KATA_PROVIDER_LOCAL_VISION` |
 | `provider_anthropic.task_classes` | "explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision" | `KATA_PROVIDER_ANTHROPIC_TASK_CLASSES` |
 | `provider_anthropic.base_url` | "https://api.anthropic.com" | `KATA_PROVIDER_ANTHROPIC_BASE_URL` |
@@ -164,6 +166,11 @@ The file path is read from `KATA_CONFIG` when not passed in.
 | `jokes.max_joke_chars` | 300 | `KATA_JOKES_MAX_JOKE_CHARS` |
 | `jokes.cache_size` | 50 | `KATA_JOKES_CACHE_SIZE` |
 | `jokes.refill_interval_seconds` | 7200 | `KATA_JOKES_REFILL_INTERVAL_SECONDS` |
+| `exam_mode.idle_timeout_seconds` | 10800 | `KATA_EXAM_MODE_IDLE_TIMEOUT_SECONDS` |
+| `exam_mode.analysis_lease_seconds` | 120 | `KATA_EXAM_MODE_ANALYSIS_LEASE_SECONDS` |
+| `exam_mode.lane_max_items` | 200 | `KATA_EXAM_MODE_LANE_MAX_ITEMS` |
+| `exam_mode.max_question_chars` | 4000 | `KATA_EXAM_MODE_MAX_QUESTION_CHARS` |
+| `exam_mode.max_name_chars` | 80 | `KATA_EXAM_MODE_MAX_NAME_CHARS` |
 
 Defaults are the values in `config/kata.example.toml`. The example values are placeholders.
 

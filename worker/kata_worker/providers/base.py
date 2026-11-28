@@ -23,6 +23,7 @@ TASK_CLASSES = (
     "scan_extract",
     "quiz_generate",
     "vision",
+    "exam_analyse",
 )
 
 

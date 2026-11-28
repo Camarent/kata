@@ -17,7 +17,7 @@ kata is a self-hosted learning companion. It keeps a per-user model of known top
 Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to-end test), `docs/decisions.md`, `docs/design/overview.md`, `docs/design/extension-ui.md` (side panel and lesson page UI design), `docs/INDEX.md` (generated file and symbol list).
 
 ## Data and control flow
-1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:111`). The `[models]`, `[provider_openai]` and `vision` keys are in the example and host files; `needs_cloud` follows the `[models]` cloud provider token (`docs/modules/core.md`).
+1. Config: `load_config` reads `config/kata.example.toml`-shaped TOML (path from `KATA_CONFIG` or `--config`), applies `KATA_*` env overrides (`core/kata_core/config.py:111`). The `[models]`, `[provider_openai]`, `vision` and `[exam_mode]` keys are in the example and host files; `needs_cloud` follows the `[models]` cloud provider token (`docs/modules/core.md`).
 2. Provisioning: `scripts/db/kata_db.py` calls `core/kata_core/storage/provision.py` to create databases and apply `core/migrations/*.sql`.
 3. Auth: admin creates a user and an enrolment code (`core/kata_core/auth/admin.py`). Client redeems the code at `POST /auth/enrol`; the core stores only sha256 digests and returns the raw token once. Every other route takes `Authorization: Bearer`, resolved by `current_user` (`core/kata_core/api/deps.py:76`).
 4. Request: route module in `core/kata_core/api/routes/` -> repository in `core/kata_core/storage/` -> Postgres. `user_id` always comes from the token.
