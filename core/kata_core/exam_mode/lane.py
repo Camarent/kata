@@ -43,6 +43,7 @@ class AnalysisLane:
         self._max_attempts = max_attempts
         self._queue: deque[LaneItem] = deque()
         self._leased: dict[int, LaneItem] = {}
+        self._dropped: list[LaneItem] = []
         self._lock = threading.Lock()
 
     def put(self, item: LaneItem, now: float) -> bool:
@@ -56,13 +57,17 @@ class AnalysisLane:
             self._queue.append(item)
             return True
 
-    def lease(self, now: float) -> LaneItem | None:
-        """Hand the oldest queued item to a worker for `lease_seconds`, or None when nothing is queued."""
+    def lease(self, now: float, user_id: int | None = None) -> LaneItem | None:
+        """Hand the oldest queued item to a worker for `lease_seconds`, or None when nothing is queued.
+
+        With `user_id`, only that user's items qualify.
+        """
         with self._lock:
             self._requeue_expired(now)
-            if not self._queue:
+            item = next((held for held in self._queue if user_id is None or held.user_id == user_id), None)
+            if item is None:
                 return None
-            item = self._queue.popleft()
+            self._queue.remove(item)
             item.attempts += 1
             item.leased_until = now + self._lease_seconds
             self._leased[item.ticket] = item
@@ -91,6 +96,32 @@ class AnalysisLane:
                 self._queue.append(item)
             return True
 
+    @property
+    def max_attempts(self) -> int:
+        """Leases an item gets before `fail` drops it."""
+        return self._max_attempts
+
+    def leased_item(self, ticket: int, now: float, user_id: int | None = None) -> LaneItem | None:
+        """The item leased under `ticket`, or None. Reads only: the lease is left as it is.
+
+        With `user_id`, another user's ticket gives None.
+        """
+        with self._lock:
+            self._requeue_expired(now)
+            item = self._leased.get(ticket)
+            if item is not None and user_id is not None and item.user_id != user_id:
+                return None
+            return item
+
+    def take_dropped(self) -> list[LaneItem]:
+        """The items an expired lease dropped since the last call, oldest drop first. Clears the list.
+
+        The caller marks each one's signal failed: the lane itself keeps no record of it.
+        """
+        with self._lock:
+            dropped, self._dropped = self._dropped, []
+            return dropped
+
     def size(self) -> int:
         """Items the lane holds, queued or leased."""
         with self._lock:
@@ -104,6 +135,8 @@ class AnalysisLane:
             item.leased_until = None
             if item.attempts < self._max_attempts:
                 self._queue.append(item)
+            else:
+                self._dropped.append(item)
 
 
 _LANE: AnalysisLane | None = None

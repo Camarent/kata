@@ -1793,6 +1793,54 @@
         "title": "ModuleOut",
         "type": "object"
       },
+      "NextOut": {
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "picked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picked"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          },
+          "ticket": {
+            "title": "Ticket",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket",
+          "session_id",
+          "position",
+          "question",
+          "choices",
+          "picked"
+        ],
+        "title": "NextOut",
+        "type": "object"
+      },
       "OutputRequest": {
         "properties": {
           "output": {
@@ -3876,6 +3924,170 @@
           }
         },
         "summary": "Viewed Concept Route"
+      }
+    },
+    "/exam-mode/analysis/next": {
+      "get": {
+        "description": "Lease the oldest queued question for `lane_seconds`. 204 when the lane is empty.",
+        "operationId": "next_item_exam_mode_analysis_next_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "204": {
+            "description": "lane empty"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Next Item"
+      }
+    },
+    "/exam-mode/analysis/{ticket}/fail": {
+      "post": {
+        "description": "Give a leased question back. It is retried once; on the final drop its signal is marked failed.",
+        "operationId": "post_fail_exam_mode_analysis__ticket__fail_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "title": "Ticket",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "ticket not leased"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Fail"
+      }
+    },
+    "/exam-mode/analysis/{ticket}/output": {
+      "post": {
+        "description": "Store the analysis of a leased question and complete the ticket. 422 drops it as failed.",
+        "operationId": "post_output_exam_mode_analysis__ticket__output_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "title": "Ticket",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "ticket not leased"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Output"
       }
     },
     "/exam-mode/sessions": {

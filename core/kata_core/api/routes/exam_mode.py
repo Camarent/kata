@@ -58,6 +58,23 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def mark_dropped(conn: Conn, items: list[LaneItem]) -> None:
+    """Set each dropped item's signal to `failed` with no analysis columns. Called after a lane op."""
+    for item in items:
+        mark_signal(
+            conn,
+            session_id=item.session_id,
+            position=item.position,
+            status=STATUS_FAILED,
+            topic_id=None,
+            proposed_topic=None,
+            concept_ids=(),
+            proposed_names=(),
+            outcome="unknown",
+            analysed_at=None,
+        )
+
+
 class StartIn(BaseModel):
     site_host: str = ""
 
@@ -188,7 +205,9 @@ def post_signal(
         choices=tuple(body.choices),
         picked=body.picked,
     )
-    if not lane.put(item, now.timestamp()):
+    accepted = lane.put(item, now.timestamp())
+    mark_dropped(conn, lane.take_dropped())
+    if not accepted:
         mark_signal(
             conn,
             session_id=row.id,

@@ -406,7 +406,9 @@ Area > topic > concept identity, the aliases, the definition line, the ignored l
 - Routes under `/exam-mode` (`core/kata_core/api/routes/exam_mode.py`, router at `:35`): `POST /exam-mode/sessions` (`:101`, start or return the open session), `GET /exam-mode/sessions/{session_id}` (`:110`), `POST /exam-mode/sessions/{session_id}/end` (`:120`, idempotent), `POST /exam-mode/sessions/{session_id}/result` (`:130`), `POST /exam-mode/sessions/{session_id}/signals` (`:152`, 202 queued; the text goes to the analysis lane and is never logged).
 - `core/kata_core/exam_mode/sessions.py` holds the lazy idle end: every start, get and signal call sets `ended_at` to `last_activity_at` plus `idle_timeout_seconds` when `now - last_activity_at` reaches the timeout. `now` is a parameter; the route calls `datetime.now(UTC)` once.
 - The analysis lane is the `get_exam_lane` dependency (`core/kata_core/api/routes/exam_mode.py:48`), so tests override it. A signal the cloud cannot run (`needs_cloud`, task class `exam_analyse`) is stored `skipped` with no lane item.
-- Tests: `tests/core/test_api_exam_mode.py`.
+- Worker lane routes under `/exam-mode/analysis` (`core/kata_core/api/routes/exam_mode_analysis.py`, router prefix `/exam-mode/analysis`, same `current_user` auth as `/jobs`): `GET /next` (204 when the lane is empty), `POST /{ticket}/output` (parse and match the model reply, mark the signal `analysed`, complete the ticket, 204), `POST /{ticket}/fail` (one retry, then the signal row is `failed`, 204). Signals of an ended session are still updated.
+- Their schema is exported to `docs/openapi.json` (`core/kata_core/api/openapi_export.py` `main`), and `tests/core/test_openapi_export.py` fails when the committed file drifts.
+- Tests: `tests/core/test_api_exam_mode.py`, `tests/core/test_api_exam_mode_analysis.py`.
 
 ## Quiz and exam results
 
