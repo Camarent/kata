@@ -37,6 +37,18 @@ Baseline gate timings (before the speed-up) are in `docs/testing.md`.
 - `tests/browser/stub_core.py` - `stub_core(routes, received=None, bodies=None)`: a context manager that serves the JSON in `routes` (path to body) on 127.0.0.1 port 0 from a ThreadingHTTPServer, stops it at exit; other paths get 404. When `received` is a list, every request is appended to it as `"METHOD /path"` so a test can assert what the extension sent; when `bodies` is a list, each request's raw body is appended to it in the same order. It answers GET, POST, PUT and DELETE alike (PUT and DELETE added for the block menu's Ignore and Delete). `tests/browser/test_block_menu.py` uses it to check the block menu: hover a scanned block, the menu shows its concept rows, and Ignore sends `PUT /concepts/{id}/ignore` to the stub. `tests/browser/test_panel_track_create.py` uses it the same way for track create: Save sends `POST /v1/tracks` with the name and deadline (checked from `bodies`), and the new row shows in the Tracks tab.
 - `tests/browser/signed_in.py` - `seed_session` (writes the `kata.session` storage key, base URL and token, from an extension page), `grant_host_permission` (grants the stub origin by a real click on a test button; raises when the grant is not given).
 - `tests/browser/test_signed_in_panel.py` - `test_signed_in_panel_shows_tabs`: a seeded session opens the panel with the tab bar and no sign-in form, in each browser.
+- `tests/browser/test_block_menu.py` - hover a scanned block, the concept rows show, Ignore sends `PUT /concepts/{id}/ignore` to the stub.
+- `tests/browser/test_hover_menu.py` - hover a highlighted word opens the hover menu.
+- `tests/browser/test_which_one.py` - which-one candidates are listed and a candidate reassigns.
+- `tests/browser/test_image_menu.py` - hover an image pin opens the image menu.
+- `tests/browser/test_prod_content.py` - production content mounts the floating card.
+- `tests/browser/test_list_picker.py` - the list picker opens from the block menu and a pick sends the add request.
+- `tests/browser/test_quiz_pin.py` - the quiz pin shows, and its action requests a mini quiz.
+- `tests/browser/test_panel_scan_rows.py` - the panel scan rows render from the lesson page.
+- `tests/browser/test_panel_exam.py` - the exam result screen in the panel.
+- `tests/browser/test_panel_course.py` - the Courses tab and the course page show the course version (`Version 2` from the stub).
+- `tests/browser/test_panel_track_detail.py` - track detail: Add source and Quiz work from the panel.
+- `tests/browser/test_panel_track_create.py` - track create: Save sends `POST /v1/tracks` and the new row shows in the Tracks tab.
 - `tests/browser/test_panel_flow.py` - `test_panel_flow` - side panel flow in each browser; `tests/browser/pages/lesson.html` is its page.
 - `tests/browser/test_panel_a11y.py` - `test_signin_tab_order_and_focus_indicator` - keyboard tab order (base URL, code, device label, submit) and focus indicator of the sign-in view.
 - `tests/browser/test_panel_contrast.py` - `test_panel_signin_theme_contrast` - contrast of the sign-in view in light and dark; `contrast_ratio` and `test_contrast_ratio_known_pairs` check the ratio math.

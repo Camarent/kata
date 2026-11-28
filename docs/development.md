@@ -154,6 +154,8 @@ scripts/dev/check-all.sh --browser
 
 The install goes to `$HOME/.cache/kata-browsers` (or `$KATA_BROWSERS_DIR`) with sha256 checks; `scripts/dev/install-browsers.sh --status` checks it. Without the install, `--browser` skips with a message. Build the extension first (`npm run build` in `extension/`). Details and skip behaviour: `docs/e2e.md`, "Browser tests".
 
+Rule: every mounted screen or overlay has a `tests/browser` test that does the real user action (a click, a hover, a key press), not only a render check. Browser tests run at the merge and full levels in parallel with the other jobs (`--merge` and the full run start them as concurrent jobs), so a screen with no browser test is a gap in both.
+
 ## Postgres for tests
 
 ```
