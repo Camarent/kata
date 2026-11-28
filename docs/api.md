@@ -106,6 +106,14 @@ This guide covers the core HTTP API, the skill list file format, the database an
 | GET | `/v1/health/deep` | none | none | 200 `{"status": "ok", "checks": {"db", "migrations"}}` | 503 `{"status": "fail", "failed": [...], "checks"}` when the database is unreachable or migrations are pending |
 | GET | `/capabilities` | none | none | 200 capabilities document, schema 2 (`models`, `fits_together`, `loaded_now`) | not a core route: served by the model host info service at `[modelhost] info_url` (default `http://127.0.0.1:11435`); the worker reads it, see [worker](modules/worker.md) |
 | POST | `/mcp` | bearer, `mcp` scope | one JSON-RPC 2.0 message (see MCP below) | 200 JSON-RPC reply; 204 for a valid notification (no `id`) | 401 missing, invalid or revoked token, or an `api` token; 200 with JSON-RPC error `-32700` for bad JSON |
+| POST | `/exam-mode/sessions` | bearer | `{"site_host"?: str}` | 200 session JSON with `idle_timeout_seconds`: the caller's open session, or a new one | an open session that has gone idle ends first (lazy idle end) |
+| GET | `/exam-mode/sessions/{session_id}` | bearer | none | 200 session JSON | 404 another user's id or an unknown id |
+| POST | `/exam-mode/sessions/{session_id}/end` | bearer | none | 200 session JSON; idempotent, an ended session answers 200 unchanged | 404 another user's id or an unknown id |
+| POST | `/exam-mode/sessions/{session_id}/result` | bearer | `{"result_date", "passed", "score", "picked_topic_ids"}` (score capped) | 200 session JSON with the result | 404 another user's id or an unknown id; 422 score over the cap |
+| POST | `/exam-mode/sessions/{session_id}/signals` | bearer | `{"position", "question", "choices", "picked"}` (question at most `max_question_chars`) | 202 `{"position", "status"}` queued; 200 `{"position", "recorded": false}` when the position is already recorded | 404 another user's id or an unknown id; 409 session ended; 422 question over `max_question_chars`; 503 lane full (row `failed`); the question text is never logged or returned |
+| GET | `/exam-mode/analysis/next` | bearer | none | 200 `{"ticket", "session_id", "position", "question", "choices", "picked"}` (leases the oldest queued question for `analysis_lease_seconds`) | 204 when the lane is empty |
+| POST | `/exam-mode/analysis/{ticket}/output` | bearer | `{"topic", "concepts", "outcome"}` (the model reply, parsed and matched) | 204; the signal row is `analysed` with derived columns only, and the ticket is completed | 404 unknown ticket; 422 a bad body (the signal is `failed` and the item is dropped) |
+| POST | `/exam-mode/analysis/{ticket}/fail` | bearer | none | 204; the item is retried once, then the signal row is `failed` | 404 unknown ticket |
 
 Notes:
 
@@ -200,7 +208,7 @@ Category / Topic = Alias
 
 ### Configuration
 
-The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` environment variable, or from `--config` where the CLI accepts it. Each key can be overridden by an environment variable named in the README. The example file is `config/kata.example.toml`; the OpenAI-compatible provider token is the env var named by `[provider_openai] api_key_env`, not a key in the file.
+The CLIs and the core read a TOML file. Its path comes from the `KATA_CONFIG` environment variable, or from `--config` where the CLI accepts it. Each key can be overridden by an environment variable named in the README. The example file is `config/kata.example.toml` (it includes the `[exam_mode]` section and the `exam_analyse` task class); the OpenAI-compatible provider token is the env var named by `[provider_openai] api_key_env`, not a key in the file.
 
 The database password is not in the file. The file names an environment variable in `[database] password_env`; set that variable to the password.
 

@@ -97,7 +97,7 @@ Project items after Milestone 0.
       `KATA_SMOKE_LOCAL=1` against the local model and records one row per model and class in
       [`research/benchmarks/LOCAL_AUDIT.md`](research/benchmarks/LOCAL_AUDIT.md). Not run yet.
 - [ ] Set `[local_capability]` from the audit verdicts in `config/kata.example.toml` and
-      `deploy/kata.host.toml`: a class gets `cloud-only` where no local model is good enough. M26 added `[models]`, `[provider_openai]` and `vision` keys to both files; this item is unchanged by them.
+      `deploy/kata.host.toml`: a class gets `cloud-only` where no local model is good enough. M26 added `[models]`, `[provider_openai]` and `vision` keys to both files; this item is unchanged by them. The exam-mode change added the `exam_analyse` task class (routing `local`, capability `kata-l`) and an `[exam_mode]` section to both files; `tests/worker/test_providers.py` lists the new class. Its capability verdict is part of this item.
       Until then every class is `kata-l` (see [`decisions.md`](decisions.md), "Routing defaults
       are local first, cloud by token (M17)").
 - [ ] M11 note, thinking on/off numbers for the local models (`kata-l` is not a thinking model,

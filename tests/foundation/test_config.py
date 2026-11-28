@@ -68,6 +68,7 @@ def test_example_has_required_sections() -> None:
         "summary",
         "reader",
         "jokes",
+        "exam_mode",
     }
     assert set(data["cost"]) == {
         "cap_micro_usd",
@@ -104,11 +105,13 @@ def test_example_has_required_sections() -> None:
         "scan_extract",
         "quiz_generate",
         "vision",
+        "exam_analyse",
     }
     assert set(data["routing"]) == task_classes
     assert set(data["local_capability"]) == task_classes
-    for name in task_classes:
+    for name in task_classes - {"exam_analyse"}:
         assert data["routing"][name] == "local,anthropic"
+    assert data["routing"]["exam_analyse"] == "local"
     for name in task_classes - {"vision"}:
         assert data["local_capability"][name] == "kata-l"
     assert data["local_capability"]["vision"] == "cloud-only"

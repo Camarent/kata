@@ -36,6 +36,7 @@ TASK_CLASSES = frozenset(
         "scan_extract",
         "quiz_generate",
         "vision",
+        "exam_analyse",
     }
 )
 

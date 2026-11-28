@@ -7,7 +7,7 @@ import json
 import pytest
 from fakes.fake_core import FakeCore
 from kata_core.config import Config
-from kata_worker.core_client import CoreClient, CoreError, Job, resolve_token
+from kata_worker.core_client import CoreClient, CoreError, ExamAnalysisItem, Job, resolve_token
 from kata_worker.providers.cost import Ledger
 
 TOKEN_ENV = "KATA_WORKER_TOKEN"
@@ -245,3 +245,108 @@ def test_document_file_over_max_file_bytes_is_core_error(fake_core: FakeCore) ->
     client = CoreClient(_cfg_with_reader(fake_core.url, max_file_bytes=10), token=fake_core.token)
     with pytest.raises(CoreError):
         client.document_file(8)
+
+
+LANE_QUESTION = "SENTINEL-LANE-Q-41"
+
+
+def _lane_client(monkeypatch: pytest.MonkeyPatch, status: int, raw: bytes = b"") -> tuple[CoreClient, list[tuple[str, str, object]]]:
+    """A client whose _call answers `status` and `raw`; the calls it receives are returned as a list."""
+    calls: list[tuple[str, str, object]] = []
+
+    def fake_call(self: CoreClient, method: str, path: str, body: object = None) -> tuple[int, bytes]:
+        calls.append((method, path, body))
+        return status, raw
+
+    monkeypatch.setattr(CoreClient, "_call", fake_call)
+    return CoreClient(_cfg("http://127.0.0.1:1"), token="t"), calls
+
+
+LANE_BODY = json.dumps(
+    {
+        "ticket": 5,
+        "session_id": 2,
+        "position": 3,
+        "question": LANE_QUESTION,
+        "choices": ["UDP", "TCP"],
+        "picked": None,
+    }
+).encode()
+
+
+def test_next_exam_analysis_returns_leased_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, calls = _lane_client(monkeypatch, 200, LANE_BODY)
+    item = client.next_exam_analysis()
+    assert item == ExamAnalysisItem(
+        ticket=5, session_id=2, position=3, question=LANE_QUESTION, choices=("UDP", "TCP"), picked=None
+    )
+    assert calls == [("GET", "/exam-mode/analysis/next", None)]
+
+
+@pytest.mark.parametrize("status", [204, 404])
+def test_next_exam_analysis_is_none_when_lane_empty_or_absent(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    client, _ = _lane_client(monkeypatch, status)
+    assert client.next_exam_analysis() is None
+
+
+def test_next_exam_analysis_other_status_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _lane_client(monkeypatch, 500)
+    with pytest.raises(CoreError):
+        client.next_exam_analysis()
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"not json",
+        b'{"ticket": 1}',
+        b'{"ticket": 1, "session_id": 1, "position": 1, "question": "q", "choices": "UD", "picked": null}',
+    ],
+)
+def test_unreadable_exam_analysis_body_raises_without_echoing_it(
+    monkeypatch: pytest.MonkeyPatch, raw: bytes
+) -> None:
+    client, _ = _lane_client(monkeypatch, 200, raw)
+    with pytest.raises(CoreError) as info:
+        client.next_exam_analysis()
+    assert raw.decode() not in str(info.value)
+
+
+def test_exam_analysis_item_repr_hides_question_and_choices() -> None:
+    item = ExamAnalysisItem(
+        ticket=5, session_id=2, position=3, question=LANE_QUESTION, choices=("UDP",), picked=0
+    )
+    assert LANE_QUESTION not in repr(item)
+    assert "UDP" not in repr(item)
+
+
+def test_report_exam_analysis_posts_body_to_ticket_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, calls = _lane_client(monkeypatch, 204)
+    client.report_exam_analysis(5, "Networks", ["ordering"], "likely_right")
+    assert calls == [
+        (
+            "POST",
+            "/exam-mode/analysis/5/output",
+            {"topic": "Networks", "concepts": ["ordering"], "outcome": "likely_right"},
+        )
+    ]
+
+
+def test_report_exam_analysis_non_204_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _lane_client(monkeypatch, 404)
+    with pytest.raises(CoreError):
+        client.report_exam_analysis(5, None, [], "unsure")
+
+
+def test_fail_exam_analysis_posts_to_ticket_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, calls = _lane_client(monkeypatch, 204)
+    client.fail_exam_analysis(5)
+    assert calls == [("POST", "/exam-mode/analysis/5/fail", None)]
+
+
+def test_fail_exam_analysis_non_204_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _lane_client(monkeypatch, 500)
+    with pytest.raises(CoreError):
+        client.fail_exam_analysis(5)

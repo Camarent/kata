@@ -92,6 +92,7 @@ Model routing: each task class tries the providers in order and the first reply 
 | generate_course | local,anthropic |
 | extract_syllabus | local,anthropic |
 | scan_classify | local,anthropic |
+| exam_analyse | local |
 
 ## Documentation
 

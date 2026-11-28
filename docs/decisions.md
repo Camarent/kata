@@ -808,3 +808,75 @@ Decided 2026-11-27 (M26). Status: implemented in M26 on the backend, config and 
 - **Literal model name scope.** A `[routing]` chain entry resolves in order: literal `model_name` of a provider section, then the generic names `cloud` and `local` through `[models]`, then a provider name. The literal check covers only the configured `model_name` of each provider; no other string counts as a model name. Code: `resolve_entry` in `worker/kata_worker/providers/models.py`.
 
 Config: [configuration.md](configuration.md), section Models: generic names, provider sections and vision (M26).
+
+## Exam mode: no question text stored
+
+Decided 2026-11-27 (owner answer 1). Status: planned, phase 1 of Exam mode. The recorder reads the question, the choices and the owner's pick, and sends them to the analysis. The question text is transient: it is never saved in a table, a log or a response. Only derived data is kept: concept ids, topic ids, proposed concept names (capped and sanitised) and an outcome per question. Design: `docs/design/exam-mode-screens.md` (proposed screens, phase 1) and `docs/modules/core.md` (phase 1 docs).
+
+## Exam mode: routing and cloud policy follow today's flags
+
+Decided 2026-11-27 (owner answer 1). Status: planned. The analysis uses the model routing and the cloud policy flags that exist today: the local model first, and a cloud call only when the policy for the task class allows it. The analysis is silent: nothing is shown, hinted or marked while the mode is on. This amends the rule that no model call runs while the mode is on.
+
+## Exam mode: no site rule
+
+Decided 2026-11-27 (owner answer 2). Status: planned. The owner decides where to turn the mode on and carries that responsibility. Kata does not detect, mark or block exam sites.
+
+## Exam mode: ends by button or idle timeout
+
+Decided 2026-11-27 (owner answer 3). Status: planned. The mode ends by the end button, or by an idle timeout (proposed: 3 hours) so a forgotten mode ends itself.
+
+## Exam mode: pin dot is the only marker
+
+Decided 2026-11-27 (owner answer 4). Status: planned. A small dot on the floating pin shows that recording runs. Nothing else appears on the page.
+
+## Exam mode: owner picks topics by hand
+
+Decided 2026-11-27 (open domain mapping, fallback chosen). Status: planned. No exam domain list is imported. The owner picks the topics of an exam by hand.
+
+## Exam mode: weak points are proposed, then confirmed
+
+Decided 2026-11-27 (owner answer 1, proposals). Status: planned. A concept kata already knows gets "Needs practice" (docs/design/extension-ui.md, item 36). A concept kata does not know yet is only proposed after the mode ends. The owner confirms each proposal; no concept is created on its own.
+
+## Exam mode: D-A analysis lane
+
+Status: planned. Core has no model access, so every model call runs in the worker through the router. The question payload is not written to the jobs table, because a payload row, its WAL and its backups are storage. Analysis requests go through a process-local in-memory lane in core: `core/kata_core/exam_mode/lane.py`, guarded by a lock, with an injected clock. Items are leased to the worker; a failed or expired item is re-queued once. A restart of core drops queued items; their signal rows stay `pending` and count as not analysed. Worker handler: `worker/kata_worker/handlers/exam_mode_analyse.py`.
+
+## Exam mode: D-B task class exam_analyse is local only
+
+Status: planned. `exam_analyse` is a new task class. Default routing is local only: the class is listed for the local provider and not for the cloud provider. The owner enables a cloud call by editing the policy flags; code never does. A signal that the cloud policy refuses gets status `skipped` and no lane item. Config: `config/kata.example.toml`, `docs/configuration.md`.
+
+## Exam mode: D-C settings in section exam_mode
+
+Status: planned. A new section `[exam_mode]` holds `idle_timeout_seconds`, `analysis_lease_seconds`, `lane_max_items`, `max_question_chars` and `max_name_chars`. Each key has a row in `docs/configuration.md`. The extension never hard-codes the timeout: session replies carry `idle_timeout_seconds`.
+
+## Exam mode: D-D tables
+
+Status: planned. Migration `core/migrations/0025_exam_mode.sql` adds three tables and changes no other table: `exam_mode_session` (one open session per user), `exam_mode_signal` (one row per captured question, with status, topic, concept ids, proposed names and outcome, and no text column) and `exam_mode_proposal_decision` (one confirm or dismiss per proposal key). The table names carry the `exam_mode_` prefix, so they never mix with the course exam tables.
+
+## Exam mode: D-E outcome without answer key
+
+Status: planned. The model judges the owner's pick against the question: `likely_right`, `likely_wrong` or `unsure`. `unknown` means not analysed. A weak point is a concept with at least one `likely_wrong` or `unsure` signal. The result screen labels these as suggestions. Kata has no answer key and gives no score of its own.
+
+## Exam mode: D-F lazy idle end
+
+Status: planned. Idle means no signal for `idle_timeout_seconds` since the last activity. Core ends an expired session lazily: on every session read, signal post and start. The end time is the last activity plus the timeout, and the end reason is `idle`. A signal to an ended session gets 409. A repeated signal position returns 200 and changes nothing. The extension clears its flag when it reads the session as expired.
+
+## Exam mode: D-G mode flag and gate
+
+Status: planned. One flag in the extension's local storage holds the session id, the start time, the last activity and the idle timeout. No text is stored in it. A gate wraps the background backend once at the entry point, and every method that starts a scan, hint, quiz, summary or model job returns an empty or no-op answer while the flag is on. The content side reads the same flag for highlights, overlays and the quiz pin. A gate test asserts no core call and no page highlight while the flag is on.
+
+## Exam mode: D-H capture and extension queue
+
+Status: planned. A generic reader turns the page into a question, choices and pick, or reports `unreadable`. It runs only while the flag is on. The content script sends the reading to the background and never waits for the analysis. The background keeps an in-memory queue: one post per reading, one retry on a network error or a 5xx other than 503, then drop. The queue never writes to storage and never logs the text.
+
+## Exam mode: D-I proposals
+
+Status: planned. Proposals are shown only after the mode ends. They group analysed signals with a weak outcome by key: a concept id, or a proposed name with its topic. Topic matching during analysis is read-only. Confirm sets the concept to learning with source `user`, and creates a proposed concept only when it is still missing. Each confirm or dismiss stores one decision row, so a second call returns the stored decision and creates nothing.
+
+## Exam mode: D-J strings owner step
+
+Status: planned. New UI strings are not added to the screen inventory in phase 1. Phase 1 writes the proposed screens and strings to `docs/design/exam-mode-screens.md`. The owner approves them; a later task adds the approved strings to the inventory and the string table.
+
+## Exam mode: D-K leak tests
+
+Status: planned. Core: a signal with a sentinel question goes through the lane, and every text, varchar and jsonb column of every table, plus the captured logs, must hold no sentinel. Worker: the handler's logs and posted output must hold no sentinel. Extension: the queue and reader never write or log the sentinel.

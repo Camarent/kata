@@ -41,7 +41,7 @@ Two named volumes: `reader-in` (worker read-write, reader read-only) and `reader
 A request is handled once: a marker that already has an `out/<id>/` or `out/<id>.tmp/` is skipped. Every failure of one request becomes an error result for that request; the loop does not stop. Paths are built from the id only after it matches `ID_RE`, and no file is followed through a symlink.
 
 ## Config keys
-All in the `[reader]` table of `config/kata.example.toml` and `deploy/kata.host.toml`; the keys and env names are in [configuration](../configuration.md). The M26 `vision` flags sit in the provider tables, not here.
+All in the `[reader]` table of `config/kata.example.toml` and `deploy/kata.host.toml`; the keys and env names are in [configuration](../configuration.md). The M26 `vision` flags sit in the provider tables, not here. The `[exam_mode]` section and the `exam_analyse` routing are not reader keys.
 - Upload and extract caps: `enabled` (off by default; `409 reader_disabled` while off), `max_file_bytes`, `max_pages`, `min_page_chars`, `max_image_side_px`, `max_image_bytes`, `max_images_per_document`, `max_text_chars_per_page`.
 - Sandbox: `child_memory_mb`, `child_cpu_seconds`, `wall_seconds`.
 - Spool: `poll_seconds` (reader poll), `wait_seconds` (worker wait for one result), `spool_dir` (`/spool` in the container; the reader uses `in/` and `out/` under it).

@@ -114,7 +114,7 @@ HTTP routes are listed in `docs/api.md` (Routes table). Code entry points:
 - `core/migrations/0023_m23_jobs.sql` - `page_summary` and `reader_document` (M23).
 - `core/migrations/0024_joke_cache.sql` - `joke_cache` (M23).
 - `core/kata_core/summary/`, `core/kata_core/reader/` and `core/kata_core/jokes/` - page summary, reader document and joke jobs (M23 sections below).
-- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set. The cloud token is read from the provider named by `[models] cloud` (`cloud_provider_section`, default `anthropic`; `cloud_token_present`).
+- `core/kata_core/jobs/needs_cloud.py` - `needs_cloud` and `needs_cloud_for_kind`: true when the task class is cloud-only and no cloud token is set. The cloud token is read from the provider named by `[models] cloud` (`cloud_provider_section`, default `anthropic`; `cloud_token_present`). `exam_analyse` is local only, so `needs_cloud` is false for it.
 
 ## Invariants and gotchas
 - Only sha256 hex digests of codes and tokens are stored (`core/kata_core/auth/service.py:42`); raw values are returned once.
@@ -400,6 +400,15 @@ Area > topic > concept identity, the aliases, the definition line, the ignored l
 - Routes under `/concepts` (`core/kata_core/api/routes/concepts.py`): `POST /concepts/{id}/aliases` (`:149`), `GET /concepts/{id}/aliases` (`:162`), `PUT /concepts/{id}/definition` (`:172`), `GET /concepts/ignored` (`:185`), `PUT` and `DELETE /concepts/{id}/ignore` (`:194`, `:202`), `DELETE /concepts/{id}` (`:210`, hard delete).
 - Sorted lists and block state: `core/kata_core/api/routes/concept_lists.py` (`GET /concepts/sorted`, `POST /concepts/block-state`, `POST /concepts/{id}/viewed`); the rank rules are in `core/kata_core/storage/concept_rank.py`.
 - Marks are keyed by concept id, so a rescan or a reassigned word keeps the mark.
+
+## Exam mode sessions
+
+- Routes under `/exam-mode` (`core/kata_core/api/routes/exam_mode.py`, router at `:35`): `POST /exam-mode/sessions` (`:101`, start or return the open session), `GET /exam-mode/sessions/{session_id}` (`:110`), `POST /exam-mode/sessions/{session_id}/end` (`:120`, idempotent), `POST /exam-mode/sessions/{session_id}/result` (`:130`), `POST /exam-mode/sessions/{session_id}/signals` (`:152`, 202 queued; the text goes to the analysis lane and is never logged).
+- `core/kata_core/exam_mode/sessions.py` holds the lazy idle end: every start, get and signal call sets `ended_at` to `last_activity_at` plus `idle_timeout_seconds` when `now - last_activity_at` reaches the timeout. `now` is a parameter; the route calls `datetime.now(UTC)` once.
+- The analysis lane is the `get_exam_lane` dependency (`core/kata_core/api/routes/exam_mode.py:48`), so tests override it. A signal the cloud cannot run (`needs_cloud`, task class `exam_analyse`) is stored `skipped` with no lane item.
+- Worker lane routes under `/exam-mode/analysis` (`core/kata_core/api/routes/exam_mode_analysis.py`, router prefix `/exam-mode/analysis`, same `current_user` auth as `/jobs`): `GET /next` (204 when the lane is empty), `POST /{ticket}/output` (parse and match the model reply, mark the signal `analysed`, complete the ticket, 204), `POST /{ticket}/fail` (one retry, then the signal row is `failed`, 204). Signals of an ended session are still updated. The worker reads these routes through `CoreClient` methods `next_exam_analysis`, `report_exam_analysis`, `fail_exam_analysis` (`worker/kata_worker/core_client.py`); a `Job` lease from `/jobs/next` is a separate route and does not carry exam-mode tickets.
+- Their schema is exported to `docs/openapi.json` (`core/kata_core/api/openapi_export.py` `main`), and `tests/core/test_openapi_export.py` fails when the committed file drifts.
+- Tests: `tests/core/test_api_exam_mode.py`, `tests/core/test_api_exam_mode_analysis.py`.
 
 ## Quiz and exam results
 

@@ -172,6 +172,19 @@
       "max_seconds": 120,
       "model": "kata-l",
       "thinking": "unset"
+    },
+    {
+      "id": "exam-analyse-en",
+      "task_class": "exam_analyse",
+      "system": "You match one exam question to the course topics the user lists. Reply with the matching topic names only, one per line.",
+      "prompt": "Question 3: Explain how the TCP three-way handshake sets up a connection and why sequence numbers matter. Topics: TCP, UDP, TLS.",
+      "json": false,
+      "script": "latin",
+      "min_chars": 4,
+      "max_chars": 400,
+      "max_seconds": 120,
+      "model": "kata-l",
+      "thinking": "unset"
     }
   ]
 }

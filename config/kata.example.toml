@@ -105,6 +105,7 @@ generate_course = "local,anthropic"
 extract_syllabus = "local,anthropic"
 scan_classify = "local,anthropic"
 scan_extract = "local,anthropic"
+exam_analyse = "local"
 # Model for quiz questions: the routing chain of task class quiz_generate.
 quiz_generate = "local,anthropic"
 # Model for page images: the routing chain of task class vision.
@@ -121,13 +122,14 @@ generate_course = "kata-l"
 extract_syllabus = "kata-l"
 scan_classify = "kata-l"
 scan_extract = "kata-l"
+exam_analyse = "kata-l"
 quiz_generate = "kata-l"
 # No local vision model is verified yet: vision needs the cloud token until one is.
 vision = "cloud-only"
 
 # vision: whether the model accepts page images. The reader refuses a non-vision model.
 [provider_local]
-task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision"
+task_classes = "tag,explain,summary,batch,generate_course,extract_syllabus,scan_classify,scan_extract,quiz_generate,vision,exam_analyse"
 vision = false
 
 [provider_anthropic]
@@ -312,3 +314,15 @@ max_joke_chars = 300
 cache_size = 50
 # Seconds between two refills of the joke cache.
 refill_interval_seconds = 7200
+
+[exam_mode]
+# Seconds an exam session may sit idle before it ends on its own.
+idle_timeout_seconds = 10800
+# Seconds one analysis lease holds a queued item for a worker before it returns to the queue.
+analysis_lease_seconds = 120
+# Most items one analysis lane holds at a time.
+lane_max_items = 200
+# Cap on the characters of one exam question.
+max_question_chars = 4000
+# Cap on the characters of one exam name.
+max_name_chars = 80
