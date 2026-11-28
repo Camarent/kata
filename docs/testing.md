@@ -111,7 +111,7 @@ Which gate runs what:
 - The full gate runs once, at the merge. It runs every suite, including the browser tests.
 - Browser tests run at merge and full level only. The unit level excludes them (`-m 'not browser'`).
 
-Machine class: Proxmox VM, 8 cores, Linux, integrated graphics only (no discrete GPU). Each
+Machine class: 8-core Linux VM, integrated graphics only (no discrete GPU). Each
 after row is one run of `scripts/dev/check-all.sh` at that level (no flags beyond the level),
 wall time taken as the difference of `date +%s.%N` before and after the run. Load average is the
 1-minute value from `uptime` just before and just after the run. Other agent sessions shared the
