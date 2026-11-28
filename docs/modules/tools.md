@@ -5,7 +5,7 @@ summary: Quality gate definitions (ruff, mypy, smoke, pytest, extension build an
 # tools
 
 ## Purpose
-Declares the repo's quality gates. Each gate is a plain command and mirrors the full `scripts/dev/check-all.sh` chain. The full chain runs its pytest, extension, editor and browser jobs concurrently (see `docs/development.md`). The browser step runs under pytest-xdist, `-n auto` capped at 4 workers.
+Declares the repo's quality gates. Each gate is a plain command and mirrors the full `scripts/dev/check-all.sh` chain. The full chain runs its pytest, extension, editor and browser jobs concurrently (see `docs/development.md`). The browser step runs under pytest-xdist, `-n auto` capped at 4 workers. The gate's `--setup` also installs `requirements-browser.txt` into a fresh `.venv` when that file exists.
 
 ## Public surface
 - `tools/gates.json` - top-level key `gates` (`tools/gates.json:2`); list of `{name, cmd}`:
