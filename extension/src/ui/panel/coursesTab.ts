@@ -2,7 +2,7 @@ import type { PanelHandlers } from "../../types";
 import type { CourseSummary } from "../../coreClient";
 import { askConfirm } from "../confirm";
 import { el } from "../dom";
-import { COURSES_TAB_TEXT } from "../strings";
+import { COURSE_VERSION_LABEL, COURSES_TAB_TEXT } from "../strings";
 
 const COURSES = COURSES_TAB_TEXT.courses;
 const NO_COURSES = COURSES_TAB_TEXT.noCourses;
@@ -52,7 +52,7 @@ async function openCourse(
 
 /** Props of the courses tab: the ready courses and the state of the core connection. */
 export interface CoursesTabProps {
-  courses: Pick<CourseSummary, "id" | "title">[];
+  courses: Pick<CourseSummary, "id" | "title" | "version">[];
   /** Course limit of the server; the tab shows "n of limit" when it is above 0. */
   courseLimit?: number;
   /** Courses counted against the limit; defaults to the number of listed courses. */
@@ -96,7 +96,7 @@ export function renderCoursesTab(handlers: PanelHandlers, props: CoursesTabProps
   error.setAttribute("role", "alert");
   for (const course of props.courses) {
     const item = el("li");
-    item.append(el("span", course.title));
+    item.append(el("span", course.title), el("span", `${COURSE_VERSION_LABEL} ${course.version}`, "course-version"));
     const open = el("button", OPEN_COURSE);
     open.type = "button";
     open.addEventListener("click", () => void openCourse(handlers, open, course.id, error));

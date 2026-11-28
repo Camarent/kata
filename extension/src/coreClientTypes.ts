@@ -95,6 +95,8 @@ export interface CourseSummary {
   title: string;
   status: string;
   concept_ids: number[];
+  /** Course version; a regenerated course is version 2 or higher. */
+  version: number;
   error: string | null;
   created_at: string;
   updated_at: string;

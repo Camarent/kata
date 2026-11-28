@@ -245,7 +245,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const session = await requireSession();
       const list = await clientFor(session).listCoursesMeta();
       return {
-        items: list.items.map((course) => ({ id: course.id, title: course.title })),
+        items: list.items.map((course) => ({ id: course.id, title: course.title, version: course.version })),
         limit: list.limit,
         total: list.total,
       };

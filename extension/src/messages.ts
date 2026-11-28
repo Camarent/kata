@@ -64,10 +64,11 @@ export interface ReviewRow {
   onPage?: boolean;
 }
 
-/** A ready course the panel can open: its id and title only. */
+/** A ready course the panel can open: its id, title and version. */
 export interface CourseLink {
   id: number;
   title: string;
+  version: number;
 }
 
 /** The Courses list: the ready courses, the course limit and the count against it. */

@@ -387,6 +387,12 @@ export const COURSES_TAB_TEXT = {
   deleteFailed: TEXT_COURSES_TAB[28],
 } as const;
 
+/**
+ * Label of a course version, shown as `${COURSE_VERSION_LABEL} ${version}` (the pinned
+ * TEXT_COURSES_TAB[22] and TEXT_COURSE_DETAIL[7] keep the version 2 text verbatim).
+ */
+export const COURSE_VERSION_LABEL = "Version";
+
 export const TEXT_LIST_DETAIL = [
   "List",
   "This list is a draft. It is not a course.",
