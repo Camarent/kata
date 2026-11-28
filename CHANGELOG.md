@@ -16,6 +16,10 @@ Entries are grouped by component: core, worker, extension, trainer, deploy.
 - deploy: deployment scripts and a container image for the web VM.
 - licence: MIT licence in `LICENSE`, declared in `pyproject.toml` and `extension/package.json`.
 
+## [0.1.23] - 2026-11-28
+
+- fix(dev): install browser deps in setup; test per-model vision config
+
 ## [0.1.22] - 2026-11-28
 
 - feat(extension): mount the M25 overlays and screens, parallel test gates
