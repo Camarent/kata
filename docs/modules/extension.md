@@ -14,8 +14,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/src/browser.ts:15` `openPanel` (`sidePanel` on Chrome, `sidebarAction` on Firefox).
 - `extension/package.json:7` `build` = `tsc --noEmit && node build/build.mjs`; `:8` `test` = `vitest run`; devDependencies `esbuild`, `jsdom`, `typescript`, `vitest`.
 - `extension/tsconfig.json:6` `strict: true`; `:7` `outDir: dist`.
-- `extension/src/backgroundBackend.ts:106` `createBackend` (the backend the panel and bridge messages call); `extension/src/background.ts:43` `wireBackground`; the panel message table is `extension/src/backgroundPanel.ts`.
-- `extension/src/content.ts:26` `handleContentMessage`, `:51` `registerContentScript`.
+- `extension/src/backgroundBackend.ts:116` `createBackend` (the backend the panel and bridge messages call; a successful page scan sends the `highlight` message with the per-block concepts to the tab); `extension/src/background.ts:43` `wireBackground`; the panel message table is `extension/src/backgroundPanel.ts`.
+- `extension/src/content.ts:27` `handleContentMessage`, `:58` `registerContentScript`; `extension/src/overlayHost.ts:44` `createOverlayHost` attaches the hover menu (`hlMenu.ts` `attachHlHover`) to every `.hl` word and sends its concept actions as panel messages (`panel:chooseConcept`, `panel:reassignConcept`, `panel:setConcept`); `extension/src/messages.ts` `RuntimeLike.sendMessage` accepts those panel messages.
 - `extension/src/scanner.ts:96` `scanBlocks`; `extension/src/scanSession.ts:33` `runScan`.
 - `extension/src/coreClient.ts:145` `CoreClient`; `:256` `listConceptMarks`, `:261` `setConceptMark` (concept marks); error classes `CoreTimeoutError`, `CoreOfflineError`, `CoreAuthError`, `CoreHttpError` in `extension/src/coreClientErrors.ts`.
 - `extension/src/offlineQueue.ts:64` `OfflineQueue`.
@@ -69,8 +69,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
     (`SCREENS`), routed by `router.ts` and drawn by `sidepanel.ts`, including the course, tracks,
     exam entry and proposal, and settings screens. The card (`cardHost.ts`) mounts `cardMain`,
     `cardScan`, `cardSummary`, `card/focus.ts` and `card/jokeCloud.ts`, and the page overlay
-    `overlay/pageChanged.ts`; `content.ts` mounts the pin (`ui/card/pin.ts`, `mountPin`) in the same host. Scan results in the panel draw the scan rows the panel holds (`renderScanTab` in `extension/src/sidepanel.ts` passes `state.rows` to the scan-results screen). Not imported by the running extension: the other page overlays under
-    `overlay/` (`whichOne`, `blockMenu`, `imageMenu`, `hlMenu`, `listPicker`, `quizPin`), the exam
+    `overlay/pageChanged.ts`; `content.ts` mounts the pin (`ui/card/pin.ts`, `mountPin`) in the same host. The hover menu `overlay/hlMenu.ts` is mounted on highlighted words by `overlayHost.ts` (`createOverlayHost`, called from `registerContentScript`). Scan results in the panel draw the scan rows the panel holds (`renderScanTab` in `extension/src/sidepanel.ts` passes `state.rows` to the scan-results screen). Not imported by the running extension: the other page overlays under
+    `overlay/` (`whichOne`, `blockMenu`, `imageMenu`, `listPicker`, `quizPin`), the exam
     screens `panel/examRun.ts` and `panel/examResult.ts`, and the course page `panel/coursePage.ts`.
     Wiring the rest is open work before M26.
 
@@ -81,7 +81,8 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - `extension/package.json` - build and test commands.
 - `extension/tsconfig.json` - compiler settings.
 - `extension/src/background.ts` - service worker; message bridge to the core client.
-- `extension/src/content.ts` - content script: `scan` returns block ids and text, `highlight` and `clear` change the page.
+- `extension/src/content.ts` - content script: `scan` returns block ids and text, `highlight` and `clear` change the page (and the overlay host's hover menus).
+- `extension/src/overlayHost.ts` - page overlay host: attaches and detaches the hover menus on `.hl` words when highlights are applied or cleared.
 - `extension/src/bridge.ts` - content bridge for the course pages: a page stub posts whole-document progress load/save requests; only the core origin, the bridge channel and the `progress-<id>` path are accepted.
 - `extension/src/bridgeRegister.ts` - registers `bridge.js` with `chrome.scripting` for the core's course pages (`<scheme>://*/c/*` of the saved origin; the bridge checks the exact origin).
 - `extension/src/coreClient.ts` - HTTP client for the core API.

@@ -28,7 +28,7 @@ export interface RuntimeLike {
   onMessage: {
     addListener(listener: (message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | void): void;
   };
-  sendMessage(message: PageMutatedMessage): Promise<unknown>;
+  sendMessage(message: PageMutatedMessage | PanelMessage): Promise<unknown>;
 }
 
 /** Reply to a panel message: the result, or the error text; `status` and `code` are set when the core refused it (CoreHttpError). */

@@ -4,6 +4,7 @@ import { CoreAuthError, CoreClient, type ConceptMark, type TopicOverview } from 
 import * as trackApi from "./coreClientTracks";
 import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
+import type { HighlightResult } from "./highlight";
 import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
@@ -102,6 +103,15 @@ const MODELHOST_QUEUE: Record<"start" | "measure" | "status", (client: CoreClien
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Highlight results of a concept scan for the content script. The scan has no per-block topic
+ * answer, so every block gets the scanned topic and is shown as new (`known: false`).
+ */
+function highlightsOf(result: ConceptScanResult): HighlightResult[] {
+  const topic = { id: result.topicId, category: result.area, label: result.topic };
+  return result.blocks.map((block) => ({ blockId: block.blockId, topic, known: false, concepts: block.concepts }));
+}
+
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
   const tokens = new TokenStore(area);
@@ -157,6 +167,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const result = await scanner.scanPage(session, tab.id, pageKey);
       if (!("error" in result)) {
         scanner.startRescan(tab.id, pageKey, result);
+        // The page shows the scan: its words get highlights and hover menus.
+        api.tabs.sendMessage(tab.id, { type: "highlight", results: highlightsOf(result) }).catch(() => undefined);
       }
       return result;
     },
