@@ -112,6 +112,7 @@ export type PanelMessage =
   | { type: "panel:deleteTrack"; trackId: number }
   | { type: "panel:addDecisionPoint"; trackId: number; input: PointIn }
   | { type: "panel:addQuizSource"; url: string }
+  | { type: "panel:miniQuiz" }
   | { type: "panel:importExamResult"; payload: string }
   | { type: "panel:confirmExamResult"; resultId: number; conceptIds: number[] }
   | { type: "panel:dismissExamResult"; resultId: number }

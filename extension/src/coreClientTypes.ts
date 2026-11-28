@@ -290,6 +290,16 @@ export interface EnqueueResponse {
   id: number;
 }
 
+/** One item of `GET /quiz/mini` (no answer index): the question, its choices and the source link. */
+export interface MiniQuestion {
+  id: number;
+  question: string;
+  choices: string[];
+  source_url: string;
+  tier: number;
+  licence: string;
+}
+
 /** One concept checked in an exam result (`ExamConceptOut`). */
 export interface ExamConcept {
   concept_id: number;

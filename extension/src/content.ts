@@ -2,7 +2,7 @@ import { applyHighlights, clearHighlights } from "./highlight";
 import { scanBlocks } from "./scanner";
 import type { StorageArea } from "./tokenStore";
 import { CARD_CSS } from "./ui/cardCss";
-import { mountCardHost, type CardHost, type CardRuntime } from "./cardHost";
+import { mountCardHost, type CardHost, type CardRuntime, type PageState } from "./cardHost";
 import { attachImageMenus, createOverlayHost, type OverlayHost } from "./overlayHost";
 import { mountPin, type Pin } from "./ui/card/pin";
 import { PinPositionStore } from "./ui/card/pinPosition";
@@ -55,9 +55,9 @@ function isContentMessage(message: unknown): message is ContentMessage {
 }
 
 /** Registers the page listener on the runtime; called once by the content script. */
-export function registerContentScript(runtime: RuntimeLike, doc: Document): void {
+export function registerContentScript(runtime: RuntimeLike, doc: Document, pageState?: () => PageState): void {
   let stopWatching: (() => void) | undefined;
-  const overlay = createOverlayHost(runtime);
+  const overlay = createOverlayHost(runtime, pageState);
   attachImageMenus(doc, runtime);
   runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!isContentMessage(message)) return false;
@@ -151,7 +151,14 @@ export async function mountFloatingUi(doc: Document, storage: StorageArea, runti
 
 // Content script entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.runtime) {
-  registerContentScript(chrome.runtime, document);
+  // The overlay reads focus mode and the core state from the floating cards once they are mounted.
+  let floating: FloatingUi | undefined;
+  const idle: PageState = { focusOn: false, offline: false };
+  registerContentScript(chrome.runtime, document, () => floating?.cards.pageState() ?? idle);
   // A failed mount is already cleaned up; the page works without the floating UI.
-  mountFloatingUi(document, chrome.storage.local, chrome.runtime).catch(() => undefined);
+  mountFloatingUi(document, chrome.storage.local, chrome.runtime)
+    .then((ui) => {
+      floating = ui;
+    })
+    .catch(() => undefined);
 }

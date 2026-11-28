@@ -2,7 +2,7 @@ import { originOf, syncBridge } from "./bridgeRegister";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark, type TopicOverview } from "./coreClient";
 import * as trackApi from "./coreClientTracks";
-import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, NamedList, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
+import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, MiniQuestion, NamedList, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
 import type { HighlightResult } from "./highlight";
 import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
@@ -66,6 +66,8 @@ export interface Backend {
   addDecisionPoint(trackId: number, input: PointIn): Promise<DecisionPoint>;
   /** Queues a quiz source from a URL; returns the job id. */
   addQuizSource(url: string): Promise<number>;
+  /** Up to five cached mini quiz questions for the section quiz pin. */
+  miniQuiz(): Promise<MiniQuestion[]>;
   /** Stores an exam result JSON as pending; changes no mark. */
   importExamResult(payload: string): Promise<ExamResult>;
   confirmExamResult(resultId: number, conceptIds: number[]): Promise<ExamResult>;
@@ -322,6 +324,10 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
 
     async addQuizSource(url) {
       return trackApi.addQuizSource(clientFor(await requireSession()), url);
+    },
+
+    async miniQuiz() {
+      return trackApi.miniQuiz(clientFor(await requireSession()));
     },
 
     async importExamResult(payload) {

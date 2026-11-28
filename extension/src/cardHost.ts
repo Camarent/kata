@@ -24,9 +24,17 @@ export interface CardHostOptions {
   onUndoable?: (undo: (() => void) | null) => void;
 }
 
+/** Page-wide state the cards hold: focus mode on, and the core unreachable (the last scan found it down). */
+export interface PageState {
+  focusOn: boolean;
+  offline: boolean;
+}
+
 export interface CardHost {
   /** Container the cards and the page-changed prompt are drawn into. */
   readonly element: HTMLElement;
+  /** Focus mode and core state as the cards last saw them; the section quiz pin reads it. */
+  pageState(): PageState;
   /** Shows the main card. */
   open(): void;
   /** Hides the card (the page-changed prompt stays). */
@@ -208,6 +216,7 @@ export function mountCardHost(
       });
       draw(current);
     },
+    pageState: (): PageState => ({ focusOn: isFocusOn(focusEnds, Date.now), offline: serverDown }),
     dispose(): void {
       root.remove();
     },

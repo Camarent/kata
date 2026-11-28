@@ -12,6 +12,8 @@ import {
   type OverlayState,
 } from "./ui/overlay/blockMenu";
 import { renderImageMenu } from "./ui/overlay/imageMenu";
+import { renderQuizPin } from "./ui/overlay/quizPin";
+import type { PageState } from "./cardHost";
 import { type ListPickerActions, renderListPicker } from "./ui/overlay/listPicker";
 import { BLOCK_MENU_TEXT, IMAGE_PIN_MENU_TEXT } from "./ui/strings";
 
@@ -178,6 +180,52 @@ function attachBlockMenu(doc: Document, runtime: RuntimeLike, block: HTMLElement
 }
 
 /**
+ * Section quiz pin: "Quiz this section" under the block while the section's end is in view (the page
+ * is scrolled to it) and the block has new concepts. Focus mode and the core state come from the
+ * cards (`pageState`); focus mode hides the pin. Its action asks the background for the mini quiz
+ * (`panel:miniQuiz`, core `GET /quiz/mini`). Returns the detach that removes the listener and the pin.
+ */
+function attachQuizPin(
+  doc: Document,
+  runtime: RuntimeLike,
+  block: HTMLElement,
+  result: HighlightResult,
+  pageState: () => PageState,
+): () => void {
+  const view = block.ownerDocument.defaultView;
+  const newConceptCount = (result.concepts ?? []).filter((item) => item.state === "new").length;
+  let pin: HTMLElement | null = null;
+  const hide = (): void => {
+    pin?.remove();
+    pin = null;
+  };
+  // Re-renders on each scroll, so a focus or core state change shows up at the next scroll.
+  const update = (): void => {
+    hide();
+    const bottom = block.getBoundingClientRect().bottom;
+    const inView = view !== null && bottom >= 0 && bottom <= view.innerHeight;
+    if (!inView) return;
+    const { focusOn, offline } = pageState();
+    const card = renderQuizPin(doc, { newConceptCount, focus: focusOn, offline }, {
+      onStart: () => {
+        sendPanel(runtime, { type: "panel:miniQuiz" }).catch(() => undefined);
+      },
+    });
+    if (card === null) return;
+    card.style.position = "absolute";
+    placeBelow(card, block);
+    pin = card;
+    doc.body.append(card);
+  };
+  view?.addEventListener("scroll", update);
+  update();
+  return () => {
+    view?.removeEventListener("scroll", update);
+    hide();
+  };
+}
+
+/**
  * Image pin: a small pin button shown over a page image while the pointer is on the image; hovering
  * the pin (or pressing it) opens the image menu under the image. Image concepts need a vision model (D33), so the menu shows
  * its empty state and its actions reach the background as `panel:imageAction`.
@@ -277,8 +325,16 @@ export function attachImageMenus(doc: Document, runtime: RuntimeLike): () => voi
   };
 }
 
-/** Creates the overlay host of one page; `runtime` carries the menu actions to the background. */
-export function createOverlayHost(runtime: RuntimeLike): OverlayHost {
+/** Page state before the cards exist: focus mode off, core reachable. */
+function idlePageState(): PageState {
+  return { focusOn: false, offline: false };
+}
+
+/**
+ * Creates the overlay host of one page; `runtime` carries the menu actions to the background and
+ * `pageState` gives the focus mode and core state the section quiz pin needs (from the cards).
+ */
+export function createOverlayHost(runtime: RuntimeLike, pageState: () => PageState = idlePageState): OverlayHost {
   let detaches: (() => void)[] = [];
   const clear = (): void => {
     for (const detach of detaches) detach();
@@ -298,7 +354,10 @@ export function createOverlayHost(runtime: RuntimeLike): OverlayHost {
       }
       for (const result of results) {
         const block = blocks.get(result.blockId);
-        if (block !== undefined) detaches.push(attachBlockMenu(doc, runtime, block, result));
+        if (block !== undefined) {
+          detaches.push(attachBlockMenu(doc, runtime, block, result));
+          detaches.push(attachQuizPin(doc, runtime, block, result, pageState));
+        }
       }
       for (const span of Array.from(doc.querySelectorAll<HTMLElement>(`.${CLASS_HL}`))) {
         const item = highlightItem(span);

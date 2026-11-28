@@ -71,6 +71,7 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:addDecisionPoint": (backend, message) =>
     refusable(() => backend.addDecisionPoint(message.trackId, message.input)),
   "panel:addQuizSource": (backend, message) => refusable(() => backend.addQuizSource(message.url)),
+  "panel:miniQuiz": (backend) => refusable(() => backend.miniQuiz()),
   "panel:importExamResult": (backend, message) => refusable(() => backend.importExamResult(message.payload)),
   "panel:confirmExamResult": (backend, message) =>
     refusable(() => backend.confirmExamResult(message.resultId, message.conceptIds)),

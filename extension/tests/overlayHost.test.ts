@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyHighlights, clearHighlights } from "../src/highlight";
+import { applyHighlights, clearHighlights, type HighlightResult } from "../src/highlight";
 import { attachImageMenus, createOverlayHost } from "../src/overlayHost";
 import type { RuntimeLike } from "../src/messages";
 import type { ScanConceptItem } from "../src/coreClientTypes";
@@ -33,6 +33,11 @@ function pageWithHighlight(): HTMLElement {
   return block;
 }
 
+/** The highlight result of block b1 (topic 3) with `concepts`; default is one new concept. */
+function sectionResult(concepts: ScanConceptItem[] = [item()]): HighlightResult {
+  return { blockId: "b1", topic: { id: 3, category: "net", label: "tcp" }, known: false, concepts };
+}
+
 function runtimeFake(): RuntimeLike & { sendMessage: ReturnType<typeof vi.fn> } {
   return {
     onMessage: { addListener: vi.fn() },
@@ -51,6 +56,43 @@ afterEach(() => {
 });
 
 describe("overlay host", () => {
+  it("shows the section quiz pin for new concepts and sends the mini quiz request on its action", () => {
+    const runtime = runtimeFake();
+    const overlay = createOverlayHost(runtime);
+    pageWithHighlight();
+    overlay.attach(document, [sectionResult()]);
+    const start = document.querySelector<HTMLButtonElement>(".quiz-pin button");
+    expect(start?.disabled).toBe(false);
+    start?.click();
+    expect(runtime.sendMessage).toHaveBeenCalledWith({ type: "panel:miniQuiz" });
+    overlay.clear();
+    expect(document.querySelector(".quiz-pin")).toBeNull();
+  });
+
+  it("hides the section quiz pin in focus mode", () => {
+    const overlay = createOverlayHost(runtimeFake(), () => ({ focusOn: true, offline: false }));
+    pageWithHighlight();
+    overlay.attach(document, [sectionResult()]);
+    expect(document.querySelector(".quiz-pin")).toBeNull();
+    overlay.clear();
+  });
+
+  it("disables the section quiz pin's action while the core is offline", () => {
+    const overlay = createOverlayHost(runtimeFake(), () => ({ focusOn: false, offline: true }));
+    pageWithHighlight();
+    overlay.attach(document, [sectionResult()]);
+    expect(document.querySelector<HTMLButtonElement>(".quiz-pin button")?.disabled).toBe(true);
+    overlay.clear();
+  });
+
+  it("shows no section quiz pin when the section has no new concepts", () => {
+    const overlay = createOverlayHost(runtimeFake());
+    pageWithHighlight();
+    overlay.attach(document, [sectionResult([item({ state: "known" })])]);
+    expect(document.querySelector(".quiz-pin")).toBeNull();
+    overlay.clear();
+  });
+
   it("attaches one hover menu per highlighted word and removes it on clear", () => {
     const runtime = runtimeFake();
     const overlay = createOverlayHost(runtime);
