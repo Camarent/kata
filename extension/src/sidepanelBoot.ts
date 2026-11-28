@@ -17,42 +17,15 @@ import type { MarkOutcome } from "./offlineQueue";
 import { validateServerUrl } from "./serverUrl";
 import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
 import type { SettingsPage } from "./ui/panel/settingsHome";
-import type { TrackDetailView } from "./ui/panel/trackDetail";
-import type { TrackRowView, TrackSortKey } from "./ui/panel/tracksTab";
+import type { TrackSortKey } from "./ui/panel/tracksTab";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
+import { loadTrackList, sortTrackRows, trackCreateHandlers } from "./sidepanelTracks";
+import { closeCourse } from "./sidepanelCourse";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
 export interface OriginsRequest {
   origins: string[];
-}
-
-/** One track as the Tracks tab draws it. The core sends no progress or pace, so the status stands in for progress. */
-function trackRowView(track: Track): TrackRowView {
-  return { id: track.id, name: track.name, progress: track.status, tooSlow: false };
-}
-
-/**
- * One track as the detail screen draws it. The core Track has no goal, progress, velocity or pace flags,
- * so those take neutral empty values (open work in docs/roadmap.md); the items stand in for the sources.
- */
-function trackDetailView(track: Track): TrackDetailView {
-  return {
-    name: track.name,
-    goal: "",
-    deadline: track.deadline,
-    progress: "",
-    velocity: "",
-    finishEarly: false,
-    tooSlow: false,
-    dropReason: null,
-    sources: track.items.map((item) => item.label),
-  };
-}
-
-/** Rows in the order the sort key asks for; only the name sort reorders, the others keep the core order. */
-function sortTrackRows(rows: TrackRowView[], sort: TrackSortKey): TrackRowView[] {
-  return sort === "name" ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
 }
 
 /** The part of `chrome` the side panel page uses; tests pass a fake with these members. */
@@ -129,20 +102,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   };
 
   /** Tracks for the Tracks tab from the panel:tracks reply; a refused list shows the could-not-load state. */
-  const loadTracks = async (): Promise<void> => {
-    const sort = state.tracks?.sort ?? "name";
-    state.tracks = { state: "loading", rows: [], sort };
-    draw();
-    try {
-      const page = await send<TrackPage>({ type: "panel:tracks" });
-      const rows = page.items.map(trackRowView);
-      state.trackViews = Object.fromEntries(page.items.map((track) => [track.id, trackDetailView(track)]));
-      state.tracks = { state: rows.length === 0 ? "empty" : "ready", rows: sortTrackRows(rows, sort), sort };
-    } catch {
-      state.tracks = { state: "error", rows: [], sort };
-    }
-    draw();
-  };
+  const loadTracks = (): Promise<void> => loadTrackList(state, send, draw);
 
   /** Ignored concepts for the ignored list page, from the panel:ignored reply. */
   const loadIgnored = async (): Promise<void> => {
@@ -401,10 +361,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       state.coursePage = { title: course.title, version: course.version };
       draw();
     },
-    onCloseCourse() {
-      state.coursePage = null;
-      draw();
-    },
+    onCloseCourse: () => closeCourse(state, draw),
     async onCreateCourse(title: string) {
       const reply = await api.runtime.sendMessage({ type: "panel:createCourse", title });
       // A core refusal keeps its status and code so the panel can show the matching text.
@@ -473,15 +430,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       onFinish: backToDetail,
       onStop: backToDetail,
     },
-    trackCreate: {
-      // A refused save rejects: the form shows its error line and stays open. The core takes only a name and deadline.
-      async onCreate(input) {
-        await send<Track>({ type: "panel:createTrack", input: { name: input.name, deadline: input.deadline } });
-        state.trackScreen = null;
-        await loadTracks();
-      },
-      onCancel: backFromTrack,
-    },
+    trackCreate: trackCreateHandlers({ state, send, loadTracks, onCancel: backFromTrack }),
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
     onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
     onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),
