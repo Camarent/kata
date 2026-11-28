@@ -17,6 +17,7 @@ import type { MarkOutcome } from "./offlineQueue";
 import { validateServerUrl } from "./serverUrl";
 import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
 import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackDetailView } from "./ui/panel/trackDetail";
 import type { TrackRowView, TrackSortKey } from "./ui/panel/tracksTab";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
@@ -29,6 +30,24 @@ export interface OriginsRequest {
 /** One track as the Tracks tab draws it. The core sends no progress or pace, so the status stands in for progress. */
 function trackRowView(track: Track): TrackRowView {
   return { id: track.id, name: track.name, progress: track.status, tooSlow: false };
+}
+
+/**
+ * One track as the detail screen draws it. The core Track has no goal, progress, velocity or pace flags,
+ * so those take neutral empty values (open work in docs/roadmap.md); the items stand in for the sources.
+ */
+function trackDetailView(track: Track): TrackDetailView {
+  return {
+    name: track.name,
+    goal: "",
+    deadline: track.deadline,
+    progress: "",
+    velocity: "",
+    finishEarly: false,
+    tooSlow: false,
+    dropReason: null,
+    sources: track.items.map((item) => item.label),
+  };
 }
 
 /** Rows in the order the sort key asks for; only the name sort reorders, the others keep the core order. */
@@ -93,6 +112,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.coursesFailed = false;
     state.coursePage = null;
     state.tracks = undefined;
+    state.trackViews = undefined;
     state.settingsPage = null;
     state.tab = "scan";
     state.status = { kind: "idle" };
@@ -116,6 +136,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     try {
       const page = await send<TrackPage>({ type: "panel:tracks" });
       const rows = page.items.map(trackRowView);
+      state.trackViews = Object.fromEntries(page.items.map((track) => [track.id, trackDetailView(track)]));
       state.tracks = { state: rows.length === 0 ? "empty" : "ready", rows: sortTrackRows(rows, sort), sort };
     } catch {
       state.tracks = { state: "error", rows: [], sort };
@@ -144,6 +165,27 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   /** Back from a track screen to the Tracks list. */
   const backFromTrack = (): void => {
     state.trackScreen = null;
+    draw();
+  };
+
+  /** Track the detail, add-source or quiz screen belongs to; undefined when no such screen is open. */
+  const shownTrackId = (): number | undefined => {
+    const screen = state.trackScreen;
+    return screen === undefined || screen === null || screen.kind === "create" ? undefined : screen.trackId;
+  };
+
+  /** Opens the add-source or quiz screen for the track the detail shows. */
+  const openFromDetail = (kind: "source-add" | "quiz"): void => {
+    const trackId = shownTrackId();
+    if (trackId === undefined) return;
+    state.trackScreen = { kind, trackId };
+    draw();
+  };
+
+  /** Back from the add-source or quiz screen to the detail of the same track. */
+  const backToDetail = (): void => {
+    const trackId = shownTrackId();
+    state.trackScreen = trackId === undefined ? null : { kind: "detail", trackId };
     draw();
   };
 
@@ -413,9 +455,23 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
     trackDetail: {
       onBack: backFromTrack,
-      // Add source and Quiz are not wired yet: the detail only routes here.
+      onAddSource: () => openFromDetail("source-add"),
+      onQuiz: () => openFromDetail("quiz"),
+    },
+    sourceAdd: {
+      // Paste, file, page, course and the submit are not wired yet: the screen only routes here.
+      onPasteText: () => {},
+      onChooseFile: () => {},
+      onUsePage: () => {},
+      onUseCourse: () => {},
       onAddSource: () => {},
-      onQuiz: () => {},
+      onCancel: backToDetail,
+    },
+    quizRun: {
+      // Next is not wired yet: the run shows no questions until the quiz loads.
+      onNext: () => {},
+      onFinish: backToDetail,
+      onStop: backToDetail,
     },
     trackCreate: {
       // Save is not wired yet: the form only routes here.

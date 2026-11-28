@@ -21,6 +21,8 @@ import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey } from "./ui/panel/tracksTab";
 import type { TrackDetailHandlers } from "./ui/panel/trackDetail";
 import type { TrackCreateHandlers } from "./ui/panel/trackCreate";
+import type { SourceAddHandlers } from "./ui/panel/sourceAdd";
+import type { QuizRunActions } from "./ui/panel/quizRun";
 
 /** A readable block of page text, optionally bound to its DOM element. */
 export interface Block {
@@ -100,6 +102,10 @@ export interface PanelHandlers {
   trackDetail?: TrackDetailHandlers;
   /** Create-track form: save and cancel; the panel draws it when the Tracks tab chose New track. */
   trackCreate?: TrackCreateHandlers;
+  /** Add-source screen the track detail opened: its submit and cancel; the panel draws it over the detail. */
+  sourceAdd?: SourceAddHandlers;
+  /** Quiz run screen the track detail opened: stop and finish return to the detail. */
+  quizRun?: QuizRunActions;
   /** Tracks tab: the user changed the sort key; the panel re-sorts the rows it holds. */
   onSortTracks?: (sort: TrackSortKey) => void;
   /** Tracks tab: the user opened one track; the panel draws its detail screen when it has one. */

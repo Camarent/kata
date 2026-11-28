@@ -29,7 +29,8 @@ Open:
   The course page `extension/src/ui/panel/coursePage.ts` is mounted from Open course on the courses tab
   (task-18, `renderCoursesView` in `extension/src/sidepanel.ts`, boot in `extension/src/sidepanelBoot.ts`).
   The exam result screen `extension/src/ui/panel/examResult.ts` is mounted in the panel.
-- Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate).
+- Unwired track handler (no-op stub in `extension/src/sidepanelBoot.ts`): `onCreate` (trackCreate). Add source and Quiz open their screens.
+- Track detail loads the real track (name, deadline, items as sources). The core `Track` has no goal, progress, velocity, finishEarly, tooSlow or dropReason, so `trackDetailView` in `extension/src/sidepanelBoot.ts` gives them neutral empty values: open work, needs core fields.
 
 ## Later
 

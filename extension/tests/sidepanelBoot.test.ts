@@ -859,4 +859,30 @@ describe("bootPanel Tracks tab and settings home", () => {
     root.querySelector<HTMLButtonElement>("button.new-track")!.click();
     expect(root.querySelector("form.track-create")).not.toBeNull();
   });
+
+  it("the track detail Add source and Quiz buttons open their screens, and back returns to the detail", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("button.open-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-track")!.click();
+    expect(root.querySelector("section.track-detail")?.getAttribute("data-state")).toBe("ready");
+    expect(root.querySelector("section.track-detail")!.textContent).toContain("Alpha");
+    root.querySelector<HTMLButtonElement>("section.track-detail button.add-source")!.click();
+    expect(root.querySelector("section.source-add")).not.toBeNull();
+    expect(root.querySelector("section.track-detail")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.source-add button.cancel")!.click();
+    expect(root.querySelector("section.track-detail")).not.toBeNull();
+    expect(root.querySelector("section.source-add")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.track-detail button.quiz")!.click();
+    expect(root.querySelector("section.quiz-run")).not.toBeNull();
+    expect(root.querySelector("section.track-detail")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.quiz-run button.stop")!.click();
+    expect(root.querySelector("section.track-detail")).not.toBeNull();
+    expect(root.querySelector("section.quiz-run")).toBeNull();
+  });
 });

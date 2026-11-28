@@ -10,6 +10,7 @@ import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connect
 import type { IgnoredRowView } from "./ui/panel/ignoredList";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
 import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackDetailView } from "./ui/panel/trackDetail";
 import type { TrackSortKey, TracksTabProps } from "./ui/panel/tracksTab";
 import { routeScreen } from "./ui/panel/router";
 import type { ScanResultRow, ScanResultsStatus } from "./ui/panel/scanResults";
@@ -38,8 +39,15 @@ type PanelStatus =
   | { kind: "error"; reason: "timeout" | "auth" | "failed" }
   | { kind: "notice"; text: string };
 
-/** A track screen the Tracks tab opened: the detail of one track, or the create form. */
-export type TrackScreen = { kind: "detail"; trackId: number } | { kind: "create" };
+/**
+ * A track screen the Tracks tab opened: the detail of one track, the create form, or the add-source
+ * and quiz screens the detail opened for that track.
+ */
+export type TrackScreen =
+  | { kind: "detail"; trackId: number }
+  | { kind: "create" }
+  | { kind: "source-add"; trackId: number }
+  | { kind: "quiz"; trackId: number };
 
 /**
  * Everything the panel draws. `session` null means signed out. `changing` true shows the
@@ -68,6 +76,8 @@ export interface PanelState {
   queue?: QueuedMarkView[] | null;
   /** Tracks tab state and rows; unset means still loading. */
   tracks?: TracksTabProps;
+  /** Loaded tracks by id for the detail screen; a track missing here shows the detail's loading state. */
+  trackViews?: Record<number, TrackDetailView>;
   /** Track screen the Tracks tab opened: one track's detail, or the create form; null or unset shows the list. */
   trackScreen?: TrackScreen | null;
   /** Settings page drawn in place of the settings home; null or unset shows the home. */
@@ -290,8 +300,16 @@ function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElem
 /** Tracks tab: the state the panel holds (loading until the panel:tracks reply arrives), with its rows. */
 function renderTracksView(state: PanelState, handlers: PanelHandlers): HTMLElement {
   if (state.trackScreen?.kind === "detail" && handlers.trackDetail !== undefined) {
-    // The track data is not loaded yet, so the detail stays in its loading state.
-    return routeScreen("track-detail", { state: "loading", track: null }, handlers.trackDetail);
+    const track = state.trackViews?.[state.trackScreen.trackId] ?? null;
+    const props = track === null ? { state: "loading" as const, track } : { state: "ready" as const, track };
+    return routeScreen("track-detail", props, handlers.trackDetail);
+  }
+  if (state.trackScreen?.kind === "source-add" && handlers.sourceAdd !== undefined) {
+    return routeScreen("source-add", { status: "idle" }, handlers.sourceAdd);
+  }
+  if (state.trackScreen?.kind === "quiz" && handlers.quizRun !== undefined) {
+    // No quiz questions are loaded yet, so the run shows its loading line.
+    return routeScreen("quiz-run", { state: "loading", index: 0, total: 0 }, handlers.quizRun);
   }
   if (state.trackScreen?.kind === "create" && handlers.trackCreate !== undefined) {
     return routeScreen("track-create", { state: "form" }, handlers.trackCreate);
