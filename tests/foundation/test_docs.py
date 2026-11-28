@@ -143,6 +143,46 @@ def test_decisions_record_exam_mode_decisions():
         assert heading in lines, f"docs/decisions.md lacks {heading!r}"
 
 
+EXAM_SCREENS_DOC = ROOT / "docs" / "design" / "exam-mode-screens.md"
+
+# Screen id of each string key of the owner step (D-J). One row per key.
+EXAM_SCREEN_KEYS = {
+    "em-switch-label": "em-switch",
+    "em-switch-effect": "em-switch",
+    "em-pin-menu": "em-pin",
+    "em-pin-tooltip": "em-pin",
+    "em-unreadable-text": "em-unreadable",
+    "em-result-title": "em-result",
+    "em-result-topics": "em-result",
+    "em-result-weak": "em-result",
+    "em-result-score": "em-result",
+    "em-result-date": "em-result",
+    "em-result-passfail": "em-result",
+    "em-result-picked": "em-result",
+    "em-prop-confirm": "em-proposals",
+    "em-prop-dismiss": "em-proposals",
+    "em-prop-needs-practice": "em-proposals",
+    "em-error-core": "em-error",
+    "em-error-idle": "em-error",
+}
+
+
+def test_exam_mode_screens_doc():
+    text = EXAM_SCREENS_DOC.read_text(encoding="utf-8")
+    assert re.search(r"^Status: (proposed|approved by owner .+)$", text, re.MULTILINE)
+    pairs = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        match = re.fullmatch(r"`(em-[a-z-]+)`", cells[1]) if len(cells) == 5 else None
+        if match:
+            assert cells[2], f"empty proposed text for {match.group(1)}"
+            pairs.append((cells[0], match.group(1)))
+    expected = sorted((screen, key) for key, screen in EXAM_SCREEN_KEYS.items())
+    assert sorted(pairs) == expected
+
+
 def test_no_personal_or_provider_names_in_docs():
     for path in (README, DECISIONS):
         text = path.read_text(encoding="utf-8")
