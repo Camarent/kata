@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 
-# Full commit SHA pin with the tag as a trailing comment: owner/name@<40 hex> # vN.
+# Full commit SHA pin with the tag as a trailing comment: owner/name@<40 hex> # vN or # vN.N.N.
 # A tag-only ref, a branch name or a bare SHA without the tag comment does not match.
-SHA_PIN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40} # v\d+$")
+SHA_PIN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40} # v\d+(\.\d+)*$")
 # The value after `uses:`, trailing comment included (YAML parsing drops the comment).
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S.*?)\s*$", re.MULTILINE)
 
