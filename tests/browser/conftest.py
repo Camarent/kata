@@ -8,9 +8,9 @@ scripts/dev/install-browsers.sh (pinned); Chrome and chromedriver are looked up 
 from __future__ import annotations
 
 import functools
-import shutil
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
