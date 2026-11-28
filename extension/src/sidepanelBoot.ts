@@ -474,8 +474,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       onStop: backToDetail,
     },
     trackCreate: {
-      // Save is not wired yet: the form only routes here.
-      onCreate: () => {},
+      // A refused save rejects: the form shows its error line and stays open. The core takes only a name and deadline.
+      async onCreate(input) {
+        await send<Track>({ type: "panel:createTrack", input: { name: input.name, deadline: input.deadline } });
+        state.trackScreen = null;
+        await loadTracks();
+      },
       onCancel: backFromTrack,
     },
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),

@@ -112,7 +112,7 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
 - Firefox first; Chrome later from the same code.
 - Adding a permission widens what users grant; keep the list minimal. `scripting` is there only for the bridge registration.
 - Match patterns cannot name a port: the bridge pattern uses `*` as host, so a core on a non-default port still gets `bridge.js`; `runBridge` returns early on any other origin.
-- Track detail: `onAddSource` opens the source add screen and `onQuiz` starts the quiz run, both wired in `extension/src/sidepanelBoot.ts`; the detail loads the real track from the core. Unwired stub: `onCreate` (trackCreate) in `extension/src/sidepanelBoot.ts` is a no-op handler; the form routes to it but nothing is sent to the core yet.
+- Track detail: `onAddSource` opens the source add screen and `onQuiz` starts the quiz run, both wired in `extension/src/sidepanelBoot.ts`; the detail loads the real track from the core. Track create: `trackCreate.onCreate` in `extension/src/sidepanelBoot.ts` sends `panel:createTrack` (name and deadline only; the core takes no more), then leaves the form and reloads the Tracks list; a refused save rejects, so the form shows its error line and stays open.
 - Release: a `v*` tag runs `.github/workflows/release-extension.yml`, which builds both browsers and publishes the zips and `SHA256SUMS`. Actions are pinned by major tag, like `ci.yml`.
 
 ## Depends on / used by

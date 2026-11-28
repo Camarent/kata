@@ -55,7 +55,9 @@ def _handler_for(
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
-            body = json.dumps(routes[path]).encode("utf-8")
+            # A route may be a callable that returns the body per request, so a test can answer a later GET differently.
+            reply = routes[path]
+            body = json.dumps(reply() if callable(reply) else reply).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", JSON_TYPE)
             self.send_header("Content-Length", str(len(body)))

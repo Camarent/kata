@@ -860,6 +860,66 @@ describe("bootPanel Tracks tab and settings home", () => {
     expect(root.querySelector("form.track-create")).not.toBeNull();
   });
 
+  /** Fills the create form and submits it, as the owner does with Create. */
+  const submitTrackCreate = (name: string, deadline: string): void => {
+    const form = root.querySelector("form.track-create") as HTMLFormElement;
+    (form.querySelector('input[name="name"]') as HTMLInputElement).value = name;
+    (form.querySelector('input[name="deadline"]') as HTMLInputElement).value = deadline;
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+  };
+
+  it("Save on the create form sends the track, then the Tracks tab shows the new row", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({});
+    let created = false;
+    sendMessage.mockImplementation(async (message: PanelMessage) => {
+      if (message.type === "panel:createTrack") {
+        created = true;
+        return { ok: true, data: track(2, "Beta") };
+      }
+      if (message.type === "panel:tracks") {
+        const items = created ? [track(1, "Alpha"), track(2, "Beta")] : [track(1, "Alpha")];
+        return { ok: true, data: { items, next_before_id: null } };
+      }
+      return { ok: true };
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    // Wait for the list load to finish first: its redraw would replace the form the test submits.
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("ready"));
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    submitTrackCreate("Beta", "2027-03-01");
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.textContent).toContain("Beta"));
+    expect(root.querySelector("form.track-create")).toBeNull();
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "panel:createTrack",
+      input: { name: "Beta", deadline: "2027-03-01" },
+    });
+  });
+
+  it("a refused Save keeps the create form open with its error line and does not reload the list", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+      "panel:createTrack": { ok: false, error: "refused" },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    // Wait for the list load to finish first: its redraw would replace the form the test submits.
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("ready"));
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    submitTrackCreate("Beta", "2027-03-01");
+    await vi.waitFor(() =>
+      expect(root.querySelector("form.track-create p.error")?.textContent).toBe("Could not create the track."),
+    );
+    expect(root.querySelector("form.track-create button[type=submit]")).not.toBeNull();
+    expect((root.querySelector("form.track-create button[type=submit]") as HTMLButtonElement).disabled).toBe(false);
+    const listLoads = sendMessage.mock.calls.filter(([message]) => message.type === "panel:tracks");
+    expect(listLoads).toHaveLength(1);
+  });
+
   it("the track detail Add source and Quiz buttons open their screens, and back returns to the detail", async () => {
     root = document.createElement("main");
     document.body.append(root);
