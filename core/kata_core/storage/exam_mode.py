@@ -83,6 +83,14 @@ def open_session(conn: psycopg.Connection[Any], user_id: int, site_host: str, no
     return opened
 
 
+def lock_session(conn: psycopg.Connection[Any], user_id: int, session_id: int) -> None:
+    """Lock the session row until the enclosing transaction ends, so answers to one session run in turn."""
+    conn.execute(
+        "SELECT id FROM exam_mode_session WHERE id = %s AND user_id = %s FOR UPDATE",
+        (session_id, user_id),
+    )
+
+
 def get_session(conn: psycopg.Connection[Any], user_id: int, session_id: int) -> SessionRow | None:
     """The session when it belongs to user_id; None for another user's id or an unknown id."""
     row = conn.execute(
