@@ -117,6 +117,7 @@ export type PanelMessage =
   | { type: "panel:dismissExamResult"; resultId: number }
   | { type: "panel:ignored" }
   | { type: "panel:ignoreConcept"; conceptId: number }
+  | { type: "panel:imageAction"; label: string }
   | { type: "panel:deleteConcept"; conceptId: number }
   | { type: "panel:unignoreConcept"; conceptId: number }
   | { type: "panel:markConceptViewed"; conceptId: number }

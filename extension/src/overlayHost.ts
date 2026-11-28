@@ -5,6 +5,8 @@ import { BLOCK_ATTR } from "./scanner";
 import type { PanelMessage, PanelReply, RuntimeLike } from "./messages";
 import type { ScanConceptItem } from "./coreClientTypes";
 import { type ConceptAction, renderBlockMenu, renderConceptActions, type OverlayState } from "./ui/overlay/blockMenu";
+import { renderImageMenu } from "./ui/overlay/imageMenu";
+import { IMAGE_PIN_MENU_TEXT } from "./ui/strings";
 
 /** Undo window of the block menu's Delete / Ignore, in milliseconds before the change is sent. */
 const CONCEPT_UNDO_WINDOW_MS = 3000;
@@ -119,6 +121,106 @@ function attachBlockMenu(doc: Document, runtime: RuntimeLike, block: HTMLElement
     block.removeEventListener("mouseleave", leave);
     block.removeEventListener("focusout", leave);
     close();
+  };
+}
+
+/**
+ * Image pin: a small pin button shown over a page image while the pointer is on the image; hovering
+ * the pin (or pressing it) opens the image menu under the image. Image concepts need a vision model (D33), so the menu shows
+ * its empty state and its actions reach the background as `panel:imageAction`.
+ */
+function attachImageMenu(doc: Document, runtime: RuntimeLike, img: HTMLImageElement): () => void {
+  let pin: HTMLButtonElement | null = null;
+  let menu: HTMLElement | null = null;
+  const hidePin = (): void => {
+    pin?.remove();
+    pin = null;
+  };
+  const closeMenu = (): void => {
+    menu?.remove();
+    menu = null;
+  };
+  const openMenu = (): void => {
+    hidePin();
+    if (menu !== null) return;
+    const actions = {
+      onPick: (label: string) => {
+        sendPanel(runtime, { type: "panel:imageAction", label }).catch(() => undefined);
+      },
+    };
+    menu = renderImageMenu(doc, "empty", actions);
+    // Leaving the menu closes it, unless the pointer moves back onto the image.
+    menu.addEventListener("mouseleave", (event) => {
+      const next = (event as MouseEvent).relatedTarget;
+      if (next instanceof Node && img.contains(next)) return;
+      closeMenu();
+    });
+    placeBelow(menu, img);
+    doc.body.append(menu);
+  };
+  const showPin = (): void => {
+    if (pin !== null || menu !== null) return;
+    const button = doc.createElement("button");
+    button.type = "button";
+    button.className = "image-pin";
+    button.title = IMAGE_PIN_MENU_TEXT.header;
+    button.setAttribute("aria-label", IMAGE_PIN_MENU_TEXT.header);
+    const rect = img.getBoundingClientRect();
+    const view = doc.defaultView;
+    button.style.position = "absolute";
+    button.style.top = `${rect.top + (view?.scrollY ?? 0)}px`;
+    button.style.left = `${rect.left + (view?.scrollX ?? 0)}px`;
+    // Hovering the pin opens the menu (docs/design/extension-ui.md, item 33); a press does too.
+    button.addEventListener("mouseenter", openMenu);
+    button.addEventListener("click", openMenu);
+    button.addEventListener("mouseleave", (event) => {
+      const next = (event as MouseEvent).relatedTarget;
+      if (!(next instanceof Node && img.contains(next))) hidePin();
+    });
+    pin = button;
+    doc.body.append(button);
+  };
+  const leaveImage = (event: Event): void => {
+    const next = (event as MouseEvent).relatedTarget;
+    if (!(next instanceof Node && pin?.contains(next))) hidePin();
+  };
+  img.addEventListener("mouseenter", showPin);
+  img.addEventListener("mouseleave", leaveImage);
+  return () => {
+    img.removeEventListener("mouseenter", showPin);
+    img.removeEventListener("mouseleave", leaveImage);
+    hidePin();
+    closeMenu();
+  };
+}
+
+/**
+ * Attaches the image menu to every `img` of `doc`, the ones present now and the ones added later
+ * (lazy load, single-page apps); returns the detach that removes them all. Called once per page by
+ * the content script.
+ */
+export function attachImageMenus(doc: Document, runtime: RuntimeLike): () => void {
+  const detaches = new Map<HTMLImageElement, () => void>();
+  const attachTo = (img: HTMLImageElement): void => {
+    if (!detaches.has(img)) detaches.set(img, attachImageMenu(doc, runtime, img));
+  };
+  const attachWithin = (root: Element): void => {
+    if (root instanceof HTMLImageElement) attachTo(root);
+    for (const img of Array.from(root.querySelectorAll("img"))) attachTo(img);
+  };
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of Array.from(record.addedNodes)) {
+        if (node instanceof Element) attachWithin(node);
+      }
+    }
+  });
+  attachWithin(doc.documentElement);
+  observer.observe(doc.documentElement, { childList: true, subtree: true });
+  return () => {
+    observer.disconnect();
+    for (const detach of detaches.values()) detach();
+    detaches.clear();
   };
 }
 
