@@ -68,6 +68,8 @@ export interface PanelHandlers {
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
   onCloseReview: () => void;
   onOpenCourse: (courseId: number) => Promise<void>;
+  /** Back from the course page to the Courses list. */
+  onCloseCourse?: () => void;
   onDeleteCourse: (courseId: number) => Promise<void>;
   onCreateCourse: (title: string) => Promise<void>;
   onRegenerateCourse: (courseId: number) => Promise<void>;

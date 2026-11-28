@@ -25,7 +25,9 @@ Open:
 - Unmounted, pending owner decision (no importer outside its group): the page overlays
   `extension/src/ui/overlay/hlMenu.ts` (hover menu), `whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`,
   `listPicker.ts`, `quizPin.ts`; the exam run screen `extension/src/ui/panel/examRun.ts` (the core has no
-  route that starts an exam run yet); the course page `extension/src/ui/panel/coursePage.ts`.
+  route that starts an exam run yet).
+  The course page `extension/src/ui/panel/coursePage.ts` is mounted from Open course on the courses tab
+  (task-18, `renderCoursesView` in `extension/src/sidepanel.ts`, boot in `extension/src/sidepanelBoot.ts`).
   The exam result screen `extension/src/ui/panel/examResult.ts` is mounted in the panel.
 - Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate).
 

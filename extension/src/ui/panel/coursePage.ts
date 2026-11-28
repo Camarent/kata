@@ -1,23 +1,26 @@
 import { el } from "../dom";
-import { TEXT_COURSE_PAGE } from "../strings";
+import { COURSE_VERSION_LABEL, TEXT_COURSE_PAGE } from "../strings";
 
 const [ITEMS, START_EXAM, BACK, LOAD_FAILED] = TEXT_COURSE_PAGE;
 
-/** Props of the course page: the course title, its items and the Back exit. */
+/** Props of the course page: the course title, its version, its items and the Back exit. */
 export interface CoursePageProps {
   title: string;
+  /** Course version; shown as the version label under the title when set. */
+  version?: number;
   items: string[];
   loadFailed: boolean;
   onBack: () => void;
 }
 
 /**
- * Course page: the course title, the list of course items and Back to panel. A failed load shows the
- * could-not-load text in place of the items.
+ * Course page: the course title, its version label, the list of course items and Back to panel. A
+ * failed load shows the could-not-load text in place of the items.
  */
 export function renderCoursePage(props: CoursePageProps): HTMLElement {
   const page = el("main", undefined, "course-page");
   page.append(el("h1", props.title));
+  if (props.version !== undefined) page.append(el("p", `${COURSE_VERSION_LABEL} ${props.version}`, "course-version"));
   if (props.loadFailed) {
     page.append(el("p", LOAD_FAILED, "error"));
   } else {

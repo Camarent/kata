@@ -49,7 +49,7 @@ Reference docs: `docs/api.md` (routes, file format, CLIs), `docs/e2e.md` (end-to
 - Admin CLI: `python3 -m kata_core.auth.admin` (`core/kata_core/auth/admin.py:77` `main`), run with `PYTHONPATH=core`.
 - DB CLI: `python3 scripts/db/kata_db.py` (`scripts/db/kata_db.py:35` `main`), run with `PYTHONPATH=core`.
 - Migrate CLI: `python -m kata_core.migrate` (`core/kata_core/migrate.py:43` `main`); `--check` lists pending migrations and exits 1. Compose runs it as the `migrate` service before `core`.
-- Extension: `extension/manifest.base.json` plus `extension/build/manifest.mjs` compose `dist/<browser>/manifest.json` for `chrome` and `firefox`; each `dist/<browser>/` loads `background.js`, `content.js`, `sidepanelBoot.js`, `sidepanel.html` and `bridge.js` (registered at runtime for `/c/*` course pages, `extension/src/bridgeRegister.ts`). Built by `npm run build` in `extension/`.
+- Extension: `extension/manifest.base.json` plus `extension/build/manifest.mjs` compose `dist/<browser>/manifest.json` for `chrome` and `firefox`; each `dist/<browser>/` loads `background.js`, `content.js`, `sidepanelBoot.js`, `sidepanel.html` and `bridge.js` (registered at runtime for `/c/*` course pages, `extension/src/bridgeRegister.ts`). Built by `npm run build` in `extension/`. The side panel page is drawn by `sidepanel.ts` from the screens in `ui/panel/screens.ts`, booted by `sidepanelBoot.ts`; from Open course on the courses tab it mounts the course page (`ui/panel/coursePage.ts`).
 
 ## Build and test commands
 From `tools/gates.json` (plain commands): `.venv/bin/ruff check .`, `.venv/bin/mypy core`, `.venv/bin/python -m pytest tests -m smoke`, the full pytest run with coverage and `-m 'not flaky'`, `npm --prefix extension run build`, `npm --prefix extension run test:cov`.

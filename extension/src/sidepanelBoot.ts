@@ -91,6 +91,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.review = null;
     state.courses = [];
     state.coursesFailed = false;
+    state.coursePage = null;
     state.tracks = undefined;
     state.settingsPage = null;
     state.tab = "scan";
@@ -353,6 +354,14 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onOpenCourse(courseId: number) {
       const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);
+      const course = state.courses?.find((listed) => listed.id === courseId);
+      if (course === undefined) return;
+      state.coursePage = { title: course.title, version: course.version };
+      draw();
+    },
+    onCloseCourse() {
+      state.coursePage = null;
+      draw();
     },
     async onCreateCourse(title: string) {
       const reply = await api.runtime.sendMessage({ type: "panel:createCourse", title });

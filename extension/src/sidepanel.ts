@@ -60,6 +60,8 @@ export interface PanelState {
   courseLimit?: number;
   /** Courses counted against the limit; defaults to the number of listed courses. */
   courseTotal?: number;
+  /** Course the Courses tab opened: its course page replaces the list; null or unset shows the list. */
+  coursePage?: { title: string; version: number } | null;
   /** Server link and unsynced count; when set, the connection detail shows under the header. */
   link?: ConnectionDetailProps;
   /** Marks waiting in the offline queue; non-null means the Not synced marks screen. */
@@ -267,8 +269,13 @@ function renderScanTab(state: PanelState, handlers: PanelHandlers): HTMLElement 
   return tab;
 }
 
-/** Courses tab: the ready courses with Open course and Delete; Generate course is fed by the courses task. */
+/** Courses tab: the ready courses with Open course and Delete; Generate course is fed by the courses task. Open course shows the course page. */
 function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  if (state.coursePage) {
+    // The course items are not in the core course list yet, so the page lists none.
+    const page = { ...state.coursePage, items: [], loadFailed: false, onBack: () => handlers.onCloseCourse?.() };
+    return routeScreen("course-page", page, undefined);
+  }
   const props = {
     courses: state.courses ?? [],
     courseLimit: state.courseLimit,

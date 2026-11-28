@@ -13,6 +13,7 @@ import { renderScanResults } from "./scanResults";
 import { renderSummaryPanel } from "./summaryPanel";
 import { renderCourseDetail, renderCourseRegenerate } from "./courseDetail";
 import { renderCourseGenerate } from "./courseGenerate";
+import { renderCoursePage } from "./coursePage";
 import { renderCoursesTab } from "./coursesTab";
 import { renderExamEntry } from "./examEntry";
 import { renderExamProposals } from "./examProposals";
@@ -57,6 +58,7 @@ export interface ScreenArgs {
   "course-generate": { props: Arg<typeof renderCourseGenerate, 1>; ctx: Arg<typeof renderCourseGenerate, 0> };
   "course-detail": { props: Arg<typeof renderCourseDetail, 1>; ctx: Arg<typeof renderCourseDetail, 0> };
   "course-regenerate": { props: Arg<typeof renderCourseRegenerate, 1>; ctx: Arg<typeof renderCourseRegenerate, 0> };
+  "course-page": { props: Arg<typeof renderCoursePage, 0>; ctx: undefined };
   "quiz-run": { props: Arg<typeof renderQuizRun, 0>; ctx: Arg<typeof renderQuizRun, 1> };
   "quiz-end": { props: Arg<typeof renderQuizEnd, 0>; ctx: Arg<typeof renderQuizEnd, 1> };
   "tracks-tab": { props: Arg<typeof renderTracksTab, 0>; ctx: Arg<typeof renderTracksTab, 1> };
@@ -106,6 +108,7 @@ export const SCREENS: InventoryRegistry = {
   "course-generate": (props, handlers) => renderCourseGenerate(handlers, props),
   "course-detail": (props, handlers) => renderCourseDetail(handlers, props),
   "course-regenerate": (props, handlers) => renderCourseRegenerate(handlers, props),
+  "course-page": (props) => renderCoursePage(props),
   "quiz-run": (props, actions) => renderQuizRun(props, actions),
   "quiz-end": (props, actions) => renderQuizEnd(props, actions),
   "tracks-tab": (props, handlers) => renderTracksTab(props, handlers),

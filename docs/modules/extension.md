@@ -74,8 +74,10 @@ Client for Milestones 0 and 2: a Manifest V3 browser extension that scans the op
     `cardScan`, `cardSummary`, `card/focus.ts` and `card/jokeCloud.ts`, and the page overlay
     `overlay/pageChanged.ts`; `content.ts` mounts the pin (`ui/card/pin.ts`, `mountPin`) in the same host. The hover menu `overlay/hlMenu.ts` is mounted on highlighted words by `overlayHost.ts` (`createOverlayHost`, called from `registerContentScript`), and the block menu `overlay/blockMenu.ts` on each scanned block (`attachBlockMenu`, same host), and its `Add all to list` button opens the list picker (`overlay/listPicker.ts`). The image menu `overlay/imageMenu.ts` (`renderImageMenu`) is mounted on page images by `attachImageMenus` in `overlayHost.ts`, called from `registerContentScript`. Scan results in the panel draw the scan rows the panel holds (`renderScanTab` in `extension/src/sidepanel.ts` passes `state.rows` to the scan-results screen). Not imported by the running extension: the other page overlays under
     `overlay/` (`whichOne`, `quizPin`), the exam run screen `panel/examRun.ts`
-    (`renderExamRun`; open: the core has no route that starts an exam run), and the course page
-    `panel/coursePage.ts`. The exam result screen `panel/examResult.ts` is mounted from the exam import result.
+    (`renderExamRun`; open: the core has no route that starts an exam run). The course page
+    `panel/coursePage.ts` (`renderCoursePage`) is registered in `SCREENS` and mounted from Open course on the
+    courses tab (`renderCoursesView` in `sidepanel.ts`; the course data comes from the course page call in
+    `sidepanelBoot.ts`). The exam result screen `panel/examResult.ts` is mounted from the exam import result.
     Its "Open course items" button is not drawn yet (no handler is wired; it appears once a course-items
     route exists). The score field is a percentage from 0 to 100; a blank or out-of-range score is refused
     and the form shows "Could not save the result." A refused Done keeps the result screen with

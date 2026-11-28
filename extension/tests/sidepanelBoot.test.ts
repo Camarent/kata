@@ -8,7 +8,7 @@ import type { PanelMessage, PanelReply } from "../src/messages";
 import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
 import { ERROR_TEXT } from "../src/ui/panel/statusText";
-import { TEXT_COURSES_TAB, TEXT_EXAM_RESULT_ENTRY, TEXT_SCAN_RESULTS } from "../src/ui/strings";
+import { COURSE_VERSION_LABEL, TEXT_COURSE_PAGE, TEXT_COURSES_TAB, TEXT_EXAM_RESULT_ENTRY, TEXT_SCAN_RESULTS } from "../src/ui/strings";
 
 /** The handlers bootPanel hands to renderPanel; the courses regenerate action has no other DOM entry point yet. */
 const captured = vi.hoisted(() => ({ handlers: undefined as PanelHandlers | undefined }));
@@ -458,6 +458,24 @@ describe("bootPanel", () => {
     openTab("courses");
     root.querySelector<HTMLButtonElement>("section.courses-tab li button")!.click();
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: "panel:openCourse", courseId: 4 }));
+  });
+
+  it("Open course shows the course page with its version label, and Back returns to the list", async () => {
+    const versioned = { items: [{ id: 4, title: "Algebra", status: "ready", version: 2 }], limit: 5, total: 1 };
+    const { api } = courseChrome(() => ({ ok: true }), () => versioned);
+    await bootPanel(mountPoint(), api);
+    openTab("courses");
+    root.querySelector<HTMLButtonElement>("section.courses-tab li button")!.click();
+    await vi.waitFor(() => expect(root.querySelector("main.course-page")).not.toBeNull());
+    expect(root.querySelector("main.course-page h1")?.textContent).toBe("Algebra");
+    expect(root.querySelector("main.course-page p.course-version")?.textContent).toBe(`${COURSE_VERSION_LABEL} 2`);
+    expect(root.querySelector("section.courses-tab")).toBeNull();
+    const back = [...root.querySelectorAll<HTMLButtonElement>("main.course-page button")].find(
+      (button) => button.textContent === TEXT_COURSE_PAGE[2],
+    );
+    back!.click();
+    expect(root.querySelector("main.course-page")).toBeNull();
+    expect(root.querySelector("section.courses-tab li span")?.textContent).toBe("Algebra");
   });
 
   it("a refused open shows the error text on the Courses tab and turns the button on again", async () => {
