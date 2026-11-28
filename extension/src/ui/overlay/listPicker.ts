@@ -12,14 +12,17 @@ const NEW_LIST = LIST_PICKER_TEXT.newList;
 const CANCEL = LIST_PICKER_TEXT.cancel;
 const ERROR_LOAD = LIST_PICKER_TEXT.loadFailed;
 
-/** Callbacks of the list picker: `onPick` gets the chosen list name, `onNew` opens list creation. */
+/**
+ * Callbacks of the list picker: `onPick` gets the chosen list name, `onNew` opens list creation.
+ * Without `onNew` the New list button is not shown (list creation is not wired yet).
+ */
 export interface ListPickerActions {
   onPick(list: string): void;
-  onNew(): void;
+  onNew?: () => void;
   onCancel(): void;
 }
 
-/** Builds the list picker card: title, prompt, one button per list, New list and Cancel, and the state line. */
+/** Builds the list picker card: title, prompt, one button per list, New list (when wired) and Cancel, and the state line. */
 export function renderListPicker(
   doc: Document,
   state: OverlayState,
@@ -44,10 +47,9 @@ export function renderListPicker(
       picks.append(menuButton(doc, name, "btn", () => actions.onPick(name), busy));
     }
   }
-  picks.append(
-    menuButton(doc, NEW_LIST, "btn list-picker-new", () => actions.onNew(), busy),
-    menuButton(doc, CANCEL, "btn list-picker-cancel", () => actions.onCancel()),
-  );
+  const onNew = actions.onNew;
+  if (onNew) picks.append(menuButton(doc, NEW_LIST, "btn list-picker-new", () => onNew(), busy));
+  picks.append(menuButton(doc, CANCEL, "btn list-picker-cancel", () => actions.onCancel()));
   card.append(picks);
 
   const status = overlayStatus(state, { empty: NO_LISTS, error: ERROR_LOAD });

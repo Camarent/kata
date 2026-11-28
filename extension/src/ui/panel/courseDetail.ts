@@ -2,7 +2,7 @@ import type { PanelHandlers } from "../../types";
 import type { CourseSummary } from "../../coreClient";
 import { CoreOfflineError } from "../../coreClient";
 import { el } from "../dom";
-import { COURSE_DETAIL_TEXT, COURSE_GENERATE_TEXT, COURSE_REGENERATE_TEXT } from "../strings";
+import { COURSE_DETAIL_TEXT, COURSE_GENERATE_TEXT, COURSE_REGENERATE_TEXT, COURSE_VERSION_LABEL } from "../strings";
 
 const {
   preview: PREVIEW,
@@ -46,7 +46,11 @@ export function renderCourseDetail(handlers: PanelHandlers, props: CourseDetailP
   if (props.loadFailed) {
     screen.append(el("p", LOAD_FAILED, "error"));
   } else {
-    screen.append(el("h3", props.course.title), el("p", START_NOTE));
+    screen.append(
+      el("h3", props.course.title),
+      el("p", `${COURSE_VERSION_LABEL} ${props.course.version}`, "course-version"),
+      el("p", START_NOTE),
+    );
   }
   const openPage = el("button", OPEN_PAGE);
   openPage.type = "button";

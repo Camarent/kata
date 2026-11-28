@@ -52,6 +52,8 @@ Project items after Milestone 0.
 - [x] `tools/gates.json` used a wrapper that a clean clone does not have.
       Closed: `scripts/dev/check-all.sh` is the clean-clone gate with plain commands;
       `gates.json` now has plain commands too (see [`development.md`](development.md)).
+      The merge and full modes of `check-all.sh` now run their jobs concurrently.
+      The browser cases run in xdist workers (`-n auto`, at most 4), each with its own profile and temp dir.
 - [ ] Several API tests were pinned to a fixed date and failed once the real clock passed the
       token lifetime; fixed, but check new tests for fixed dates.
 - [ ] Cost cap check-then-record is not atomic: `CappedProvider.complete` in

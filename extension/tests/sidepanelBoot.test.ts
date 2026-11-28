@@ -8,7 +8,7 @@ import type { PanelMessage, PanelReply } from "../src/messages";
 import type { PanelHandlers, PanelState } from "../src/sidepanel";
 import type { StorageArea } from "../src/tokenStore";
 import { ERROR_TEXT } from "../src/ui/panel/statusText";
-import { TEXT_COURSES_TAB, TEXT_SCAN_RESULTS } from "../src/ui/strings";
+import { COURSE_VERSION_LABEL, TEXT_COURSE_PAGE, TEXT_COURSES_TAB, TEXT_EXAM_RESULT_ENTRY, TEXT_SCAN_RESULTS } from "../src/ui/strings";
 
 /** The handlers bootPanel hands to renderPanel; the courses regenerate action has no other DOM entry point yet. */
 const captured = vi.hoisted(() => ({ handlers: undefined as PanelHandlers | undefined }));
@@ -332,7 +332,7 @@ describe("bootPanel", () => {
       await vi.waitFor(() => expect(root.querySelector("li.row")).not.toBeNull());
       expect(sendMessage).toHaveBeenCalledWith({ type: "panel:scan" });
       expect(sendMessage.mock.calls.filter(([message]) => message.type === "panel:scan")).toHaveLength(1);
-      expect(Array.from(root.querySelectorAll("span.badge"), (badge) => badge.textContent)).toEqual(["known", "new"]);
+      expect(Array.from(root.querySelectorAll("li.row span.badge"), (badge) => badge.textContent)).toEqual(["known", "new"]);
       expect(Array.from(root.querySelectorAll<HTMLButtonElement>("li.row button"), (button) => button.hidden)).toEqual([
         true,
         false,
@@ -458,6 +458,24 @@ describe("bootPanel", () => {
     openTab("courses");
     root.querySelector<HTMLButtonElement>("section.courses-tab li button")!.click();
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ type: "panel:openCourse", courseId: 4 }));
+  });
+
+  it("Open course shows the course page with its version label, and Back returns to the list", async () => {
+    const versioned = { items: [{ id: 4, title: "Algebra", status: "ready", version: 2 }], limit: 5, total: 1 };
+    const { api } = courseChrome(() => ({ ok: true }), () => versioned);
+    await bootPanel(mountPoint(), api);
+    openTab("courses");
+    root.querySelector<HTMLButtonElement>("section.courses-tab li button")!.click();
+    await vi.waitFor(() => expect(root.querySelector("main.course-page")).not.toBeNull());
+    expect(root.querySelector("main.course-page h1")?.textContent).toBe("Algebra");
+    expect(root.querySelector("main.course-page p.course-version")?.textContent).toBe(`${COURSE_VERSION_LABEL} 2`);
+    expect(root.querySelector("section.courses-tab")).toBeNull();
+    const back = [...root.querySelectorAll<HTMLButtonElement>("main.course-page button")].find(
+      (button) => button.textContent === TEXT_COURSE_PAGE[2],
+    );
+    back!.click();
+    expect(root.querySelector("main.course-page")).toBeNull();
+    expect(root.querySelector("section.courses-tab li span")?.textContent).toBe("Algebra");
   });
 
   it("a refused open shows the error text on the Courses tab and turns the button on again", async () => {
@@ -681,6 +699,116 @@ describe("bootPanel Tracks tab and settings home", () => {
     expect(root.querySelector("section.ignored-list")).toBeNull();
   });
 
+  it("the settings tab opens the exam entry, saving imports the result and draws the result screen with its score", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const stored = {
+      id: 5,
+      origin: "page",
+      taken_at: "2026-01-01T00:00:00Z",
+      passed: true,
+      score: 0.85,
+      status: "pending",
+      concepts: [],
+    };
+    const { api, sendMessage } = chromeWith({ "panel:importExamResult": { ok: true, data: stored } });
+    await bootPanel(root, api);
+    openTab("settings");
+    root.querySelector<HTMLButtonElement>("button.open-exam-entry")!.click();
+    const entry = root.querySelector("section.exam-entry")!;
+    entry.querySelector<HTMLInputElement>('input[name="date"]')!.value = "2026-01-01";
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "85";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    expect(root.querySelector("p.exam-score")?.textContent).toContain("85%");
+    const sent = sendMessage.mock.calls.map((c) => c[0]).find((m) => m.type === "panel:importExamResult") as {
+      payload: string;
+    };
+    expect(JSON.parse(sent.payload)).toMatchObject({ score: 0.85, taken_at: "2026-01-01T00:00:00Z" });
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.settings-home")).not.toBeNull());
+    expect(sendMessage).toHaveBeenCalledWith({ type: "panel:confirmExamResult", resultId: 5, conceptIds: [] });
+  });
+
+  /** Opens the exam entry on the settings tab and fills the date; the caller sets the score and saves. */
+  const openFilledEntry = async (replies: Record<string, PanelReply>) => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const chrome = chromeWith(replies);
+    await bootPanel(root, chrome.api);
+    openTab("settings");
+    root.querySelector<HTMLButtonElement>("button.open-exam-entry")!.click();
+    const entry = root.querySelector("section.exam-entry")!;
+    entry.querySelector<HTMLInputElement>('input[name="date"]')!.value = "2026-01-01";
+    return { entry, sendMessage: chrome.sendMessage };
+  };
+
+  it("a blank or out-of-range score is refused: no import is sent and the form shows its error", async () => {
+    for (const score of ["", "   ", "101", "-1", "abc"]) {
+      const { entry, sendMessage } = await openFilledEntry({ "panel:importExamResult": { ok: true, data: {} } });
+      entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = score;
+      entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+      await vi.waitFor(() => expect(entry.querySelector("p.error")?.textContent).toBe(TEXT_EXAM_RESULT_ENTRY[9]));
+      expect(sendMessage.mock.calls.some((c) => c[0].type === "panel:importExamResult")).toBe(false);
+      expect(root.querySelector("section.exam-entry")).not.toBeNull();
+    }
+  });
+
+  it("the score field is a percentage: 1 is sent as 0.01 and 0.5 as 0.005", async () => {
+    for (const [typed, sent] of [
+      ["1", 0.01],
+      ["0.5", 0.005],
+    ] as const) {
+      const { entry, sendMessage } = await openFilledEntry({
+        "panel:importExamResult": { ok: true, data: { id: 6, score: sent, concepts: [] } },
+      });
+      entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = typed;
+      entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+      await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+      const imported = sendMessage.mock.calls.map((c) => c[0]).find((m) => m.type === "panel:importExamResult") as {
+        payload: string;
+      };
+      expect(JSON.parse(imported.payload)).toMatchObject({ score: sent });
+    }
+  });
+
+  it("a refused Done keeps the result screen with its error line, and Done can be pressed again", async () => {
+    const stored = { id: 7, origin: "page", taken_at: "2026-01-01T00:00:00Z", passed: true, score: 0.9, status: "pending", concepts: [] };
+    const { entry, sendMessage } = await openFilledEntry({
+      "panel:importExamResult": { ok: true, data: stored },
+      "panel:confirmExamResult": { ok: false, error: "gone" },
+    });
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "90";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() => expect(root.querySelector("p.exam-confirm-error")?.textContent).toBe("Could not confirm the result. Press Done to try again."));
+    expect(root.querySelector("section.exam-result")).not.toBeNull();
+    expect(root.querySelector("section.settings-home")).toBeNull();
+    root.querySelector<HTMLButtonElement>("button.exam-done")!.click();
+    await vi.waitFor(() =>
+      expect(sendMessage.mock.calls.filter((c) => c[0].type === "panel:confirmExamResult")).toHaveLength(2),
+    );
+  });
+
+  it("the result screen with a wrong concept draws no Open course items button until it is wired", async () => {
+    const stored = {
+      id: 8,
+      origin: "page",
+      taken_at: "2026-01-01T00:00:00Z",
+      passed: false,
+      score: 0.4,
+      status: "pending",
+      concepts: [{ concept_id: 3, correct: false, confirmed: false }],
+    };
+    const { entry } = await openFilledEntry({ "panel:importExamResult": { ok: true, data: stored } });
+    entry.querySelector<HTMLInputElement>('input[name="score"]')!.value = "40";
+    entry.querySelector<HTMLButtonElement>("button.save-result")!.click();
+    await vi.waitFor(() => expect(root.querySelector("section.exam-result")).not.toBeNull());
+    expect(root.querySelector(".exam-needs")).not.toBeNull();
+    expect(root.querySelector("button.exam-open-items")).toBeNull();
+  });
+
   it("a refused panel:ignored keeps the settings home drawn", async () => {
     root = document.createElement("main");
     document.body.append(root);
@@ -730,5 +858,91 @@ describe("bootPanel Tracks tab and settings home", () => {
     await vi.waitFor(() => expect(root.querySelector("button.new-track")).not.toBeNull());
     root.querySelector<HTMLButtonElement>("button.new-track")!.click();
     expect(root.querySelector("form.track-create")).not.toBeNull();
+  });
+
+  /** Fills the create form and submits it, as the owner does with Create. */
+  const submitTrackCreate = (name: string, deadline: string): void => {
+    const form = root.querySelector("form.track-create") as HTMLFormElement;
+    (form.querySelector('input[name="name"]') as HTMLInputElement).value = name;
+    (form.querySelector('input[name="deadline"]') as HTMLInputElement).value = deadline;
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+  };
+
+  it("Save on the create form sends the track, then the Tracks tab shows the new row", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({});
+    let created = false;
+    sendMessage.mockImplementation(async (message: PanelMessage) => {
+      if (message.type === "panel:createTrack") {
+        created = true;
+        return { ok: true, data: track(2, "Beta") };
+      }
+      if (message.type === "panel:tracks") {
+        const items = created ? [track(1, "Alpha"), track(2, "Beta")] : [track(1, "Alpha")];
+        return { ok: true, data: { items, next_before_id: null } };
+      }
+      return { ok: true };
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    // Wait for the list load to finish first: its redraw would replace the form the test submits.
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("ready"));
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    submitTrackCreate("Beta", "2027-03-01");
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.textContent).toContain("Beta"));
+    expect(root.querySelector("form.track-create")).toBeNull();
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "panel:createTrack",
+      input: { name: "Beta", deadline: "2027-03-01" },
+    });
+  });
+
+  it("a refused Save keeps the create form open with its error line and does not reload the list", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api, sendMessage } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+      "panel:createTrack": { ok: false, error: "refused" },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    // Wait for the list load to finish first: its redraw would replace the form the test submits.
+    await vi.waitFor(() => expect(root.querySelector("section.tracks-tab")?.getAttribute("data-state")).toBe("ready"));
+    root.querySelector<HTMLButtonElement>("button.new-track")!.click();
+    submitTrackCreate("Beta", "2027-03-01");
+    await vi.waitFor(() =>
+      expect(root.querySelector("form.track-create p.error")?.textContent).toBe("Could not create the track."),
+    );
+    expect(root.querySelector("form.track-create button[type=submit]")).not.toBeNull();
+    expect((root.querySelector("form.track-create button[type=submit]") as HTMLButtonElement).disabled).toBe(false);
+    const listLoads = sendMessage.mock.calls.filter(([message]) => message.type === "panel:tracks");
+    expect(listLoads).toHaveLength(1);
+  });
+
+  it("the track detail Add source and Quiz buttons open their screens, and back returns to the detail", async () => {
+    root = document.createElement("main");
+    document.body.append(root);
+    const { api } = chromeWith({
+      "panel:tracks": { ok: true, data: { items: [track(1, "Alpha")], next_before_id: null } },
+    });
+    await bootPanel(root, api);
+    openTab("tracks");
+    await vi.waitFor(() => expect(root.querySelector("button.open-track")).not.toBeNull());
+    root.querySelector<HTMLButtonElement>("button.open-track")!.click();
+    expect(root.querySelector("section.track-detail")?.getAttribute("data-state")).toBe("ready");
+    expect(root.querySelector("section.track-detail")!.textContent).toContain("Alpha");
+    root.querySelector<HTMLButtonElement>("section.track-detail button.add-source")!.click();
+    expect(root.querySelector("section.source-add")).not.toBeNull();
+    expect(root.querySelector("section.track-detail")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.source-add button.cancel")!.click();
+    expect(root.querySelector("section.track-detail")).not.toBeNull();
+    expect(root.querySelector("section.source-add")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.track-detail button.quiz")!.click();
+    expect(root.querySelector("section.quiz-run")).not.toBeNull();
+    expect(root.querySelector("section.track-detail")).toBeNull();
+    root.querySelector<HTMLButtonElement>("section.quiz-run button.stop")!.click();
+    expect(root.querySelector("section.track-detail")).not.toBeNull();
+    expect(root.querySelector("section.quiz-run")).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import type {
   DecisionPoint,
   EnqueueResponse,
   ExamResult,
+  MiniQuestion,
   PointIn,
   Track,
   TrackIn,
@@ -53,6 +54,11 @@ export function addDecisionPoint(client: CoreClient, trackId: number, input: Poi
 export async function addQuizSource(client: CoreClient, url: string): Promise<number> {
   const res = await client.request<EnqueueResponse>("POST", "/quiz/sources", { url });
   return res.id;
+}
+
+/** `GET /quiz/mini`: up to five cached quiz questions, without the answer index. */
+export function miniQuiz(client: CoreClient): Promise<MiniQuestion[]> {
+  return client.request<MiniQuestion[]>("GET", "/quiz/mini");
 }
 
 /** `POST /exams/import`: store an exam result JSON as pending; changes no mark. */

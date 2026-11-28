@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { scanBlocks } from "../src/scanner";
-import { applyHighlights, clearHighlights, CLASS_KNOWN, CLASS_NEW, STYLE_ID } from "../src/highlight";
+import { applyHighlights, clearHighlights, CLASS_KNOWN, CLASS_NEW, highlightItem, STYLE_ID } from "../src/highlight";
 import type { HighlightResult } from "../src/highlight";
+import type { ScanConceptItem } from "../src/coreClientTypes";
 
 const LONG = "This paragraph has plenty of readable words in it.";
 const LONG2 = "The second section also carries enough words to pass.";
@@ -70,6 +71,94 @@ describe("applyHighlights", () => {
     applyHighlights(doc, [{ blockId: "b0", topic: TOPIC, known: true }]);
     expect(blockEl(doc, "b0").classList.contains(CLASS_KNOWN)).toBe(true);
     expect(blockEl(doc, "b0").classList.contains(CLASS_NEW)).toBe(false);
+  });
+});
+
+function concept(word: string, conceptId: number | null): ScanConceptItem {
+  return { word, conceptId, label: word, definition: "", state: "new", candidates: [] };
+}
+
+describe("concept word spans", () => {
+  it("wraps every occurrence of a concept word in a .hl span with its concept id", () => {
+    const doc = docOf(`<p>${LONG} Generics help. Then generics again, Generics!</p>`);
+    scanBlocks(doc);
+    const text = doc.body.textContent;
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: false, concepts: [concept("Generics", 7)] },
+    ]);
+    const spans = blockEl(doc, "b0").querySelectorAll<HTMLElement>("span.hl");
+    expect(spans).toHaveLength(2);
+    expect(spans[0].textContent).toBe("Generics");
+    expect(spans[0].getAttribute("data-kata-concept")).toBe("7");
+    expect(highlightItem(spans[0])?.word).toBe("Generics");
+    expect(doc.body.textContent).toBe(text);
+  });
+
+  it("wraps a word that occurs twice in one block", () => {
+    const doc = docOf(`<p>${LONG} ${LONG}</p>`);
+    scanBlocks(doc);
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: true, concepts: [concept("words", 3)] },
+    ]);
+    expect(blockEl(doc, "b0").querySelectorAll("span.hl")).toHaveLength(2);
+  });
+
+  it("adds no span for a concept word absent from the block", () => {
+    const doc = pageWithBlocks();
+    const before = blockEl(doc, "b0").innerHTML;
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: true, concepts: [concept("Quantum", 9)] },
+    ]);
+    expect(blockEl(doc, "b0").querySelectorAll("span.hl")).toHaveLength(0);
+    expect(blockEl(doc, "b0").innerHTML).toBe(before);
+  });
+
+  it("does not wrap a word inside another word", () => {
+    const doc = docOf(`<p>${LONG} Generics and Genericsx here</p>`);
+    scanBlocks(doc);
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: true, concepts: [concept("Generics", 1)] },
+    ]);
+    expect(blockEl(doc, "b0").querySelectorAll("span.hl")).toHaveLength(1);
+  });
+
+  it("wraps a concept word inside a link and keeps the link", () => {
+    const doc = docOf(`<p>${LONG} <a href="#x">Generics</a></p>`);
+    scanBlocks(doc);
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: true, concepts: [concept("Generics", 2)] },
+    ]);
+    const links = blockEl(doc, "b0").querySelectorAll("a");
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("#x");
+    const spans = links[0].querySelectorAll("span.hl");
+    expect(spans).toHaveLength(1);
+    expect(spans[0].textContent).toBe("Generics");
+  });
+
+  it("leaves a page's own span.hl untouched through apply and clear", () => {
+    const doc = docOf(`<p>${LONG} <span class="hl">x</span> Generics</p>`);
+    scanBlocks(doc);
+    const original = doc.body.innerHTML;
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: true, concepts: [concept("Generics", 1)] },
+    ]);
+    expect(doc.querySelectorAll("span.hl")).toHaveLength(2);
+    clearHighlights(doc);
+    expect(doc.body.innerHTML).toBe(original);
+  });
+
+  it("clear after apply removes every word span and restores the markup", () => {
+    const doc = docOf(`<p>${LONG} Generics and <a href="#x">Generics</a> again</p>`);
+    scanBlocks(doc);
+    const original = doc.body.innerHTML;
+    applyHighlights(doc, [
+      { blockId: "b0", topic: TOPIC, known: false, concepts: [concept("Generics", 1)] },
+    ]);
+    expect(doc.querySelectorAll("span.hl")).toHaveLength(2);
+    clearHighlights(doc);
+    expect(doc.querySelectorAll("span.hl")).toHaveLength(0);
+    expect(doc.body.innerHTML).toBe(original);
   });
 });
 

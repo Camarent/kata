@@ -252,6 +252,18 @@ describe("ignored list", () => {
     expect(allText(screen)).not.toContain(TEXT_IGNORED_LIST[7]);
   });
 
+  it("shows the restore-failed line and keeps the row when the client rejects", async () => {
+    const client = { ignoreConcept: vi.fn(), unignoreConcept: vi.fn().mockRejectedValue(new Error("down")) };
+    const row = { conceptId: 4, label: "decimals", kind: "word" as const };
+    const screen = renderIgnoredList({ rows: [row] }, ignoredClientHandlers(client, vi.fn()));
+    buttonNamed(screen, TEXT_IGNORED_LIST[3]).click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.unignoreConcept).toHaveBeenCalledWith(4);
+    expect(allText(screen)).toContain(TEXT_IGNORED_LIST[8]);
+    expect(allText(screen)).toContain("decimals");
+    expect(allText(screen)).not.toContain(TEXT_IGNORED_LIST[7]);
+  });
+
   it("keeps the Restored line when the Undo handler rejects, without an unhandled rejection", async () => {
     const onUndo = vi.fn().mockRejectedValue(new Error("down"));
     const row = { conceptId: 4, label: "decimals", kind: "word" as const };

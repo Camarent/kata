@@ -1,0 +1,90 @@
+"""A stub core server for browser tests: serves JSON for the /v1 routes a test passes in.
+
+The extension talks to the core over HTTP; a browser test points the extension at this stub instead
+of a real core. Routes are data: the test maps a path (for example "/v1/courses") to the JSON body
+it wants answered, and every other path gets a 404. Nothing here reaches beyond 127.0.0.1.
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+
+STUB_HOST = "127.0.0.1"
+NOT_FOUND = 404
+JSON_TYPE = "application/json"
+SHUTDOWN_JOIN_SECONDS = 10
+
+
+def _handler_for(
+    routes: Mapping[str, Any], received: list[str] | None, bodies: list[str] | None = None
+) -> type[BaseHTTPRequestHandler]:
+    """A request handler class that answers each routed path with its JSON body.
+
+    When `received` is given, every request is appended to it as "METHOD /path" so a test can assert
+    that the extension sent it. `bodies` gets the raw request body of each request, in the same order.
+    """
+
+    class _StubHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self._answer()
+
+        def do_POST(self) -> None:
+            self._answer()
+
+        def do_PUT(self) -> None:
+            self._answer()
+
+        def do_DELETE(self) -> None:
+            self._answer()
+
+        def _answer(self) -> None:
+            path = self.path.split("?", 1)[0]
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length).decode("utf-8") if length else ""
+            if bodies is not None:
+                bodies.append(raw)
+            if received is not None:
+                received.append(f"{self.command} {path}")
+            if path not in routes:
+                self.send_response(NOT_FOUND)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            # A route may be a callable that returns the body per request, so a test can answer a later GET differently.
+            reply = routes[path]
+            body = json.dumps(reply() if callable(reply) else reply).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", JSON_TYPE)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+    return _StubHandler
+
+
+@contextmanager
+def stub_core(
+    routes: Mapping[str, Any], received: list[str] | None = None, bodies: list[str] | None = None
+) -> Generator[str]:
+    """Serve routes on 127.0.0.1 port 0 for the duration of the with-block; yield the base URL.
+
+    `received` (optional) collects the "METHOD /path" of every request, `bodies` the raw body of each
+    request in the same order, see _handler_for.
+    """
+    server = ThreadingHTTPServer((STUB_HOST, 0), _handler_for(routes, received, bodies))
+    thread = threading.Thread(target=server.serve_forever, name="stub-core", daemon=True)
+    thread.start()
+    try:
+        yield f"http://{STUB_HOST}:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=SHUTDOWN_JOIN_SECONDS)

@@ -15,10 +15,14 @@ import type {
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import type { IgnoredListHandlers } from "./ui/panel/ignoredList";
+import type { ExamEntryHandlers } from "./ui/panel/examEntry";
+import type { ExamResultHandlers } from "./ui/panel/examResult";
 import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey } from "./ui/panel/tracksTab";
 import type { TrackDetailHandlers } from "./ui/panel/trackDetail";
 import type { TrackCreateHandlers } from "./ui/panel/trackCreate";
+import type { SourceAddHandlers } from "./ui/panel/sourceAdd";
+import type { QuizRunActions } from "./ui/panel/quizRun";
 
 /** A readable block of page text, optionally bound to its DOM element. */
 export interface Block {
@@ -66,6 +70,8 @@ export interface PanelHandlers {
   onSetConcept: (conceptId: number, state: ReviewState) => Promise<void>;
   onCloseReview: () => void;
   onOpenCourse: (courseId: number) => Promise<void>;
+  /** Back from the course page to the Courses list. */
+  onCloseCourse?: () => void;
   onDeleteCourse: (courseId: number) => Promise<void>;
   onCreateCourse: (title: string) => Promise<void>;
   onRegenerateCourse: (courseId: number) => Promise<void>;
@@ -96,12 +102,22 @@ export interface PanelHandlers {
   trackDetail?: TrackDetailHandlers;
   /** Create-track form: save and cancel; the panel draws it when the Tracks tab chose New track. */
   trackCreate?: TrackCreateHandlers;
+  /** Add-source screen the track detail opened: its submit and cancel; the panel draws it over the detail. */
+  sourceAdd?: SourceAddHandlers;
+  /** Quiz run screen the track detail opened: stop and finish return to the detail. */
+  quizRun?: QuizRunActions;
   /** Tracks tab: the user changed the sort key; the panel re-sorts the rows it holds. */
   onSortTracks?: (sort: TrackSortKey) => void;
   /** Tracks tab: the user opened one track; the panel draws its detail screen when it has one. */
   onOpenTrack?: (trackId: number) => void;
   /** Tracks tab: the user chose New track; the panel draws the create screen when it has one. */
   onNewTrack?: () => void;
+  /** Exam entry screen actions (save imports the result, cancel returns to the settings home). */
+  examEntry?: ExamEntryHandlers;
+  /** Exam result screen actions (Done confirms the right answers). */
+  examResult?: ExamResultHandlers;
+  /** Settings tab: the user chose Enter exam result. */
+  onOpenExamEntry?: () => void;
   /** Settings home: the user opened one settings page; the panel draws it when it has a screen for it. */
   onOpenSettingsPage?: (page: SettingsPage) => void | Promise<void>;
   /** Feed tabs: aliases, page summary, jokes and concept views; each sends one panel message. */

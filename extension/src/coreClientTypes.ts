@@ -95,6 +95,8 @@ export interface CourseSummary {
   title: string;
   status: string;
   concept_ids: number[];
+  /** Course version; a regenerated course is version 2 or higher. */
+  version: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -183,6 +185,13 @@ export type BlockState = "new" | "learning" | "known" | "mixed";
 export interface IgnoredConcept {
   concept_id: number;
   label: string;
+}
+
+/** One named list of the caller (`GET /v1/lists`): its id, its name and how many concepts it holds. */
+export interface NamedList {
+  id: number;
+  name: string;
+  item_count: number;
 }
 
 /** One alias of a concept (`GET`/`POST /concepts/{id}/aliases`); `private` when the caller owns it. */
@@ -279,6 +288,16 @@ export interface DecisionPoint {
 /** Reply of `POST /quiz/sources` (202): the id of the queued job. */
 export interface EnqueueResponse {
   id: number;
+}
+
+/** One item of `GET /quiz/mini` (no answer index): the question, its choices and the source link. */
+export interface MiniQuestion {
+  id: number;
+  question: string;
+  choices: string[];
+  source_url: string;
+  tier: number;
+  licence: string;
 }
 
 /** One concept checked in an exam result (`ExamConceptOut`). */

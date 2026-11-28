@@ -22,11 +22,21 @@ are in [`design/extension-ui.md`](design/extension-ui.md), section 9; the decisi
 [`decisions.md`](decisions.md). The UI modules are listed in [`modules/extension.md`](modules/extension.md).
 
 Open:
-- Unmounted, pending owner decision (no importer outside its group): the page overlays
-  `extension/src/ui/overlay/hlMenu.ts` (hover menu), `whichOne.ts`, `blockMenu.ts`, `imageMenu.ts`,
-  `listPicker.ts`, `quizPin.ts`; the exam screens `extension/src/ui/panel/examRun.ts` and
-  `extension/src/ui/panel/examResult.ts`; the course page `extension/src/ui/panel/coursePage.ts`.
-- Unwired track handlers (no-op stubs in `extension/src/sidepanelBoot.ts`): `onAddSource` and `onQuiz` (trackDetail), `onCreate` (trackCreate).
+- Still unmounted (no importer outside its group): the exam run screen `extension/src/ui/panel/examRun.ts`
+  (the core has no route that starts an exam run yet). The six page overlays are mounted by
+  `extension/src/overlayHost.ts` (`whichOne.ts` is opened from the hover menu `hlMenu.ts`).
+  The course page `extension/src/ui/panel/coursePage.ts` is mounted from Open course on the courses tab
+  (task-18, `renderCoursesView` in `extension/src/sidepanel.ts`, boot in `extension/src/sidepanelBoot.ts`).
+  The exam result screen `extension/src/ui/panel/examResult.ts` is mounted in the panel.
+- Track create: Save (`trackCreateHandlers` `onCreate` in `extension/src/sidepanelTracks.ts`) sends `panel:createTrack` with name and deadline, then reloads the Tracks list; a refused save shows the form's error line. Add source and Quiz open their screens.
+- Track detail loads the real track (name, deadline, items as sources). The core `Track` has no goal, progress, velocity, finishEarly, tooSlow or dropReason, so `trackDetailView` in `extension/src/sidepanelTracks.ts` gives them neutral empty values: open work, needs core fields.
+- Quiz pin: its onStart sends `panel:miniQuiz` (`extension/src/overlayHost.ts:210`) and shows no result; the
+  quiz result is not shown yet.
+- Image action: `panel:imageAction` returns `ok:false` (`extension/src/backgroundPanel.ts:82`), so the image
+  menu action is a dead end. Errors are swallowed at `extension/src/overlayHost.ts:129`, `:211` and `:249`.
+- Block menu: bulk buttons are unwired (`extension/src/overlayHost.ts:116`) and New list is hidden (`extension/src/overlayHost.ts:93`).
+- No-op handlers (do nothing when called): `onPasteText`, `onChooseFile`, `onUsePage`, `onUseCourse`,
+  `onAddSource` (`sourceAdd` handlers in `extension/src/sidepanelBoot.ts`), `onNext` (`quizRun` handlers in `extension/src/sidepanelBoot.ts`), and `onGenerate` (`extension/src/sidepanel.ts:295`).
 
 ## Later
 

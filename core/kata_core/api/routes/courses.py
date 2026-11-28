@@ -66,6 +66,7 @@ class CourseOut(BaseModel):
     error: str | None
     created_at: str
     updated_at: str
+    version: int  # the course version: 1 when created, +1 per regenerate
 
 
 class CourseAcceptedOut(CourseOut):
@@ -100,6 +101,7 @@ def _course_out(course: Course) -> CourseOut:
         error=course.error,
         created_at=course.created_at.isoformat(),
         updated_at=course.updated_at.isoformat(),
+        version=course.version,
     )
 
 

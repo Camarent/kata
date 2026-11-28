@@ -5,14 +5,20 @@ import type { ModelhostEngine } from "./coreClient";
 import type { Session } from "./types";
 import { button, el } from "./ui/dom";
 import { SCAN_RESULTS_TEXT } from "./ui/strings";
+import type { ExamResult } from "./coreClientTypes";
 import { renderConnection, type ConnectionDetailProps } from "./ui/panel/connection";
 import type { IgnoredRowView } from "./ui/panel/ignoredList";
 import type { QueuedMarkView } from "./ui/panel/offlineQueue";
 import type { SettingsPage } from "./ui/panel/settingsHome";
+import type { TrackDetailView } from "./ui/panel/trackDetail";
 import type { TrackSortKey, TracksTabProps } from "./ui/panel/tracksTab";
 import { routeScreen } from "./ui/panel/router";
-import type { ScanResultsStatus } from "./ui/panel/scanResults";
+import type { ScanResultRow, ScanResultsStatus } from "./ui/panel/scanResults";
 import { ERROR_TEXT, SCANNING_TEXT, partialText } from "./ui/panel/statusText";
+
+/** Panel-only exam texts: the Settings button that opens the entry form, and the score line label. */
+const EXAM_ENTRY_OPEN = "Enter exam result";
+const EXAM_SCORE_LABEL = "Score:";
 
 /** Group heading for rows whose block has no topic. */
 const UNTAGGED = "untagged";
@@ -33,8 +39,15 @@ type PanelStatus =
   | { kind: "error"; reason: "timeout" | "auth" | "failed" }
   | { kind: "notice"; text: string };
 
-/** A track screen the Tracks tab opened: the detail of one track, or the create form. */
-export type TrackScreen = { kind: "detail"; trackId: number } | { kind: "create" };
+/**
+ * A track screen the Tracks tab opened: the detail of one track, the create form, or the add-source
+ * and quiz screens the detail opened for that track.
+ */
+export type TrackScreen =
+  | { kind: "detail"; trackId: number }
+  | { kind: "create" }
+  | { kind: "source-add"; trackId: number }
+  | { kind: "quiz"; trackId: number };
 
 /**
  * Everything the panel draws. `session` null means signed out. `changing` true shows the
@@ -55,16 +68,22 @@ export interface PanelState {
   courseLimit?: number;
   /** Courses counted against the limit; defaults to the number of listed courses. */
   courseTotal?: number;
+  /** Course the Courses tab opened: its course page replaces the list; null or unset shows the list. */
+  coursePage?: { title: string; version: number } | null;
   /** Server link and unsynced count; when set, the connection detail shows under the header. */
   link?: ConnectionDetailProps;
   /** Marks waiting in the offline queue; non-null means the Not synced marks screen. */
   queue?: QueuedMarkView[] | null;
   /** Tracks tab state and rows; unset means still loading. */
   tracks?: TracksTabProps;
+  /** Loaded tracks by id for the detail screen; a track missing here shows the detail's loading state. */
+  trackViews?: Record<number, TrackDetailView>;
   /** Track screen the Tracks tab opened: one track's detail, or the create form; null or unset shows the list. */
   trackScreen?: TrackScreen | null;
   /** Settings page drawn in place of the settings home; null or unset shows the home. */
   settingsPage?: SettingsPage | null;
+  /** Exam screen the Settings tab opened: the entry form (failed after a refused save) or a stored result. */
+  examScreen?: { kind: "entry"; failed: boolean } | { kind: "result"; result: ExamResult; confirmFailed?: boolean } | null;
   /** Ignored concepts for the ignored list page. */
   ignored?: IgnoredRowView[];
 }
@@ -240,13 +259,18 @@ function renderTabBar(current: PanelTab, handlers: PanelHandlers): HTMLElement {
   return bar;
 }
 
+/** Scan-results row for one panel row: its topic label (or the untagged reason) and known/new state. */
+function scanResultRow(row: PanelRow): ScanResultRow {
+  return { label: row.topic?.label ?? row.reason ?? "no topic", state: row.known === true ? "known" : "new" };
+}
+
 /** Scan tab: the scan-results screen, the status line, then the grouped rows with "I know this". */
 function renderScanTab(state: PanelState, handlers: PanelHandlers): HTMLElement {
   const tab = el("div", undefined, "scan-tab");
   const scanning = state.status.kind === "scanning";
   const empty = state.rows.length === 0 && state.status.kind === "idle";
   const status: ScanResultsStatus = scanning ? "loading" : empty ? "empty" : "ready";
-  const screen = routeScreen("scan-results", { status, rows: [] }, handlers);
+  const screen = routeScreen("scan-results", { status, rows: state.rows.map(scanResultRow) }, handlers);
   // A scan in flight disables the button; the boot script also ignores a second call.
   const scanButton = screen.querySelector<HTMLButtonElement>("button.scan-page");
   if (scanButton !== null) scanButton.disabled = scanning;
@@ -255,8 +279,13 @@ function renderScanTab(state: PanelState, handlers: PanelHandlers): HTMLElement 
   return tab;
 }
 
-/** Courses tab: the ready courses with Open course and Delete; Generate course is fed by the courses task. */
+/** Courses tab: the ready courses with Open course and Delete; Generate course is fed by the courses task. Open course shows the course page. */
 function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElement {
+  if (state.coursePage) {
+    // The course items are not in the core course list yet, so the page lists none.
+    const page = { ...state.coursePage, items: [], loadFailed: false, onBack: () => handlers.onCloseCourse?.() };
+    return routeScreen("course-page", page, undefined);
+  }
   const props = {
     courses: state.courses ?? [],
     courseLimit: state.courseLimit,
@@ -271,8 +300,16 @@ function renderCoursesView(state: PanelState, handlers: PanelHandlers): HTMLElem
 /** Tracks tab: the state the panel holds (loading until the panel:tracks reply arrives), with its rows. */
 function renderTracksView(state: PanelState, handlers: PanelHandlers): HTMLElement {
   if (state.trackScreen?.kind === "detail" && handlers.trackDetail !== undefined) {
-    // The track data is not loaded yet, so the detail stays in its loading state.
-    return routeScreen("track-detail", { state: "loading", track: null }, handlers.trackDetail);
+    const track = state.trackViews?.[state.trackScreen.trackId] ?? null;
+    const props = track === null ? { state: "loading" as const, track } : { state: "ready" as const, track };
+    return routeScreen("track-detail", props, handlers.trackDetail);
+  }
+  if (state.trackScreen?.kind === "source-add" && handlers.sourceAdd !== undefined) {
+    return routeScreen("source-add", { status: "idle" }, handlers.sourceAdd);
+  }
+  if (state.trackScreen?.kind === "quiz" && handlers.quizRun !== undefined) {
+    // No quiz questions are loaded yet, so the run shows its loading line.
+    return routeScreen("quiz-run", { state: "loading", index: 0, total: 0 }, handlers.quizRun);
   }
   if (state.trackScreen?.kind === "create" && handlers.trackCreate !== undefined) {
     return routeScreen("track-create", { state: "form" }, handlers.trackCreate);
@@ -293,10 +330,22 @@ function renderSettingsView(state: PanelState, handlers: PanelHandlers): HTMLEle
     tab.append(routeScreen("ignored-list", { rows: state.ignored ?? [] }, handlers.ignoredList));
     return tab;
   }
+  if (state.examScreen?.kind === "entry" && handlers.examEntry !== undefined) {
+    tab.append(routeScreen("exam-result-entry", { failed: state.examScreen.failed }, handlers.examEntry));
+    return tab;
+  }
+  if (state.examScreen?.kind === "result" && handlers.examResult !== undefined) {
+    const { result, confirmFailed } = state.examScreen;
+    tab.append(routeScreen("exam-result", { result, failed: confirmFailed === true }, handlers.examResult));
+    if (result.score !== null) tab.append(el("p", `${EXAM_SCORE_LABEL} ${Math.round(result.score * 100)}%`, "exam-score"));
+    return tab;
+  }
   const open = (page: SettingsPage) => {
     void handlers.onOpenSettingsPage?.(page);
   };
   tab.append(routeScreen("settings-home", undefined, { onOpen: open }), renderLocalModel(handlers));
+  const onOpenExamEntry = handlers.onOpenExamEntry;
+  if (onOpenExamEntry !== undefined) tab.append(button(EXAM_ENTRY_OPEN, () => onOpenExamEntry(), "open-exam-entry"));
   return tab;
 }
 

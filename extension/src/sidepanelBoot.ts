@@ -15,25 +15,18 @@ import type {
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import { validateServerUrl } from "./serverUrl";
-import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
+import { ignoredClientHandlers } from "./ui/panel/ignoredList";
+import { ignoredClient, openIgnoredPage, refreshIgnored } from "./sidepanelIgnored";
 import type { SettingsPage } from "./ui/panel/settingsHome";
-import type { TrackRowView, TrackSortKey } from "./ui/panel/tracksTab";
+import type { TrackSortKey } from "./ui/panel/tracksTab";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
+import { loadTrackList, sortTrackRows, trackCreateHandlers, trackScreenNav } from "./sidepanelTracks";
+import { closeCourse } from "./sidepanelCourse";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
 export interface OriginsRequest {
   origins: string[];
-}
-
-/** One track as the Tracks tab draws it. The core sends no progress or pace, so the status stands in for progress. */
-function trackRowView(track: Track): TrackRowView {
-  return { id: track.id, name: track.name, progress: track.status, tooSlow: false };
-}
-
-/** Rows in the order the sort key asks for; only the name sort reorders, the others keep the core order. */
-function sortTrackRows(rows: TrackRowView[], sort: TrackSortKey): TrackRowView[] {
-  return sort === "name" ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
 }
 
 /** The part of `chrome` the side panel page uses; tests pass a fake with these members. */
@@ -91,7 +84,9 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     state.review = null;
     state.courses = [];
     state.coursesFailed = false;
+    state.coursePage = null;
     state.tracks = undefined;
+    state.trackViews = undefined;
     state.settingsPage = null;
     state.tab = "scan";
     state.status = { kind: "idle" };
@@ -108,47 +103,19 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   };
 
   /** Tracks for the Tracks tab from the panel:tracks reply; a refused list shows the could-not-load state. */
-  const loadTracks = async (): Promise<void> => {
-    const sort = state.tracks?.sort ?? "name";
-    state.tracks = { state: "loading", rows: [], sort };
-    draw();
-    try {
-      const page = await send<TrackPage>({ type: "panel:tracks" });
-      const rows = page.items.map(trackRowView);
-      state.tracks = { state: rows.length === 0 ? "empty" : "ready", rows: sortTrackRows(rows, sort), sort };
-    } catch {
-      state.tracks = { state: "error", rows: [], sort };
-    }
-    draw();
-  };
+  const loadTracks = (): Promise<void> => loadTrackList(state, send, draw);
 
-  /** Ignored concepts for the ignored list page, from the panel:ignored reply. */
-  const loadIgnored = async (): Promise<void> => {
-    const list = await send<IgnoredConcept[]>({ type: "panel:ignored" });
-    state.ignored = list.map((concept): IgnoredRowView => ({ conceptId: concept.concept_id, label: concept.label }));
-  };
-
-  /** The two ignored calls the ignored list makes, each as one panel message. */
-  const ignoredClient: IgnoredClient = {
-    ignoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
-    unignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
-  };
-
-  /** After Restore or Undo the ignored list page reloads its rows from the core. */
-  const refreshIgnored = async (): Promise<void> => {
-    await loadIgnored();
-    draw();
-  };
-
-  /** Back from a track screen to the Tracks list. */
-  const backFromTrack = (): void => {
-    state.trackScreen = null;
-    draw();
-  };
+  const { backFromTrack, openFromDetail, backToDetail } = trackScreenNav(state, draw);
 
   /** Back from the ignored list page to the settings home. */
   const backToSettings = (): void => {
     state.settingsPage = null;
+    draw();
+  };
+
+  /** Back from an exam screen to the settings home. */
+  const closeExam = (): void => {
+    state.examScreen = null;
     draw();
   };
 
@@ -242,6 +209,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
       state.review = null;
       state.tab = tab;
       state.settingsPage = null;
+      state.examScreen = null;
       if (tab === "tracks") {
         await loadTracks();
         return;
@@ -258,14 +226,50 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onOpenSettingsPage(page: SettingsPage) {
       // Only the ignored list page has a screen so far; the other settings pages keep the home.
       if (page !== "ignored") return;
-      try {
-        await loadIgnored();
-      } catch {
-        // The list did not load: the settings home stays drawn.
-        return;
-      }
-      state.settingsPage = "ignored";
+      await openIgnoredPage(state, send, draw);
+    },
+
+    onOpenExamEntry() {
+      state.examScreen = { kind: "entry", failed: false };
       draw();
+    },
+
+    examEntry: {
+      async onSave(input) {
+        // The score field is a percentage from 0 to 100 ("85"); the core takes a fraction from 0 to 1.
+        // A blank score is refused: Number("") is 0, which would store a 0% result.
+        const trimmed = input.score.trim();
+        const percent = trimmed === "" ? Number.NaN : Number(trimmed);
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100 || input.date === "") {
+          throw new Error("invalid exam result");
+        }
+        const payload = JSON.stringify({
+          origin: "page",
+          taken_at: `${input.date}T00:00:00Z`,
+          passed: input.passed,
+          score: percent / 100,
+          concepts: [],
+        });
+        const result = await send<ExamResult>({ type: "panel:importExamResult", payload });
+        state.examScreen = { kind: "result", result };
+        draw();
+      },
+      onCancel: closeExam,
+    },
+
+    examResult: {
+      onConfirm(conceptIds) {
+        const shown = state.examScreen;
+        if (shown?.kind !== "result") return;
+        // A refused confirm keeps the result screen with an error line; Done can be pressed again.
+        void send<ExamResult>({ type: "panel:confirmExamResult", resultId: shown.result.id, conceptIds }).then(
+          closeExam,
+          () => {
+            state.examScreen = { kind: "result", result: shown.result, confirmFailed: true };
+            draw();
+          },
+        );
+      },
     },
 
     onOpenTrack(trackId: number) {
@@ -303,7 +307,12 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onOpenCourse(courseId: number) {
       const reply = await api.runtime.sendMessage({ type: "panel:openCourse", courseId });
       if (!reply.ok) throw new Error(reply.error);
+      const course = state.courses?.find((listed) => listed.id === courseId);
+      if (course === undefined) return;
+      state.coursePage = { title: course.title, version: course.version };
+      draw();
     },
+    onCloseCourse: () => closeCourse(state, draw),
     async onCreateCourse(title: string) {
       const reply = await api.runtime.sendMessage({ type: "panel:createCourse", title });
       // A core refusal keeps its status and code so the panel can show the matching text.
@@ -351,18 +360,32 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
-    ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
+    ignoredList: ignoredClientHandlers(
+      ignoredClient(send),
+      () => refreshIgnored(state, send, draw),
+      backToSettings,
+    ),
     trackDetail: {
       onBack: backFromTrack,
-      // Add source and Quiz are not wired yet: the detail only routes here.
+      onAddSource: () => openFromDetail("source-add"),
+      onQuiz: () => openFromDetail("quiz"),
+    },
+    sourceAdd: {
+      // Paste, file, page, course and the submit are not wired yet: the screen only routes here.
+      onPasteText: () => {},
+      onChooseFile: () => {},
+      onUsePage: () => {},
+      onUseCourse: () => {},
       onAddSource: () => {},
-      onQuiz: () => {},
+      onCancel: backToDetail,
     },
-    trackCreate: {
-      // Save is not wired yet: the form only routes here.
-      onCreate: () => {},
-      onCancel: backFromTrack,
+    quizRun: {
+      // Next is not wired yet: the run shows no questions until the quiz loads.
+      onNext: () => {},
+      onFinish: backToDetail,
+      onStop: backToDetail,
     },
+    trackCreate: trackCreateHandlers({ state, send, loadTracks, onCancel: backFromTrack }),
     onListConceptAliases: (conceptId) => send<ConceptAlias[]>({ type: "panel:listConceptAliases", conceptId }),
     onAddConceptAlias: (conceptId, alias) => send<ConceptAlias>({ type: "panel:addConceptAlias", conceptId, alias }),
     onMarkConceptViewed: (conceptId) => send<void>({ type: "panel:markConceptViewed", conceptId }),

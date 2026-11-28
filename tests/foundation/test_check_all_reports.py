@@ -41,7 +41,7 @@ def test_jscpd_report_runs_in_full_mode_and_never_fails_the_gate():
     # The jscpd command must not go through step(), which exits 1 on failure.
     assert "step " not in lines[0]
     assert "|| echo" in text
-    assert "full)  start_postgres; run_lint; run_smoke; run_tests -m 'not flaky and not browser'; run_extension; run_editor; run_reports ;;" in text
+    assert "full)  start_postgres; run_lint; run_smoke; build_extension; prepare_browser; run_parallel pytest=run_full_tests extension=run_extension_tests editor=run_editor browser=run_browser; run_reports ;;" in text
     py_arm = _lines_with(text, "  py)")
     assert len(py_arm) == 1
     assert "run_reports" not in py_arm[0]
@@ -62,8 +62,8 @@ def test_editor_mode_is_a_flag_and_runs_in_full_merge_and_ext():
     assert "--ext|--editor|--setup|--browser)" in text
     assert "  editor) run_editor ;;" in text
     assert "  ext)   run_extension; run_editor ;;" in text
-    assert "merge) start_postgres; run_tests -m 'not e2e and not browser'; run_extension; run_editor ;;" in text
-    assert "run_extension; run_editor; run_reports ;;" in text
+    assert "merge) start_postgres; build_extension; prepare_browser; run_parallel pytest=run_merge_tests extension=run_extension_tests editor=run_editor browser=run_browser ;;" in text
+    assert "run_merge_tests() { run_tests -m 'not e2e and not browser'; }" in text
 
 
 def test_editor_flag_cannot_combine_with_ext():

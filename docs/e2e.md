@@ -60,7 +60,7 @@ Test files:
 Prerequisites:
 
 - **Browser install.** `scripts/dev/install-browsers.sh` installs Firefox 140.0esr and geckodriver 0.36.0 into `$KATA_BROWSERS_DIR` (default `$HOME/.cache/kata-browsers`), with sha256 checks. Run it once; `scripts/dev/install-browsers.sh --status` checks it with no network. Chrome and chromedriver are not installed by the script: they are looked up on `PATH`.
-- **Selenium** from `requirements-browser.txt`. `check-all.sh --browser` installs it into `.venv`.
+- **Selenium** and `pytest-xdist` from `requirements-browser.txt`. `check-all.sh --browser` installs it into `.venv`.
 - **Built extension.** `npm run build` in `extension/` writes `extension/dist/firefox/` and `extension/dist/chrome/`. A missing build fails the Browser test, it does not skip.
 - **No Postgres** is needed.
 
@@ -72,13 +72,15 @@ scripts/dev/check-all.sh --browser
 
 To run only the browser tests by hand: `.venv/bin/python -m pytest tests/browser -m browser`.
 
+`check-all.sh --browser` runs them with `-n auto --maxprocesses 4` (`BROWSER_MAX_WORKERS` in `check-all.sh`). Each `driver` case owns its Firefox profile or Chrome `--user-data-dir`, its driver port and its temp dir; all are removed at teardown. The Chrome copy of the extension grants `http://127.0.0.1/*` in its manifest, since headless Chrome never answers `permissions.request`.
+
 Skip behaviour:
 
 - With no Firefox or geckodriver in the install, `check-all.sh --browser` prints `check-all: browser tests skipped: ...` and exits 0. Each Firefox case skips with a reason too.
 - A Chrome case skips with a reason when `google-chrome`, `chromium` or `chromedriver` is not on `PATH`.
 - A skip is not a pass. Read the skip lines of `pytest tests/browser -m browser -rs`; an all-skipped run is not a browser check.
 - The Chrome case has never run against a real Chrome. See `docs/decisions.md` for the open risk.
-- The browser marker is excluded from every other gate. CI and the default `check-all.sh` never run these tests.
+- The browser marker is excluded from `--unit`, `--py` and the smoke step, and from CI. The `--merge` and full modes run these tests as a concurrent job; without browsers that job prints the skip line and the run goes on.
 
 ## Notes
 

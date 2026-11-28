@@ -28,7 +28,7 @@ export interface RuntimeLike {
   onMessage: {
     addListener(listener: (message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => boolean | void): void;
   };
-  sendMessage(message: PageMutatedMessage): Promise<unknown>;
+  sendMessage(message: PageMutatedMessage | PanelMessage): Promise<unknown>;
 }
 
 /** Reply to a panel message: the result, or the error text; `status` and `code` are set when the core refused it (CoreHttpError). */
@@ -64,10 +64,11 @@ export interface ReviewRow {
   onPage?: boolean;
 }
 
-/** A ready course the panel can open: its id and title only. */
+/** A ready course the panel can open: its id, title and version. */
 export interface CourseLink {
   id: number;
   title: string;
+  version: number;
 }
 
 /** The Courses list: the ready courses, the course limit and the count against it. */
@@ -111,11 +112,14 @@ export type PanelMessage =
   | { type: "panel:deleteTrack"; trackId: number }
   | { type: "panel:addDecisionPoint"; trackId: number; input: PointIn }
   | { type: "panel:addQuizSource"; url: string }
+  | { type: "panel:miniQuiz" }
   | { type: "panel:importExamResult"; payload: string }
   | { type: "panel:confirmExamResult"; resultId: number; conceptIds: number[] }
   | { type: "panel:dismissExamResult"; resultId: number }
   | { type: "panel:ignored" }
   | { type: "panel:ignoreConcept"; conceptId: number }
+  | { type: "panel:imageAction"; label: string }
+  | { type: "panel:deleteConcept"; conceptId: number }
   | { type: "panel:unignoreConcept"; conceptId: number }
   | { type: "panel:markConceptViewed"; conceptId: number }
   | { type: "panel:listConceptAliases"; conceptId: number }
@@ -123,4 +127,6 @@ export type PanelMessage =
   | { type: "panel:requestSummary"; url: string; text: string }
   | { type: "panel:cachedSummary"; url: string; textSha256: string }
   | { type: "panel:nextJoke" }
-  | { type: "panel:listJokeSources" };
+  | { type: "panel:listJokeSources" }
+  | { type: "panel:lists" }
+  | { type: "panel:addToList"; listName: string; conceptIds: number[] };

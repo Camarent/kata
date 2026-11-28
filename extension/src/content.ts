@@ -2,7 +2,8 @@ import { applyHighlights, clearHighlights } from "./highlight";
 import { scanBlocks } from "./scanner";
 import type { StorageArea } from "./tokenStore";
 import { CARD_CSS } from "./ui/cardCss";
-import { mountCardHost, type CardHost, type CardRuntime } from "./cardHost";
+import { mountCardHost, type CardHost, type CardRuntime, type PageState } from "./cardHost";
+import { attachImageMenus, createOverlayHost, type OverlayHost } from "./overlayHost";
 import { mountPin, type Pin } from "./ui/card/pin";
 import { PinPositionStore } from "./ui/card/pinPosition";
 import type { ContentMessage, PageMutatedMessage, RuntimeLike, ScanResponse } from "./messages";
@@ -23,14 +24,20 @@ function watchPage(doc: Document, onChange: () => void, ignore?: Node): () => vo
 }
 
 /** Answers one content message against `doc`; unknown messages get no answer. */
-export function handleContentMessage(message: ContentMessage, doc: Document): ScanResponse | undefined {
+export function handleContentMessage(
+  message: ContentMessage,
+  doc: Document,
+  overlay?: OverlayHost,
+): ScanResponse | undefined {
   switch (message.type) {
     case "scan":
       return { blocks: scanBlocks(doc).map((block) => ({ id: block.id, text: block.text })) };
     case "highlight":
       applyHighlights(doc, message.results);
+      overlay?.attach(doc, message.results);
       return undefined;
     case "clear":
+      overlay?.clear();
       clearHighlights(doc);
       return undefined;
     case "watch":
@@ -48,8 +55,10 @@ function isContentMessage(message: unknown): message is ContentMessage {
 }
 
 /** Registers the page listener on the runtime; called once by the content script. */
-export function registerContentScript(runtime: RuntimeLike, doc: Document): void {
+export function registerContentScript(runtime: RuntimeLike, doc: Document, pageState?: () => PageState): void {
   let stopWatching: (() => void) | undefined;
+  const overlay = createOverlayHost(runtime, pageState);
+  attachImageMenus(doc, runtime);
   runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!isContentMessage(message)) return false;
     if (message.type === "watch" || message.type === "unwatch") {
@@ -63,7 +72,7 @@ export function registerContentScript(runtime: RuntimeLike, doc: Document): void
       sendResponse(undefined);
       return false;
     }
-    sendResponse(handleContentMessage(message, doc));
+    sendResponse(handleContentMessage(message, doc, overlay));
     return false;
   });
 }
@@ -79,9 +88,9 @@ interface FloatingUi {
 /**
  * Injects the card stylesheet into `doc`, mounts the floating pin at its stored position and the
  * page cards beside it. A pin button press opens the main card; after a scan the page is watched
- * and a change shows the page-changed prompt. The hover and block menus, image menu and list picker
- * need per-concept data and backend actions that are not wired on the page yet, so only the
- * page-changed overlay is mounted here.
+ * and a change shows the page-changed prompt. The hover menus on highlighted words are attached by
+ * the overlay host (registerContentScript), and so are the block menu and the image menu. The list
+ * picker opens from the block menu's "Add all to list" button.
  */
 export async function mountFloatingUi(doc: Document, storage: StorageArea, runtime: CardRuntime): Promise<FloatingUi> {
   const style = doc.createElement("style");
@@ -142,7 +151,14 @@ export async function mountFloatingUi(doc: Document, storage: StorageArea, runti
 
 // Content script entry: runs only where the extension runtime exists (not under tests).
 if (typeof chrome !== "undefined" && chrome.runtime) {
-  registerContentScript(chrome.runtime, document);
+  // The overlay reads focus mode and the core state from the floating cards once they are mounted.
+  let floating: FloatingUi | undefined;
+  const idle: PageState = { focusOn: false, offline: false };
+  registerContentScript(chrome.runtime, document, () => floating?.cards.pageState() ?? idle);
   // A failed mount is already cleaned up; the page works without the floating UI.
-  mountFloatingUi(document, chrome.storage.local, chrome.runtime).catch(() => undefined);
+  mountFloatingUi(document, chrome.storage.local, chrome.runtime)
+    .then((ui) => {
+      floating = ui;
+    })
+    .catch(() => undefined);
 }

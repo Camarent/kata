@@ -13,6 +13,8 @@ The gate levels must fit these wall-time limits:
 | merge | `scripts/dev/check-all.sh --merge` | 5 min (300 s) |
 | full | `scripts/dev/check-all.sh` | 9 min (540 s) |
 
+The merge and full levels run the browser tests as one concurrent job with pytest, the extension and the editor. The browser cases run under pytest-xdist, `-n auto` capped at 4 workers. The browser job runs only when Firefox and geckodriver are installed (`scripts/dev/install-browsers.sh`); otherwise it prints a skip line.
+
 ## Before
 
 Baseline taken after the cleanup-m25 tasks and before the speed task 16. Measured 2026-11-27.
@@ -44,7 +46,7 @@ set up by `--setup`. Load average was not sampled for these runs. The columns ma
 
 ## After
 
-Measured after task 16 on the same machine class, one bare run per level, no driver running.
+Measured after task 16 on the same machine class, one bare run per level.
 Each run was started from a plain subprocess call (wall time), and pytest's own clock is taken
 from the pytest summary line in the run log. "Other" is the wall time minus pytest and minus the
 smoke step (only the full level runs smoke). The table splits pytest from the rest; it does not
@@ -96,3 +98,46 @@ The slowest tests below are from the pre-speed `--py` run (see Before), not re-m
 
 The last line is a teardown phase, not a call phase. The list is pytest's output as printed.
 Pytest truncates long node ids with `...`.
+
+## Parallel gates
+
+This section records the gate wall times after the parallel speed-up (stage m25-finish, tasks 1
+and 2): the merge and full levels run their suites concurrently, and browser tests run under
+pytest-xdist.
+
+Which gate runs what:
+
+- The task gate runs the unit level plus the task's own tests. It does not run browser tests.
+- The full gate runs once, at the merge. It runs every suite, including the browser tests.
+- Browser tests run at merge and full level only. The unit level excludes them (`-m 'not browser'`).
+
+Machine class: 8-core Linux VM, integrated graphics only (no discrete GPU). Each
+after row is one run of `scripts/dev/check-all.sh` at that level (no flags beyond the level),
+wall time taken as the difference of `date +%s.%N` before and after the run. Load average is the
+1-minute value from `uptime` just before and just after the run. Other agent sessions shared the
+machine, so the load was 0.3 to 6.5 on 8 cores. The after rows were timed while a stage driver
+(`wave.py run --stage m25-finish`) was running on the same machine; the load average column
+records that contention.
+The before values for unit, merge and full are reused from the Before table (runs on checkout
+`f0f551e`); they were not re-timed for this section. The browser before is a serial run
+(`-n 0`) of the current tree, because the browser tests were serial before task 2. It was not
+load-sampled ("not sampled"), and the driver status during that run was not recorded, so it is
+unknown whether a stage driver was running then.
+
+| Level | Run | Wall time (s) | Target (s) | Load avg (1 min) | Note |
+|---|---|---|---|---|---|
+| unit | before | 51.3 | 120 | not sampled | `f0f551e` checkout, Before table |
+| unit | after | 21.1 | 120 | 3.02 to 3.77 | `check-all.sh --unit` |
+| merge | before | 200.5 | 300 | not sampled | `f0f551e` checkout, Before table |
+| merge | after | 106.2 | 300 | 3.77 to 6.52 | `check-all.sh --merge` |
+| full | before | 204.8 | 540 | not sampled | `f0f551e` checkout, Before table |
+| full | after | 104.5 | 540 | 0.32 to 5.88 | `check-all.sh`, exit 0 (`CHECK-ALL OK (full)`) |
+| browser | before | 52.1 | 300 | not sampled | `pytest tests/browser -m browser -n 0`, serial |
+| browser | after | 19.6 | 300 | 5.41 to 5.71 | `check-all.sh --browser`, 37 passed |
+
+The browser target is 300 s, the merge target, because browser tests run inside the merge level.
+
+The first full run of this stage exited 1: its browser job errored at setup for the `[chrome]` case
+of `tests/browser/test_ui_flow.py::test_component_hover_menu_opens_without_shift_and_changes_state`
+(`Extensions.loadUnpacked` failed). That red time is discarded. The full row above is a rerun on
+the same tree that exited 0, and the `--browser` row is a separate run that passed all 37 tests.

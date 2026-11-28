@@ -13,9 +13,11 @@ import { renderScanResults } from "./scanResults";
 import { renderSummaryPanel } from "./summaryPanel";
 import { renderCourseDetail, renderCourseRegenerate } from "./courseDetail";
 import { renderCourseGenerate } from "./courseGenerate";
+import { renderCoursePage } from "./coursePage";
 import { renderCoursesTab } from "./coursesTab";
 import { renderExamEntry } from "./examEntry";
 import { renderExamProposals } from "./examProposals";
+import { renderExamResult } from "./examResult";
 import { renderIgnoredList } from "./ignoredList";
 import { renderListDelete } from "./listDelete";
 import { renderListDetail } from "./listDetail";
@@ -56,6 +58,7 @@ export interface ScreenArgs {
   "course-generate": { props: Arg<typeof renderCourseGenerate, 1>; ctx: Arg<typeof renderCourseGenerate, 0> };
   "course-detail": { props: Arg<typeof renderCourseDetail, 1>; ctx: Arg<typeof renderCourseDetail, 0> };
   "course-regenerate": { props: Arg<typeof renderCourseRegenerate, 1>; ctx: Arg<typeof renderCourseRegenerate, 0> };
+  "course-page": { props: Arg<typeof renderCoursePage, 0>; ctx: undefined };
   "quiz-run": { props: Arg<typeof renderQuizRun, 0>; ctx: Arg<typeof renderQuizRun, 1> };
   "quiz-end": { props: Arg<typeof renderQuizEnd, 0>; ctx: Arg<typeof renderQuizEnd, 1> };
   "tracks-tab": { props: Arg<typeof renderTracksTab, 0>; ctx: Arg<typeof renderTracksTab, 1> };
@@ -65,6 +68,7 @@ export interface ScreenArgs {
   "source-confirm-tree": { props: Arg<typeof renderSourceConfirm, 0>; ctx: Arg<typeof renderSourceConfirm, 1> };
   "exam-result-entry": { props: Arg<typeof renderExamEntry, 0>; ctx: Arg<typeof renderExamEntry, 1> };
   "exam-result-proposals": { props: Arg<typeof renderExamProposals, 0>; ctx: Arg<typeof renderExamProposals, 1> };
+  "exam-result": { props: Arg<typeof renderExamResult, 0>; ctx: Arg<typeof renderExamResult, 1> };
   "settings-home": { props: undefined; ctx: Arg<typeof renderSettingsHome, 0> };
   "settings-connection": { props: Arg<typeof renderSettingsConnection, 0>; ctx: Arg<typeof renderSettingsConnection, 1> };
   "signout-confirm": { props: Arg<typeof renderSignOutConfirm, 0>; ctx: Arg<typeof renderSignOutConfirm, 1> };
@@ -104,6 +108,7 @@ export const SCREENS: InventoryRegistry = {
   "course-generate": (props, handlers) => renderCourseGenerate(handlers, props),
   "course-detail": (props, handlers) => renderCourseDetail(handlers, props),
   "course-regenerate": (props, handlers) => renderCourseRegenerate(handlers, props),
+  "course-page": (props) => renderCoursePage(props),
   "quiz-run": (props, actions) => renderQuizRun(props, actions),
   "quiz-end": (props, actions) => renderQuizEnd(props, actions),
   "tracks-tab": (props, handlers) => renderTracksTab(props, handlers),
@@ -113,6 +118,7 @@ export const SCREENS: InventoryRegistry = {
   "source-confirm-tree": (props, handlers) => renderSourceConfirm(props, handlers),
   "exam-result-entry": (props, handlers) => renderExamEntry(props, handlers),
   "exam-result-proposals": (props, handlers) => renderExamProposals(props, handlers),
+  "exam-result": (props, handlers) => renderExamResult(props, handlers),
   "settings-home": (_props, handlers) => renderSettingsHome(handlers),
   "settings-connection": (props, handlers) => renderSettingsConnection(props, handlers),
   "signout-confirm": (props, handlers) => renderSignOutConfirm(props, handlers),

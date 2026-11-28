@@ -610,6 +610,17 @@ describe("background tracks, exam results and ignored list wiring", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ url: "https://example.org/q" });
   });
 
+  it("panel:miniQuiz fetches the mini quiz and replies with its questions", async () => {
+    const chrome = fakeChrome();
+    const questions = [{ id: 4, question: "What is SYN?" }];
+    const fetchImpl = coreReply(200, questions);
+    wireBackground(chrome.api, createBackend(chrome.api, signedInArea(), fetchImpl as unknown as typeof fetch));
+    expect(await chrome.send({ type: "panel:miniQuiz" })).toEqual({ ok: true, data: questions });
+    const [url, init] = sentTo(fetchImpl);
+    expect(String(url)).toBe("http://127.0.0.1:8080/quiz/mini");
+    expect(init?.method ?? "GET").toBe("GET");
+  });
+
   it("importExamResult posts the raw payload and replies with the stored result", async () => {
     const chrome = fakeChrome();
     const result = { id: 2, origin: "exam", taken_at: "", passed: null, score: null, status: "pending", concepts: [] };

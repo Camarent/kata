@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from browser.conftest import EXTENSION_DIST, FIREFOX_EXTENSION_UUID
+from browser.conftest import CHROME_LOADED_PATH_ENV, EXTENSION_DIST, FIREFOX_EXTENSION_UUID
 
 PANEL_PATH = "/sidepanel.html"
 # The sign-in form is the panel's first view with no session (extension/src/sidepanel.ts:63).
@@ -25,7 +26,8 @@ def _chrome_extension_id(path: Path) -> str:
 def panel_url(browser_name: str) -> str:
     if browser_name == "firefox":
         return f"moz-extension://{FIREFOX_EXTENSION_UUID}{PANEL_PATH}"
-    return f"chrome-extension://{_chrome_extension_id(EXTENSION_DIST / 'chrome')}{PANEL_PATH}"
+    loaded = Path(os.environ.get(CHROME_LOADED_PATH_ENV) or EXTENSION_DIST / "chrome")
+    return f"chrome-extension://{_chrome_extension_id(loaded)}{PANEL_PATH}"
 
 
 def open_panel(driver: Any, browser_name: str) -> None:

@@ -12,6 +12,7 @@ const course: CourseSummary = {
   title: "Linear algebra",
   status: "ready",
   concept_ids: [1, 2],
+  version: 2,
   error: null,
   created_at: "2026-11-01T10:00:00Z",
   updated_at: "2026-11-02T10:00:00Z",
@@ -77,9 +78,14 @@ describe("courses tab, one test per inventory state", () => {
     const h = handlers();
     root.append(renderCoursesTab(h, { courses: [course], loadFailed: false, serverDown: false, onGenerate: vi.fn() }));
     expect(textsOf(root, "h2")).toEqual([TEXT_COURSES_TAB[0]]);
-    expect(textsOf(root, "li span")).toEqual(["Linear algebra"]);
+    expect(textsOf(root, "li span")).toEqual(["Linear algebra", "Version 2"]);
     buttonNamed(root, TEXT_COURSES_TAB[5]).click();
     expect(h.onOpenCourse).toHaveBeenCalledWith(7);
+  });
+
+  it("shows the course version from the course, not a constant", () => {
+    root.append(renderCoursesTab(handlers(), { courses: [{ ...course, version: 3 }], loadFailed: false, serverDown: false, onGenerate: vi.fn() }));
+    expect(textsOf(root, "li span")).toEqual(["Linear algebra", "Version 3"]);
   });
 
   it("shows the empty text when there are no courses", () => {
@@ -253,6 +259,12 @@ describe("course preview and regenerate, one test per inventory state", () => {
     root.append(renderCourseDetail(h, { course, loadFailed: false, onBack, onRegenerate }));
     expect(textsOf(root, "h2")).toEqual([TEXT_COURSE_DETAIL[0]]);
     expect(textsOf(root, "h3")).toEqual(["Linear algebra"]);
+    expect(textsOf(root, "p.course-version")).toEqual(["Version 2"]);
+    root.replaceChildren();
+    root.append(renderCourseDetail(h, { course: { ...course, version: 3 }, loadFailed: false, onBack, onRegenerate }));
+    expect(textsOf(root, "p.course-version")).toEqual(["Version 3"]);
+    root.replaceChildren();
+    root.append(renderCourseDetail(h, { course, loadFailed: false, onBack, onRegenerate }));
     buttonNamed(root, TEXT_COURSE_DETAIL[3]).click();
     expect(h.onOpenCourse).toHaveBeenCalledWith(7);
     buttonNamed(root, TEXT_COURSE_DETAIL[4]).click();

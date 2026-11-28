@@ -23,6 +23,7 @@ import type {
   IgnoredConcept,
   Joke,
   JokeSource,
+  NamedList,
   SummaryReply,
 } from "./coreClientTypes";
 import {
@@ -70,6 +71,7 @@ export type {
   IgnoredConcept,
   Joke,
   JokeSource,
+  NamedList,
   SummaryReply,
 } from "./coreClientTypes";
 
@@ -401,6 +403,11 @@ export class CoreClient {
     await this.request("PUT", `/concepts/${conceptId}/ignore`);
   }
 
+  /** Hard-delete a concept the caller owns, with its marks and aliases (`DELETE /concepts/{id}`). */
+  async deleteConcept(conceptId: number): Promise<void> {
+    await this.request("DELETE", `/concepts/${conceptId}`);
+  }
+
   /** Show an ignored concept in the caller's lists again (`DELETE /concepts/{id}/ignore`). */
   async unignoreConcept(conceptId: number): Promise<void> {
     await this.request("DELETE", `/concepts/${conceptId}/ignore`);
@@ -414,6 +421,19 @@ export class CoreClient {
   /** Add a private alias to a concept (`POST /concepts/{id}/aliases`). Throws CoreHttpError 409 when it exists. */
   addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias> {
     return this.request<ConceptAlias>("POST", `/concepts/${conceptId}/aliases`, { alias });
+  }
+
+  /** The caller's named lists in name order (`GET /v1/lists`). */
+  listNamedLists(): Promise<NamedList[]> {
+    return this.request<NamedList[]>("GET", "/v1/lists");
+  }
+
+  /** Adds concepts to one list (`POST /v1/lists/{id}/concepts`); returns how many were added. */
+  async addConceptsToList(listId: number, conceptIds: number[]): Promise<number> {
+    const reply = await this.request<{ added: number }>("POST", `/v1/lists/${listId}/concepts`, {
+      concept_ids: conceptIds,
+    });
+    return reply.added;
   }
 
   /** Summary of a page: the cached one (200) or a queued job id (202) (`POST /summary`). */

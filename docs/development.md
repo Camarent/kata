@@ -65,17 +65,19 @@ The test tiers are markers in `pyproject.toml`:
 Which `scripts/dev/check-all.sh` flag runs which tier:
 
 - no flag (full): ruff, mypy, smoke, pytest `-m 'not flaky and not browser'` with coverage,
-  extension build and tests, then editor build and tests, then the jscpd report. The closest local run to CI, plus the extras.
+  extension build, then pytest, extension tests, editor tests and browser tests as concurrent jobs, then the jscpd report. The closest local run to CI, plus the extras.
 - `--unit`: ruff, mypy, pytest without the `integration`, `e2e`, `smoke` and `browser` tiers.
 - `--py`: ruff, mypy, pytest with every test except `browser`, `flaky` included.
-- `--merge`: pytest `-m 'not e2e and not browser'` with coverage, then the extension and editor build and tests.
+- `--merge`: extension build, then pytest `-m 'not e2e and not browser'` with coverage, extension and editor tests and browser tests as concurrent jobs.
 - `--ext`: extension build and tests, then editor build and tests.
 - `--editor`: editor build and tests only.
 - `--browser`: the `browser` tier only, through selenium. It needs `scripts/dev/install-browsers.sh`;
-  without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md` (a11y, contrast and layout checks; the layout test probes the page body, no `.panel` host).
+  without it the step prints a skip line and exits 0. See "Browser tests" in `docs/e2e.md` (a11y, contrast and layout checks; the layout test probes the page body, no `.panel` host). The tier runs under pytest-xdist: `-n auto`, at most 4 workers (`BROWSER_MAX_WORKERS`).
 
 `tools/gates.json` lists the same gates as the full chain (ruff, mypy, smoke, pytest with
 `-m 'not flaky'`, extension build, extension test), each as a plain command. On a clean clone, run `scripts/dev/check-all.sh`.
+
+In the merge and full modes each job logs to its own file under the run's temp dir: a red job's log is printed and the run ends with `CHECK-ALL FAILED at <job>`; a green job prints only its `check-all:` notice lines, such as the browser skip line.
 
 ## JS audit rows
 
@@ -95,10 +97,12 @@ extension's typescript 7). Each check goes through `extension/tools-js/baseline-
 - Baseline files take one entry per line. Lines starting with `#` are comments and are ignored.
 - madge baseline: zero cycles. The 6 cycles found without `skipTypeImports` are all closed by
   type-only imports.
-- knip baseline: 9 unmounted modules under `src/ui/overlay/` and `src/ui/panel/`, kept pending an
-  owner decision. Remove a line when its module is mounted or deleted.
+- knip baseline: 1 unmounted module, `src/ui/panel/examRun.ts`, kept pending an owner decision. The
+  other unmounted modules were mounted and their lines removed. Remove a line when its module is
+  mounted or deleted.
 - `tests/foundation/test_js_audit_baselines.py` checks that `check-all.sh` names both gates, that
-  every knip entry is an existing file, and that the madge baseline is empty with `skipTypeImports` on.
+  the knip baseline lists exactly one entry and that it is an existing file, and that the madge
+  baseline is empty with `skipTypeImports` on.
 
 ## Coverage baseline
 
@@ -149,6 +153,8 @@ scripts/dev/check-all.sh --browser
 ```
 
 The install goes to `$HOME/.cache/kata-browsers` (or `$KATA_BROWSERS_DIR`) with sha256 checks; `scripts/dev/install-browsers.sh --status` checks it. Without the install, `--browser` skips with a message. Build the extension first (`npm run build` in `extension/`). Details and skip behaviour: `docs/e2e.md`, "Browser tests".
+
+Rule: every mounted screen or overlay has a `tests/browser` test that does the real user action (a click, a hover, a key press), not only a render check. Browser tests run at the merge and full levels in parallel with the other jobs (`--merge` and the full run start them as concurrent jobs), so a screen with no browser test is a gap in both.
 
 ## Postgres for tests
 

@@ -71,12 +71,16 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:addDecisionPoint": (backend, message) =>
     refusable(() => backend.addDecisionPoint(message.trackId, message.input)),
   "panel:addQuizSource": (backend, message) => refusable(() => backend.addQuizSource(message.url)),
+  "panel:miniQuiz": (backend) => refusable(() => backend.miniQuiz()),
   "panel:importExamResult": (backend, message) => refusable(() => backend.importExamResult(message.payload)),
   "panel:confirmExamResult": (backend, message) =>
     refusable(() => backend.confirmExamResult(message.resultId, message.conceptIds)),
   "panel:dismissExamResult": (backend, message) => refusable(() => backend.dismissExamResult(message.resultId)),
   "panel:ignored": (backend) => refusable(() => backend.ignored()),
   "panel:ignoreConcept": (backend, message) => refusable(() => backend.ignoreConcept(message.conceptId)),
+  // Image concepts need a vision model (D33, D16), not built: the image menu has no concepts to act on yet.
+  "panel:imageAction": async () => ({ ok: false, error: "image concepts are not available yet" }),
+  "panel:deleteConcept": (backend, message) => refusable(() => backend.deleteConcept(message.conceptId)),
   "panel:unignoreConcept": (backend, message) => refusable(() => backend.unignoreConcept(message.conceptId)),
   "panel:markConceptViewed": (backend, message) => refusable(() => backend.markConceptViewed(message.conceptId)),
   "panel:listConceptAliases": (backend, message) => refusable(() => backend.listConceptAliases(message.conceptId)),
@@ -86,6 +90,8 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:cachedSummary": (backend, message) => refusable(() => backend.cachedSummary(message.url, message.textSha256)),
   "panel:nextJoke": (backend) => refusable(() => backend.nextJoke()),
   "panel:listJokeSources": (backend) => refusable(() => backend.listJokeSources()),
+  "panel:lists": (backend) => refusable(() => backend.listNamedLists()),
+  "panel:addToList": (backend, message) => refusable(() => backend.addToList(message.listName, message.conceptIds)),
 };
 
 /** Routes one panel message to the backend and returns its reply. */

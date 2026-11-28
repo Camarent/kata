@@ -2,8 +2,9 @@ import { originOf, syncBridge } from "./bridgeRegister";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark, type TopicOverview } from "./coreClient";
 import * as trackApi from "./coreClientTracks";
-import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
+import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, MiniQuestion, NamedList, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
+import type { HighlightResult } from "./highlight";
 import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
 import { OfflineQueue, type FlushResult, type MarkOutcome } from "./offlineQueue";
 import { createProgressBridge, type ProgressBridge } from "./progressBridge";
@@ -65,6 +66,8 @@ export interface Backend {
   addDecisionPoint(trackId: number, input: PointIn): Promise<DecisionPoint>;
   /** Queues a quiz source from a URL; returns the job id. */
   addQuizSource(url: string): Promise<number>;
+  /** Up to five cached mini quiz questions for the section quiz pin. */
+  miniQuiz(): Promise<MiniQuestion[]>;
   /** Stores an exam result JSON as pending; changes no mark. */
   importExamResult(payload: string): Promise<ExamResult>;
   confirmExamResult(resultId: number, conceptIds: number[]): Promise<ExamResult>;
@@ -72,6 +75,8 @@ export interface Backend {
   /** Concepts the caller ignores, for the ignored list. */
   ignored(): Promise<IgnoredConcept[]>;
   ignoreConcept(conceptId: number): Promise<void>;
+  /** Hard-delete a concept of the caller, from the block menu. */
+  deleteConcept(conceptId: number): Promise<void>;
   unignoreConcept(conceptId: number): Promise<void>;
   /** Stamps the last-viewed time of a concept. */
   markConceptViewed(conceptId: number): Promise<void>;
@@ -79,6 +84,10 @@ export interface Backend {
   listConceptAliases(conceptId: number): Promise<ConceptAlias[]>;
   /** Adds a private alias to a concept; refuses an alias that exists. */
   addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias>;
+  /** The caller's named lists, for the list picker. */
+  listNamedLists(): Promise<NamedList[]>;
+  /** Adds concepts to the list called `listName`; returns how many were added. */
+  addToList(listName: string, conceptIds: number[]): Promise<number>;
   /** Summary of a page: the cached one or a queued job id. */
   requestSummary(url: string, text: string): Promise<SummaryReply>;
   /** The cached summary of a page text, or null when none is cached. */
@@ -101,6 +110,15 @@ const MODELHOST_QUEUE: Record<"start" | "measure" | "status", (client: CoreClien
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Highlight results of a concept scan for the content script. The scan has no per-block topic
+ * answer, so every block gets the scanned topic and is shown as new (`known: false`).
+ */
+function highlightsOf(result: ConceptScanResult): HighlightResult[] {
+  const topic = { id: result.topicId, category: result.area, label: result.topic };
+  return result.blocks.map((block) => ({ blockId: block.blockId, topic, known: false, concepts: block.concepts }));
+}
 
 /** Builds the backend over the chrome tabs API and the extension storage area. */
 export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: typeof fetch): Backend {
@@ -157,6 +175,8 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const result = await scanner.scanPage(session, tab.id, pageKey);
       if (!("error" in result)) {
         scanner.startRescan(tab.id, pageKey, result);
+        // The page shows the scan: its words get highlights and hover menus.
+        api.tabs.sendMessage(tab.id, { type: "highlight", results: highlightsOf(result) }).catch(() => undefined);
       }
       return result;
     },
@@ -245,7 +265,7 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       const session = await requireSession();
       const list = await clientFor(session).listCoursesMeta();
       return {
-        items: list.items.map((course) => ({ id: course.id, title: course.title })),
+        items: list.items.map((course) => ({ id: course.id, title: course.title, version: course.version })),
         limit: list.limit,
         total: list.total,
       };
@@ -306,6 +326,10 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       return trackApi.addQuizSource(clientFor(await requireSession()), url);
     },
 
+    async miniQuiz() {
+      return trackApi.miniQuiz(clientFor(await requireSession()));
+    },
+
     async importExamResult(payload) {
       return trackApi.importExamResult(clientFor(await requireSession()), payload);
     },
@@ -326,6 +350,10 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
       await clientFor(await requireSession()).ignoreConcept(conceptId);
     },
 
+    async deleteConcept(conceptId) {
+      await clientFor(await requireSession()).deleteConcept(conceptId);
+    },
+
     async unignoreConcept(conceptId) {
       await clientFor(await requireSession()).unignoreConcept(conceptId);
     },
@@ -340,6 +368,17 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
 
     async addConceptAlias(conceptId, alias) {
       return clientFor(await requireSession()).addConceptAlias(conceptId, alias);
+    },
+
+    async listNamedLists() {
+      return clientFor(await requireSession()).listNamedLists();
+    },
+
+    async addToList(listName, conceptIds) {
+      const client = clientFor(await requireSession());
+      const list = (await client.listNamedLists()).find((named) => named.name === listName);
+      if (list === undefined) throw new Error(`no list named ${listName}`);
+      return client.addConceptsToList(list.id, conceptIds);
     },
 
     async requestSummary(url, text) {

@@ -52,6 +52,13 @@ describe("block menu", () => {
     expect(statusText(menu)).toBe("");
   });
 
+  it("hides the bulk buttons until onBulk is wired", () => {
+    const menu = renderBlockMenu(document, "ready", {});
+    expect(menu.querySelector(".menu-list")).toBeNull();
+    expect(menu.querySelectorAll("button")).toHaveLength(0);
+    expect(menu.querySelector("h2")?.textContent).toBe(TEXT_BLOCK_MENU[5]);
+  });
+
   it("shows the empty, error and offline line and disables buttons while loading", () => {
     expect(statusText(renderBlockMenu(document, "empty", { onBulk: vi.fn() }))).toBe(TEXT_REVIEW[19]);
     expect(statusText(renderBlockMenu(document, "error", { onBulk: vi.fn() }))).toBe(TEXT_REVIEW[20]);
@@ -129,6 +136,12 @@ describe("list picker", () => {
     expect(buttonLabels(card)).toEqual([TEXT_LIST_PICKER[3], TEXT_LIST_PICKER[5]]);
     expect(card.querySelector<HTMLButtonElement>(".list-picker-new")?.disabled).toBe(true);
     expect(statusText(card)).toBe("");
+  });
+
+  it("hides New list when no onNew is wired, keeping the picks and Cancel", () => {
+    const card = renderListPicker(document, "ready", lists, { onPick: vi.fn(), onCancel: vi.fn() });
+    expect(buttonLabels(card)).toEqual([...lists, TEXT_LIST_PICKER[5]]);
+    expect(card.querySelector(".list-picker-new")).toBeNull();
   });
 
   it("buttons call onPick, onNew and onCancel", () => {
