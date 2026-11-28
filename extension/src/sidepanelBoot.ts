@@ -15,12 +15,13 @@ import type {
 } from "./coreClientTypes";
 import type { MarkOutcome } from "./offlineQueue";
 import { validateServerUrl } from "./serverUrl";
-import { ignoredClientHandlers, type IgnoredClient, type IgnoredRowView } from "./ui/panel/ignoredList";
+import { ignoredClientHandlers } from "./ui/panel/ignoredList";
+import { ignoredClient, openIgnoredPage, refreshIgnored } from "./sidepanelIgnored";
 import type { SettingsPage } from "./ui/panel/settingsHome";
 import type { TrackSortKey } from "./ui/panel/tracksTab";
 import { PANEL_CSS } from "./ui/panelCss";
 import type { Session } from "./types";
-import { loadTrackList, sortTrackRows, trackCreateHandlers } from "./sidepanelTracks";
+import { loadTrackList, sortTrackRows, trackCreateHandlers, trackScreenNav } from "./sidepanelTracks";
 import { closeCourse } from "./sidepanelCourse";
 
 /** Origin permission request or removal: the host pattern `<origin>/*`. */
@@ -104,50 +105,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
   /** Tracks for the Tracks tab from the panel:tracks reply; a refused list shows the could-not-load state. */
   const loadTracks = (): Promise<void> => loadTrackList(state, send, draw);
 
-  /** Ignored concepts for the ignored list page, from the panel:ignored reply. */
-  const loadIgnored = async (): Promise<void> => {
-    const list = await send<IgnoredConcept[]>({ type: "panel:ignored" });
-    state.ignored = list.map((concept): IgnoredRowView => ({ conceptId: concept.concept_id, label: concept.label }));
-  };
-
-  /** The two ignored calls the ignored list makes, each as one panel message. */
-  const ignoredClient: IgnoredClient = {
-    ignoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
-    unignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
-  };
-
-  /** After Restore or Undo the ignored list page reloads its rows from the core. */
-  const refreshIgnored = async (): Promise<void> => {
-    await loadIgnored();
-    draw();
-  };
-
-  /** Back from a track screen to the Tracks list. */
-  const backFromTrack = (): void => {
-    state.trackScreen = null;
-    draw();
-  };
-
-  /** Track the detail, add-source or quiz screen belongs to; undefined when no such screen is open. */
-  const shownTrackId = (): number | undefined => {
-    const screen = state.trackScreen;
-    return screen === undefined || screen === null || screen.kind === "create" ? undefined : screen.trackId;
-  };
-
-  /** Opens the add-source or quiz screen for the track the detail shows. */
-  const openFromDetail = (kind: "source-add" | "quiz"): void => {
-    const trackId = shownTrackId();
-    if (trackId === undefined) return;
-    state.trackScreen = { kind, trackId };
-    draw();
-  };
-
-  /** Back from the add-source or quiz screen to the detail of the same track. */
-  const backToDetail = (): void => {
-    const trackId = shownTrackId();
-    state.trackScreen = trackId === undefined ? null : { kind: "detail", trackId };
-    draw();
-  };
+  const { backFromTrack, openFromDetail, backToDetail } = trackScreenNav(state, draw);
 
   /** Back from the ignored list page to the settings home. */
   const backToSettings = (): void => {
@@ -268,14 +226,7 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     async onOpenSettingsPage(page: SettingsPage) {
       // Only the ignored list page has a screen so far; the other settings pages keep the home.
       if (page !== "ignored") return;
-      try {
-        await loadIgnored();
-      } catch {
-        // The list did not load: the settings home stays drawn.
-        return;
-      }
-      state.settingsPage = "ignored";
-      draw();
+      await openIgnoredPage(state, send, draw);
     },
 
     onOpenExamEntry() {
@@ -409,7 +360,11 @@ export async function bootPanel(root: HTMLElement, api: PanelChromeLike): Promis
     onLoadIgnored: () => send<IgnoredConcept[]>({ type: "panel:ignored" }),
     onIgnoreConcept: (conceptId) => send<void>({ type: "panel:ignoreConcept", conceptId }),
     onUnignoreConcept: (conceptId) => send<void>({ type: "panel:unignoreConcept", conceptId }),
-    ignoredList: ignoredClientHandlers(ignoredClient, refreshIgnored, backToSettings),
+    ignoredList: ignoredClientHandlers(
+      ignoredClient(send),
+      () => refreshIgnored(state, send, draw),
+      backToSettings,
+    ),
     trackDetail: {
       onBack: backFromTrack,
       onAddSource: () => openFromDetail("source-add"),

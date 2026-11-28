@@ -56,6 +56,35 @@ export async function loadTrackList(
   draw();
 }
 
+/** Steps between the track screens: back to the list, open add-source or quiz from the detail, back to the detail. */
+export function trackScreenNav(
+  state: PanelState,
+  draw: () => void,
+): { backFromTrack: () => void; openFromDetail: (kind: "source-add" | "quiz") => void; backToDetail: () => void } {
+  /** Track the detail, add-source or quiz screen belongs to; undefined when no such screen is open. */
+  const shownTrackId = (): number | undefined => {
+    const screen = state.trackScreen;
+    return screen === undefined || screen === null || screen.kind === "create" ? undefined : screen.trackId;
+  };
+  return {
+    backFromTrack: () => {
+      state.trackScreen = null;
+      draw();
+    },
+    openFromDetail: (kind) => {
+      const trackId = shownTrackId();
+      if (trackId === undefined) return;
+      state.trackScreen = { kind, trackId };
+      draw();
+    },
+    backToDetail: () => {
+      const trackId = shownTrackId();
+      state.trackScreen = trackId === undefined ? null : { kind: "detail", trackId };
+      draw();
+    },
+  };
+}
+
 /** What the create-track form needs from the panel: its state, the panel message sender, the list reload and the back step. */
 export interface TrackCreateDeps {
   state: PanelState;

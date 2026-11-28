@@ -36,7 +36,7 @@ Open:
   menu action is a dead end. Errors are swallowed at `extension/src/overlayHost.ts:129`, `:211` and `:249`.
 - Block menu: bulk buttons are unwired (`extension/src/overlayHost.ts:116`) and New list is hidden (`extension/src/overlayHost.ts:93`).
 - No-op handlers (do nothing when called): `onPasteText`, `onChooseFile`, `onUsePage`, `onUseCourse`,
-  `onAddSource` (`extension/src/sidepanelBoot.ts:420-424`), `onNext` (`extension/src/sidepanelBoot.ts:429`), and `onGenerate` (`extension/src/sidepanel.ts:295`).
+  `onAddSource` (`sourceAdd` handlers in `extension/src/sidepanelBoot.ts`), `onNext` (`quizRun` handlers in `extension/src/sidepanelBoot.ts`), and `onGenerate` (`extension/src/sidepanel.ts:295`).
 
 ## Later
 
