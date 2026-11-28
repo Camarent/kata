@@ -115,6 +115,34 @@ def test_decisions_guided_screen_out_of_milestone_0():
     assert "## Guided screen is out of Milestone 0" in text
 
 
+EXAM_MODE_HEADINGS = (
+    "## Exam mode: no question text stored",
+    "## Exam mode: routing and cloud policy follow today's flags",
+    "## Exam mode: no site rule",
+    "## Exam mode: ends by button or idle timeout",
+    "## Exam mode: pin dot is the only marker",
+    "## Exam mode: owner picks topics by hand",
+    "## Exam mode: weak points are proposed, then confirmed",
+    "## Exam mode: D-A analysis lane",
+    "## Exam mode: D-B task class exam_analyse is local only",
+    "## Exam mode: D-C settings in section exam_mode",
+    "## Exam mode: D-D tables",
+    "## Exam mode: D-E outcome without answer key",
+    "## Exam mode: D-F lazy idle end",
+    "## Exam mode: D-G mode flag and gate",
+    "## Exam mode: D-H capture and extension queue",
+    "## Exam mode: D-I proposals",
+    "## Exam mode: D-J strings owner step",
+    "## Exam mode: D-K leak tests",
+)
+
+
+def test_decisions_record_exam_mode_decisions():
+    lines = DECISIONS.read_text(encoding="utf-8").splitlines()
+    for heading in EXAM_MODE_HEADINGS:
+        assert heading in lines, f"docs/decisions.md lacks {heading!r}"
+
+
 def test_no_personal_or_provider_names_in_docs():
     for path in (README, DECISIONS):
         text = path.read_text(encoding="utf-8")

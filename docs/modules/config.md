@@ -36,7 +36,7 @@ Load `config/kata.example.toml`-shaped TOML into a frozen `Config`. Every tunabl
 - Env override keys cast to the type of the TOML template value; a bad cast raises `ConfigError`.
 - Database password is never in the file: `[database] password_env` names the env var that holds it.
 - Missing key raises `ConfigError` naming the key; no silent defaults.
-- Adding a key: add it to the example file and to the settings table in `docs/configuration.md` (checked by `tests/foundation/test_docs.py`).
+- Adding a key: add it to the example file and to the settings table in `docs/configuration.md` (checked by `tests/foundation/test_docs.py`; that file also pins the decision headings in `docs/decisions.md`, not the config keys).
 
 ## Depends on / used by
 - Depends on: stdlib `tomllib`.

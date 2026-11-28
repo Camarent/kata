@@ -17,7 +17,7 @@ Baseline gate timings (before the speed-up) are in `docs/testing.md`.
 - `tests/e2e/conftest.py:66` `live_core` (core on uvicorn, 127.0.0.1, scratch DB), `:93` `enrolled`, `:119` `issue_code`, `:132` `fake_model`, `:143` `running_worker`, `:175` `driver_js` (esbuild bundle of `tests/e2e/driver.ts`), `:203` `run_driver`.
 - `tests/e2e/test_lesson_round_trip.py:34` `test_lesson_round_trip` - scan, tag, "I know this", read back on a second device.
 - `tests/foundation/test_gates.py:18` `load_gates` - reads `tools/gates.json`; `test_no_cmd_runs_through_qrun` (`:45`) asserts no `cmd` runs through the qrun wrapper.
-- `tests/foundation/test_docs.py` - README config table covers every example key; decisions text; no personal or provider names in docs.
+- `tests/foundation/test_docs.py` - README config table covers every example key; decisions text (including the `## Exam mode: ` headings in `docs/decisions.md`, asserted by `test_decisions_record_exam_mode_decisions`); no personal or provider names in docs.
 
 ## Key files
 - `tests/core/conftest.py` - DB fixtures and leak guard.
