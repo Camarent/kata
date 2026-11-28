@@ -20,11 +20,13 @@ JSON_TYPE = "application/json"
 SHUTDOWN_JOIN_SECONDS = 10
 
 
-def _handler_for(routes: Mapping[str, Any], received: list[str] | None) -> type[BaseHTTPRequestHandler]:
+def _handler_for(
+    routes: Mapping[str, Any], received: list[str] | None, bodies: list[str] | None = None
+) -> type[BaseHTTPRequestHandler]:
     """A request handler class that answers each routed path with its JSON body.
 
     When `received` is given, every request is appended to it as "METHOD /path" so a test can assert
-    that the extension sent it.
+    that the extension sent it. `bodies` gets the raw request body of each request, in the same order.
     """
 
     class _StubHandler(BaseHTTPRequestHandler):
@@ -42,6 +44,10 @@ def _handler_for(routes: Mapping[str, Any], received: list[str] | None) -> type[
 
         def _answer(self) -> None:
             path = self.path.split("?", 1)[0]
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length).decode("utf-8") if length else ""
+            if bodies is not None:
+                bodies.append(raw)
             if received is not None:
                 received.append(f"{self.command} {path}")
             if path not in routes:
@@ -63,12 +69,15 @@ def _handler_for(routes: Mapping[str, Any], received: list[str] | None) -> type[
 
 
 @contextmanager
-def stub_core(routes: Mapping[str, Any], received: list[str] | None = None) -> Generator[str]:
+def stub_core(
+    routes: Mapping[str, Any], received: list[str] | None = None, bodies: list[str] | None = None
+) -> Generator[str]:
     """Serve routes on 127.0.0.1 port 0 for the duration of the with-block; yield the base URL.
 
-    `received` (optional) collects the "METHOD /path" of every request, see _handler_for.
+    `received` (optional) collects the "METHOD /path" of every request, `bodies` the raw body of each
+    request in the same order, see _handler_for.
     """
-    server = ThreadingHTTPServer((STUB_HOST, 0), _handler_for(routes, received))
+    server = ThreadingHTTPServer((STUB_HOST, 0), _handler_for(routes, received, bodies))
     thread = threading.Thread(target=server.serve_forever, name="stub-core", daemon=True)
     thread.start()
     try:

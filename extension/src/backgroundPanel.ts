@@ -89,6 +89,8 @@ const PANEL_HANDLERS: { [T in PanelMessage["type"]]: PanelHandler<T> } = {
   "panel:cachedSummary": (backend, message) => refusable(() => backend.cachedSummary(message.url, message.textSha256)),
   "panel:nextJoke": (backend) => refusable(() => backend.nextJoke()),
   "panel:listJokeSources": (backend) => refusable(() => backend.listJokeSources()),
+  "panel:lists": (backend) => refusable(() => backend.listNamedLists()),
+  "panel:addToList": (backend, message) => refusable(() => backend.addToList(message.listName, message.conceptIds)),
 };
 
 /** Routes one panel message to the backend and returns its reply. */

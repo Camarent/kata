@@ -138,6 +138,12 @@ describe("list picker", () => {
     expect(statusText(card)).toBe("");
   });
 
+  it("hides New list when no onNew is wired, keeping the picks and Cancel", () => {
+    const card = renderListPicker(document, "ready", lists, { onPick: vi.fn(), onCancel: vi.fn() });
+    expect(buttonLabels(card)).toEqual([...lists, TEXT_LIST_PICKER[5]]);
+    expect(card.querySelector(".list-picker-new")).toBeNull();
+  });
+
   it("buttons call onPick, onNew and onCancel", () => {
     const actions = { onPick: vi.fn(), onNew: vi.fn(), onCancel: vi.fn() };
     const card = renderListPicker(document, "ready", lists, actions);

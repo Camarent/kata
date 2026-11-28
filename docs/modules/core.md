@@ -297,7 +297,7 @@ Invariants:
 
 ### Depends on / used by
 - Depends on: `kata_core.jobs.runner` (`OutputHook`, `load_registry`), `kata_core.jobs.queue` (`Job`).
-- Used by: `core/kata_core/api/routes/jobs.py` (422 on a bad payload); the worker's `kata_worker.modelhost` and handlers; the extension client (`extension/src/coreClient.ts:266-290`); its `deleteConcept` calls `DELETE /concepts/{id}` (the block menu Delete).
+- Used by: `core/kata_core/api/routes/jobs.py` (422 on a bad payload); the worker's `kata_worker.modelhost` and handlers; the extension client (`extension/src/coreClient.ts:266-290`); its `deleteConcept` calls `DELETE /concepts/{id}` (the block menu Delete); the list picker calls `GET /v1/lists` (`listNamedLists`) and `POST /v1/lists/{id}/concepts` (`addConceptsToList`) in the same client.
 
 ## Page scan (M20)
 

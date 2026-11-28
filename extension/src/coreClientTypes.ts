@@ -187,6 +187,13 @@ export interface IgnoredConcept {
   label: string;
 }
 
+/** One named list of the caller (`GET /v1/lists`): its id, its name and how many concepts it holds. */
+export interface NamedList {
+  id: number;
+  name: string;
+  item_count: number;
+}
+
 /** One alias of a concept (`GET`/`POST /concepts/{id}/aliases`); `private` when the caller owns it. */
 export interface ConceptAlias {
   id: number;

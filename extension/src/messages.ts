@@ -126,4 +126,6 @@ export type PanelMessage =
   | { type: "panel:requestSummary"; url: string; text: string }
   | { type: "panel:cachedSummary"; url: string; textSha256: string }
   | { type: "panel:nextJoke" }
-  | { type: "panel:listJokeSources" };
+  | { type: "panel:listJokeSources" }
+  | { type: "panel:lists" }
+  | { type: "panel:addToList"; listName: string; conceptIds: number[] };

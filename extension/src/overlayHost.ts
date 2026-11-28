@@ -3,10 +3,17 @@ import type { HlMenuOptions } from "./ui/overlay/hlMenu";
 import { attachHlHover } from "./ui/overlay/hlMenu";
 import { BLOCK_ATTR } from "./scanner";
 import type { PanelMessage, PanelReply, RuntimeLike } from "./messages";
-import type { ScanConceptItem } from "./coreClientTypes";
-import { type ConceptAction, renderBlockMenu, renderConceptActions, type OverlayState } from "./ui/overlay/blockMenu";
+import type { NamedList, ScanConceptItem } from "./coreClientTypes";
+import {
+  type ConceptAction,
+  menuButton,
+  renderBlockMenu,
+  renderConceptActions,
+  type OverlayState,
+} from "./ui/overlay/blockMenu";
 import { renderImageMenu } from "./ui/overlay/imageMenu";
-import { IMAGE_PIN_MENU_TEXT } from "./ui/strings";
+import { type ListPickerActions, renderListPicker } from "./ui/overlay/listPicker";
+import { BLOCK_MENU_TEXT, IMAGE_PIN_MENU_TEXT } from "./ui/strings";
 
 /** Undo window of the block menu's Delete / Ignore, in milliseconds before the change is sent. */
 const CONCEPT_UNDO_WINDOW_MS = 3000;
@@ -19,10 +26,16 @@ export interface OverlayHost {
   clear(): void;
 }
 
-/** Sends one panel message through the background; throws the background's error when it failed. */
-async function sendPanel(runtime: RuntimeLike, message: PanelMessage): Promise<void> {
+/** Sends one panel message through the background; returns the reply data, throws the background's error when it failed. */
+async function panelData(runtime: RuntimeLike, message: PanelMessage): Promise<unknown> {
   const reply = (await runtime.sendMessage(message)) as PanelReply | undefined;
   if (reply?.ok !== true) throw new Error(reply?.ok === false ? reply.error : "no reply from background");
+  return reply.data;
+}
+
+/** Sends one panel message through the background; throws the background's error when it failed. */
+async function sendPanel(runtime: RuntimeLike, message: PanelMessage): Promise<void> {
+  await panelData(runtime, message);
 }
 
 /** Menu options for one word: the concept actions go to the background as panel messages. */
@@ -64,8 +77,40 @@ function placeBelow(menu: HTMLElement, block: HTMLElement): void {
   menu.style.left = `${rect.left + (view?.scrollX ?? 0)}px`;
 }
 
+/**
+ * Swaps the block menu body for the list picker. The lists load from the background; a pick adds the
+ * block's concepts to that list and closes the menu. Cancel closes the menu; New list is not shown.
+ */
+function openListPicker(
+  doc: Document,
+  runtime: RuntimeLike,
+  menu: HTMLElement,
+  conceptIds: number[],
+  close: () => void,
+): void {
+  // No onNew: the New list button is hidden until list creation exists.
+  const actions: ListPickerActions = {
+    onPick: (listName) => {
+      // A failed add shows the error state of the picker (the lists are not reloaded).
+      panelData(runtime, { type: "panel:addToList", listName, conceptIds }).then(close, () => {
+        menu.replaceChildren(renderListPicker(doc, "error", [], actions));
+      });
+    },
+    onCancel: close,
+  };
+  menu.replaceChildren(renderListPicker(doc, "loading", [], actions));
+  const listsOf = async (): Promise<string[]> => {
+    const lists = (await panelData(runtime, { type: "panel:lists" })) as NamedList[];
+    return lists.map((list) => list.name);
+  };
+  void listsOf().then(
+    (names) => menu.replaceChildren(renderListPicker(doc, names.length > 0 ? "ready" : "empty", names, actions)),
+    () => menu.replaceChildren(renderListPicker(doc, "error", [], actions)),
+  );
+}
+
 /** The block menu: the bulk card, then one row per concept with its Delete / Ignore actions. */
-function blockMenuCard(doc: Document, runtime: RuntimeLike, result: HighlightResult): HTMLElement {
+function blockMenuCard(doc: Document, runtime: RuntimeLike, result: HighlightResult, close: () => void): HTMLElement {
   // Bulk actions are not wired yet, so the card omits the bulk buttons (renderBlockMenu without onBulk).
   const menu = renderBlockMenu(doc, blockState(result), {});
   for (const item of result.concepts ?? []) {
@@ -83,6 +128,14 @@ function blockMenuCard(doc: Document, runtime: RuntimeLike, result: HighlightRes
     };
     row.append(label, renderConceptActions(doc, { windowMs: CONCEPT_UNDO_WINDOW_MS, onCommit }));
     menu.append(row);
+  }
+  // "Add all to list" adds every concept of the block to one list, picked in the list picker.
+  const conceptIds = (result.concepts ?? []).flatMap((item) => (item.conceptId === null ? [] : [item.conceptId]));
+  if (conceptIds.length > 0) {
+    const addAll = menuButton(doc, BLOCK_MENU_TEXT.addAll, "btn block-add-list", () =>
+      openListPicker(doc, runtime, menu, conceptIds, close),
+    );
+    menu.append(addAll);
   }
   return menu;
 }
@@ -105,7 +158,7 @@ function attachBlockMenu(doc: Document, runtime: RuntimeLike, block: HTMLElement
   };
   const open = (): void => {
     if (menu !== null) return;
-    menu = blockMenuCard(doc, runtime, result);
+    menu = blockMenuCard(doc, runtime, result, close);
     menu.addEventListener("mouseleave", leave);
     menu.addEventListener("focusout", leave);
     placeBelow(menu, block);

@@ -90,7 +90,7 @@ interface FloatingUi {
  * page cards beside it. A pin button press opens the main card; after a scan the page is watched
  * and a change shows the page-changed prompt. The hover menus on highlighted words are attached by
  * the overlay host (registerContentScript), and so are the block menu and the image menu. The list
- * picker is not wired on the page yet.
+ * picker opens from the block menu's "Add all to list" button.
  */
 export async function mountFloatingUi(doc: Document, storage: StorageArea, runtime: CardRuntime): Promise<FloatingUi> {
   const style = doc.createElement("style");

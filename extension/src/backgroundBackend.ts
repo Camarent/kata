@@ -2,7 +2,7 @@ import { originOf, syncBridge } from "./bridgeRegister";
 import { MAX_WAIT_MS, POLL_MS, REQUEST_TIMEOUT_MS } from "./config";
 import { CoreAuthError, CoreClient, type ConceptMark, type TopicOverview } from "./coreClient";
 import * as trackApi from "./coreClientTracks";
-import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
+import type { DecisionPoint, ExamResult, ConceptAlias, IgnoredConcept, Joke, JokeSource, NamedList, PointIn, SummaryReply, Track, TrackIn, TrackPage, TrackPatch } from "./coreClientTypes";
 import type { ConceptScanError, ConceptScanResult } from "./conceptScan";
 import type { HighlightResult } from "./highlight";
 import { createConceptScanner, pageKeyOf } from "./backgroundRescan";
@@ -82,6 +82,10 @@ export interface Backend {
   listConceptAliases(conceptId: number): Promise<ConceptAlias[]>;
   /** Adds a private alias to a concept; refuses an alias that exists. */
   addConceptAlias(conceptId: number, alias: string): Promise<ConceptAlias>;
+  /** The caller's named lists, for the list picker. */
+  listNamedLists(): Promise<NamedList[]>;
+  /** Adds concepts to the list called `listName`; returns how many were added. */
+  addToList(listName: string, conceptIds: number[]): Promise<number>;
   /** Summary of a page: the cached one or a queued job id. */
   requestSummary(url: string, text: string): Promise<SummaryReply>;
   /** The cached summary of a page text, or null when none is cached. */
@@ -358,6 +362,17 @@ export function createBackend(api: ChromeLike, area: StorageArea, fetchImpl?: ty
 
     async addConceptAlias(conceptId, alias) {
       return clientFor(await requireSession()).addConceptAlias(conceptId, alias);
+    },
+
+    async listNamedLists() {
+      return clientFor(await requireSession()).listNamedLists();
+    },
+
+    async addToList(listName, conceptIds) {
+      const client = clientFor(await requireSession());
+      const list = (await client.listNamedLists()).find((named) => named.name === listName);
+      if (list === undefined) throw new Error(`no list named ${listName}`);
+      return client.addConceptsToList(list.id, conceptIds);
     },
 
     async requestSummary(url, text) {
